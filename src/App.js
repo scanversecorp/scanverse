@@ -2830,7 +2830,7 @@ export default function App() {
         }
 
         // Seed demo data if DB is empty
-        await Promise.race([seedDatabase(), new Promise(r=>setTimeout(r,3000))]);
+        // seedDatabase() skipped
 
         // Restore Supabase session
         const session = await Auth.getSession();
