@@ -40,6 +40,8 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 ────────────────────────────────────────────────────────────────────── */
 
 
+const SUPABASE_URL      = "https://fpdljyncyaedrzqqeguy.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwZGxqeW5jeWFlZHJ6cXFlZ3V5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTU2MTYsImV4cCI6MjEwMTQ5MTYxNn0.dZNJSV9G4Sh-MmA_X86MoIe5rrydF3vWZ7CU_WcvX4U";
 const RAZORPAY_URL   = process.env.REACT_APP_RAZORPAY_URL || "https://rzp.io/rzp/QEuXj4E";
 const PLATFORM_FEE   = 0.10;
 const GST_RATE       = 0.18;
