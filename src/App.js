@@ -38,9 +38,9 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
    checks for it first, so the app degrades gracefully outside CRA
    instead of crashing on load.
 ────────────────────────────────────────────────────────────────────── */
-const ENV = (typeof process !== "undefined" && process.env) ? process.env : {};
 
-const RAZORPAY_URL   = ENV.REACT_APP_RAZORPAY_URL || "https://rzp.io/rzp/QEuXj4E";
+
+const RAZORPAY_URL   = process.env.REACT_APP_RAZORPAY_URL || "https://rzp.io/rzp/QEuXj4E";
 const PLATFORM_FEE   = 0.10;
 const GST_RATE       = 0.18;
 const TOKEN_KEY      = "sv_auth_token"; // kept for compatibility
@@ -60,8 +60,8 @@ const SESSION_HOURS  = 168;
      REACT_APP_UPI_PN            = Your Business Name
    All REACT_APP_* vars are baked in at build time — safe to expose.
 ────────────────────────────────────────────────────────────────────── */
-const SUPABASE_URL      = ENV.REACT_APP_SUPABASE_URL;      // set REACT_APP_SUPABASE_URL in .env
-const SUPABASE_ANON_KEY = ENV.REACT_APP_SUPABASE_ANON_KEY; // set REACT_APP_SUPABASE_ANON_KEY in .env
+const SUPABASE_URL      = process.env.REACT_APP_SUPABASE_URL;      // set REACT_APP_SUPABASE_URL in .env
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY; // set REACT_APP_SUPABASE_ANON_KEY in .env
 
 /* ── Tiny inline Supabase REST client (no npm needed) ─────────────────
    Wraps Supabase REST + Auth APIs so we need zero external dependencies.
@@ -748,8 +748,8 @@ function TopBar({ title, subtitle }) {
        UPI_PA  → your Razorpay UPI VPA (Settings → UPI in dashboard)
        UPI_PN  → your registered business name (must match exactly)
 ═══════════════════════════════════════════════════════════════ */
-const UPI_PA = ENV.REACT_APP_UPI_PA || "dcoreglobalcorp@razorpay"; // ← set in .env
-const UPI_PN = ENV.REACT_APP_UPI_PN || "DCORE Global Corporation"; // ← set in .env
+const UPI_PA = process.env.REACT_APP_UPI_PA || "dcoreglobalcorp@razorpay"; // ← set in .env
+const UPI_PN = process.env.REACT_APP_UPI_PN || "DCORE Global Corporation"; // ← set in .env
 
 /* Builds the NPCI-standard UPI deep-link URI.
    Encoding it as a QR code lets ANY UPI app scan it:
