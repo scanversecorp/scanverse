@@ -60,8 +60,8 @@ const SESSION_HOURS  = 168;
      REACT_APP_UPI_PN            = Your Business Name
    All REACT_APP_* vars are baked in at build time — safe to expose.
 ────────────────────────────────────────────────────────────────────── */
-const SUPABASE_URL      = process.env.REACT_APP_SUPABASE_URL;      // set REACT_APP_SUPABASE_URL in .env
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY; // set REACT_APP_SUPABASE_ANON_KEY in .env
+const SUPABASE_URL      = "https://fpdljyncyaedrzqqeguy.supabase.co";      // set REACT_APP_SUPABASE_URL in .env
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwZGxqeW5jeWFlZHJ6cXFlZ3V5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTU2MTYsImV4cCI6MjEwMTQ5MTYxNn0.dZNJSV9G4Sh-MmA_X86MoIe5rrydF3vWZ7CU_WcvX4U"; // set REACT_APP_SUPABASE_ANON_KEY in .env
 
 /* ── Tiny inline Supabase REST client (no npm needed) ─────────────────
    Wraps Supabase REST + Auth APIs so we need zero external dependencies.
