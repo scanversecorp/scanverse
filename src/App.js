@@ -2880,9 +2880,9 @@ export default function App() {
   const login  = async (profile) => {
     setUser(profile);
     setScreen("home");
-    await subscribeToBookings(profile.id, profile.role, () => refresh());
-    await subscribeToNotifications(profile.id, (notif) => {
-      setNotifs(prev => [notif, ...prev]);
+    try { await subscribeToBookings(profile.id, profile.role, () => refresh()); } catch(e) { console.warn('Realtime bookings:', e); }
+    try { await subscribeToNotifications(profile.id, (notif) => {
+      setNotifs(prev => [notif, ...prev]); } catch(e) { console.warn('Realtime notifs:', e); }
       addToast(notif.message, "info");
     });
     loadNotifications(profile.id);
