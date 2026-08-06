@@ -69,7 +69,23 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 ────────────────────────────────────────────────────────────────────── */
 let _supabase = null;
 
-async function getSupabase() {
+function getSupabase() {
+  if (_supabase) return Promise.resolve(_supabase);
+  if (window.supabase) {
+    _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return Promise.resolve(_supabase);
+  }
+  return new Promise(resolve => {
+    const check = setInterval(() => {
+      if (window.supabase) {
+        clearInterval(check);
+        _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        resolve(_supabase);
+      }
+    }, 50);
+  });
+}
+async function getSupabase_DELETED() {
   if (_supabase) return _supabase;
   // Load official supabase-js from CDN
   if (!window.supabase) {
