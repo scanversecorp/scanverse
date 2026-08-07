@@ -26,17 +26,17 @@
  *   REACT_APP_UPI_PN            = Your Business Name
  */
 
-import React, { useState, useEffect, useRef, useCallback, createContext, useContext, useReducer } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, useReducer, Component } from "react";
 
-class ErrorBoundary extends React.Component {
+class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(e) { console.error('SCANVERSE render error:', e); }
   render() {
-    if (this.state.hasError) return React.createElement('div', {
+    if (this.state.hasError) return createElement('div', {
       style: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
                height:'100vh', background:'#05070D', color:'#00D4FF', fontFamily:'sans-serif', gap:16 }
-    }, React.createElement('div', {style:{fontSize:24}}, '⚠️ Something went wrong'),
+    }, createElement('div', {style:{fontSize:24}}, '⚠️ Something went wrong'),
        React.createElement('button', {
          onClick: () => { this.setState({hasError:false}); window.location.href='/'; },
          style: { padding:'10px 24px', background:'#00D4FF', color:'#05070D', border:'none',
