@@ -38,9 +38,9 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
    checks for it first, so the app degrades gracefully outside CRA
    instead of crashing on load.
 ────────────────────────────────────────────────────────────────────── */
+const ENV = (typeof process !== "undefined" && process.env) ? process.env : {};
 
-
-const RAZORPAY_URL   = process.env.REACT_APP_RAZORPAY_URL || "https://rzp.io/rzp/QEuXj4E";
+const RAZORPAY_URL   = ENV.REACT_APP_RAZORPAY_URL || "https://rzp.io/rzp/QEuXj4E";
 const PLATFORM_FEE   = 0.10;
 const GST_RATE       = 0.18;
 const TOKEN_KEY      = "sv_auth_token"; // kept for compatibility
@@ -60,8 +60,8 @@ const SESSION_HOURS  = 168;
      REACT_APP_UPI_PN            = Your Business Name
    All REACT_APP_* vars are baked in at build time — safe to expose.
 ────────────────────────────────────────────────────────────────────── */
-const SUPABASE_URL      = "https://fpdljyncyaedrzqqeguy.supabase.co";      // set REACT_APP_SUPABASE_URL in .env
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwZGxqeW5jeWFlZHJ6cXFlZ3V5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTU2MTYsImV4cCI6MjEwMTQ5MTYxNn0.dZNJSV9G4Sh-MmA_X86MoIe5rrydF3vWZ7CU_WcvX4U"; // set REACT_APP_SUPABASE_ANON_KEY in .env
+const SUPABASE_URL      = ENV.REACT_APP_SUPABASE_URL;      // set REACT_APP_SUPABASE_URL in .env
+const SUPABASE_ANON_KEY = ENV.REACT_APP_SUPABASE_ANON_KEY; // set REACT_APP_SUPABASE_ANON_KEY in .env
 
 /* ── Tiny inline Supabase REST client (no npm needed) ─────────────────
    Wraps Supabase REST + Auth APIs so we need zero external dependencies.
@@ -107,14 +107,14 @@ const db = {
   _t: function(store) { return this._tbl[store] || store; },
 
   async get(store, key) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data, error } = await sb.from(this._t(store)).select("*").eq("id", key).single();
     if (error && error.code !== "PGRST116") console.error("db.get", store, error);
     return data || null;
   },
 
   async getAll(store, indexName, key) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     let q = sb.from(this._t(store)).select("*");
     if (indexName && key !== undefined) {
       // Map old IndexedDB index names to column names
@@ -131,7 +131,7 @@ const db = {
   },
 
   async put(store, value) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     // Convert camelCase keys to snake_case for Postgres
     const row = toSnake(value);
     const { data, error } = await sb.from(this._t(store)).upsert(row, { onConflict: "id" }).select().single();
@@ -140,14 +140,14 @@ const db = {
   },
 
   async delete(store, key) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const col = store === "otp" ? "email" : "id";
     const { error } = await sb.from(this._t(store)).delete().eq(col, key);
     if (error) console.error("db.delete", store, error);
   },
 
   async getByIndex(store, indexName, key) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const colMap = { email: "email", userId: "user_id" };
     const col = colMap[indexName] || indexName;
     const { data, error } = await sb.from(this._t(store)).select("*").eq(col, key).single();
@@ -183,7 +183,7 @@ function fromSnake(obj) {
 let _channels = {};
 
 async function subscribeToBookings(userId, role, callback) {
-  const sb = await getSupabase();
+  const sb = getSupabase();
   const key = `bookings_${userId}`;
   if (_channels[key]) _channels[key].unsubscribe();
 
@@ -199,7 +199,7 @@ async function subscribeToBookings(userId, role, callback) {
 }
 
 async function subscribeToNotifications(userId, callback) {
-  const sb = await getSupabase();
+  const sb = getSupabase();
   const key = `notifs_${userId}`;
   if (_channels[key]) _channels[key].unsubscribe();
 
@@ -227,7 +227,7 @@ function unsubscribeAll() {
 ═══════════════════════════════════════════════════════════════════════ */
 const Auth = {
   async signUp({ email, password, name, phone, role, business, category }) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data, error } = await sb.auth.signUp({
       email, password,
       options: {
@@ -244,14 +244,14 @@ const Auth = {
   },
 
   async signIn({ email, password }) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   },
 
   async sendOTP(email) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     // Uses Supabase's built-in OTP email (configure SMTP in Supabase dashboard)
     const { error } = await sb.auth.signInWithOtp({ email,
       options: { shouldCreateUser: false } });
@@ -259,7 +259,7 @@ const Auth = {
   },
 
   async verifyOTP(email, token) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data, error } = await sb.auth.verifyOtp({ email, token, type: "email" });
     if (error) throw error;
     return data;
@@ -272,7 +272,7 @@ const Auth = {
      Phone must be in E.164 format: +91XXXXXXXXXX
   ───────────────────────────────────────────────────────────────── */
   async sendPhoneOTP(phone, signupData) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { error } = await sb.auth.signInWithOtp({
       phone,
       options: {
@@ -285,14 +285,14 @@ const Auth = {
   },
 
   async verifyPhoneOTP(phone, token) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data, error } = await sb.auth.verifyOtp({ phone, token, type: "sms" });
     if (error) throw error;
     return data;
   },
 
   async resetPassword(email) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { error } = await sb.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}?reset=1`,
     });
@@ -300,32 +300,32 @@ const Auth = {
   },
 
   async updatePassword(newPassword) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { error } = await sb.auth.updateUser({ password: newPassword });
     if (error) throw error;
   },
 
   async signOut() {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     await sb.auth.signOut();
     unsubscribeAll();
   },
 
   async getSession() {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data: { session } } = await sb.auth.getSession();
     return session;
   },
 
   async getProfile(userId) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     const { data, error } = await sb.from("profiles").select("*").eq("id", userId).single();
     if (error) return null;
     return fromSnake(data);
   },
 
   async onAuthStateChange(callback) {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     return sb.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await Auth.getProfile(session.user.id);
@@ -352,7 +352,7 @@ const verifyPassword = async () => true; // no-op
 ═══════════════════════════════════════════════════════════════════════ */
 const seedDatabase = async () => {
   // Check if already seeded by looking for a known service
-  const sb = await getSupabase();
+  const sb = getSupabase();
   const { data: existing } = await sb.from("services").select("id").limit(1);
   if (existing && existing.length > 0) return;
 
@@ -748,8 +748,8 @@ function TopBar({ title, subtitle }) {
        UPI_PA  → your Razorpay UPI VPA (Settings → UPI in dashboard)
        UPI_PN  → your registered business name (must match exactly)
 ═══════════════════════════════════════════════════════════════ */
-const UPI_PA = process.env.REACT_APP_UPI_PA || "dcoreglobalcorp@razorpay"; // ← set in .env
-const UPI_PN = process.env.REACT_APP_UPI_PN || "DCORE Global Corporation"; // ← set in .env
+const UPI_PA = ENV.REACT_APP_UPI_PA || "dcoreglobalcorp@razorpay"; // ← set in .env
+const UPI_PN = ENV.REACT_APP_UPI_PN || "DCORE Global Corporation"; // ← set in .env
 
 /* Builds the NPCI-standard UPI deep-link URI.
    Encoding it as a QR code lets ANY UPI app scan it:
@@ -1850,7 +1850,7 @@ function ProfilePage() {
   const [pw, setPw]       = useState("");
   const [npw, setNpw]     = useState("");
   const save = async () => {
-    const sb = await getSupabase();
+    const sb = getSupabase();
     await sb.from("profiles").update({ name, phone }).eq("id", user.id);
     const updated = { ...user, name, phone };
     setUser(updated);
@@ -1862,7 +1862,7 @@ function ProfilePage() {
     try {
       // Supabase requires re-authentication before password update
       // Sign in with current password to verify, then update
-      const sb = await getSupabase();
+      const sb = getSupabase();
       const { error: signInErr } = await sb.auth.signInWithPassword({ email: user.email, password: pw });
       if (signInErr) { addToast("Current password incorrect","error"); return; }
       await Auth.updatePassword(npw);
@@ -2790,7 +2790,7 @@ export default function App() {
 
   const markAllNotifsRead = useCallback(async () => {
     if (!user) return;
-    const sb = await getSupabase();
+    const sb = getSupabase();
     await sb.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
     loadNotifications(user.id);
   }, [user, loadNotifications]);
@@ -2812,7 +2812,7 @@ export default function App() {
         }
 
         // Seed demo data if DB is empty
-        // seedDatabase skipped
+        await seedDatabase();
 
         // Restore Supabase session
         const session = await Auth.getSession();
@@ -2820,8 +2820,8 @@ export default function App() {
           const profile = await Auth.getProfile(session.user.id);
           if (profile && profile.status !== "pending") {
             setUser(profile);
-            await subscribeToBookings(profile.id, profile.role, () => refresh());
-            await subscribeToNotifications(profile.id, (notif) => {
+            try { await subscribeToBookings(profile.id, profile.role, () => refresh());
+            } catch(e){} try { await subscribeToNotifications(profile.id, (notif) => {
               setNotifs(prev => [notif, ...prev]);
               addToast(notif.message, "info");
             });
@@ -2843,8 +2843,8 @@ export default function App() {
       if (event === "SIGNED_IN" && profile) {
         setUser(profile);
         setScreen("home");
-        await subscribeToBookings(profile.id, profile.role, () => refresh());
-        await subscribeToNotifications(profile.id, (notif) => {
+        try { await subscribeToBookings(profile.id, profile.role, () => refresh());
+        } catch(e){} try { await subscribeToNotifications(profile.id, (notif) => {
           setNotifs(prev => [notif, ...prev]);
           addToast(notif.message, "info");
         });
@@ -2862,8 +2862,8 @@ export default function App() {
   const login  = async (profile) => {
     setUser(profile);
     setScreen("home");
-    await subscribeToBookings(profile.id, profile.role, () => refresh());
-    await subscribeToNotifications(profile.id, (notif) => {
+    try { await subscribeToBookings(profile.id, profile.role, () => refresh());
+    } catch(e){} try { await subscribeToNotifications(profile.id, (notif) => {
       setNotifs(prev => [notif, ...prev]);
       addToast(notif.message, "info");
     });
