@@ -2820,8 +2820,8 @@ export default function App() {
           const profile = await Auth.getProfile(session.user.id);
           if (profile && profile.status !== "pending") {
             setUser(profile);
-            try { await subscribeToBookings(profile.id, profile.role, () => refresh());
-            } catch(e){console.warn(e);} try { await subscribeToNotifications(profile.id, (notif) => {
+            await subscribeToBookings(profile.id, profile.role, () => refresh());
+            await subscribeToNotifications(profile.id, (notif) => {
               setNotifs(prev => [notif, ...prev]);
               addToast(notif.message, "info");
             });
@@ -2843,8 +2843,8 @@ export default function App() {
       if (event === "SIGNED_IN" && profile) {
         setUser(profile);
         setScreen("home");
-        try { await subscribeToBookings(profile.id, profile.role, () => refresh());
-        } catch(e){console.warn(e);} try { await subscribeToNotifications(profile.id, (notif) => {
+        await subscribeToBookings(profile.id, profile.role, () => refresh());
+        await subscribeToNotifications(profile.id, (notif) => {
           setNotifs(prev => [notif, ...prev]);
           addToast(notif.message, "info");
         });
@@ -2862,8 +2862,8 @@ export default function App() {
   const login  = async (profile) => {
     setUser(profile);
     setScreen("home");
-    try { await subscribeToBookings(profile.id, profile.role, () => refresh());
-    } catch(e){console.warn(e);} try { await subscribeToNotifications(profile.id, (notif) => {
+    await subscribeToBookings(profile.id, profile.role, () => refresh());
+    await subscribeToNotifications(profile.id, (notif) => {
       setNotifs(prev => [notif, ...prev]);
       addToast(notif.message, "info");
     });
