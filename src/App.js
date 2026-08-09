@@ -222,25 +222,7 @@ async function sendSMSViaSB(mobile, otp) {
   }).then(()=>{}).catch(e=>console.warn('[OTP DB]',e.message));
 }
 
-// Send SMS via 2Factor.in (primary — works in India instantly)
-async function sendVia2Factor(mobile, otp) {
-  const num = mobile.replace(/^\+91/,'').replace(/\D/g,'');
-  const url = `https://2factor.in/API/V1/${TWOFACTOR_KEY}/SMS/${num}/${otp}/OTP1`;
-  const r = await fetch(url);
-  const d = await r.json();
-  if (d.Status !== 'Success') throw new Error(d.Details||'2Factor failed');
-  return true;
-}
-
-// Send SMS via Fast2SMS (secondary — needs ₹100 recharge)
-async function sendViaFast2SMS(mobile, otp) {
-  const num = mobile.replace(/^\+91/,'').replace(/\D/g,'');
-  const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_KEY}&variables_values=${otp}&route=otp&numbers=${num}`;
-  const r = await fetch(url);
-  const d = await r.json();
-  if (d.return !== true) throw new Error(d.message||'Fast2SMS failed');
-  return true;
-}
+// SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
 
 async function generateAndSendOTP(mobile) {
   const otp = String(Math.floor(100000 + Math.random() * 900000));
@@ -468,18 +450,19 @@ function RegistrationFlow({ onComplete, prefill }) {
       // 2. Show OTP screen IMMEDIATELY — never block on SMS delivery
       setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
-      // 3. Send SMS via multiple providers in background — show OTP on screen as fallback
+      // 3. Send SMS via Supabase Edge Function (server-side — no CORS)
       (async () => {
-        let smsSent = false;
-        // Try 2Factor.in first
-        try { await sendVia2Factor(mob, otp); smsSent = true; console.log('[OTP] Sent via 2Factor ✓'); } catch(e) { console.warn('[OTP] 2Factor:', e.message); }
-        // Try Fast2SMS if 2Factor failed
-        if (!smsSent) {
-          try { await sendViaFast2SMS(mob, otp); smsSent = true; console.log('[OTP] Sent via Fast2SMS ✓'); } catch(e) { console.warn('[OTP] Fast2SMS:', e.message); }
-        }
-        // If both failed — show OTP on screen so user is never stuck
-        if (!smsSent) {
-          setScreenOTP(otp);
+        try {
+          const r = await sb().functions.invoke('send-otp', { body: { mobile: mob, otp } });
+          if (r.data?.success) {
+            console.log('[OTP] Sent via', r.data.provider, '✓');
+          } else {
+            console.warn('[OTP] Edge fn result:', JSON.stringify(r.data));
+            setScreenOTP(otp); // fallback: show on screen
+          }
+        } catch(e) {
+          console.warn('[OTP] Edge fn error:', e.message);
+          setScreenOTP(otp); // fallback: show on screen
         }
       })();
     } catch(e) { setErr(e.message||'Could not prepare OTP. Try again.'); setLoading(false); }
