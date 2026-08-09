@@ -208,15 +208,38 @@ async function getBattery() {
 }
 
 /* ─── OTP: FAST2SMS (India) ─────────────────────────────────────── */
-// Fast2SMS — India SMS gateway (fast2sms.com) · OTP route
-const FAST2SMS_KEY = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
+// 2Factor.in — India OTP SMS (works instantly, no verification needed)
+// Get free API key: https://2factor.in/cp/ → API → Copy key
+const TWOFACTOR_KEY = 'TWOFACTOR_API_KEY_HERE';
+// Fast2SMS (blocked until website verified + ₹100 recharge — keep for later)
+const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
 async function sendSMSViaSB(mobile, otp) {
-  // Store OTP in DB — never throw on SMS failure (handled in sendOTP)
+  // Store OTP in DB first
   await sb().from('custom_otp').insert({
     mobile, otp,
     expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
   }).then(()=>{}).catch(e=>console.warn('[OTP DB]',e.message));
+}
+
+// Send SMS via 2Factor.in (primary — works in India instantly)
+async function sendVia2Factor(mobile, otp) {
+  const num = mobile.replace(/^\+91/,'').replace(/\D/g,'');
+  const url = `https://2factor.in/API/V1/${TWOFACTOR_KEY}/SMS/${num}/${otp}/OTP1`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.Status !== 'Success') throw new Error(d.Details||'2Factor failed');
+  return true;
+}
+
+// Send SMS via Fast2SMS (secondary — needs ₹100 recharge)
+async function sendViaFast2SMS(mobile, otp) {
+  const num = mobile.replace(/^\+91/,'').replace(/\D/g,'');
+  const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_KEY}&variables_values=${otp}&route=otp&numbers=${num}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.return !== true) throw new Error(d.message||'Fast2SMS failed');
+  return true;
 }
 
 async function generateAndSendOTP(mobile) {
@@ -367,7 +390,7 @@ function RegistrationFlow({ onComplete, prefill }) {
   const [ip, setIp]         = useState(prefill?.ip||'');
   const [geo, setGeo]       = useState(prefill?.geo||null);
   const [sessionId, setSessionId] = useState(prefill?.scanId||null);
-  const [devOTP, setDevOTP] = useState(''); // show OTP on screen during dev/SMS not configured
+  const [screenOTP, setScreenOTP] = useState(''); // fallback: show OTP when all SMS providers fail
 
   const [form, setForm] = useState({
     firstName:'', lastName:'', age:'', mobile:'', email:'',
@@ -445,12 +468,22 @@ function RegistrationFlow({ onComplete, prefill }) {
       // 2. Show OTP screen IMMEDIATELY — never block on SMS delivery
       setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
-      // 3. Send SMS in background — soft warning only if it fails
-      const num = mob.replace(/^\+91/,'').replace(/\D/g,'');
-      fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_KEY}&variables_values=${otp}&route=otp&numbers=${num}`)
-        .then(r=>r.json())
-        .then(d=>{ if(d.return!==true) console.warn('[OTP] Fast2SMS:', d.message); })
-        .catch(e=>console.warn('[OTP] SMS error:', e.message));
+      // 3. Send SMS via multiple providers in background — show OTP on screen as fallback
+      (async () => {
+        let smsSent = false;
+        // Try 2Factor.in first
+        if (TWOFACTOR_KEY !== 'TWOFACTOR_API_KEY_HERE') {
+          try { await sendVia2Factor(mob, otp); smsSent = true; console.log('[OTP] Sent via 2Factor ✓'); } catch(e) { console.warn('[OTP] 2Factor:', e.message); }
+        }
+        // Try Fast2SMS if 2Factor failed
+        if (!smsSent) {
+          try { await sendViaFast2SMS(mob, otp); smsSent = true; console.log('[OTP] Sent via Fast2SMS ✓'); } catch(e) { console.warn('[OTP] Fast2SMS:', e.message); }
+        }
+        // If both failed — show OTP on screen so user is never stuck
+        if (!smsSent) {
+          setScreenOTP(otp);
+        }
+      })();
     } catch(e) { setErr(e.message||'Could not prepare OTP. Try again.'); setLoading(false); }
   };
 
@@ -671,7 +704,15 @@ function RegistrationFlow({ onComplete, prefill }) {
         OTP sent to <strong style={{color:C.txt}}>{form.mobile}</strong>
       </div>
 
-      {/* OTP sent via Fast2SMS SMS gateway */}
+      {/* Fallback: show OTP on screen if all SMS providers fail */}
+      {screenOTP&&(
+        <div style={{background:`${C.gold}22`,border:`1.5px solid ${C.gold}`,borderRadius:10,padding:'14px 16px',marginBottom:14,textAlign:'center'}}>
+          <div style={{color:C.gold,fontSize:12,fontWeight:600,marginBottom:6}}>📱 SMS delivery issue — your OTP:</div>
+          <div style={{color:C.txt,fontSize:32,fontFamily:'monospace',fontWeight:800,letterSpacing:8}}>{screenOTP}</div>
+          <div style={{color:C.dim,fontSize:11,marginTop:6}}>Copy this OTP and enter it below · valid 10 min</div>
+        </div>
+      )}
+      {/* OTP sent via SMS */}
 
       <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
         {digits.map((d,i)=>(
