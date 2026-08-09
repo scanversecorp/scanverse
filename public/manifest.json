@@ -26,11 +26,7 @@
   "orientation": "portrait",
   "theme_color": "#e94560",
   "background_color": "#0d0f1a",
-  "categories": [
-    "business",
-    "lifestyle",
-    "utilities"
-  ],
+  "categories": ["business", "lifestyle", "utilities"],
   "lang": "en-IN",
   "scope": "/"
 }
