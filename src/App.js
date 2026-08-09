@@ -224,6 +224,21 @@ async function sendSMSViaSB(mobile, otp) {
 
 // SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
 
+/* ─── WHATSAPP VERIFICATION ──────────────────────────────────── */
+async function generateWAToken(mobile) {
+  const r = await sb().functions.invoke('whatsapp-verify', {
+    body: { action:'generate', mobile }
+  });
+  return r.data;
+}
+
+async function checkWAVerified(token) {
+  const r = await sb().functions.invoke('whatsapp-verify', {
+    body: { action:'check', token }
+  });
+  return r.data;
+}
+
 async function generateAndSendOTP(mobile) {
   const otp = String(Math.floor(100000 + Math.random() * 900000));
   // Invalidate old OTPs for this mobile
@@ -373,6 +388,9 @@ function RegistrationFlow({ onComplete, prefill }) {
   const [geo, setGeo]       = useState(prefill?.geo||null);
   const [sessionId, setSessionId] = useState(prefill?.scanId||null);
   const [screenOTP, setScreenOTP] = useState(''); // fallback: show OTP when all SMS providers fail
+  const [waToken, setWaToken]       = useState('');
+  const [waLink, setWaLink]         = useState('');
+  const [waChecking, setWaChecking] = useState(false);
 
   const [form, setForm] = useState({
     firstName:'', lastName:'', age:'', mobile:'', email:'',
@@ -440,32 +458,52 @@ function RegistrationFlow({ onComplete, prefill }) {
     setLoading(true); setErr('');
     try {
       const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
-      // 1. Generate OTP and store in DB
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      await sb().from('custom_otp').update({used:true}).eq('mobile',mob).eq('used',false);
-      await sb().from('custom_otp').insert({
-        mobile:mob, otp,
-        expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
-      });
-      // 2. Show OTP screen IMMEDIATELY — never block on SMS delivery
+      // 1. Send OTP via Twilio Verify (server-side, no DLT needed)
+      //    Twilio generates and sends the OTP — we don't need to store it
       setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
-      // 3. Send SMS via Supabase Edge Function (server-side — no CORS)
+      // 2. Fire SMS via Edge Function in background
+      sb().functions.invoke('send-otp', { body: { mobile: mob } })
+        .then(r => {
+          if (r.data?.success) {
+            console.log('[OTP] Sent via', r.data.provider, '✓');
+            if (r.data.provider !== 'twilio-verify') setScreenOTP(''); // screen OTP only if not Twilio
+          } else {
+            console.warn('[OTP]', r.data);
+            // Show screen OTP as fallback
+            const otp = String(Math.floor(100000 + Math.random()*900000));
+            sb().from('custom_otp').insert({mobile:mob,otp,expires_at:new Date(Date.now()+600000).toISOString()});
+            setScreenOTP(otp);
+          }
+        })
+        .catch(e => { console.warn('[OTP]', e.message); });
       (async () => {
         try {
           const r = await sb().functions.invoke('send-otp', { body: { mobile: mob, otp } });
-          if (r.data?.success) {
-            console.log('[OTP] Sent via', r.data.provider, '✓');
-          } else {
-            console.warn('[OTP] Edge fn result:', JSON.stringify(r.data));
-            setScreenOTP(otp); // fallback: show on screen
-          }
-        } catch(e) {
-          console.warn('[OTP] Edge fn error:', e.message);
-          setScreenOTP(otp); // fallback: show on screen
-        }
+          if (r.data?.success) console.log('[OTP] SMS also sent via', r.data.provider, '✓');
+        } catch(e) { console.warn('[OTP] SMS background error:', e.message); }
       })();
     } catch(e) { setErr(e.message||'Could not prepare OTP. Try again.'); setLoading(false); }
+  };
+
+  // Direct verification for WhatsApp path (skips OTP check)
+  const verifyOTP_direct = async (mob) => {
+    setLoading(true); setErr('');
+    try {
+      const fakeEmail = `${mob.replace(/^\+91/,'').replace(/\s/g,'')}@scanv.app`;
+      const fakePass  = `ScanV_${mob.slice(-4)}_${Date.now()}`;
+      let userId;
+      try {
+        const { data:su, error:se } = await sb().auth.signUp({ email:fakeEmail, password:fakePass });
+        if (se && se.message?.includes('already registered')) {
+          const { data:si } = await sb().auth.signInWithPassword({ email:fakeEmail, password:fakePass });
+          userId = si?.user?.id;
+        } else { userId = su?.user?.id; }
+      } catch(e) {}
+      if (!userId) { userId = localStorage.getItem('scanv_uid') || crypto.randomUUID(); localStorage.setItem('scanv_uid', userId); }
+      await finalise(userId, fakeEmail, mob);
+    } catch(e) { setErr(e.message||'Verification failed.'); setPhase('form'); }
+    finally { setLoading(false); }
   };
 
   const verifyOTP = async () => {
@@ -474,7 +512,14 @@ function RegistrationFlow({ onComplete, prefill }) {
     setLoading(true); setErr('');
     try {
       const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
-      const ok = await verifyCustomOTP(mob, token);
+      // Try Twilio Verify first (if SMS came from Twilio)
+      let ok = false;
+      try {
+        const r = await sb().functions.invoke('send-otp', { body: { mobile: mob, otp: token, action: 'verify' } });
+        if (r.data?.success) ok = true;
+      } catch(e) { console.warn('[Verify Twilio]', e.message); }
+      // Fallback: check custom_otp table (for screen OTP / other providers)
+      if (!ok) ok = await verifyCustomOTP(mob, token);
       if (!ok) throw new Error('Invalid or expired OTP. Request a new one.');
 
       // Create Supabase auth user via email (phone auth needs SMS provider)
@@ -685,15 +730,63 @@ function RegistrationFlow({ onComplete, prefill }) {
         OTP sent to <strong style={{color:C.txt}}>{form.mobile}</strong>
       </div>
 
-      {/* Fallback: show OTP on screen if all SMS providers fail */}
+      {/* OTP always shown on screen — tap to auto-fill */}
       {screenOTP&&(
-        <div style={{background:`${C.gold}22`,border:`1.5px solid ${C.gold}`,borderRadius:10,padding:'14px 16px',marginBottom:14,textAlign:'center'}}>
-          <div style={{color:C.gold,fontSize:12,fontWeight:600,marginBottom:6}}>📱 SMS delivery issue — your OTP:</div>
-          <div style={{color:C.txt,fontSize:32,fontFamily:'monospace',fontWeight:800,letterSpacing:8}}>{screenOTP}</div>
-          <div style={{color:C.dim,fontSize:11,marginTop:6}}>Copy this OTP and enter it below · valid 10 min</div>
+        <div
+          onClick={()=>{
+            const d=screenOTP.split('');
+            setDigits([d[0]||'',d[1]||'',d[2]||'',d[3]||'',d[4]||'',d[5]||'']);
+          }}
+          style={{background:`${C.acc}`,borderRadius:12,padding:'16px',marginBottom:16,textAlign:'center',cursor:'pointer'}}>
+          <div style={{color:'rgba(255,255,255,0.85)',fontSize:11,fontWeight:600,marginBottom:6}}>🔐 Your OTP — tap to auto-fill</div>
+          <div style={{color:'#fff',fontSize:44,fontFamily:'monospace',fontWeight:800,letterSpacing:10}}>{screenOTP}</div>
+          <div style={{color:'rgba(255,255,255,0.75)',fontSize:11,marginTop:6}}>Tap this box to fill automatically ↓</div>
         </div>
       )}
-      {/* OTP sent via SMS */}
+
+      {/* WhatsApp verification option */}
+      {!screenOTP&&waLink&&(
+        <div style={{background:`${C.grn}22`,border:`1.5px solid ${C.grn}`,borderRadius:12,padding:14,marginBottom:14}}>
+          <div style={{color:C.grn,fontSize:12,fontWeight:600,marginBottom:8}}>📱 Verify via WhatsApp</div>
+          <div style={{color:C.sub,fontSize:11,lineHeight:1.6,marginBottom:10}}>
+            Tap below → WhatsApp opens with a pre-filled message → Send it → you're verified.<br/>
+            <span style={{color:C.dim,fontSize:10}}>This proves you own this number.</span>
+          </div>
+          <a href={waLink} target="_blank" rel="noreferrer"
+            onClick={()=>{
+              // Start polling for verification
+              setWaChecking(true);
+              const poll = setInterval(async()=>{
+                const res = await checkWAVerified(waToken);
+                if(res?.verified){
+                  clearInterval(poll);
+                  setWaChecking(false);
+                  // Mark as verified via WhatsApp — proceed to finalise
+                  const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
+                  setPhase('completing');
+                  // Store OTP as used
+                  await sb().from('custom_otp').insert({
+                    mobile:mob, otp:'WA-VERIFIED',
+                    expires_at:new Date(Date.now()+60000).toISOString(), used:true
+                  }).then(()=>{});
+                  await verifyOTP_direct(mob);
+                }
+              }, 3000);
+              // Stop polling after 10 min
+              setTimeout(()=>{clearInterval(poll);setWaChecking(false);}, 600000);
+            }}
+            style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'11px 16px',textDecoration:'none'}}>
+            <span style={{fontSize:20}}>💬</span>
+            <span style={{color:'#fff',fontWeight:700,fontSize:14}}>Open WhatsApp to verify</span>
+          </a>
+          {waChecking&&<div style={{textAlign:'center',marginTop:8,fontSize:11,color:C.sub}}>
+            <span>Waiting for WhatsApp message… </span><span style={{color:C.grn}}>●</span>
+          </div>}
+          <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.dim}}>
+            Send to: <strong style={{color:C.sub}}>+91-9270194842</strong> · Token: <code style={{color:C.acc}}>{waToken}</code>
+          </div>
+        </div>
+      )}
 
       <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
         {digits.map((d,i)=>(
