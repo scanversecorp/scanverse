@@ -1,13 +1,36 @@
 {
-  "name": "SCANVERSE",
-  "short_name": "SCANVERSE",
-  "description": "Professional service marketplace by DCORE Global Corporation",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#05070D",
-  "theme_color": "#00D4FF",
+  "short_name": "ScanV",
+  "name": "ScanV — Professional Services · PCMC Pune",
+  "description": "Find and book verified services near you — Legal, Health, Cloud Training, Property, Food & more",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#e94560",
+  "background_color": "#0d0f1a",
+  "categories": [
+    "business",
+    "lifestyle",
+    "utilities"
+  ],
+  "lang": "en-IN",
+  "scope": "/"
 }
