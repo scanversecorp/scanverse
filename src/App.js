@@ -208,25 +208,35 @@ async function getBattery() {
 }
 
 /* ─── OTP: FAST2SMS (India) ─────────────────────────────────────── */
-// NOTE: Replace YOUR_FAST2SMS_API_KEY with your actual key from fast2sms.com
-// Free tier: 50 SMS/day — get key at https://www.fast2sms.com/dashboard/dlt
-const FAST2SMS_KEY = 'YOUR_FAST2SMS_API_KEY';
+// Fast2SMS — India SMS gateway (fast2sms.com) · OTP route
+const FAST2SMS_KEY = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
 async function sendSMSViaSB(mobile, otp) {
-  // Store OTP in Supabase custom_otp table
-  // Then trigger SMS via Supabase Edge Function (avoids CORS)
+  // 1. Store OTP in DB first
   const { error } = await sb().from('custom_otp').insert({
     mobile, otp,
     expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
   });
   if (error) throw error;
 
-  // Try Fast2SMS via edge function (if deployed)
+  // 2. Send SMS via Fast2SMS (India)
+  // Strip country code for Fast2SMS — it needs 10-digit number
+  const num = mobile.replace(/^\+91/, '').replace(/\D/g, '');
   try {
-    await sb().functions.invoke('send-otp', { body: { mobile, otp } });
+    const res = await fetch(
+      `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_KEY}&variables_values=${otp}&route=otp&numbers=${num}`,
+      { method: 'GET' }
+    );
+    const data = await res.json();
+    if (data.return !== true) {
+      console.warn('[ScanV OTP] Fast2SMS response:', JSON.stringify(data));
+      throw new Error(data.message || 'SMS delivery failed');
+    }
+    console.log('[ScanV OTP] SMS sent via Fast2SMS ✓');
   } catch(e) {
-    // Edge function not deployed yet — OTP still stored in DB
-    console.warn('[ScanV OTP] Edge function not available:', e.message);
+    console.warn('[ScanV OTP] Fast2SMS error:', e.message);
+    // OTP is still in DB — user can try WhatsApp or email fallback
+    throw new Error('SMS could not be sent. Check your number and try again.');
   }
   return otp;
 }
@@ -448,10 +458,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     try {
       const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
       const otp = await generateAndSendOTP(mob);
-      // During development (SMS not configured) — show OTP on screen
-      if (FAST2SMS_KEY === 'YOUR_FAST2SMS_API_KEY') {
-        setDevOTP(otp);
-      }
+      // SMS configured via Fast2SMS — OTP sent silently
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
     } catch(e) { setErr(e.message||'Could not send OTP. Try again.'); }
     finally { setLoading(false); }
@@ -674,14 +681,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         OTP sent to <strong style={{color:C.txt}}>{form.mobile}</strong>
       </div>
 
-      {/* DEV MODE: show OTP on screen when SMS not configured */}
-      {devOTP&&(
-        <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}55`,borderRadius:8,padding:'10px 14px',marginBottom:14,textAlign:'center'}}>
-          <div style={{color:C.gold,fontSize:11,fontWeight:600,marginBottom:4}}>⚠️ DEV MODE — SMS not configured yet</div>
-          <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Configure Fast2SMS at fast2sms.com to send real SMS</div>
-          <div style={{color:C.txt,fontSize:26,fontFamily:'monospace',fontWeight:700,letterSpacing:6}}>{devOTP}</div>
-        </div>
-      )}
+      {/* OTP sent via Fast2SMS SMS gateway */}
 
       <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
         {digits.map((d,i)=>(
