@@ -210,7 +210,7 @@ async function getBattery() {
 /* ─── OTP: FAST2SMS (India) ─────────────────────────────────────── */
 // 2Factor.in — India OTP SMS (works instantly, no verification needed)
 // Get free API key: https://2factor.in/cp/ → API → Copy key
-const TWOFACTOR_KEY = 'TWOFACTOR_API_KEY_HERE';
+const TWOFACTOR_KEY = '2e5ec291-9406-11f1-908b-0200cd936042';
 // Fast2SMS (blocked until website verified + ₹100 recharge — keep for later)
 const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
@@ -472,9 +472,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       (async () => {
         let smsSent = false;
         // Try 2Factor.in first
-        if (TWOFACTOR_KEY !== 'TWOFACTOR_API_KEY_HERE') {
-          try { await sendVia2Factor(mob, otp); smsSent = true; console.log('[OTP] Sent via 2Factor ✓'); } catch(e) { console.warn('[OTP] 2Factor:', e.message); }
-        }
+        try { await sendVia2Factor(mob, otp); smsSent = true; console.log('[OTP] Sent via 2Factor ✓'); } catch(e) { console.warn('[OTP] 2Factor:', e.message); }
         // Try Fast2SMS if 2Factor failed
         if (!smsSent) {
           try { await sendViaFast2SMS(mob, otp); smsSent = true; console.log('[OTP] Sent via Fast2SMS ✓'); } catch(e) { console.warn('[OTP] Fast2SMS:', e.message); }
