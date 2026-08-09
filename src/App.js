@@ -212,33 +212,11 @@ async function getBattery() {
 const FAST2SMS_KEY = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
 async function sendSMSViaSB(mobile, otp) {
-  // 1. Store OTP in DB first
-  const { error } = await sb().from('custom_otp').insert({
+  // Store OTP in DB — never throw on SMS failure (handled in sendOTP)
+  await sb().from('custom_otp').insert({
     mobile, otp,
     expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
-  });
-  if (error) throw error;
-
-  // 2. Send SMS via Fast2SMS (India)
-  // Strip country code for Fast2SMS — it needs 10-digit number
-  const num = mobile.replace(/^\+91/, '').replace(/\D/g, '');
-  try {
-    const res = await fetch(
-      `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_KEY}&variables_values=${otp}&route=otp&numbers=${num}`,
-      { method: 'GET' }
-    );
-    const data = await res.json();
-    if (data.return !== true) {
-      console.warn('[ScanV OTP] Fast2SMS response:', JSON.stringify(data));
-      throw new Error(data.message || 'SMS delivery failed');
-    }
-    console.log('[ScanV OTP] SMS sent via Fast2SMS ✓');
-  } catch(e) {
-    console.warn('[ScanV OTP] Fast2SMS error:', e.message);
-    // OTP is still in DB — user can try WhatsApp or email fallback
-    throw new Error('SMS could not be sent. Check your number and try again.');
-  }
-  return otp;
+  }).then(()=>{}).catch(e=>console.warn('[OTP DB]',e.message));
 }
 
 async function generateAndSendOTP(mobile) {
@@ -454,14 +432,26 @@ function RegistrationFlow({ onComplete, prefill }) {
     if (!form.mobile)           return setErr('Enter your mobile number');
     if (!form.city.trim())      return setErr('Enter your city');
     if (!form.pincode.trim())   return setErr('Enter PIN code');
-    setLoading(true); setErr(''); setDevOTP('');
+    setLoading(true); setErr('');
     try {
       const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
-      const otp = await generateAndSendOTP(mob);
-      // SMS configured via Fast2SMS — OTP sent silently
+      // 1. Generate OTP and store in DB
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      await sb().from('custom_otp').update({used:true}).eq('mobile',mob).eq('used',false);
+      await sb().from('custom_otp').insert({
+        mobile:mob, otp,
+        expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
+      });
+      // 2. Show OTP screen IMMEDIATELY — never block on SMS delivery
+      setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
-    } catch(e) { setErr(e.message||'Could not send OTP. Try again.'); }
-    finally { setLoading(false); }
+      // 3. Send SMS in background — soft warning only if it fails
+      const num = mob.replace(/^\+91/,'').replace(/\D/g,'');
+      fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_KEY}&variables_values=${otp}&route=otp&numbers=${num}`)
+        .then(r=>r.json())
+        .then(d=>{ if(d.return!==true) console.warn('[OTP] Fast2SMS:', d.message); })
+        .catch(e=>console.warn('[OTP] SMS error:', e.message));
+    } catch(e) { setErr(e.message||'Could not prepare OTP. Try again.'); setLoading(false); }
   };
 
   const verifyOTP = async () => {
