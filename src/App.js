@@ -1,8 +1,8 @@
 /**
- * ScanV v5 -- Production
+ * ScanV v5.5 -- Daylight Trust UI
  * DCORE Global Corporation - PCMC, Pune
  * URL: https://scanv-tau.vercel.app
- * Bold Dark Premium: #0d0f1a - #e94560
+ * Daylight Trust: #f2efe8 · #d63a56 · Android-first
  *
  * OTP FIX: Using Fast2SMS (India, free tier) directly from client
  * + Supabase email OTP fallback + manual email entry fallback
@@ -26,14 +26,17 @@ const ASSIST   = '+91-9270194842';
 const FEE_PCT  = 0.10;
 const GST_RATE = 0.18;
 
-/* --- DESIGN TOKENS ------------------------------------------------ */
+/* --- DESIGN TOKENS · Daylight Trust -------------------------------- */
 const C = {
-  bg:'#0d0f1a', surf:'#1a1a2e', card:'#16213e', deep:'#0f3460',
-  acc:'#e94560', cyan:'#00d4ff', gold:'#f5a623',
-  grn:'#00c48c', red:'#ff4d6d', vio:'#7c3aed',
-  txt:'#f0f0f0', sub:'#a8a8c0', dim:'#5a5a7a',
-  bdr:'rgba(255,255,255,0.08)', gls:'rgba(255,255,255,0.04)',
+  bg:'#f2efe8', surf:'#fffcf8', card:'#fffcf8', deep:'#ebe6dc',
+  acc:'#d63a56', cyan:'#0d47a1', gold:'#b8860b',
+  grn:'#007a4d', red:'#c62828', vio:'#7c3aed',
+  txt:'#121212', sub:'#3d4f5f', dim:'#5c6b7a',
+  bdr:'rgba(18,18,18,0.14)', gls:'rgba(18,18,18,0.04)',
 };
+const FF = "'Inter',system-ui,sans-serif";
+const BDR = `1.5px solid ${C.bdr}`;
+const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food' };
 
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
@@ -79,23 +82,22 @@ class Boundary extends Component {
 
 /* --- STYLES ------------------------------------------------------- */
 const S = {
-  center: {height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:16,fontFamily:"'DM Sans',sans-serif",padding:20},
-  inp: (x={}) => ({width:'100%',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,padding:'11px 14px',color:C.txt,fontSize:14,outline:'none',fontFamily:"'DM Sans',sans-serif",boxSizing:'border-box',...x}),
-  lbl: {fontSize:11,fontWeight:600,color:C.sub,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:5,display:'block'},
-  card: (x={}) => ({background:C.card,border:`1px solid ${C.bdr}`,borderRadius:14,padding:16,...x}),
-  err: {background:`${C.red}15`,border:`1px solid ${C.red}40`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
+  center: {height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:16,fontFamily:FF,padding:20},
+  inp: (x={}) => ({width:'100%',background:C.surf,border:BDR,borderRadius:10,padding:'12px 14px',color:C.txt,fontSize:15,outline:'none',fontFamily:FF,boxSizing:'border-box',...x}),
+  lbl: {fontSize:11,fontWeight:700,color:C.sub,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:5,display:'block'},
+  card: (x={}) => ({background:C.card,border:BDR,borderRadius:14,padding:16,boxShadow:'0 3px 14px rgba(18,18,18,0.08)',...x}),
+  err: {background:`${C.red}12`,border:`1.5px solid ${C.red}55`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
 };
 
 const APP_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:${C.bg};color:${C.txt};font-family:'DM Sans',sans-serif;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
-  input,select,textarea,button{font-family:'DM Sans',sans-serif}
+  body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px}
+  input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
-  select option{background:${C.deep};color:${C.txt}}
+  select option{background:${C.surf};color:${C.txt}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   ::-webkit-scrollbar{width:0}
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
 `;
@@ -109,9 +111,9 @@ function Spin({size=20}) {
   return <div style={{width:size,height:size,border:`2px solid ${C.bdr}`,borderTop:`2px solid ${C.acc}`,borderRadius:'50%',animation:'spin .7s linear infinite',flexShrink:0}}/>;
 }
 
-function Btn({children,onClick,v='primary',full,disabled,sm}) {
-  const b={borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:600,cursor:disabled?'not-allowed':'pointer',width:full?'100%':'auto',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,opacity:disabled?.6:1,border:'none',padding:sm?'7px 14px':'11px 22px',fontSize:sm?12:14,transition:'opacity .15s'};
-  const vs={primary:{...b,background:disabled?'#2a2a3e':C.acc,color:disabled?C.dim:'#fff'},outline:{...b,background:'transparent',color:C.acc,border:`1px solid ${C.acc}`},ghost:{...b,background:C.gls,color:C.txt,border:`1px solid ${C.bdr}`},secondary:{...b,background:C.deep,color:C.txt,border:`1px solid ${C.bdr}`},danger:{...b,background:disabled?'#2a2a3e':C.red,color:disabled?C.dim:'#fff'}};
+function Btn({children,onClick,v='primary',full,disabled,sm,style}) {
+  const b={borderRadius:11,fontFamily:FF,fontWeight:700,cursor:disabled?'not-allowed':'pointer',width:full?'100%':'auto',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,opacity:disabled?.6:1,border:'none',padding:sm?'8px 14px':'13px 22px',fontSize:sm?12:15,transition:'opacity .15s',...style};
+  const vs={primary:{...b,background:disabled?C.deep:C.acc,color:disabled?C.dim:'#fff',boxShadow:disabled?'none':'0 4px 16px rgba(214,58,86,0.35)'},outline:{...b,background:'transparent',color:C.acc,border:`1.5px solid ${C.acc}`,boxShadow:'none'},ghost:{...b,background:C.gls,color:C.txt,border:BDR,boxShadow:'none'},secondary:{...b,background:C.deep,color:C.txt,border:BDR,boxShadow:'none'},danger:{...b,background:disabled?C.deep:C.red,color:disabled?C.dim:'#fff',boxShadow:'none'}};
   return <button onClick={onClick} disabled={disabled} style={vs[v]||vs.primary}>{children}</button>;
 }
 
@@ -143,11 +145,39 @@ function Toast({toasts}) {
 
 function AssistBanner() {
   return (
-    <a href={`tel:${ASSIST}`} style={{display:'flex',alignItems:'center',gap:12,background:C.acc,borderRadius:12,padding:'12px 16px',textDecoration:'none',marginBottom:16}}>
+    <a href={`tel:${ASSIST.replace(/-/g,'')}`} style={{display:'flex',alignItems:'center',gap:12,background:C.surf,border:'1.5px solid #f0c040',borderRadius:12,padding:'12px 14px',textDecoration:'none',marginBottom:16,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
       <span style={{fontSize:22}}>📞</span>
-      <div><div style={{color:'#fff',fontSize:13,fontWeight:600}}>Quick assistance</div><div style={{color:'rgba(255,255,255,0.8)',fontSize:11}}>{ASSIST} · 24/7</div></div>
-      <div style={{marginLeft:'auto',color:'rgba(255,255,255,0.7)',fontSize:18}}>→</div>
+      <div><div style={{color:C.txt,fontSize:13,fontWeight:700}}>Need help booking?</div><div style={{color:C.sub,fontSize:11}}>{ASSIST} · Call our team</div></div>
+      <div style={{marginLeft:'auto',background:C.acc,color:'#fff',fontSize:11,fontWeight:800,padding:'8px 12px',borderRadius:8,boxShadow:'0 4px 12px rgba(214,58,86,0.3)'}}>Call</div>
     </a>
+  );
+}
+
+function GuestBottomNav({ screen, setScreen, addToast }) {
+  const active = screen==='services' ? 'home' : 'services';
+  const tabs = [
+    {id:'home', icon:'🏠', label:'Home', go:()=>setScreen('services')},
+    {id:'services', icon:'🔍', label:'Services', go:()=>setScreen('services')},
+    {id:'bookings', icon:'📅', label:'Bookings', go:()=>addToast?.('Book & verify to see your bookings here','info')},
+    {id:'profile', icon:'👤', label:'Profile', go:()=>addToast?.('Profile created when you complete a booking','info')},
+  ];
+  return (
+    <div style={{position:'fixed',bottom:0,left:0,right:0,maxWidth:480,margin:'0 auto',background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50}}>
+      {tabs.map(t=>(
+        <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0'}}>
+          <span style={{fontSize:20}}>{t.icon}</span>
+          <span style={{fontSize:10,fontWeight:700,fontFamily:FF,color:active===t.id?C.acc:C.dim}}>{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StickyCta({ children, onClick }) {
+  return (
+    <div style={{position:'fixed',bottom:64,left:0,right:0,maxWidth:480,margin:'0 auto',padding:'10px 16px',background:`linear-gradient(transparent, ${C.bg} 40%)`,zIndex:40}}>
+      <button onClick={onClick} style={{width:'100%',background:C.acc,color:'#fff',border:'none',borderRadius:12,padding:14,fontSize:15,fontWeight:800,fontFamily:FF,cursor:'pointer',boxShadow:'0 6px 20px rgba(214,58,86,0.4)'}}>{children}</button>
+    </div>
   );
 }
 
@@ -437,7 +467,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState('');
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
-  const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
+  const [verifyMethod, setVerifyMethod] = useState('whatsapp'); // 'sms' | 'whatsapp'
+  const [search, setSearch]               = useState('');
   const [waToken, setWaToken]     = useState('');
   const [waChecking, setWaChecking] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(!!localStorage.getItem('scanv_terms_accepted'));
@@ -467,8 +498,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   };
 
   const verifyAndBook = async (waVerified=false) => {
-    const code = otpCode.join('');
-    if (code.length<6) return setErr('Enter 6-digit OTP');
+    if (!waVerified) {
+      const code = otpCode.join('');
+      if (code.length<6) return setErr('Enter 6-digit OTP');
+    }
     setLoading(true); setErr('');
     try {
       const mob = `+91${mobile}`;
@@ -542,111 +575,101 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     finally { setLoading(false); }
   };
 
-  // -- LOCATION BANNER ------------------------------------------------------
   const locBanner = (
-    <div style={{background:`${C.acc}11`,borderBottom:`1px solid ${C.bdr}`,padding:'6px 16px',fontSize:11,color:C.dim,textAlign:'center'}}>
-      📍 ScanV uses your location to show services and enable deliveries · DPDP Act 2023
+    <div style={{background:C.grn+'18',borderBottom:BDR,padding:'6px 16px',fontSize:11,color:C.grn,fontWeight:600,textAlign:'center'}}>
+      📍 Location used for nearby services · DPDP Act 2023
     </div>
   );
 
+  const browseWrap = (content, sticky=null) => (
+    <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:72}}>
+      {content}
+      {sticky}
+      <GuestBottomNav screen={screen} setScreen={setScreen} addToast={addToast}/>
+    </div>
+  );
+
+  const svcList = SVCS.filter(s=>!search||s.name.toLowerCase().includes(search.toLowerCase())||s.sub.toLowerCase().includes(search.toLowerCase())||(SVC_SHORT[s.id]||'').toLowerCase().includes(search.toLowerCase()));
+
   // -- SERVICES LIST --------------------------------------------------------
-  if (screen==='services') return (
-    <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif",display:'flex',flexDirection:'column'}}>
-      <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div style={{fontWeight:800,fontSize:22,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
-        <div style={{fontSize:11,color:C.dim}}>PCMC · Pune</div>
+  if (screen==='services') return browseWrap(
+    <>
+      <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+        <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
+        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||'PCMC'} {silentGeo?.pincode||''}</div>
       </div>
-      {locBanner}
-      <div style={{padding:'16px 16px 80px',flex:1,overflowY:'auto'}}>
-        <div style={{background:`linear-gradient(135deg,${C.surf} 0%,${C.card} 55%,${C.deep} 100%)`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'18px 16px',marginBottom:18,animation:'fadeUp .45s ease'}}>
-          <div style={{fontSize:11,color:C.acc,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:6}}>Professional services · PCMC Pune</div>
-          <div style={{color:C.txt,fontSize:20,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",marginBottom:6}}>Book trusted experts near you</div>
-          <div style={{color:C.sub,fontSize:12,lineHeight:1.5}}>Browse 8 categories · OTP verify at checkout · Pay via UPI or cash</div>
+      <div style={{margin:'10px 16px 0',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+        <span>🔍</span>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search legal, health, plumber…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+      </div>
+      <div style={{display:'flex',gap:6,padding:'8px 16px 0',overflowX:'auto'}}>
+        {['✓ DPDP 2023','✓ Verified partners','UPI · Cash'].map(p=>(
+          <span key={p} style={{flexShrink:0,fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99}}>{p}</span>
+        ))}
+      </div>
+      <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
+        <div style={{marginBottom:12}}>
+          <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Book a service</div>
+          <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'}</div>
         </div>
-        <div style={{marginBottom:16}}>
-          <div style={{color:C.txt,fontSize:18,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",marginBottom:4}}>Services near you</div>
-          <div style={{color:C.sub,fontSize:12}}>{silentGeo?.city||'PCMC, Pune'} · {silentGeo?.pincode||'Detecting location…'}</div>
-        </div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {SVCS.map((s,i)=>{
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          {svcList.map((s,i)=>{
             const d=SVC_DETAIL[s.id]||{};
             return (
-              <div key={s.id} style={{...S.card(),cursor:'pointer',transition:'transform .15s ease, border-color .15s ease, box-shadow .15s ease',animation:`fadeUp .4s ease ${i*0.04}s both`}}
-                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.borderColor='rgba(233,69,96,0.35)';e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.25)';}}
-                onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.borderColor='';e.currentTarget.style.boxShadow='';}}
+              <div key={s.id} style={{...S.card(),padding:'14px 10px',textAlign:'center',cursor:'pointer',minHeight:118,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,animation:`fadeUp .35s ease ${i*0.03}s both`}}
                 onClick={()=>{setActiveSvc(s);setScreen('detail');}}>
-                <div style={{display:'flex',gap:14,alignItems:'center'}}>
-                  <div style={{width:54,height:54,borderRadius:12,background:C.deep,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,flexShrink:0}}>{s.icon}</div>
-                  <div style={{flex:1}}>
-                    <div style={{color:C.txt,fontWeight:700,fontSize:15}}>{s.name}</div>
-                    <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
-                    <div style={{display:'flex',gap:8,marginTop:5,flexWrap:'wrap',alignItems:'center'}}>
-                      <span style={{color:C.gold,fontSize:11}}>{d.rating||'4.8 ⭐'}</span>
-                      <span style={{color:C.dim,fontSize:11}}>·</span>
-                      <span style={{color:C.dim,fontSize:11}}>{d.turnaround||'Same day'}</span>
-                      {s.cash&&<span style={{color:C.grn,fontSize:11,background:`${C.grn}22`,padding:'1px 6px',borderRadius:4}}>💵 Cash</span>}
-                    </div>
-                  </div>
-                  <div style={{color:C.acc,fontSize:20}}>›</div>
-                </div>
+                <div style={{fontSize:28}}>{s.icon}</div>
+                <div style={{color:C.txt,fontWeight:800,fontSize:12,lineHeight:1.2}}>{SVC_SHORT[s.id]||s.name.split(' ')[0]}</div>
+                <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{((s.price||50000)/100).toLocaleString('en-IN')}</div>
+                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {d.turnaround?.split(' ').slice(0,2).join(' ')||'Same day'}</div>
+                {s.cash&&<span style={{color:C.grn,fontSize:8,fontWeight:800,background:'#e6f4ee',border:`1px solid rgba(0,122,77,0.35)`,padding:'2px 6px',borderRadius:4}}>💵 Cash</span>}
               </div>
             );
           })}
         </div>
         <AssistBanner/>
+        <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
+          {[['privacy','Privacy'],['terms','Terms'],['refund','Refund'],['payment','Payment']].map(([k,l])=>(
+            <a key={k} href={'/'+k} style={{color:C.dim,fontSize:10,textDecoration:'none',margin:'0 6px',fontWeight:600}}>{l}</a>
+          ))}
+        </div>
       </div>
-      {/* Legal footer links */}
-      <div style={{textAlign:'center',padding:'16px 20px 90px',borderTop:`1px solid ${C.bdr}`,marginTop:4}}>
-        {[['privacy','Privacy Policy'],['terms','Terms & Conditions'],['refund','Refund Policy'],['payment','Payment Policy']].map(([k,l])=>(
-          <a key={k} href={'/'+k} style={{color:C.dim,fontSize:9,textDecoration:'none',margin:'0 7px',opacity:0.7}}>{l}</a>
-        ))}
-        <div style={{color:C.dim,fontSize:8,marginTop:5,opacity:0.5}}>© 2026 DCORE Global Corporation · DPDP Act 2023</div>
-      </div>
-    </div>
+    </>
   );
 
   // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
     const d = SVC_DETAIL[activeSvc.id]||{};
-    return (
-      <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{activeSvc.name}</div>
+    const total=Math.round(((activeSvc.price||50000)*1.1*1.18)/100);
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{activeSvc.name}</div>
         </div>
-        {locBanner}
-        <div style={{padding:'16px 16px 80px',overflowY:'auto'}}>
-          <div style={{background:C.card,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
-            <div style={{fontSize:56,marginBottom:10}}>{activeSvc.icon}</div>
-            <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{activeSvc.name}</div>
-            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:14}}>{d.desc||activeSvc.sub}</div>
-            <div style={{display:'flex',justifyContent:'center',gap:24}}>
-              <div><div style={{color:C.gold,fontSize:15,fontWeight:700}}>{d.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
-              <div><div style={{color:C.grn,fontSize:15,fontWeight:700}}>{d.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
-              <div><div style={{color:C.cyan,fontSize:15,fontWeight:700}}>{d.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
+        <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
+          <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
+            <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>
+            <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
+            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
+            <div style={{display:'flex',justifyContent:'center',gap:22}}>
+              <div><div style={{color:C.acc,fontSize:14,fontWeight:800}}>{d.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Rating</div></div>
+              <div><div style={{color:C.grn,fontSize:14,fontWeight:800}}>{d.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Bookings</div></div>
+              <div><div style={{color:C.cyan,fontSize:14,fontWeight:800}}>{d.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Response</div></div>
             </div>
           </div>
-          <div style={S.card({marginBottom:14})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
-            {(d.features||[activeSvc.sub]).map(f=>(
-              <div key={f} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
-                <span style={{color:C.grn}}>✓</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
+          <div style={S.card({marginBottom:12,padding:'12px 14px'})}>
+            <div style={{color:C.txt,fontSize:13,fontWeight:700,marginBottom:8}}>What&#39;s included</div>
+            {(d.features||[activeSvc.sub]).slice(0,4).map(f=>(
+              <div key={f} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:12,color:C.sub}}>
+                <span style={{color:C.grn,fontWeight:700}}>✓</span>{f}
               </div>
             ))}
           </div>
-          <div style={S.card({marginBottom:14})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>How it works</div>
-            {[['1','Pick a date','Choose when you need the service'],['2','Verify mobile','Quick OTP verification'],['3','Get matched','Best professional assigned near you'],['4','Pay securely','After service via UPI or cash']].map(([n,t,dd])=>(
-              <div key={n} style={{display:'flex',gap:12,padding:'8px 0',borderBottom:`1px solid ${C.bdr}`}}>
-                <div style={{width:24,height:24,borderRadius:'50%',background:C.acc,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',flexShrink:0}}>{n}</div>
-                <div><div style={{color:C.txt,fontSize:13,fontWeight:500}}>{t}</div><div style={{color:C.dim,fontSize:11,marginTop:2}}>{dd}</div></div>
-              </div>
-            ))}
-          </div>
-          {activeSvc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}><span>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
-          <Btn full onClick={()=>setScreen('book')}>Book now →</Btn>
+          {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:12,fontSize:12,color:C.grn,fontWeight:700}}>💵 Cash on service · platform fee paid online</div>}
         </div>
-      </div>
+      </>,
+      <StickyCta onClick={()=>setScreen('book')}>Book now — From ₹{total.toLocaleString('en-IN')} →</StickyCta>
     );
   }
 
@@ -656,16 +679,16 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
     const price=activeSvc.price||50000,fee=Math.round(price*0.10),gst=Math.round((price+fee)*0.18),total=price+fee+gst;
 
-    return (
-      <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
           <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{activeSvc.name}</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Book service</div>
         </div>
-        <div style={{padding:'16px 16px 40px'}}>
-          <div style={S.card({marginBottom:16,padding:'12px 16px'})}>
+        <div style={{padding:'14px 16px 120px'}}>
+          <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
             {[['Service',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:13}}>
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?15:13}}>
                 <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
               </div>
             ))}
@@ -675,15 +698,15 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <Field label="Service location" note="Auto-filled from your GPS">
             <div style={{display:'flex',gap:8}}>
               <input defaultValue={bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', ')} onChange={e=>setBookingDetail(b=>({...b,loc:e.target.value}))} placeholder="Address, city, PIN" style={{...S.inp(),flex:1}}/>
-              <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
+              <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
             </div>
-            {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4}}>✅ Location updated</div>}
+            {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4,fontWeight:600}}>✅ Location updated</div>}
           </Field>
           <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
-          <Btn full onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue →</Btn>
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
-      </div>
+      </>,
+      <StickyCta onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue to verify →</StickyCta>
     );
   }
 
@@ -716,122 +739,73 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       finally { setLoading(false); }
     };
 
-    return (
-      <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
           <button onClick={()=>setScreen('book')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>Verify your identity</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
         </div>
-        <div style={{padding:'20px 16px'}}>
+        <div style={{padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:16,lineHeight:1.6}}>
-            📍 {city||'Pune'} {pincode||''} · Quick verification to confirm your booking.
-          </div>
-
-          {/* Name fields */}
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>📍 {city||'Pune'} {pincode||''} · Quick verify to confirm booking</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
             <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
           </div>
-
-          {/* Mobile */}
           <Field label="Mobile" req note="10-digit Indian mobile">
-            <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
-              <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
+            <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
+              <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
               <input type="tel" maxLength={10} value={mobile} onChange={e=>setMobile(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
-
-          {/* Location */}
-          <Field label="Your location" note="Auto-detected from GPS">
-            <input value={city?(village?`${village}, ${city} ${pincode}`:`${city} ${pincode}`):'Detecting…'}
-              readOnly style={{...S.inp(),color:C.dim}}/>
-          </Field>
-
-          {/* DPDP + T&C acceptance -- once only */}
           {!termsAccepted&&(
-            <div style={{background:`${C.acc}11`,border:`1px solid ${C.acc}33`,borderRadius:10,padding:14,marginBottom:14}}>
-              <div style={{color:C.txt,fontSize:12,fontWeight:600,marginBottom:8}}>Before we continue</div>
-              <div style={{fontSize:11,color:C.sub,lineHeight:1.7,marginBottom:10}}>
-                By booking, you agree to our{' '}
-                <a href="https://www.dcoreglobal.com/termsandconditions" target="_blank" rel="noreferrer" style={{color:C.acc}}>Terms & Conditions</a>,{' '}
-                <a href="https://www.dcoreglobal.com/privacypolicy" target="_blank" rel="noreferrer" style={{color:C.acc}}>Privacy Policy</a>,{' '}
-                <a href="https://www.dcoreglobal.com/refundpolicy" target="_blank" rel="noreferrer" style={{color:C.acc}}>Refund Policy</a> and acknowledge that DCORE Global Corporation collects your location and device data in compliance with the <strong style={{color:C.txt}}>DPDP Act 2023</strong>.
-              </div>
+            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:14,marginBottom:14}}>
               <label style={{display:'flex',gap:10,alignItems:'flex-start',cursor:'pointer'}}>
-                <input type="checkbox" onChange={e=>e.target.checked&&acceptTerms()} style={{marginTop:2,accentColor:C.acc,width:16,height:16,flexShrink:0}}/>
-                <span style={{fontSize:11,color:C.txt}}>I have read and accept the Terms, Privacy Policy, Refund Policy and DPDP Act 2023 compliance. <strong style={{color:C.acc}}>*</strong></span>
+                <input type="checkbox" onChange={e=>e.target.checked&&acceptTerms()} style={{marginTop:2,accentColor:C.acc,width:18,height:18,flexShrink:0}}/>
+                <span style={{fontSize:12,color:C.sub,lineHeight:1.6}}>I accept <a href="/terms" style={{color:C.acc}}>Terms</a>, <a href="/privacy" style={{color:C.acc}}>Privacy</a> & DPDP Act 2023 <span style={{color:C.acc}}>*</span></span>
               </label>
             </div>
           )}
-          {termsAccepted&&(
-            <div style={{fontSize:10,color:C.grn,marginBottom:10}}>✅ Terms & DPDP Act 2023 accepted</div>
-          )}
-
-          {/* Verification method toggle */}
+          {termsAccepted&&<div style={{fontSize:11,color:C.grn,marginBottom:10,fontWeight:700}}>✅ Terms & DPDP accepted</div>}
           {!otpSent&&(
-            <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14}}>
-              {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
-                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'9px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:verifyMethod===v?600:400,background:verifyMethod===v?C.acc:'transparent',color:verifyMethod===v?'#fff':C.sub}}>
-                  {l}
-                </button>
+            <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
+              {[['whatsapp','💬 WhatsApp'],['sms','📱 SMS OTP']].map(([v,l])=>(
+                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:12,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
               ))}
             </div>
           )}
-
-          {/* SMS OTP flow */}
           {verifyMethod==='sms'&&!otpSent&&(
-            <Btn full onClick={sendOTP} disabled={loading||!termsAccepted}>
-              {loading?<><Spin size={16}/>Sending OTP…</>:'Send SMS OTP →'}
-            </Btn>
+            <Btn full onClick={sendOTP} disabled={loading||!termsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send SMS OTP →'}</Btn>
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <div style={{color:C.grn,fontSize:12,marginBottom:12}}>✅ OTP sent to +91 {mobile} · check SMS</div>
+              <div style={{color:C.grn,fontSize:12,marginBottom:12,fontWeight:700}}>✅ OTP sent to +91 {mobile}</div>
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
                     onChange={e=>{const nd=[...otpCode];nd[i]=e.target.value.replace(/\D/g,'').slice(-1);setOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`votp-${i+1}`)?.focus();}}
                     onKeyDown={e=>{if(e.key==='Backspace'&&!otpCode[i]&&i>0)document.getElementById(`votp-${i-1}`)?.focus();}}
-                    style={{width:44,height:52,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:10,color:C.acc,fontFamily:'monospace',fontSize:24,outline:'none'}}/>
+                    style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={()=>verifyAndBook(false)} disabled={loading||otpCode.join('').length<6}>
-                {loading?<><Spin size={16}/>Verifying…</>:'Verify & confirm booking →'}
-              </Btn>
-              <button onClick={sendOTP} disabled={loading} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
+              <Btn full onClick={()=>verifyAndBook(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & confirm →'}</Btn>
             </>
           )}
-
-          {/* WhatsApp flow */}
           {verifyMethod==='whatsapp'&&!otpSent&&(
-            <Btn full onClick={sendWA} disabled={loading||!termsAccepted} style={{background:'#25D366'}}>
-              {loading?<><Spin size={16}/>Generating link…</>:<><span style={{fontSize:18}}>💬</span> Verify via WhatsApp →</>}
-            </Btn>
+            <Btn full onClick={sendWA} disabled={loading||!termsAccepted} style={{background:'#25D366',boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>{loading?<><Spin size={16}/>…</>:<>💬 Verify via WhatsApp</>}</Btn>
           )}
           {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
-            <div style={{background:`#25D36622`,border:`1.5px solid #25D366`,borderRadius:12,padding:14,textAlign:'center'}}>
-              <div style={{color:'#25D366',fontSize:13,fontWeight:600,marginBottom:8}}>📱 Open WhatsApp to verify</div>
-              <div style={{color:C.sub,fontSize:11,marginBottom:12,lineHeight:1.6}}>
-                Tap the button below — WhatsApp will open with a pre-filled message. Tap Send to verify your number.
-              </div>
-              <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`}
-                target="_blank" rel="noreferrer"
-                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10}}>
-                <span style={{fontSize:20}}>💬</span>
-                <span style={{color:'#fff',fontWeight:700,fontSize:14}}>Open WhatsApp — Send VERIFY message</span>
+            <div style={{background:'#e8f8ef',border:'1.5px solid #25D366',borderRadius:12,padding:14,textAlign:'center'}}>
+              <div style={{color:'#128C7E',fontSize:13,fontWeight:700,marginBottom:8}}>📱 Open WhatsApp to verify</div>
+              <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`} target="_blank" rel="noreferrer"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10,boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>
+                <span style={{color:'#fff',fontWeight:800,fontSize:14}}>💬 Open WhatsApp · Send VERIFY</span>
               </a>
-              {waChecking&&<div style={{fontSize:11,color:C.sub}}>⏳ Waiting for WhatsApp confirmation…</div>}
-              <div style={{fontSize:10,color:C.dim,marginTop:6}}>Token: <code style={{color:C.acc}}>{waToken}</code> · Send to +91-9270194842</div>
+              {waChecking&&<div style={{fontSize:11,color:C.dim,fontWeight:600}}>⏳ Waiting for confirmation…</div>}
             </div>
           )}
-
-          <div style={{textAlign:'center',marginTop:16,fontSize:10,color:C.dim}}>
-            🔒 Stored securely in India · DPDP Act 2023 ·{' '}
-            <a href="https://www.dcoreglobal.com/privacypolicy" target="_blank" rel="noreferrer" style={{color:C.dim}}>Privacy</a>
-          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -2063,7 +2037,7 @@ export default function App() {
 
   if (state==='boot') return (
     <><style>{APP_CSS}</style>
-    <div style={S.center}><div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div><Spin size={32}/></div></>
+    <div style={S.center}><div style={{fontSize:32,fontWeight:800,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div><Spin size={32}/></div></>
   );
 
   // QR landing page -- capture data then proceed to register
@@ -2111,7 +2085,7 @@ export default function App() {
       <Ctx.Provider value={ctx}>
         <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
-        <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.surf}}>
+        <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.bg}}>
           <Boundary>{renderScreen()}</Boundary>
           {!['book'].includes(screen)&&<BottomNav/>}
         </div>

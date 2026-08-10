@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>04 · Daylight Trust Android — ScanV UI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Cool Light (previous Local Trust) ── */
+    .theme-cool {
+      --bg: #f5f6fa;
+      --surf: #ffffff;
+      --card: #ffffff;
+      --deep: #eef1f7;
+      --acc: #e94560;
+      --pro: #1565c0;
+      --grn: #00a86b;
+      --grn-bg: #e8f5e9;
+      --grn-bdr: rgba(0,168,107,0.2);
+      --txt: #1a1a2e;
+      --sub: #4a5568;
+      --dim: #718096;
+      --bdr: rgba(26,26,46,0.1);
+      --bdr-w: 1px;
+      --shadow: 0 2px 16px rgba(26,26,46,0.08);
+      --cta-shadow: 0 4px 16px rgba(233,69,96,0.25);
+      --loc-bg: #e3f2fd;
+    }
+    /* ── Daylight Trust (recommended) ── */
+    .theme-daylight, :root {
+      --bg: #f2efe8;
+      --surf: #fffcf8;
+      --card: #fffcf8;
+      --deep: #ebe6dc;
+      --acc: #d63a56;
+      --pro: #0d47a1;
+      --grn: #007a4d;
+      --grn-bg: #e6f4ee;
+      --grn-bdr: rgba(0,122,77,0.35);
+      --txt: #121212;
+      --sub: #3d4f5f;
+      --dim: #5c6b7a;
+      --bdr: rgba(18,18,18,0.14);
+      --bdr-w: 1.5px;
+      --shadow: 0 3px 14px rgba(18,18,18,0.1);
+      --cta-shadow: 0 6px 20px rgba(214,58,86,0.4);
+      --loc-bg: #dce8f7;
+      --nav-h: 64px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: linear-gradient(180deg, #e8e4dc 0%, #f2efe8 30%);
+      color: #121212;
+      font-family: Inter, system-ui, sans-serif;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .banner {
+      background: linear-gradient(135deg, #fffcf8 0%, #f2efe8 100%);
+      border-bottom: 1.5px solid rgba(18,18,18,0.1);
+      padding: 24px 20px;
+      text-align: center;
+    }
+    .banner .tag {
+      display: inline-block;
+      background: #e6f4ee;
+      color: #007a4d;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 99px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(0,122,77,0.3);
+    }
+    .banner h1 { font-size: 1.65rem; font-weight: 800; color: #121212; }
+    .banner h1 span { color: #d63a56; }
+    .banner p { color: #3d4f5f; font-size: 14px; max-width: 520px; margin: 8px auto 0; line-height: 1.55; }
+    .banner .actions { margin-top: 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .banner a { text-decoration: none; font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 10px; }
+    .btn-primary { background: #d63a56; color: #fff; box-shadow: 0 4px 16px rgba(214,58,86,0.35); }
+    .btn-ghost { background: #fffcf8; color: #3d4f5f; border: 1.5px solid rgba(18,18,18,0.12); }
+
+    /* ── Side-by-side compare ── */
+    .compare-section {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 16px 8px;
+    }
+    .compare-section h2 {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #121212;
+    }
+    .compare-section .sub {
+      text-align: center;
+      font-size: 12px;
+      color: #5c6b7a;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .compare-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .compare-row { grid-template-columns: 1fr; }
+    }
+    .compare-col { text-align: center; }
+    .compare-col .label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .compare-col.old .label { background: #eef1f7; color: #718096; }
+    .compare-col.new .label { background: #e6f4ee; color: #007a4d; }
+    .compare-col.new .label::before { content: '✓ '; }
+    .sun-note {
+      max-width: 640px;
+      margin: 20px auto 0;
+      background: #fff8e6;
+      border: 1.5px solid #f0c040;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #5c4a00;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .hint { text-align: center; font-size: 12px; color: #5c6b7a; padding: 24px 16px 12px; font-weight: 600; }
+    .phones {
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      padding: 8px 20px 40px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .phone-col { flex: 0 0 auto; scroll-snap-align: center; text-align: center; }
+    .phone-col h3 { font-size: 13px; font-weight: 700; color: #3d4f5f; margin-bottom: 10px; }
+    .phone {
+      width: 280px;
+      background: #111;
+      border-radius: 36px;
+      padding: 9px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+      margin: 0 auto;
+    }
+    .phone.sm { width: 100%; max-width: 280px; }
+    .screen {
+      background: var(--bg);
+      border-radius: 28px;
+      height: 520px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      font-size: 13px;
+      color: var(--txt);
+    }
+    .screen.tall { height: 620px; }
+    .status { height: 26px; background: var(--surf); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--dim); font-weight: 600; border-bottom: var(--bdr-w) solid var(--bdr); }
+    .topbar {
+      background: var(--surf);
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: var(--bdr-w) solid var(--bdr);
+      box-shadow: var(--shadow);
+    }
+    .logo { font-weight: 800; font-size: 18px; color: var(--txt); }
+    .logo span { color: var(--acc); }
+    .loc-chip {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--pro);
+      background: var(--loc-bg);
+      padding: 4px 9px;
+      border-radius: 99px;
+      border: var(--bdr-w) solid var(--bdr);
+    }
+    .search {
+      margin: 10px 14px 0;
+      background: var(--surf);
+      border: var(--bdr-w) solid var(--bdr);
+      border-radius: 11px;
+      padding: 11px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--dim);
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow);
+    }
+    .trust-strip { margin: 8px 14px 0; display: flex; gap: 5px; overflow-x: auto; }
+    .trust-pill {
+      flex-shrink: 0;
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--grn);
+      background: var(--grn-bg);
+      border: var(--bdr-w) solid var(--grn-bdr);
+      padding: 4px 8px;
+      border-radius: 99px;
+    }
+    .content { flex: 1; overflow-y: auto; padding: 12px 14px calc(var(--nav-h) + 50px); }
+    .section-title { font-size: 15px; font-weight: 800; margin-bottom: 3px; color: var(--txt); }
+    .section-sub { font-size: 11px; color: var(--dim); margin-bottom: 10px; font-weight: 500; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .cat {
+      background: var(--surf);
+      border: var(--bdr-w) solid var(--bdr);
+      border-radius: 13px;
+      padding: 12px 8px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      min-height: 108px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .cat .icon { font-size: 26px; }
+    .cat .name { font-size: 11px; font-weight: 800; line-height: 1.2; color: var(--txt); }
+    .cat .price { font-size: 11px; font-weight: 800; color: var(--acc); }
+    .cat .meta { font-size: 9px; color: var(--dim); font-weight: 600; }
+    .cat .cash {
+      font-size: 8px;
+      font-weight: 800;
+      color: var(--grn);
+      background: var(--grn-bg);
+      border: 1px solid var(--grn-bdr);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .assist {
+      margin-top: 10px;
+      background: var(--surf);
+      border: var(--bdr-w) solid #f0c040;
+      border-radius: 11px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow);
+    }
+    .assist strong { font-size: 12px; display: block; color: var(--txt); }
+    .assist span { font-size: 10px; color: var(--sub); }
+    .assist .call {
+      margin-left: auto;
+      background: var(--acc);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 7px 11px;
+      border-radius: 8px;
+      box-shadow: var(--cta-shadow);
+    }
+    .bottom-nav {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surf);
+      border-top: var(--bdr-w) solid var(--bdr);
+      display: flex;
+      padding: 7px 0 calc(7px + var(--safe-b));
+      box-shadow: 0 -4px 16px rgba(18,18,18,0.08);
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--dim);
+    }
+    .nav-item.on { color: var(--acc); }
+    .nav-item .ico { font-size: 18px; }
+    .sticky-cta {
+      position: absolute;
+      bottom: calc(var(--nav-h) + var(--safe-b));
+      left: 0; right: 0;
+      padding: 8px 14px;
+      background: linear-gradient(transparent, var(--bg) 35%);
+    }
+    .sticky-cta button {
+      width: 100%;
+      background: var(--acc);
+      color: #fff;
+      border: none;
+      border-radius: 11px;
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 800;
+      font-family: inherit;
+      box-shadow: var(--cta-shadow);
+    }
+    .detail-hero {
+      background: var(--surf);
+      border-radius: 14px;
+      padding: 18px;
+      text-align: center;
+      border: var(--bdr-w) solid var(--bdr);
+      box-shadow: var(--shadow);
+      margin-bottom: 10px;
+    }
+    .detail-hero .big { font-size: 44px; margin-bottom: 6px; }
+    .stats { display: flex; justify-content: center; gap: 18px; margin-top: 10px; }
+    .stats b { display: block; font-size: 13px; color: var(--acc); font-weight: 800; }
+    .stats small { font-size: 9px; color: var(--dim); font-weight: 600; }
+    .checklist { background: var(--surf); border-radius: 11px; padding: 10px 12px; border: var(--bdr-w) solid var(--bdr); margin-bottom: 8px; }
+    .checklist li { list-style: none; padding: 5px 0; font-size: 11px; color: var(--sub); font-weight: 500; border-bottom: 1px solid var(--bdr); display: flex; gap: 6px; }
+    .checklist li:last-child { border: none; }
+    .field { margin-bottom: 10px; }
+    .field label { font-size: 10px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 4px; }
+    .field input {
+      width: 100%;
+      padding: 11px 12px;
+      border: var(--bdr-w) solid var(--bdr);
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      background: var(--surf);
+      color: var(--txt);
+    }
+    .price-box { background: var(--surf); border-radius: 11px; padding: 11px 12px; border: var(--bdr-w) solid var(--bdr); margin-bottom: 12px; font-size: 12px; font-weight: 500; }
+    .price-row { display: flex; justify-content: space-between; padding: 3px 0; color: var(--sub); }
+    .price-row.total { font-weight: 800; color: var(--acc); font-size: 15px; border-top: var(--bdr-w) solid var(--bdr); margin-top: 5px; padding-top: 7px; }
+    .wa-toggle { display: flex; background: var(--deep); border-radius: 9px; padding: 3px; margin-bottom: 12px; border: var(--bdr-w) solid var(--bdr); }
+    .wa-toggle span { flex: 1; text-align: center; padding: 9px; border-radius: 7px; font-size: 11px; font-weight: 700; color: var(--dim); }
+    .wa-toggle span.on { background: #25D366; color: #fff; }
+    .wa-btn {
+      width: 100%;
+      background: #25D366;
+      color: #fff;
+      border: none;
+      border-radius: 11px;
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 800;
+      font-family: inherit;
+      box-shadow: 0 4px 14px rgba(37,211,102,0.35);
+    }
+    .otp-row { display: flex; gap: 7px; justify-content: center; margin: 12px 0; }
+    .otp-box {
+      width: 44px; height: 50px;
+      border: var(--bdr-w) solid var(--bdr);
+      border-radius: 9px;
+      background: var(--surf);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: var(--acc);
+    }
+    .otp-box.filled { border-color: var(--acc); background: #fff0f3; border-width: 2px; }
+    .back-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .back-row button { background: none; border: none; font-size: 18px; color: var(--sub); }
+    .back-row h2 { font-size: 14px; font-weight: 800; flex: 1; text-align: center; margin-right: 26px; color: var(--txt); }
+    .token-table {
+      max-width: 640px;
+      margin: 0 auto 24px;
+      padding: 0 16px;
+      font-size: 11px;
+    }
+    .token-table table { width: 100%; border-collapse: collapse; background: #fffcf8; border-radius: 12px; overflow: hidden; border: 1.5px solid rgba(18,18,18,0.12); }
+    .token-table th, .token-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(18,18,18,0.08); }
+    .token-table th { background: #f2efe8; font-weight: 700; color: #3d4f5f; }
+    .token-table .new { color: #007a4d; font-weight: 700; }
+    footer { text-align: center; padding: 24px; font-size: 12px; color: #5c6b7a; }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <div class="tag">☀️ DAYLIGHT TRUST · ANDROID OPTIMISED</div>
+    <h1>Scan<span>V</span> Daylight Trust UI</h1>
+    <p>Warm sand background · stronger borders · high-contrast text · built for daytime outdoor use in PCMC/Pune</p>
+    <div class="actions">
+      <a class="btn-primary" href="#compare">Compare ↓</a>
+      <a class="btn-ghost" href="#screens">Full flow ↓</a>
+      <a class="btn-ghost" href="index.html">← All designs</a>
+    </div>
+  </div>
+
+  <!-- SIDE BY SIDE COMPARE -->
+  <section class="compare-section" id="compare">
+    <h2>Side-by-side: Cool Light vs Daylight Trust</h2>
+    <p class="sub">Same home screen · simulated bright daytime reading<br>Daylight Trust uses warm tones + thicker borders so cards stay visible in sunlight</p>
+    <div class="compare-row">
+      <div class="compare-col old">
+        <div class="label">Previous · Cool Light</div>
+        <div class="phone sm theme-cool">
+          <div class="screen">
+            <div class="status">9:41 ☀️</div>
+            <div class="topbar"><div class="logo">Scan<span>V</span></div><div class="loc-chip">📍 Wakad</div></div>
+            <div class="search">🔍 Search services…</div>
+            <div class="trust-strip">
+              <span class="trust-pill">✓ DPDP</span>
+              <span class="trust-pill">Verified</span>
+            </div>
+            <div class="content">
+              <div class="section-title">Book a service</div>
+              <div class="section-sub">8 categories · PCMC</div>
+              <div class="grid">
+                <div class="cat"><div class="icon">⚖️</div><div class="name">Legal</div><div class="price">From ₹500</div><div class="meta">4.8 ⭐</div></div>
+                <div class="cat"><div class="icon">🏥</div><div class="name">Health</div><div class="price">From ₹500</div><div class="meta">4.7 ⭐</div></div>
+                <div class="cat"><div class="icon">🔧</div><div class="name">Household</div><div class="price">From ₹500</div><div class="cash">💵 Cash</div></div>
+                <div class="cat"><div class="icon">🍱</div><div class="name">Food</div><div class="price">From ₹500</div><div class="cash">💵 Cash</div></div>
+              </div>
+            </div>
+            <div class="bottom-nav">
+              <div class="nav-item on"><span class="ico">🏠</span>Home</div>
+              <div class="nav-item"><span class="ico">🔍</span>Services</div>
+              <div class="nav-item"><span class="ico">📅</span>Book</div>
+              <div class="nav-item"><span class="ico">👤</span>Profile</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="compare-col new">
+        <div class="label">Daylight Trust</div>
+        <div class="phone sm theme-daylight">
+          <div class="screen">
+            <div class="status">9:41 ☀️</div>
+            <div class="topbar"><div class="logo">Scan<span>V</span></div><div class="loc-chip">📍 Wakad</div></div>
+            <div class="search">🔍 Search services…</div>
+            <div class="trust-strip">
+              <span class="trust-pill">✓ DPDP</span>
+              <span class="trust-pill">Verified</span>
+            </div>
+            <div class="content">
+              <div class="section-title">Book a service</div>
+              <div class="section-sub">8 categories · PCMC</div>
+              <div class="grid">
+                <div class="cat"><div class="icon">⚖️</div><div class="name">Legal</div><div class="price">From ₹500</div><div class="meta">4.8 ⭐</div></div>
+                <div class="cat"><div class="icon">🏥</div><div class="name">Health</div><div class="price">From ₹500</div><div class="meta">4.7 ⭐</div></div>
+                <div class="cat"><div class="icon">🔧</div><div class="name">Household</div><div class="price">From ₹500</div><div class="cash">💵 Cash</div></div>
+                <div class="cat"><div class="icon">🍱</div><div class="name">Food</div><div class="price">From ₹500</div><div class="cash">💵 Cash</div></div>
+              </div>
+            </div>
+            <div class="bottom-nav">
+              <div class="nav-item on"><span class="ico">🏠</span>Home</div>
+              <div class="nav-item"><span class="ico">🔍</span>Services</div>
+              <div class="nav-item"><span class="ico">📅</span>Book</div>
+              <div class="nav-item"><span class="ico">👤</span>Profile</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sun-note">☀️ <strong>Why Daylight Trust?</strong> Cool white (#FFF) washes out in direct sun. Warm sand (#F2EFE8) + 1.5px borders keep cards readable without going dark mode.</div>
+  </section>
+
+  <div class="token-table">
+    <table>
+      <tr><th>Token</th><th>Cool Light</th><th>Daylight Trust</th></tr>
+      <tr><td>Background</td><td>#F5F6FA</td><td class="new">#F2EFE8 warm sand</td></tr>
+      <tr><td>Cards</td><td>#FFFFFF pure white</td><td class="new">#FFFCF8 + 1.5px border</td></tr>
+      <tr><td>Text</td><td>#1A1A2E</td><td class="new">#121212 near-black</td></tr>
+      <tr><td>Subtext</td><td>#718096 light gray</td><td class="new">#5C6B7A darker</td></tr>
+      <tr><td>Trust green</td><td>#00A86B pastel</td><td class="new">#007A4D saturated</td></tr>
+      <tr><td>CTA shadow</td><td>Light</td><td class="new">Stronger rose shadow</td></tr>
+    </table>
+  </div>
+
+  <p class="hint" id="screens">Full Daylight Trust flow — swipe 5 screens →</p>
+
+  <div class="phones theme-daylight">
+    <div class="phone-col">
+      <h3>1 · Home grid</h3>
+      <div class="phone"><div class="screen tall">
+        <div class="status">9:41 ☀️</div>
+        <div class="topbar"><div class="logo">Scan<span>V</span></div><div class="loc-chip">📍 Wakad 411057</div></div>
+        <div class="search">🔍 Search legal, health, plumber…</div>
+        <div class="trust-strip">
+          <span class="trust-pill">✓ DPDP 2023</span>
+          <span class="trust-pill">✓ Verified partners</span>
+          <span class="trust-pill">UPI · Cash</span>
+        </div>
+        <div class="content">
+          <div class="section-title">Book a service</div>
+          <div class="section-sub">8 categories · PCMC, Pune</div>
+          <div class="grid">
+            <div class="cat"><div class="icon">⚖️</div><div class="name">Legal</div><div class="price">From ₹500</div><div class="meta">4.8 ⭐ · 24hr</div></div>
+            <div class="cat"><div class="icon">🏥</div><div class="name">Health</div><div class="price">From ₹500</div><div class="meta">4.7 ⭐ · 2hr</div></div>
+            <div class="cat"><div class="icon">🔧</div><div class="name">Household</div><div class="price">From ₹500</div><div class="meta">Same day</div><div class="cash">💵 Cash</div></div>
+            <div class="cat"><div class="icon">📦</div><div class="name">Delivery</div><div class="price">From ₹500</div><div class="meta">Same day</div><div class="cash">💵 Cash</div></div>
+            <div class="cat"><div class="icon">🍱</div><div class="name">Food</div><div class="price">From ₹500</div><div class="meta">30–60 min</div><div class="cash">💵 Cash</div></div>
+            <div class="cat"><div class="icon">🏡</div><div class="name">Property</div><div class="price">From ₹500</div><div class="meta">4.6 ⭐</div></div>
+            <div class="cat"><div class="icon">☁️</div><div class="name">Cloud</div><div class="price">From ₹500</div><div class="meta">Weekly</div></div>
+            <div class="cat"><div class="icon">👑</div><div class="name">VIP</div><div class="price">From ₹500</div><div class="meta">Same day</div></div>
+          </div>
+          <div class="assist">
+            <div>📞 <strong>Need help?</strong><span>Call our team</span></div>
+            <div class="call">Call</div>
+          </div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item on"><span class="ico">🏠</span>Home</div>
+          <div class="nav-item"><span class="ico">🔍</span>Services</div>
+          <div class="nav-item"><span class="ico">📅</span>Bookings</div>
+          <div class="nav-item"><span class="ico">👤</span>Profile</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="phone-col">
+      <h3>2 · Detail + sticky CTA</h3>
+      <div class="phone"><div class="screen tall">
+        <div class="status">9:42</div>
+        <div class="content" style="padding-top:10px">
+          <div class="back-row"><button>←</button><h2>Household services</h2></div>
+          <div class="detail-hero">
+            <div class="big">🔧</div>
+            <strong style="font-size:15px">Household services</strong>
+            <p style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.5">Plumbing, electrical, cleaning · PCMC/Pune</p>
+            <div class="stats">
+              <div><b>4.7 ⭐</b><small>Rating</small></div>
+              <div><b>8,900+</b><small>Bookings</small></div>
+              <div><b>Same day</b><small>Response</small></div>
+            </div>
+          </div>
+          <ul class="checklist">
+            <li><span style="color:var(--grn)">✓</span> Background verified</li>
+            <li><span style="color:var(--grn)">✓</span> Transparent pricing</li>
+            <li><span style="color:var(--grn)">✓</span> Cash on service OK</li>
+          </ul>
+        </div>
+        <div class="sticky-cta"><button>Book now — From ₹590 →</button></div>
+        <div class="bottom-nav">
+          <div class="nav-item on"><span class="ico">🏠</span>Home</div>
+          <div class="nav-item"><span class="ico">🔍</span>Services</div>
+          <div class="nav-item"><span class="ico">📅</span>Bookings</div>
+          <div class="nav-item"><span class="ico">👤</span>Profile</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="phone-col">
+      <h3>3 · Book</h3>
+      <div class="phone"><div class="screen tall">
+        <div class="status">9:43</div>
+        <div class="content" style="padding-top:10px">
+          <div class="back-row"><button>←</button><h2>Book service</h2></div>
+          <div class="price-box">
+            <div class="price-row"><span>Service</span><span>₹500</span></div>
+            <div class="price-row"><span>Platform fee</span><span>₹50</span></div>
+            <div class="price-row"><span>GST</span><span>₹99</span></div>
+            <div class="price-row total"><span>Total</span><span>₹649</span></div>
+          </div>
+          <div class="field"><label>Date *</label><input value="12 Aug 2026" readonly></div>
+          <div class="field"><label>Time</label><input value="10:00 AM" readonly></div>
+          <div class="field"><label>Location</label><input value="Wakad, Pune 411057" readonly></div>
+        </div>
+        <div class="sticky-cta"><button>Continue to verify →</button></div>
+        <div class="bottom-nav">
+          <div class="nav-item"><span class="ico">🏠</span>Home</div>
+          <div class="nav-item on"><span class="ico">🔍</span>Services</div>
+          <div class="nav-item"><span class="ico">📅</span>Bookings</div>
+          <div class="nav-item"><span class="ico">👤</span>Profile</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="phone-col">
+      <h3>4 · WhatsApp verify</h3>
+      <div class="phone"><div class="screen tall">
+        <div class="status">9:44</div>
+        <div class="content" style="padding-top:10px">
+          <div class="back-row"><button>←</button><h2>Verify mobile</h2></div>
+          <div class="field"><label>First name *</label><input value="Rahul" readonly></div>
+          <div class="field"><label>Mobile *</label><input value="+91 9876543210" readonly></div>
+          <div class="wa-toggle"><span>SMS OTP</span><span class="on">💬 WhatsApp</span></div>
+          <button class="wa-btn">💬 Verify via WhatsApp</button>
+          <p style="text-align:center;font-size:11px;color:var(--dim);margin-top:10px;font-weight:600">Tap Send in WhatsApp · done in 5 sec</p>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><span class="ico">🏠</span>Home</div>
+          <div class="nav-item on"><span class="ico">🔍</span>Services</div>
+          <div class="nav-item"><span class="ico">📅</span>Bookings</div>
+          <div class="nav-item"><span class="ico">👤</span>Profile</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="phone-col">
+      <h3>5 · SMS OTP fallback</h3>
+      <div class="phone"><div class="screen tall">
+        <div class="status">9:45</div>
+        <div class="content" style="padding-top:10px">
+          <div class="back-row"><button>←</button><h2>Enter OTP</h2></div>
+          <p style="font-size:11px;color:var(--sub);margin-bottom:12px;font-weight:600">Sent to +91 9876543210</p>
+          <div class="otp-row">
+            <div class="otp-box filled">4</div>
+            <div class="otp-box filled">8</div>
+            <div class="otp-box filled">2</div>
+            <div class="otp-box">·</div>
+            <div class="otp-box">·</div>
+            <div class="otp-box">·</div>
+          </div>
+          <button class="wa-btn" style="background:var(--acc)">Verify & confirm</button>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><span class="ico">🏠</span>Home</div>
+          <div class="nav-item on"><span class="ico">🔍</span>Services</div>
+          <div class="nav-item"><span class="ico">📅</span>Bookings</div>
+          <div class="nav-item"><span class="ico">👤</span>Profile</div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <footer>
+    Happy with Daylight Trust? Reply <strong>"yes implement"</strong> to apply to the live ScanV app.<br>
+    DCORE Global Corporation · PCMC, Pune
+  </footer>
+</body>
+</html>

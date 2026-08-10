@@ -24,8 +24,8 @@
   "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#e94560",
-  "background_color": "#0d0f1a",
+  "theme_color": "#d63a56",
+  "background_color": "#f2efe8",
   "categories": ["business", "lifestyle", "utilities"],
   "lang": "en-IN",
   "scope": "/"
