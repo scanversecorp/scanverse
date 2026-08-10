@@ -569,6 +569,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         </div>
         <AssistBanner/>
       </div>
+      {/* Legal footer links */}
+      <div style={{textAlign:'center',padding:'16px 20px 90px',borderTop:`1px solid ${C.bdr}`,marginTop:4}}>
+        {[['privacy','Privacy Policy'],['terms','Terms & Conditions'],['refund','Refund Policy'],['payment','Payment Policy']].map(([k,l])=>(
+          <a key={k} href={'/'+k} style={{color:C.dim,fontSize:9,textDecoration:'none',margin:'0 7px',opacity:0.7}}>{l}</a>
+        ))}
+        <div style={{color:C.dim,fontSize:8,marginTop:5,opacity:0.5}}>\u00a9 2026 DCORE Global Corporation \u00b7 DPDP Act 2023</div>
+      </div>
     </div>
   );
 
