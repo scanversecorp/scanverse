@@ -149,9 +149,9 @@ erDiagram
 | Path | Trigger | Flow |
 |------|---------|------|
 | **SMS OTP (primary)** | User chooses SMS or WA unavailable | `send-otp` → 6-digit code → verify |
-| **WhatsApp (backup)** | User chooses WA or SMS fails | `whatsapp-verify` generate → `wa.me` pre-filled message → poll `check` every 3s |
+| **WhatsApp (backup)** | User chooses WA or SMS fails | `whatsapp-verify` generate → **outbound WA to user** → user replies → poll `check` every 3s |
 
-WhatsApp deep link: `https://wa.me/919270194842?text=SCANV VERIFY {token}`  
+Server sends: `ScanV verification: Reply VERIFY {token} to confirm your booking.`  
 Tokens stored in `wa_verifications` (30 min TTL). See `supabase/functions/whatsapp-verify/README.md`.
 
 ---
@@ -174,13 +174,12 @@ Providers: MSG91 (primary, India) · Twilio (fallback)
 POST /functions/v1/whatsapp-verify
 Body: { action: "generate", mobile: "+91XXXXXXXXXX" }
      | { action: "check", token: "SCANV-XXXX" }
-     | { action: "webhook", token, secret? }  // optional strict mode
+     | inbound webhook (MSG91/Twilio) or { action: "webhook", ... }
 
-Response generate: { success: true, token }
-Response check:     { verified: true|false, mobile? }
+generate: creates token, sends outbound WhatsApp TO user mobile, returns { messageSent, provider }
+check:    returns verified after inbound reply (strict) or honor delay (dev)
+webhook:  parses MSG91/Twilio inbound payloads, marks token verified
 ```
-
-MVP uses honor-system verify-on-check (10s delay) unless `WHATSAPP_WEBHOOK_SECRET` is set.
 
 ---
 
