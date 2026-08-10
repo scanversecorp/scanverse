@@ -23,46 +23,72 @@ const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE Global Corporation';
 const ASSIST   = '+91-9270194842';
 
+const UPI_PACKAGES = {
+  GPay: 'com.google.android.apps.nbu.paisa.user',
+  PhonePe: 'com.phonepe.app',
+  Paytm: 'net.one97.paytm',
+};
+
 function isAndroidUA() { return /Android/i.test(navigator.userAgent); }
 function buildUpiParams(amountPaise, txnRef, note) {
-  const am = (amountPaise / 100).toFixed(2);
-  const tn = encodeURIComponent(note || 'ScanV Booking');
-  const pn = encodeURIComponent(UPI_PN);
-  const tr = encodeURIComponent(txnRef || '');
-  return `pa=${UPI_PA}&pn=${pn}&am=${am}&cu=INR&tn=${tn}&tr=${tr}`;
+  const sp = new URLSearchParams();
+  sp.set('pa', UPI_PA);
+  sp.set('pn', UPI_PN);
+  sp.set('am', (amountPaise / 100).toFixed(2));
+  sp.set('cu', 'INR');
+  sp.set('tn', note || 'ScanV Booking');
+  if (txnRef) sp.set('tr', txnRef);
+  return sp.toString();
 }
 function buildUpiLink(amountPaise, txnRef, note) {
   return `upi://pay?${buildUpiParams(amountPaise, txnRef, note)}`;
 }
-/** Open UPI app directly — no QR modal; generic UPI uses plain upi:// only (never empty package intent) */
-function openUpiPay(app, amountPaise, txnRef, note) {
+function buildUpiIntent(amountPaise, txnRef, note, pkg) {
   const params = buildUpiParams(amountPaise, txnRef, note);
+  return `intent://pay?${params}#Intent;scheme=upi;package=${pkg};S.browser_fallback_url=;end`;
+}
+/** Open URL via hidden anchor — avoids WhatsApp intercept from window.location on intent:// */
+function openUrlViaAnchor(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+/** Open UPI app — generic uses plain upi:// only (never empty-package intent) */
+function openUpiPay(app, amountPaise, txnRef, note) {
   const upiLink = buildUpiLink(amountPaise, txnRef, note);
   const android = isAndroidUA();
-  if (app === 'GPay') {
-    if (android) {
-      window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-      setTimeout(() => { window.location.href = `tez://upi/pay?${params}`; }, 400);
-    } else {
-      window.location.href = upiLink;
-    }
-  } else if (app === 'PhonePe') {
-    if (android) {
-      window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
-      setTimeout(() => { window.location.href = `phonepe://pay?${params}`; }, 400);
-    } else {
-      window.location.href = `phonepe://pay?${params}`;
-    }
-  } else if (app === 'Paytm') {
-    if (android) {
-      window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
-      setTimeout(() => { window.location.href = `paytmmp://pay?${params}`; }, 400);
-    } else {
-      window.location.href = `paytmmp://pay?${params}`;
-    }
-  } else {
-    window.location.href = upiLink;
+  const pkg = app && app !== 'Any UPI' ? UPI_PACKAGES[app] : null;
+  if (android && pkg) {
+    openUrlViaAnchor(buildUpiIntent(amountPaise, txnRef, note, pkg));
+    setTimeout(() => openUrlViaAnchor(upiLink), 500);
+    return;
   }
+  openUrlViaAnchor(upiLink);
+}
+function UpiVpaCopy({ addToast }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(UPI_PA);
+      setCopied(true);
+      addToast?.('UPI ID copied', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {
+      addToast?.('Copy failed — select manually', 'error');
+    }
+  };
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 14, fontSize: 11, color: C.dim }}>
+      <span>Pay to: </span>
+      <span style={{ fontWeight: 700, color: C.sub, fontFamily: 'monospace' }}>{UPI_PA}</span>
+      <button type="button" onClick={copy} style={{ marginLeft: 8, background: 'none', border: `1px solid ${C.bdr}`, borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: C.cyan, cursor: 'pointer' }}>
+        {copied ? 'Copied ✓' : 'Copy'}
+      </button>
+    </div>
+  );
 }
 async function registerPaymentIntent(txnId, amountPaise, userId) {
   if (!txnId || !amountPaise) return;
@@ -977,6 +1003,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             ))}
           </div>
           {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
+          <UpiVpaCopy addToast={addToast} />
           <Btn full onClick={()=>launchUpi('Any UPI')} style={{marginBottom:14,boxShadow:'0 4px 16px rgba(214,58,86,0.35)'}}>💳 Pay via UPI →</Btn>
           {upiOpened&&!paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{checkingPay?'⏳ Checking payment status…':'Complete payment in your UPI app, then tap I\'ve paid — continue'}</div>}
           {paymentVerified&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment confirmed — you can continue</div>}
@@ -1971,6 +1998,7 @@ function BookScreen() {
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
             <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
           </div>
+          <UpiVpaCopy addToast={addToast} />
           <Btn full onClick={()=>bookPay.launchUpi('Any UPI')} style={{marginBottom:14}}>💳 Pay via UPI →</Btn>
           {bookPay.upiOpened&&!bookPay.paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{bookPay.checkingPay?'⏳ Checking payment status…':'Complete payment in your UPI app, then tap I\'ve paid — continue'}</div>}
           {bookPay.paymentVerified&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment confirmed — you can continue</div>}
