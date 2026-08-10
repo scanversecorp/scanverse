@@ -102,8 +102,16 @@ const APP_CSS = `
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
 `;
 
-function legalPathname() {
-  return window.location.pathname.replace(/^\/+|\/+$/g,'').split('/')[0];
+const LEGAL_ROUTES = new Set(['privacy','terms','refund','payment']);
+
+/** First path segment only; empty for `/` — never treat home as a legal page. */
+function legalSegment() {
+  const seg = window.location.pathname.replace(/^\/+|\/+$/g,'').split('/')[0];
+  return seg || '';
+}
+
+function isLegalRoute() {
+  return LEGAL_ROUTES.has(legalSegment());
 }
 
 /* --- PRIMITIVES --------------------------------------------------- */
@@ -2123,13 +2131,14 @@ function LegalPage({page}) {
       )
     },
   };
-  const pg = pages[page] || pages.privacy;
+  const pg = pages[page];
+  if (!pg) return null;
   return (
-    <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF}}>
       {/* Header */}
-      <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
-        <div style={{fontWeight:800,fontSize:20,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
-        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>← Back</button>
+      <div style={{background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+        <div style={{fontWeight:800,fontSize:20,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
+        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>
       </div>
       <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
         {/* Hero */}
@@ -2228,8 +2237,8 @@ export default function App() {
       .then(({data})=>setNotifs(data||[]));
   },[user]);
 
-  const legalPath = legalPathname();
-  if (['privacy','terms','refund','payment'].includes(legalPath)) {
+  const legalPath = legalSegment();
+  if (isLegalRoute()) {
     return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath}/></Boundary>;
   }
 

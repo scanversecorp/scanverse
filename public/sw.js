@@ -1,33 +1,22 @@
-/* ScanV Service Worker v4 */
-const CACHE = 'scanv-v4';
-const STATIC = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.ico',
-  '/logo192.png',
-  '/logo512.png',
-];
+/* ScanV Service Worker v5 — network-first shell, cache static assets */
+const CACHE = 'scanv-v5';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC).catch(() => {})));
+  e.waitUntil(caches.open(CACHE).then(() => Promise.resolve()));
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
-  /* Only cache GET requests */
   if (e.request.method !== 'GET') return;
 
-  /* Let Supabase and payment API calls pass through always */
   const url = e.request.url;
   if (
     url.includes('supabase.co') ||
@@ -37,15 +26,35 @@ self.addEventListener('fetch', e => {
     url.includes('api.github.com')
   ) return;
 
+  const isNavigation = e.request.mode === 'navigate';
+  const isShell = url.endsWith('/index.html') || url.endsWith('/');
+
+  /* Always fetch fresh HTML shell and SPA navigations (avoids stale legal-page bundles). */
+  if (isNavigation || isShell) {
+    e.respondWith(
+      fetch(e.request).then(response => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(e.request).then(c => c || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  /* Cache-first for hashed static assets only. */
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') return response;
-        const clone = response.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+        if (!response || response.status !== 200) return response;
+        if (url.includes('/static/')) {
+          const clone = response.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
         return response;
-      }).catch(() => caches.match('/index.html'));
+      });
     })
   );
 });

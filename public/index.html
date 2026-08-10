@@ -9,16 +9,16 @@
   <!-- PWA / mobile app meta -->
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
   <meta name="apple-mobile-web-app-title" content="ScanV"/>
   <meta name="application-name" content="ScanV"/>
-  <meta name="msapplication-TileColor" content="#e94560"/>
+  <meta name="msapplication-TileColor" content="#d63a56"/>
 
   <!-- Open Graph -->
   <meta property="og:title" content="ScanV — Services near you · PCMC Pune"/>
   <meta property="og:description" content="Legal · Health · Cloud Training · Property · Household · Food — all verified, all local."/>
   <meta property="og:type" content="website"/>
-  <meta property="og:url" content="https://scanverse-tau.vercel.app"/>
+  <meta property="og:url" content="https://scanv-tau.vercel.app"/>
 
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json"/>
   <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico"/>
@@ -27,7 +27,7 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet"/>
 
   <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -38,50 +38,46 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root {
       height: 100%;
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0d0f1a;
-      color: #f0f0f0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f2efe8;
+      color: #121212;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
-    /* Prevent iOS bounce / overscroll */
     body { overscroll-behavior: none; }
-    /* Safe area insets for notched phones */
     #root {
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
     }
-    /* Hide scrollbar globally */
     ::-webkit-scrollbar { width: 0; background: transparent; }
-    /* Spinner for initial load */
     #root-loader {
       position: fixed; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #0d0f1a; gap: 16px; z-index: 9999;
+      background: #f2efe8; gap: 16px; z-index: 9999;
     }
     #root-loader .logo {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       font-size: 32px; font-weight: 800;
+      color: #121212;
     }
-    #root-loader .logo span { color: #e94560; }
+    #root-loader .logo span { color: #d63a56; }
     #root-loader .spin {
       width: 32px; height: 32px;
-      border: 2px solid rgba(255,255,255,0.08);
-      border-top-color: #e94560;
+      border: 2px solid rgba(18,18,18,0.12);
+      border-top-color: #d63a56;
       border-radius: 50%;
       animation: spin .7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     input, select, textarea, button {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
     }
   </style>
 </head>
 <body>
   <noscript>ScanV requires JavaScript to run. Please enable JavaScript in your browser.</noscript>
 
-  <!-- Initial loader — removed by React on mount -->
   <div id="root-loader">
     <div class="logo">Scan<span>V</span></div>
     <div class="spin"></div>
@@ -89,7 +85,6 @@
 
   <div id="root"></div>
 
-  <!-- PWA Service Worker registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
