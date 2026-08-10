@@ -1861,7 +1861,7 @@ function LegalPage({page}) {
             ['User Responsibilities','Provide accurate booking details \u00b7 Be present at the agreed time and location \u00b7 Treat Partners respectfully \u00b7 Report disputes within 48 hours of service completion \u00b7 Do not book for unlawful purposes'],
             ['Payment & Fees','Platform fee: 10% of service value \u00b7 GST at applicable rates on total \u00b7 Service fees are indicative and agreed with the Partner \u00b7 Cash-on-service: platform fee still payable online'],
             ['Professional Services Disclaimer','Legal services: advice is between you and the advocate (DCORE has no liability). Healthcare: treatment is between you and the practitioner (DCORE has no liability). Training: results are between you and the trainer.'],
-            ['Liability Limitation','DCORE's total liability for any claim is capped at the platform fee for that booking. We are not liable for indirect, consequential, or punitive damages. Partners are independent contractors.'],
+            ['Liability Limitation','DCORE\u2019s total liability for any claim is capped at the platform fee for that booking. We are not liable for indirect, consequential, or punitive damages. Partners are independent contractors.'],
             ['Prohibited Uses','Illegal purposes \u00b7 Reverse engineering the platform \u00b7 Fake bookings or reviews \u00b7 Soliciting Partners outside ScanV \u00b7 Abuse or harassment of Partners or Users'],
             ['Governing Law','Laws of India \u00b7 Courts of Pune, Maharashtra have exclusive jurisdiction \u00b7 30-day good-faith negotiation before legal action \u00b7 Contact: legal@dcoreglobal.com'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
@@ -1875,7 +1875,7 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>\u26a0\ufe0f Refunds apply only to the platform fee (10%) collected by DCORE. Service fees paid to Partners \u2014 including cash \u2014 are outside DCORE's refund scope.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>\u26a0\ufe0f Refunds apply only to the platform fee (10%) collected by DCORE. Service fees paid to Partners \u2014 including cash \u2014 are outside DCORE\u2019s refund scope.</p>
           </div>
           <div style={{marginBottom:20}}>
             <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>Cancellation Schedule</div>
@@ -1911,7 +1911,7 @@ function LegalPage({page}) {
             ['Cash on Service','Platform fee still paid online \u00b7 Service fee paid in cash to Partner after service completion \u00b7 Applies to: Household Services, Deliveries, Food & Tiffin'],
             ['Security','Razorpay PCI-DSS L1 \u00b7 TLS 1.3 encryption \u00b7 AES-256 at rest \u00b7 No card/CVV/bank details stored by ScanV \u00b7 RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure \u00b7 Booking stays "Pending Payment" for 24 hours \u00b7 Auto-refund in 5\u20137 days if deducted but booking not confirmed \u00b7 Contact: payments@dcoreglobal.com'],
-            ['Partner Payouts','Within 3 business days of service completion \u00b7 Via UPI to Partner's registered UPI ID \u00b7 TDS deducted under Section 194-O Income Tax Act \u00b7 Monthly payout statements issued'],
+            ['Partner Payouts','Within 3 business days of service completion \u00b7 Via UPI to Partner\u2019s registered UPI ID \u00b7 TDS deducted under Section 194-O Income Tax Act \u00b7 Monthly payout statements issued'],
             ['Regulatory','RBI compliant payment aggregator \u00b7 GST Act 2017 \u00b7 Section 194-O TDS \u00b7 8-year payment record retention \u00b7 GSTR-1 filed annually'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
