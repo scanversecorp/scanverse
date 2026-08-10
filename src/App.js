@@ -300,18 +300,58 @@ async function sendSMSViaSB(mobile, otp) {
 // SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
 
 /* --- WHATSAPP VERIFICATION ------------------------------------ */
-async function generateWAToken(mobile) {
+const WA_NUMBER = '919270194842';
+
+async function invokeWA(action, payload) {
   const r = await sb().functions.invoke('whatsapp-verify', {
-    body: { action:'generate', mobile }
+    body: { action, ...payload }
   });
+  if (r.error) {
+    const msg = r.error.message || '';
+    const unavailable = /404|not found|failed to fetch|function.*not|non-2xx/i.test(msg);
+    throw new Error(unavailable ? 'WhatsApp verification is temporarily unavailable' : (msg || 'WhatsApp service error'));
+  }
+  if (r.data?.error) throw new Error(r.data.error);
   return r.data;
 }
 
+async function generateWAToken(mobile) {
+  const data = await invokeWA('generate', { mobile });
+  if (!data?.token) throw new Error('Could not generate WhatsApp token');
+  return data;
+}
+
 async function checkWAVerified(token) {
-  const r = await sb().functions.invoke('whatsapp-verify', {
-    body: { action:'check', token }
-  });
-  return r.data;
+  return invokeWA('check', { token });
+}
+
+function waDeepLink(token) {
+  return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('SCANV VERIFY ' + token)}`;
+}
+
+/** Start WA verify polling; returns false + runs onFallback when edge fn unavailable */
+async function startWAVerify(mobile, onVerified, { setWaToken, setWaChecking, setOtpSent, onUnavailable }) {
+  try {
+    const data = await generateWAToken(mobile);
+    setWaToken(data.token);
+    setOtpSent(true);
+    setWaChecking(true);
+    const poll = setInterval(async () => {
+      try {
+        const res = await checkWAVerified(data.token);
+        if (res?.verified) {
+          clearInterval(poll);
+          setWaChecking(false);
+          await onVerified();
+        }
+      } catch (_) { /* keep polling until timeout */ }
+    }, 3000);
+    setTimeout(() => { clearInterval(poll); setWaChecking(false); }, 600000);
+    return true;
+  } catch (e) {
+    onUnavailable?.(e.message || 'WhatsApp verification is temporarily unavailable');
+    return false;
+  }
 }
 
 async function generateAndSendOTP(mobile) {
@@ -598,24 +638,20 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const sendLoginWA = async () => {
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
     setLoading(true); setErr('');
-    try {
-      const r = await sb().functions.invoke('whatsapp-verify',{body:{action:'generate',mobile:`+91${mobile}`}});
-      if (r.data?.token) {
-        setWaToken(r.data.token);
-        setOtpSent(true);
-        setWaChecking(true);
-        const poll = setInterval(async()=>{
-          const res = await sb().functions.invoke('whatsapp-verify',{body:{action:'check',token:r.data.token}});
-          if (res.data?.verified) {
-            clearInterval(poll);
-            setWaChecking(false);
-            await loginProfile(true);
-          }
-        }, 3000);
-        setTimeout(()=>{ clearInterval(poll); setWaChecking(false); }, 600000);
-      } else throw new Error('Could not generate WhatsApp token');
-    } catch(e) { setErr(e.message||'WhatsApp verification failed'); }
-    finally { setLoading(false); }
+    const ok = await startWAVerify(`+91${mobile}`, () => loginProfile(true), {
+      setWaToken, setWaChecking, setOtpSent,
+      onUnavailable: async (msg) => {
+        setVerifyMethod('sms');
+        setOtpSent(false);
+        setWaToken('');
+        setErr(`${msg} — use SMS OTP below`);
+        try {
+          const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
+          if (r.data?.success||r.data?.provider) setOtpSent(true);
+        } catch (_) {}
+      },
+    });
+    setLoading(false);
   };
 
   const confirmPayment = (method) => {
@@ -831,25 +867,20 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
       if (!termsAccepted) return setErr('Please accept Terms & Conditions to continue');
       setLoading(true); setErr('');
-      try {
-        const r = await sb().functions.invoke('whatsapp-verify',{body:{action:'generate',mobile:`+91${mobile}`}});
-        if (r.data?.token) {
-          setWaToken(r.data.token);
-          setOtpSent(true);
-          // Start polling for WA confirmation
-          setWaChecking(true);
-          const poll = setInterval(async()=>{
-            const res = await sb().functions.invoke('whatsapp-verify',{body:{action:'check',token:r.data.token}});
-            if (res.data?.verified) {
-              clearInterval(poll);
-              setWaChecking(false);
-              await verifyProfile(true);
-            }
-          }, 3000);
-          setTimeout(()=>{ clearInterval(poll); setWaChecking(false); }, 600000);
-        } else throw new Error('Could not generate WhatsApp token');
-      } catch(e) { setErr(e.message||'WhatsApp verification failed'); }
-      finally { setLoading(false); }
+      const ok = await startWAVerify(`+91${mobile}`, () => verifyProfile(true), {
+        setWaToken, setWaChecking, setOtpSent,
+        onUnavailable: async (msg) => {
+          setVerifyMethod('sms');
+          setOtpSent(false);
+          setWaToken('');
+          setErr(`${msg} — use SMS OTP below`);
+          try {
+            const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
+            if (r.data?.success||r.data?.provider) setOtpSent(true);
+          } catch (_) {}
+        },
+      });
+      setLoading(false);
     };
 
     return browseWrap(
@@ -910,11 +941,15 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
             <div style={{background:'#e8f8ef',border:'1.5px solid #25D366',borderRadius:12,padding:14,textAlign:'center'}}>
               <div style={{color:'#128C7E',fontSize:13,fontWeight:700,marginBottom:8}}>📱 Open WhatsApp to verify</div>
-              <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`} target="_blank" rel="noreferrer"
+              <a href={waDeepLink(waToken)} target="_blank" rel="noreferrer"
                 style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10,boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>
                 <span style={{color:'#fff',fontWeight:800,fontSize:14}}>💬 Open WhatsApp · Send VERIFY</span>
               </a>
-              {waChecking&&<div style={{fontSize:11,color:C.dim,fontWeight:600}}>⏳ Waiting for confirmation…</div>}
+              {waChecking&&<div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:10}}>⏳ Waiting for confirmation…</div>}
+              <button onClick={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendOTP();}}
+                style={{background:'none',border:'none',color:C.acc,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:FF}}>
+                📱 Use SMS OTP instead →
+              </button>
             </div>
           )}
         </div>
@@ -969,11 +1004,15 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
             <div style={{background:'#e8f8ef',border:'1.5px solid #25D366',borderRadius:12,padding:14,textAlign:'center'}}>
               <div style={{color:'#128C7E',fontSize:13,fontWeight:700,marginBottom:8}}>📱 Open WhatsApp to verify</div>
-              <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`} target="_blank" rel="noreferrer"
+              <a href={waDeepLink(waToken)} target="_blank" rel="noreferrer"
                 style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10,boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>
                 <span style={{color:'#fff',fontWeight:800,fontSize:14}}>💬 Open WhatsApp · Send VERIFY</span>
               </a>
-              {waChecking&&<div style={{fontSize:11,color:C.dim,fontWeight:600}}>⏳ Waiting for confirmation…</div>}
+              {waChecking&&<div style={{fontSize:11,color:C.dim,fontWeight:600,marginBottom:10}}>⏳ Waiting for confirmation…</div>}
+              <button onClick={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendLoginOTP();}}
+                style={{background:'none',border:'none',color:C.acc,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:FF}}>
+                📱 Use SMS OTP instead →
+              </button>
             </div>
           )}
         </div>
@@ -1082,6 +1121,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       //    Twilio generates and sends the OTP -- we don’t need to store it
       setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
+      setWaToken(''); setWaLink('');
       // 2. Fire SMS via Edge Function in background
       sb().functions.invoke('send-otp', { body: { mobile: mob } })
         .then(r => {
@@ -1097,12 +1137,10 @@ function RegistrationFlow({ onComplete, prefill }) {
           }
         })
         .catch(e => { console.warn('[OTP]', e.message); });
-      (async () => {
-        try {
-          const r = await sb().functions.invoke('send-otp', { body: { mobile: mob, otp } });
-          if (r.data?.success) console.log('[OTP] SMS also sent via', r.data.provider, '✓');
-        } catch(e) { console.warn('[OTP] SMS background error:', e.message); }
-      })();
+      // 3. Try WhatsApp verify token in parallel (optional — SMS is primary)
+      generateWAToken(mob)
+        .then(data => { setWaToken(data.token); setWaLink(waDeepLink(data.token)); })
+        .catch(e => console.warn('[WA]', e.message));
     } catch(e) { setErr(e.message||'Could not prepare OTP. Try again.'); setLoading(false); }
   };
 
@@ -1406,7 +1444,7 @@ function RegistrationFlow({ onComplete, prefill }) {
             <span>Waiting for WhatsApp message… </span><span style={{color:C.grn}}>●</span>
           </div>}
           <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.dim}}>
-            Send to: <strong style={{color:C.sub}}>+91-9270194842</strong> · Token: <code style={{color:C.acc}}>{waToken}</code>
+            Send to: <strong style={{color:C.sub}}>{ASSIST}</strong> · Token: <code style={{color:C.acc}}>{waToken}</code>
           </div>
         </div>
       )}
