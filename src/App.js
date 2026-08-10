@@ -594,7 +594,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             </div>
           </div>
           <div style={S.card({marginBottom:14})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&apos;s included</div>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
             {(d.features||[activeSvc.sub]).map(f=>(
               <div key={f} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn}}>✓</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
@@ -721,7 +721,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               <div style={{color:C.txt,fontSize:12,fontWeight:600,marginBottom:8}}>Before we continue</div>
               <div style={{fontSize:11,color:C.sub,lineHeight:1.7,marginBottom:10}}>
                 By booking, you agree to our{' '}
-                <a href="https://www.dcoreglobal.com/termsandconditions" target="_blank" rel="noreferrer" style={{color:C.acc}}>Terms &amp; Conditions</a>,{' '}
+                <a href="https://www.dcoreglobal.com/termsandconditions" target="_blank" rel="noreferrer" style={{color:C.acc}}>Terms & Conditions</a>,{' '}
                 <a href="https://www.dcoreglobal.com/privacypolicy" target="_blank" rel="noreferrer" style={{color:C.acc}}>Privacy Policy</a>,{' '}
                 <a href="https://www.dcoreglobal.com/refundpolicy" target="_blank" rel="noreferrer" style={{color:C.acc}}>Refund Policy</a> and acknowledge that DCORE Global Corporation collects your location and device data in compliance with the <strong style={{color:C.txt}}>DPDP Act 2023</strong>.
               </div>
@@ -732,7 +732,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             </div>
           )}
           {termsAccepted&&(
-            <div style={{fontSize:10,color:C.grn,marginBottom:10}}>✅ Terms &amp; DPDP Act 2023 accepted</div>
+            <div style={{fontSize:10,color:C.grn,marginBottom:10}}>✅ Terms & DPDP Act 2023 accepted</div>
           )}
 
           {/* Verification method toggle */}
@@ -764,7 +764,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                 ))}
               </div>
               <Btn full onClick={()=>verifyAndBook(false)} disabled={loading||otpCode.join('').length<6}>
-                {loading?<><Spin size={16}/>Verifying…</>:'Verify &amp; confirm booking →'}
+                {loading?<><Spin size={16}/>Verifying…</>:'Verify & confirm booking →'}
               </Btn>
               <button onClick={sendOTP} disabled={loading} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
             </>
@@ -1481,7 +1481,7 @@ function ServicesScreen() {
           </div>
           {/* Features */}
           <div style={S.card({marginBottom:16})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&apos;s included</div>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
             {(d.features||[]).map(f=>(
               <div key={f} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn,fontSize:14}}>✓</span>
