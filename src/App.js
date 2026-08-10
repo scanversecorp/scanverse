@@ -594,7 +594,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             </div>
           </div>
           <div style={S.card({marginBottom:14})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What\u2019s included</div>
             {(d.features||[activeSvc.sub]).map(f=>(
               <div key={f} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn}}>\u2713</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
@@ -900,7 +900,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     try {
       const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
       // 1. Send OTP via Twilio Verify (server-side, no DLT needed)
-      //    Twilio generates and sends the OTP -- we don't need to store it
+      //    Twilio generates and sends the OTP -- we don\u2019t need to store it
       setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
       // 2. Fire SMS via Edge Function in background
@@ -1193,7 +1193,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         <div style={{background:`${C.grn}22`,border:`1.5px solid ${C.grn}`,borderRadius:12,padding:14,marginBottom:14}}>
           <div style={{color:C.grn,fontSize:12,fontWeight:600,marginBottom:8}}>\ud83d\udcf1 Verify via WhatsApp</div>
           <div style={{color:C.sub,fontSize:11,lineHeight:1.6,marginBottom:10}}>
-            Tap below \u2192 WhatsApp opens with a pre-filled message \u2192 Send it \u2192 you're verified.<br/>
+            Tap below \u2192 WhatsApp opens with a pre-filled message \u2192 Send it \u2192 you\u2019re verified.<br/>
             <span style={{color:C.dim,fontSize:10}}>This proves you own this number.</span>
           </div>
           <a href={waLink} target="_blank" rel="noreferrer"
@@ -1481,7 +1481,7 @@ function ServicesScreen() {
           </div>
           {/* Features */}
           <div style={S.card({marginBottom:16})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What\u2019s included</div>
             {(d.features||[]).map(f=>(
               <div key={f} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn,fontSize:14}}>\u2713</span>
@@ -1855,7 +1855,7 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.gold,fontSize:13}}>\u26a0\ufe0f By using ScanV or placing a booking, you agree to these terms in full.</p>
           </div>
           {[
-            ['ScanV as Marketplace Intermediary','DCORE Global Corporation operates ScanV as an IT Intermediary under the IT Act 2000. We connect Users with independent Partners. We do not employ Partners, do not deliver services, and are not responsible for service quality, safety, timeliness, or outcomes. DCORE's maximum liability for any booking is limited to the platform fee collected for that booking.'],
+            ['ScanV as Marketplace Intermediary','DCORE Global Corporation operates ScanV as an IT Intermediary under the IT Act 2000. We connect Users with independent Partners. We do not employ Partners, do not deliver services, and are not responsible for service quality, safety, timeliness, or outcomes. DCORE\u2019s maximum liability for any booking is limited to the platform fee collected for that booking.'],
             ['Eligibility','Must be 18+ \u00b7 Valid Indian mobile \u00b7 Legally capable of contracts under Indian law \u00b7 Must accept Terms, Privacy Policy, and DPDP Act 2023 compliance before first booking'],
             ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + Terms accepted + unique TXN ID generated + platform fee paid. DCORE may cancel bookings if no Partner is available or fraud is detected.'],
             ['User Responsibilities','Provide accurate booking details \u00b7 Be present at the agreed time and location \u00b7 Treat Partners respectfully \u00b7 Report disputes within 48 hours of service completion \u00b7 Do not book for unlawful purposes'],
