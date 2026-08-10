@@ -450,9 +450,13 @@ function QRLandingPage({ onContinue }) {
    User browses → picks service → books → THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, addToast }) {
-  const [screen, setScreen] = useState('services'); // services | detail | book | verify | payment
+  const [screen, setScreen] = useState('services'); // services | detail | verify | payment | schedule
   const [activeSvc, setActiveSvc] = useState(null);
-  const [bookingDetail, setBookingDetail] = useState(null); // {date,time,notes,loc}
+  const [bookingDetail, setBookingDetail] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [pendingProfile, setPendingProfile] = useState(null);
+  const [txnId, setTxnId] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState(null);
 
   // Mini registration state
   const [firstName, setFirstName] = useState('');
@@ -497,7 +501,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     finally { setLoading(false); }
   };
 
-  const verifyAndBook = async (waVerified=false) => {
+  const verifyProfile = async (waVerified=false) => {
     if (!waVerified) {
       const code = otpCode.join('');
       if (code.length<6) return setErr('Enter 6-digit OTP');
@@ -505,34 +509,29 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setLoading(true); setErr('');
     try {
       const mob = `+91${mobile}`;
-      // Verify OTP (skip if WhatsApp already verified)
       if (!waVerified) {
         const code = otpCode.join('');
-        if (code.length<6) throw new Error('Enter 6-digit OTP');
         const r = await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
         if (!r.data?.success) throw new Error('Invalid OTP. Try again.');
       }
 
-      // Create user profile
       const fakeEmail = `${mobile}@scanv.app`;
       const fakePass  = `ScanV_${mobile.slice(-4)}_${Date.now()}`;
-      let userId;
+      let uid;
       try {
         const {data:su,error:se} = await sb().auth.signUp({email:fakeEmail,password:fakePass});
         if (se?.message?.includes('already registered')) {
           const {data:si} = await sb().auth.signInWithPassword({email:fakeEmail,password:fakePass});
-          userId = si?.user?.id;
-        } else { userId = su?.user?.id; }
+          uid = si?.user?.id;
+        } else { uid = su?.user?.id; }
       } catch(e) {}
-      if (!userId) { userId = localStorage.getItem('scanv_uid')||crypto.randomUUID(); localStorage.setItem('scanv_uid',userId); }
+      if (!uid) { uid = localStorage.getItem('scanv_uid')||crypto.randomUUID(); localStorage.setItem('scanv_uid',uid); }
 
-      // Get device info silently
       const dev = detectDevice();
       const ip  = await getIP();
 
-      // Upsert profile -- no age/gender asked
       await sb().from('profiles').upsert({
-        id:userId, email:fakeEmail, name:`${firstName} ${lastName}`.trim(),
+        id:uid, email:fakeEmail, name:`${firstName} ${lastName}`.trim(),
         first_name:firstName.trim(), last_name:lastName.trim(),
         phone:mob, address, village, city, pincode,
         ip_address:ip, last_lat:silentGeo?.lat||null, last_lng:silentGeo?.lng||null,
@@ -542,44 +541,58 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         role:'customer', status:'active', avatar:'👤',
       },{onConflict:'id'});
 
-      // Now create the booking if we have booking details
-      if (activeSvc && bookingDetail) {
-        const svc = activeSvc;
-        const price = svc.price||50000;
-        const fee   = Math.round(price*0.10);
-        const gst   = Math.round((price+fee)*0.18);
-        const total = price+fee+gst;
-        const txn   = 'TXN-'+Date.now();
-        const {data:bk} = await sb().from('bookings').insert({
-          customer_id:userId, service_name:svc.name,
-          customer_name:`${firstName} ${lastName}`.trim(),
-          customer_email:fakeEmail,
-          date:bookingDetail.date, time:bookingDetail.time,
-          notes:bookingDetail.notes, location_text:bookingDetail.loc||`${village}, ${city} ${pincode}`,
-          price, platform_fee:fee, gst_amt:gst, total,
-          status:'awaiting_payment', txn_id:txn,
-        }).select().single();
-        await sb().from('service_requests').insert({
-          customer_id:userId, service_name:svc.name, service_type:svc.cat,
-          preferred_date:bookingDetail.date, preferred_time:bookingDetail.time,
-          notes:bookingDetail.notes, location_text:bookingDetail.loc||`${village}, ${city} ${pincode}`,
-          price, platform_fee:fee, gst_amount:gst, total,
-          status:'new', txn_id:txn, added_by:userId,
-        }).then(()=>{});
-        setBookingDetail(bd=>({...bd,booking:bk,txn}));
-      }
-
-      const profile = {id:userId,name:`${firstName} ${lastName}`.trim(),first_name:firstName,last_name:lastName,phone:mob,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city,village,pincode,device_type:dev.deviceType,os_name:dev.osName,browser:dev.browser,ip_address:ip};
-      onRegistered(profile);
+      const prof = {id:uid,name:`${firstName} ${lastName}`.trim(),first_name:firstName,last_name:lastName,phone:mob,email:fakeEmail,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city,village,pincode,device_type:dev.deviceType,os_name:dev.osName,browser:dev.browser,ip_address:ip};
+      setUserId(uid);
+      setPendingProfile(prof);
+      setTxnId('TXN-'+Date.now());
+      setScreen('payment');
     } catch(e) { setErr(e.message||'Verification failed.'); }
     finally { setLoading(false); }
   };
 
-  const locBanner = (
-    <div style={{background:C.grn+'18',borderBottom:BDR,padding:'6px 16px',fontSize:11,color:C.grn,fontWeight:600,textAlign:'center'}}>
-      📍 Location used for nearby services · DPDP Act 2023
-    </div>
-  );
+  const confirmPayment = (method) => {
+    setPaymentMethod(method);
+    setScreen('schedule');
+    addToast?.('Payment recorded — pick date & time','success');
+  };
+
+  const createBooking = async () => {
+    if (!bookingDetail?.date) return setErr('Select a date');
+    if (!userId||!activeSvc||!txnId) return setErr('Session expired — start again');
+    setLoading(true); setErr('');
+    try {
+      const svc = activeSvc;
+      const price = svc.price||50000;
+      const fee   = Math.round(price*FEE_PCT);
+      const gst   = Math.round((price+fee)*GST_RATE);
+      const total = price+fee+gst;
+      const loc   = bookingDetail.loc||`${village}, ${city} ${pincode}`.trim();
+      const {data:bk,error} = await sb().from('bookings').insert({
+        customer_id:userId, service_name:svc.name,
+        customer_name:`${firstName} ${lastName}`.trim(),
+        customer_email:`${mobile}@scanv.app`,
+        date:bookingDetail.date, time:bookingDetail.time||'10:00',
+        notes:bookingDetail.notes||'', location_text:loc,
+        price, platform_fee:fee, gst_amt:gst, total,
+        status:'confirmed', txn_id:txnId,
+        paid_at:new Date().toISOString(),
+      }).select().single();
+      if (error) throw error;
+      await sb().from('service_requests').insert({
+        customer_id:userId, service_name:svc.name, service_type:svc.cat,
+        preferred_date:bookingDetail.date, preferred_time:bookingDetail.time||'10:00',
+        notes:bookingDetail.notes||'', location_text:loc,
+        price, platform_fee:fee, gst_amount:gst, total,
+        status:'new', txn_id:txnId, added_by:userId,
+      });
+      await sb().from('payments').insert({
+        booking_id:bk.id, user_id:userId, amount:total,
+        method:paymentMethod||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
+      }).catch(()=>{});
+      onRegistered(pendingProfile);
+    } catch(e) { setErr(e.message||'Booking failed.'); }
+    finally { setLoading(false); }
+  };
 
   const browseWrap = (content, sticky=null) => (
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:72}}>
@@ -640,7 +653,6 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
     const d = SVC_DETAIL[activeSvc.id]||{};
-    const total=Math.round(((activeSvc.price||50000)*1.1*1.18)/100);
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
@@ -669,30 +681,22 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:12,fontSize:12,color:C.grn,fontWeight:700}}>💵 Cash on service · platform fee paid online</div>}
         </div>
       </>,
-      <StickyCta onClick={()=>setScreen('book')}>Book now — From ₹{total.toLocaleString('en-IN')} →</StickyCta>
+      <StickyCta onClick={()=>setScreen('verify')}>Book now — verify & pay →</StickyCta>
     );
   }
 
-  // -- BOOK: Date/Time/Location ---------------------------------------------
-  if (screen==='book'&&activeSvc) {
+  // -- SCHEDULE: Date/Time/Location (after payment) -----------------------
+  if (screen==='schedule'&&activeSvc) {
     const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBookingDetail(b=>({...b,loc:[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ')}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true});};
-
-    const price=activeSvc.price||50000,fee=Math.round(price*0.10),gst=Math.round((price+fee)*0.18),total=price+fee+gst;
 
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Book service</div>
+          <button onClick={()=>setScreen('payment')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pick date & time</div>
         </div>
         <div style={{padding:'14px 16px 120px'}}>
-          <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
-            {[['Service',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?15:13}}>
-                <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
-              </div>
-            ))}
-          </div>
+          <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
           <Field label="Date" req><input type="date" defaultValue={bookingDetail?.date||''} onChange={e=>setBookingDetail(b=>({...b,date:e.target.value}))} style={S.inp()}/></Field>
           <Field label="Time"><input type="time" defaultValue={bookingDetail?.time||'10:00'} onChange={e=>setBookingDetail(b=>({...b,time:e.target.value}))} style={S.inp()}/></Field>
           <Field label="Service location" note="Auto-filled from your GPS">
@@ -706,11 +710,52 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
       </>,
-      <StickyCta onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue to verify →</StickyCta>
+      <StickyCta onClick={createBooking}>{loading?<><Spin size={16}/> Confirming…</>:'Confirm booking →'}</StickyCta>
     );
   }
 
-  // -- VERIFY: Name + Mobile + OTP or WhatsApp ----------------------------
+  // -- PAYMENT: UPI / Razorpay (after verify, before schedule) ------------
+  if (screen==='payment'&&activeSvc) {
+    const price=activeSvc.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
+    const upiLink=`upi://pay?pa=${UPI_PA}&pn=${encodeURIComponent(UPI_PN)}&am=${(total/100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(activeSvc.name+' '+txnId)}`;
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setScreen('verify')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
+        </div>
+        <div style={{padding:'14px 16px 120px'}}>
+          <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
+            <div style={{fontSize:13,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
+            <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
+            <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
+          </div>
+          <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
+            {[['Service (indicative)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Pay now',total]].map(([k,v],i)=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?15:13}}>
+                <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+          {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+            {[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=>(
+              <a key={lbl} href={upiLink} onClick={()=>confirmPayment(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),padding:'12px 14px',textDecoration:'none',cursor:'pointer'}}>
+                <span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:13,fontWeight:700}}>{lbl}</span>
+              </a>
+            ))}
+          </div>
+          <div style={{textAlign:'center',marginBottom:14}}>
+            <a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.cyan,fontSize:13,fontWeight:600}}>Card / Net Banking via Razorpay ↗</a>
+          </div>
+          <Btn full onClick={()=>confirmPayment('UPI')} disabled={loading}>✅ I&apos;ve paid — continue →</Btn>
+          {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
+        </div>
+      </>
+    );
+  }
+
+  // -- VERIFY: Name + Mobile + OTP (before payment) -------------------------
   if (screen==='verify') {
 
     const sendWA = async () => {
@@ -730,7 +775,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             if (res.data?.verified) {
               clearInterval(poll);
               setWaChecking(false);
-              await verifyAndBook(true); // WA verified -- skip OTP check
+              await verifyProfile(true);
             }
           }, 3000);
           setTimeout(()=>{ clearInterval(poll); setWaChecking(false); }, 600000);
@@ -742,12 +787,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setScreen('book')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
         </div>
         <div style={{padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>📍 {city||'Pune'} {pincode||''} · Quick verify to confirm booking</div>
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Verify identity before payment</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
             <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -788,7 +833,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                     style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={()=>verifyAndBook(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & confirm →'}</Btn>
+              <Btn full onClick={()=>verifyProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & continue to pay →'}</Btn>
             </>
           )}
           {verifyMethod==='whatsapp'&&!otpSent&&(
@@ -1560,6 +1605,8 @@ function BookScreen() {
   const [gpsState,setGpsState]=useState('idle');
   const [booking,setBooking]=useState(null);
   const [loading,setLoading]=useState(false);
+  const [txnId,setTxnId]=useState(null);
+  const [payMethod,setPayMethod]=useState(null);
   const svc=activeSvc;
   if (!svc) { setScreen('services'); return null; }
   const price=svc.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
@@ -1591,24 +1638,25 @@ function BookScreen() {
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
       const r=await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
-      if(r.data?.success){ setBookOtpVerified(true); setStep(3); addToast('Mobile verified ✓','success'); }
+      if(r.data?.success){ setBookOtpVerified(true); setTxnId('TXN-'+Date.now()); setStep(3); addToast('Mobile verified — proceed to payment ✓','success'); }
       else throw new Error('Invalid OTP');
     }catch(e){addToast(e.message||'Verification failed','error');}
     finally{setLoading(false);}
   };
 
-  const create=async()=>{if(!date)return addToast('Select a date','error');setLoading(true);try{const txn='TXN-'+Date.now();const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'awaiting_payment',txn_id:txn}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txn,added_by:user.id});setBooking(data);setStep(4);}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
-  const confirmPaid=async method=>{if(!booking)return;setLoading(true);try{await sb().from('bookings').update({status:'confirmed',paid_at:new Date().toISOString()}).eq('id',booking.id);await sb().from('payments').insert({booking_id:booking.id,user_id:user.id,amount:total,method,status:'success',txn_id:booking.txn_id,gateway:'Razorpay'});addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast('Could not confirm payment','error');}finally{setLoading(false);}};
-  const upiLink=`upi://pay?pa=${UPI_PA}&pn=${encodeURIComponent(UPI_PN)}&am=${(total/100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(svc.name)}`;
+  const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});setBooking(data);addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
+  const confirmPaid=method=>{setPayMethod(method);setStep(4);addToast('Payment recorded — pick date & time','success');};
+  const upiLink=`upi://pay?pa=${UPI_PA}&pn=${encodeURIComponent(UPI_PN)}&am=${(total/100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(svc.name+' '+(txnId||''))}`;
+  const stepLabels=['Service','Verify','Pay','Schedule'];
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title={svc.name} back="services"/>
-      <div style={{display:'flex',padding:'12px 16px',gap:4}}>{[1,2,3,4].map(n=><div key={n} style={{flex:1,height:3,borderRadius:2,background:step>=n?C.acc:C.deep}}/>)}</div>
+      <div style={{display:'flex',padding:'12px 16px',gap:4}}>{stepLabels.map((_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:step>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
       <div style={{padding:'8px 16px 40px'}}>
-        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12}}>💵 Cash on service available</div>}</div><Btn full onClick={()=>setStep(2)}>Continue →</Btn></>}
+        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>}</div><Btn full onClick={()=>setStep(2)}>Continue →</Btn></>}
 
         {step===2&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:600,marginBottom:12}}>Verify your identity</div>
+          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 2 · Verify identity</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
             <Field label="First name" req><input value={bookFirstName} onChange={e=>setBookFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={bookLastName} onChange={e=>setBookLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -1630,15 +1678,39 @@ function BookScreen() {
                     style={{width:40,height:48,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:8,color:C.acc,fontFamily:'monospace',fontSize:22,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & continue →'}</Btn>
+              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pay →'}</Btn>
               <button onClick={sendBookOTP} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
             </>
           )}
         </>}
 
-        {step===3&&<><Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field><Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field><Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn}}>✅ GPS captured</div>}</Field><Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field><Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Creating…</>:'Confirm booking →'}</Btn></>}
+        {step===3&&<>
+          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 3 · Pay platform fee</div>
+          <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
+            <div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount due now</div>
+            <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
+            <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+            {[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=>(
+              <a key={lbl} href={upiLink} onClick={()=>confirmPaid(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),padding:'12px 14px',textDecoration:'none'}}>
+                <span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:13,fontWeight:700}}>{lbl}</span>
+              </a>
+            ))}
+          </div>
+          <div style={{textAlign:'center',marginBottom:14}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.cyan,fontSize:13,fontWeight:600}}>Card / Net Banking via Razorpay ↗</a></div>
+          <Btn full onClick={()=>confirmPaid('UPI')}>✅ I&apos;ve paid — continue →</Btn>
+        </>}
 
-        {step===4&&<><div style={{...S.card(),textAlign:'center',marginBottom:20,padding:24}}><div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount to pay</div><div style={{fontSize:40,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:C.dim}}>UPI: {UPI_PA} · Ref: {booking?.txn_id}</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>{[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=><a key={lbl} href={upiLink} target="_blank" rel="noreferrer" onClick={()=>confirmPaid(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),textDecoration:'none'}}><span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:14,fontWeight:600}}>{lbl}</span></a>)}</div>{svc.cash&&<Btn full v="secondary" onClick={()=>confirmPaid('Cash')} style={{marginBottom:10}}>💵 Pay cash on service</Btn>}<div style={{textAlign:'center',marginBottom:16}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.sub,fontSize:12}}>Card / Net Banking via Razorpay ↗</a></div><Btn full onClick={()=>confirmPaid('UPI')} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:"✅ I've paid — confirm booking"}</Btn></>}
+        {step===4&&<>
+          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 4 · Pick date & time</div>
+          <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
+          <Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field>
+          <Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field>
+          <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
+          <Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field>
+          <Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:'Confirm booking →'}</Btn>
+        </>}
       </div>
     </div>
   );
