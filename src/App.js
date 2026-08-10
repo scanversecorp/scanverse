@@ -14,43 +14,47 @@ import {
   useState, useEffect, useRef, useCallback,
   createContext, useContext, useReducer, Component
 } from 'react';
+import QRCode from 'qrcode';
 
 /* --- CONFIG ------------------------------------------------------- */
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-const UPI_PA   = 'dcoreglobalcorp@razorpay';
+/** Razorpay UPI VPA decoded from working merchant QR (rxairtel rail) */
+const UPI_PA   = 'dcoreglobalcorp406807.rzp@rxairtel';
 const UPI_PN   = 'DCORE Global Corporation';
+const UPI_MC   = '5817';
+const UPI_MODE = '19';
+const UPI_QR_STATIC = `${process.env.PUBLIC_URL || ''}/razorpay-upi-qr.png`;
+const UPI_PACKAGES = {
+  GPay: 'com.google.android.apps.nbu.paisa.user',
+  PhonePe: 'com.phonepe.app',
+  Paytm: 'net.one97.paytm',
+};
 const ASSIST   = '+91-9270194842';
 
 function isAndroidUA() { return /Android/i.test(navigator.userAgent); }
 function isIOSUA() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
 function buildUpiParams(amountPaise, txnRef, note) {
   const am = (amountPaise / 100).toFixed(2);
-  const tn = encodeURIComponent(note || txnRef || '');
+  const tn = encodeURIComponent(note || `Payment To ${UPI_PN}`);
   const pn = encodeURIComponent(UPI_PN);
   const tr = encodeURIComponent(txnRef || '');
-  return `pa=${UPI_PA}&pn=${pn}&am=${am}&cu=INR&tn=${tn}&tr=${tr}`;
+  return `cu=INR&mc=${UPI_MC}&mode=${UPI_MODE}&pa=${UPI_PA}&pn=${pn}&am=${am}&tn=${tn}&tr=${tr}`;
 }
 function buildUpiLink(amountPaise, txnRef, note) {
   return `upi://pay?${buildUpiParams(amountPaise, txnRef, note)}`;
 }
-function buildAppUpiLink(app, amountPaise, txnRef, note) {
-  const base = buildUpiParams(amountPaise, txnRef, note);
-  const schemes = { GPay:`tez://upi/pay?${base}`, PhonePe:`phonepe://pay?${base}`, Paytm:`paytmmp://pay?${base}`, 'Any UPI':`upi://pay?${base}` };
-  return schemes[app] || `upi://pay?${base}`;
-}
-/** Open UPI on mobile — Android intent chooser for Any UPI, app schemes for GPay/PhonePe/Paytm */
+/** Open UPI app — standard upi:// only; never intent:// with empty package (routes to WhatsApp) */
 function openUpiPay(app, amountPaise, txnRef, note) {
-  const params = buildUpiParams(amountPaise, txnRef, note);
-  const link = buildAppUpiLink(app, amountPaise, txnRef, note);
-  if (app === 'Any UPI' && isAndroidUA()) {
-    window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=;end`;
-    setTimeout(() => { window.location.href = link; }, 600);
-  } else {
-    window.location.href = link;
+  const link = buildUpiLink(amountPaise, txnRef, note);
+  const pkg = app && app !== 'Any UPI' ? UPI_PACKAGES[app] : null;
+  if (isAndroidUA() && pkg) {
+    window.location.href = `intent://pay?${buildUpiParams(amountPaise, txnRef, note)}#Intent;scheme=upi;package=${pkg};end`;
+    return;
   }
+  window.location.href = link;
 }
 async function registerPaymentIntent(txnId, amountPaise, userId) {
   if (!txnId || !amountPaise) return;
@@ -104,8 +108,14 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     document.addEventListener('visibilitychange', onVis);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
   }, [upiOpened, txnId, paymentVerified, addToast]);
-  const launchUpi = (app) => { openUpiPay(app, amountPaise, txnId, txnId); setUpiOpened(true); };
-  return { paymentVerified, upiOpened, checkingPay, launchUpi, setPaymentVerified, setUpiOpened };
+  const [upiModalApp, setUpiModalApp] = useState(null);
+  const launchUpi = (app) => { setUpiModalApp(app); setUpiOpened(true); };
+  const closeUpiModal = () => setUpiModalApp(null);
+  const onUpiOpened = () => setUpiOpened(true);
+  return {
+    paymentVerified, upiOpened, checkingPay, launchUpi, setPaymentVerified, setUpiOpened,
+    upiModalApp, closeUpiModal, onUpiOpened, amountPaise, txnId,
+  };
 }
 const FEE_PCT  = 0.10;
 const GST_RATE = 0.18;
@@ -207,6 +217,44 @@ function Btn({children,onClick,v='primary',full,disabled,sm,style}) {
   const b={borderRadius:11,fontFamily:FF,fontWeight:700,cursor:disabled?'not-allowed':'pointer',width:full?'100%':'auto',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,opacity:disabled?.6:1,border:'none',padding:sm?'8px 14px':'13px 22px',fontSize:sm?12:15,transition:'opacity .15s',...style};
   const vs={primary:{...b,background:disabled?C.deep:C.acc,color:disabled?C.dim:'#fff',boxShadow:disabled?'none':'0 4px 16px rgba(214,58,86,0.35)'},outline:{...b,background:'transparent',color:C.acc,border:`1.5px solid ${C.acc}`,boxShadow:'none'},ghost:{...b,background:C.gls,color:C.txt,border:BDR,boxShadow:'none'},secondary:{...b,background:C.deep,color:C.txt,border:BDR,boxShadow:'none'},danger:{...b,background:disabled?C.deep:C.red,color:disabled?C.dim:'#fff',boxShadow:'none'}};
   return <button onClick={onClick} disabled={disabled} style={vs[v]||vs.primary}>{children}</button>;
+}
+
+function UpiPayModal({ open, app, amountPaise, txnId, onClose, onOpened }) {
+  const [qrUrl, setQrUrl] = useState('');
+  const upiLink = amountPaise && txnId ? buildUpiLink(amountPaise, txnId, txnId) : '';
+  useEffect(() => {
+    if (!open || !upiLink) return;
+    let cancelled = false;
+    QRCode.toDataURL(upiLink, { width: 280, margin: 1, color: { dark: '#121212', light: '#fffcf8' } })
+      .then((url) => { if (!cancelled) setQrUrl(url); })
+      .catch(() => { if (!cancelled) setQrUrl(''); });
+    return () => { cancelled = true; };
+  }, [open, upiLink]);
+  if (!open) return null;
+  const amountStr = `₹${(amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  const openApp = () => { openUpiPay(app || 'Any UPI', amountPaise, txnId, txnId); onOpened?.(); };
+  return (
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(18,18,18,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: C.surf, borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 28px', boxShadow: '0 -8px 32px rgba(18,18,18,0.18)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Pay {amountStr} via UPI</div>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: C.sub, lineHeight: 1 }}>×</button>
+        </div>
+        {app && app !== 'Any UPI' && <div style={{ fontSize: 12, color: C.dim, marginBottom: 12, fontWeight: 600 }}>{app}</div>}
+        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+          {qrUrl
+            ? <img src={qrUrl} alt="UPI payment QR code" style={{ width: 260, height: 260, borderRadius: 12, border: `1.5px solid ${C.bdr}` }} />
+            : <img src={UPI_QR_STATIC} alt="Razorpay UPI QR" style={{ width: 260, maxHeight: 320, borderRadius: 12, border: `1.5px solid ${C.bdr}` }} />}
+        </div>
+        <p style={{ textAlign: 'center', fontSize: 13, color: C.sub, margin: '0 0 8px', fontWeight: 600, lineHeight: 1.5 }}>
+          Scan with GPay, PhonePe, Paytm or any UPI app
+        </p>
+        <p style={{ textAlign: 'center', fontSize: 11, color: C.dim, margin: '0 0 16px' }}>Ref: {txnId}</p>
+        <Btn full onClick={openApp} style={{ marginBottom: 10 }}>Open in UPI app →</Btn>
+        <Btn full v="outline" onClick={() => { onOpened?.(); onClose(); }}>I&apos;ve paid — check status</Btn>
+      </div>
+    </div>
+  );
 }
 
 function Field({label,req,note,children}) {
@@ -937,9 +985,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- PAYMENT: UPI / Razorpay (after verify, before schedule) ------------
   if (screen==='payment'&&activeSvc) {
     const price=browsePrice,fee=browseFee,gst=browseGst,total=browseTotal;
-    const { paymentVerified, upiOpened, checkingPay, launchUpi, setUpiOpened, setPaymentVerified } = browsePay;
+    const { paymentVerified, upiOpened, checkingPay, launchUpi, setUpiOpened, setPaymentVerified, upiModalApp, closeUpiModal, onUpiOpened } = browsePay;
     return browseWrap(
       <>
+        <UpiPayModal open={!!upiModalApp} app={upiModalApp} amountPaise={total} txnId={txnId} onClose={closeUpiModal} onOpened={onUpiOpened} />
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
           <button onClick={()=>{setScreen('verify');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
@@ -959,7 +1008,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           </div>
           {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
           <Btn full onClick={()=>launchUpi('Any UPI')} style={{marginBottom:14,boxShadow:'0 4px 16px rgba(214,58,86,0.35)'}}>💳 Pay via UPI →</Btn>
-          {upiOpened&&!paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{checkingPay?'⏳ Checking payment status…':'UPI app opened — complete payment to unlock continue'}</div>}
+          {upiOpened&&!paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{checkingPay?'⏳ Checking payment status…':'Scan the QR or pay in your UPI app — waiting for confirmation'}</div>}
           {paymentVerified&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment confirmed — you can continue</div>}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
             {[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=>(
@@ -1911,6 +1960,7 @@ function BookScreen() {
   const stepLabels=skipVerify?['Service','Pay','Schedule']:['Service','Verify','Pay','Schedule'];
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
+      <UpiPayModal open={!!bookPay.upiModalApp} app={bookPay.upiModalApp} amountPaise={total} txnId={txnId} onClose={bookPay.closeUpiModal} onOpened={bookPay.onUpiOpened} />
       <TopBar title={svc.name} back="services"/>
       <div style={{display:'flex',padding:'12px 16px',gap:4}}>{Array.from({length:progressTotal},(_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:progressIdx>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
       <div style={{padding:'8px 16px 40px'}}>
@@ -1953,7 +2003,7 @@ function BookScreen() {
             <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <Btn full onClick={()=>bookPay.launchUpi('Any UPI')} style={{marginBottom:14}}>💳 Pay via UPI →</Btn>
-          {bookPay.upiOpened&&!bookPay.paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{bookPay.checkingPay?'⏳ Checking payment status…':'UPI app opened — complete payment to unlock continue'}</div>}
+          {bookPay.upiOpened&&!bookPay.paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{bookPay.checkingPay?'⏳ Checking payment status…':'Scan the QR or pay in your UPI app — waiting for confirmation'}</div>}
           {bookPay.paymentVerified&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment confirmed — you can continue</div>}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
             {[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=>(
