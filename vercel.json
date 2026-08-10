@@ -14,12 +14,8 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
           "key": "Cache-Control",
-          "value": "no-cache, must-revalidate"
+          "value": "no-cache"
         }
       ]
     },
@@ -28,7 +24,7 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=86400"
+          "value": "public, max-age=604800"
         }
       ]
     }
