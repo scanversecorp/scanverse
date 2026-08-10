@@ -1,8 +1,8 @@
 /**
- * ScanV v5 — Production
- * DCORE Global Corporation · PCMC, Pune
+ * ScanV v5 -- Production
+ * DCORE Global Corporation - PCMC, Pune
  * URL: https://scanv-tau.vercel.app
- * Bold Dark Premium: #0d0f1a · #e94560
+ * Bold Dark Premium: #0d0f1a - #e94560
  *
  * OTP FIX: Using Fast2SMS (India, free tier) directly from client
  * + Supabase email OTP fallback + manual email entry fallback
@@ -15,7 +15,7 @@ import {
   createContext, useContext, useReducer, Component
 } from 'react';
 
-/* ─── CONFIG ─────────────────────────────────────────────────────── */
+/* --- CONFIG ------------------------------------------------------- */
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
@@ -26,7 +26,7 @@ const ASSIST   = '+91-9270194842';
 const FEE_PCT  = 0.10;
 const GST_RATE = 0.18;
 
-/* ─── DESIGN TOKENS ──────────────────────────────────────────────── */
+/* --- DESIGN TOKENS ------------------------------------------------ */
 const C = {
   bg:'#0d0f1a', surf:'#1a1a2e', card:'#16213e', deep:'#0f3460',
   acc:'#e94560', cyan:'#00d4ff', gold:'#f5a623',
@@ -35,7 +35,7 @@ const C = {
   bdr:'rgba(255,255,255,0.08)', gls:'rgba(255,255,255,0.04)',
 };
 
-/* ─── SERVICES ───────────────────────────────────────────────────── */
+/* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
   { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false },
   { id:'cloud',    icon:'☁️', name:'Cloud training',     sub:'AWS · Azure · GCP · AI',           cat:'Cloud Training',     cash:false },
@@ -47,7 +47,7 @@ const SVCS = [
   { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true  },
 ];
 
-/* ─── SUPABASE ───────────────────────────────────────────────────── */
+/* --- SUPABASE ----------------------------------------------------- */
 let _sb = null;
 function sb() {
   if (_sb) return _sb;
@@ -56,11 +56,11 @@ function sb() {
   return _sb;
 }
 
-/* ─── CONTEXT ────────────────────────────────────────────────────── */
+/* --- CONTEXT ------------------------------------------------------ */
 const Ctx = createContext(null);
 const useApp = () => useContext(Ctx);
 
-/* ─── ERROR BOUNDARY ─────────────────────────────────────────────── */
+/* --- ERROR BOUNDARY ----------------------------------------------- */
 class Boundary extends Component {
   constructor(p) { super(p); this.state = { err:null }; }
   static getDerivedStateFromError(e) { return { err:e }; }
@@ -77,7 +77,7 @@ class Boundary extends Component {
   }
 }
 
-/* ─── STYLES ─────────────────────────────────────────────────────── */
+/* --- STYLES ------------------------------------------------------- */
 const S = {
   center: {height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:16,fontFamily:"'DM Sans',sans-serif",padding:20},
   inp: (x={}) => ({width:'100%',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,padding:'11px 14px',color:C.txt,fontSize:14,outline:'none',fontFamily:"'DM Sans',sans-serif",boxSizing:'border-box',...x}),
@@ -86,7 +86,7 @@ const S = {
   err: {background:`${C.red}15`,border:`1px solid ${C.red}40`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
 };
 
-/* ─── PRIMITIVES ─────────────────────────────────────────────────── */
+/* --- PRIMITIVES --------------------------------------------------- */
 function Spin({size=20}) {
   return <div style={{width:size,height:size,border:`2px solid ${C.bdr}`,borderTop:`2px solid ${C.acc}`,borderRadius:'50%',animation:'spin .7s linear infinite',flexShrink:0}}/>;
 }
@@ -133,7 +133,7 @@ function AssistBanner() {
   );
 }
 
-/* ─── DEVICE / IP / GEO UTILS ────────────────────────────────────── */
+/* --- DEVICE / IP / GEO UTILS -------------------------------------- */
 function detectDevice() {
   const ua = navigator.userAgent;
   const mob = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
@@ -205,7 +205,7 @@ async function reverseGeo(lat,lng) {
   } catch(e) { return {address:'',village:'',city:'Pune',state:'Maharashtra',pincode:'',country:'India'}; }
 }
 
-/* ─── CANVAS FINGERPRINT ─────────────────────────────────────────── */
+/* --- CANVAS FINGERPRINT ------------------------------------------- */
 function getCanvasFP() {
   try {
     const c=document.createElement('canvas'); c.width=200; c.height=50;
@@ -217,7 +217,7 @@ function getCanvasFP() {
   } catch(e) { return 'unavailable'; }
 }
 
-/* ─── BATTERY API ────────────────────────────────────────────────── */
+/* --- BATTERY API -------------------------------------------------- */
 async function getBattery() {
   try {
     if (!navigator.getBattery) return {level:null,charging:null};
@@ -226,11 +226,11 @@ async function getBattery() {
   } catch(e) { return {level:null,charging:null}; }
 }
 
-/* ─── OTP: FAST2SMS (India) ─────────────────────────────────────── */
-// 2Factor.in — India OTP SMS (works instantly, no verification needed)
+/* --- OTP: FAST2SMS (India) --------------------------------------- */
+// 2Factor.in -- India OTP SMS (works instantly, no verification needed)
 // Get free API key: https://2factor.in/cp/ → API → Copy key
 const TWOFACTOR_KEY = '2e5ec291-9406-11f1-908b-0200cd936042';
-// Fast2SMS (blocked until website verified + ₹100 recharge — keep for later)
+// Fast2SMS (blocked until website verified + ₹100 recharge -- keep for later)
 const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
 async function sendSMSViaSB(mobile, otp) {
@@ -243,7 +243,7 @@ async function sendSMSViaSB(mobile, otp) {
 
 // SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
 
-/* ─── WHATSAPP VERIFICATION ──────────────────────────────────── */
+/* --- WHATSAPP VERIFICATION ------------------------------------ */
 async function generateWAToken(mobile) {
   const r = await sb().functions.invoke('whatsapp-verify', {
     body: { action:'generate', mobile }
@@ -282,9 +282,9 @@ async function verifyCustomOTP(mobile, enteredOtp) {
   return true;
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ================================================================
    QR CODE GENERATOR COMPONENT
-════════════════════════════════════════════════════════════════ */
+================================================================ */
 function QRCodeDisplay({ url, size=220 }) {
   // QR via Google Charts API (reliable, no library needed)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=0d0f1a&color=e94560&margin=10&format=png&qzone=2`;
@@ -305,10 +305,10 @@ function QRCodeDisplay({ url, size=220 }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   QR LANDING PAGE — shown when ?qr=1 in URL
+/* ================================================================
+   QR LANDING PAGE -- shown when ?qr=1 in URL
    Captures maximum data on scan
-════════════════════════════════════════════════════════════════ */
+================================================================ */
 function QRLandingPage({ onContinue }) {
   const [loading, setLoading] = useState(true);
   const [scanId, setScanId]   = useState(null);
@@ -397,10 +397,10 @@ function QRLandingPage({ onContinue }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   BROWSE FLOW — Services first, no registration wall
+/* ================================================================
+   BROWSE FLOW -- Services first, no registration wall
    User browses → picks service → books → THEN registers
-════════════════════════════════════════════════════════════════ */
+================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const [screen, setScreen] = useState('services'); // services | detail | book | verify | payment
   const [activeSvc, setActiveSvc] = useState(null);
@@ -479,7 +479,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const dev = detectDevice();
       const ip  = await getIP();
 
-      // Upsert profile — no age/gender asked
+      // Upsert profile -- no age/gender asked
       await sb().from('profiles').upsert({
         id:userId, email:fakeEmail, name:`${firstName} ${lastName}`.trim(),
         first_name:firstName.trim(), last_name:lastName.trim(),
@@ -524,14 +524,14 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     finally { setLoading(false); }
   };
 
-  // ── LOCATION BANNER ──────────────────────────────────────────────────────
+  // -- LOCATION BANNER ------------------------------------------------------
   const locBanner = (
     <div style={{background:`${C.acc}11`,borderBottom:`1px solid ${C.bdr}`,padding:'6px 16px',fontSize:11,color:C.dim,textAlign:'center'}}>
       📍 ScanV uses your location to show services and enable deliveries · DPDP Act 2023
     </div>
   );
 
-  // ── SERVICES LIST ────────────────────────────────────────────────────────
+  // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return (
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif",display:'flex',flexDirection:'column'}}>
       <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -572,7 +572,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     </div>
   );
 
-  // ── SERVICE DETAIL ───────────────────────────────────────────────────────
+  // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
     const d = SVC_DETAIL[activeSvc.id]||{};
     return (
@@ -617,7 +617,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     );
   }
 
-  // ── BOOK: Date/Time/Location ─────────────────────────────────────────────
+  // -- BOOK: Date/Time/Location ---------------------------------------------
   if (screen==='book'&&activeSvc) {
     const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBookingDetail(b=>({...b,loc:[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ')}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true});};
 
@@ -654,7 +654,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     );
   }
 
-  // ── VERIFY: Name + Mobile + OTP or WhatsApp ────────────────────────────
+  // -- VERIFY: Name + Mobile + OTP or WhatsApp ----------------------------
   if (screen==='verify') {
 
     const sendWA = async () => {
@@ -674,7 +674,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             if (res.data?.verified) {
               clearInterval(poll);
               setWaChecking(false);
-              await verifyAndBook(true); // WA verified — skip OTP check
+              await verifyAndBook(true); // WA verified -- skip OTP check
             }
           }, 3000);
           setTimeout(()=>{ clearInterval(poll); setWaChecking(false); }, 600000);
@@ -715,7 +715,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               readOnly style={{...S.inp(),color:C.dim}}/>
           </Field>
 
-          {/* DPDP + T&C acceptance — once only */}
+          {/* DPDP + T&C acceptance -- once only */}
           {!termsAccepted&&(
             <div style={{background:`${C.acc}11`,border:`1px solid ${C.acc}33`,borderRadius:10,padding:14,marginBottom:14}}>
               <div style={{color:C.txt,fontSize:12,fontWeight:600,marginBottom:8}}>Before we continue</div>
@@ -805,9 +805,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   return null;
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ================================================================
    REGISTRATION FLOW
-════════════════════════════════════════════════════════════════ */
+================================================================ */
 function RegistrationFlow({ onComplete, prefill }) {
   const [phase, setPhase]   = useState('consent');
   const [dev, setDev]       = useState(prefill?.dev||null);
@@ -900,7 +900,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     try {
       const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
       // 1. Send OTP via Twilio Verify (server-side, no DLT needed)
-      //    Twilio generates and sends the OTP — we don't need to store it
+      //    Twilio generates and sends the OTP -- we don't need to store it
       setLoading(false);
       setPhase('otp'); setCd(120); setDigits(['','','','','','']);
       // 2. Fire SMS via Edge Function in background
@@ -970,7 +970,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       try {
         const { data:su, error:se } = await sb().auth.signUp({ email:fakeEmail, password:fakePass });
         if (se && se.message?.includes('already registered')) {
-          // User exists — sign them in
+          // User exists -- sign them in
           const { data:si } = await sb().auth.signInWithPassword({ email:fakeEmail, password:fakePass });
           userId = si?.user?.id;
         } else {
@@ -979,7 +979,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       } catch(authErr) { console.warn('Auth:', authErr); }
 
       if (!userId) {
-        // Fallback — use anonymous UUID stored in localStorage
+        // Fallback -- use anonymous UUID stored in localStorage
         userId = localStorage.getItem('scanv_uid') || crypto.randomUUID();
         localStorage.setItem('scanv_uid', userId);
       }
@@ -1040,7 +1040,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     } catch(e) { setErr(e.message||'Could not save profile. Try again.'); setPhase('form'); }
   };
 
-  /* ── UI ── */
+  /* -- UI -- */
   const logo = (
     <div style={{textAlign:'center',marginBottom:22}}>
       <div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'-0.02em'}}>
@@ -1091,7 +1091,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       <div style={{color:C.sub,fontSize:12,textAlign:'center',lineHeight:1.65,marginBottom:10}}>
         Find and book verified services near you — Legal, Health, Cloud Training, Property, Household, Food & more.
       </div>
-      {/* DPDP consent — compact as requested */}
+      {/* DPDP consent -- compact as requested */}
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:18,fontSize:11,color:C.dim,lineHeight:1.6}}>
         <strong style={{color:C.sub}}>Before we begin:</strong> ScanV collects your GPS location, IP address and device details to show nearby services and enable local deliveries. Data is stored securely in India under the <strong style={{color:C.sub}}>DPDP Act 2023</strong>. You can update or delete your data anytime in Profile.
       </div>
@@ -1174,7 +1174,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         OTP sent to <strong style={{color:C.txt}}>{form.mobile}</strong>
       </div>
 
-      {/* OTP always shown on screen — tap to auto-fill */}
+      {/* OTP always shown on screen -- tap to auto-fill */}
       {screenOTP&&(
         <div
           onClick={()=>{
@@ -1205,7 +1205,7 @@ function RegistrationFlow({ onComplete, prefill }) {
                 if(res?.verified){
                   clearInterval(poll);
                   setWaChecking(false);
-                  // Mark as verified via WhatsApp — proceed to finalise
+                  // Mark as verified via WhatsApp -- proceed to finalise
                   const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
                   setPhase('completing');
                   // Store OTP as used
@@ -1276,9 +1276,9 @@ function RegistrationFlow({ onComplete, prefill }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ================================================================
    QR CODE SCREEN (accessible from admin)
-════════════════════════════════════════════════════════════════ */
+================================================================ */
 function QRScreen() {
   const { setScreen } = useApp();
   const qrUrl = `${APP_URL}?qr=1&utm_source=qr&utm_medium=print`;
@@ -1327,9 +1327,9 @@ function QRScreen() {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ================================================================
    MAIN APP SCREENS (unchanged structure, updated URL ref)
-════════════════════════════════════════════════════════════════ */
+================================================================ */
 function BottomNav() {
   const {screen,setScreen,user,notifs}=useApp();
   const unread=notifs.filter(n=>!n.read).length;
@@ -1729,7 +1729,7 @@ function ProfileScreen() {
         <div style={{...S.card(),marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:600,color:C.txt,marginBottom:14}}>Edit profile</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} onChange={e=>f('firstName',e.target.value)} style={S.inp()}/></Field><Field label="Last name"><input value={frm.lastName} onChange={e=>f('lastName',e.target.value)} style={S.inp()}/></Field></div>
-          {/* Age & Gender captured silently from device — not shown in form */}
+          {/* Age & Gender captured silently from device -- not shown in form */}
           <Field label="Mobile"><input value={frm.phone} onChange={e=>f('phone',e.target.value)} style={S.inp()}/></Field>
           <Field label="Address"><input value={frm.address} onChange={e=>f('address',e.target.value)} style={S.inp()}/></Field>
           <Field label="Village / Area"><input value={frm.village} onChange={e=>f('village',e.target.value)} style={S.inp()}/></Field>
@@ -1814,12 +1814,12 @@ function LeaderHome() {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ================================================================
    ROOT APP
-════════════════════════════════════════════════════════════════ */
-export default /* ════════════════════════════════════════════════════════════════
-   LEGAL PAGES — Served at /privacy /terms /refund /payment
-════════════════════════════════════════════════════════════════ */
+================================================================ */
+export default /* ================================================================
+   LEGAL PAGES -- Served at /privacy /terms /refund /payment
+================================================================ */
 function LegalPage({page}) {
   const pages = {
     privacy:  {
@@ -2018,7 +2018,7 @@ function App() {
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) { setUser(p); setState('app'); return; }
         }
       } catch(e){ console.warn('[ScanV]',e.message); }
-      // Always show services first — no registration wall
+      // Always show services first -- no registration wall
       setState(isQRScan?'qr':'browse');
     })();
   },[]);
@@ -2045,7 +2045,7 @@ function App() {
     <div style={S.center}><div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div><Spin size={32}/></div></>
   );
 
-  // QR landing page — capture data then proceed to register
+  // QR landing page -- capture data then proceed to register
   if (state==='qr') return (
     <Boundary><style>{CSS}</style><Toast toasts={toasts}/>
     <QRLandingPage onContinue={(scanId,dev,ip,geo,coords)=>{
