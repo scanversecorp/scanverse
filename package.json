@@ -1,6 +1,6 @@
 {
   "name": "scanv",
-  "version": "5.4.0",
+  "version": "5.4.1786366627839",
   "description": "ScanV — Professional Services Marketplace · DCORE Global Corporation · PCMC Pune",
   "private": true,
   "homepage": "https://scanverse-tau.vercel.app",
@@ -13,7 +13,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "REACT_APP_TS=1786366627839 react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
