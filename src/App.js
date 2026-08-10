@@ -398,6 +398,424 @@ function QRLandingPage({ onContinue }) {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   BROWSE FLOW — Services first, no registration wall
+   User browses → picks service → books → THEN registers
+════════════════════════════════════════════════════════════════ */
+function BrowseFlow({ silentGeo, onRegistered, addToast }) {
+  const [screen, setScreen] = useState('services'); // services | detail | book | verify | payment
+  const [activeSvc, setActiveSvc] = useState(null);
+  const [bookingDetail, setBookingDetail] = useState(null); // {date,time,notes,loc}
+
+  // Mini registration state
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName]   = useState('');
+  const [mobile, setMobile]       = useState('');
+  const [address, setAddress]     = useState(silentGeo?.address||'');
+  const [village, setVillage]     = useState(silentGeo?.village||'');
+  const [city, setCity]           = useState(silentGeo?.city||'');
+  const [pincode, setPincode]     = useState(silentGeo?.pincode||'');
+  const [otpSent, setOtpSent]     = useState(false);
+  const [otpCode, setOtpCode]     = useState(['','','','','','']);
+  const [loading, setLoading]     = useState(false);
+  const [err, setErr]             = useState('');
+
+  // Update address fields when GPS arrives
+  useEffect(()=>{
+    if (silentGeo) {
+      setAddress(a=>a||silentGeo.address||'');
+      setVillage(v=>v||silentGeo.village||'');
+      setCity(c=>c||silentGeo.city||'Pune');
+      setPincode(p=>p||silentGeo.pincode||'');
+    }
+  },[silentGeo]);
+
+  const sendOTP = async () => {
+    if (!firstName.trim()) return setErr('Enter your first name');
+    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    if (!localStorage.getItem('scanv_terms_accepted')) return setErr('Please accept Terms & Conditions to continue');
+    setLoading(true); setErr('');
+    try {
+      const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
+      if (r.data?.success||r.data?.provider) { setOtpSent(true); }
+      else throw new Error('OTP send failed');
+    } catch(e) { setErr(e.message||'Could not send OTP'); }
+    finally { setLoading(false); }
+  };
+
+  const verifyAndBook = async (waVerified=false) => {
+    const code = otpCode.join('');
+    if (code.length<6) return setErr('Enter 6-digit OTP');
+    setLoading(true); setErr('');
+    try {
+      const mob = `+91${mobile}`;
+      // Verify OTP (skip if WhatsApp already verified)
+      if (!waVerified) {
+        const code = otpCode.join('');
+        if (code.length<6) throw new Error('Enter 6-digit OTP');
+        const r = await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
+        if (!r.data?.success) throw new Error('Invalid OTP. Try again.');
+      }
+
+      // Create user profile
+      const fakeEmail = `${mobile}@scanv.app`;
+      const fakePass  = `ScanV_${mobile.slice(-4)}_${Date.now()}`;
+      let userId;
+      try {
+        const {data:su,error:se} = await sb().auth.signUp({email:fakeEmail,password:fakePass});
+        if (se?.message?.includes('already registered')) {
+          const {data:si} = await sb().auth.signInWithPassword({email:fakeEmail,password:fakePass});
+          userId = si?.user?.id;
+        } else { userId = su?.user?.id; }
+      } catch(e) {}
+      if (!userId) { userId = localStorage.getItem('scanv_uid')||crypto.randomUUID(); localStorage.setItem('scanv_uid',userId); }
+
+      // Get device info silently
+      const dev = detectDevice();
+      const ip  = await getIP();
+
+      // Upsert profile — no age/gender asked
+      await sb().from('profiles').upsert({
+        id:userId, email:fakeEmail, name:`${firstName} ${lastName}`.trim(),
+        first_name:firstName.trim(), last_name:lastName.trim(),
+        phone:mob, address, village, city, pincode,
+        ip_address:ip, last_lat:silentGeo?.lat||null, last_lng:silentGeo?.lng||null,
+        device_type:dev.deviceType, os_name:dev.osName, browser:dev.browser,
+        timezone:dev.timezone, language:dev.language,
+        mobile_verified:true, mobile_verified_at:new Date().toISOString(),
+        role:'customer', status:'active', avatar:'👤',
+      },{onConflict:'id'});
+
+      // Now create the booking if we have booking details
+      if (activeSvc && bookingDetail) {
+        const svc = activeSvc;
+        const price = svc.price||50000;
+        const fee   = Math.round(price*0.10);
+        const gst   = Math.round((price+fee)*0.18);
+        const total = price+fee+gst;
+        const txn   = 'TXN-'+Date.now();
+        const {data:bk} = await sb().from('bookings').insert({
+          customer_id:userId, service_name:svc.name,
+          customer_name:`${firstName} ${lastName}`.trim(),
+          customer_email:fakeEmail,
+          date:bookingDetail.date, time:bookingDetail.time,
+          notes:bookingDetail.notes, location_text:bookingDetail.loc||`${village}, ${city} ${pincode}`,
+          price, platform_fee:fee, gst_amt:gst, total,
+          status:'awaiting_payment', txn_id:txn,
+        }).select().single();
+        await sb().from('service_requests').insert({
+          customer_id:userId, service_name:svc.name, service_type:svc.cat,
+          preferred_date:bookingDetail.date, preferred_time:bookingDetail.time,
+          notes:bookingDetail.notes, location_text:bookingDetail.loc||`${village}, ${city} ${pincode}`,
+          price, platform_fee:fee, gst_amount:gst, total,
+          status:'new', txn_id:txn, added_by:userId,
+        }).then(()=>{});
+        setBookingDetail(bd=>({...bd,booking:bk,txn}));
+      }
+
+      const profile = {id:userId,name:`${firstName} ${lastName}`.trim(),first_name:firstName,last_name:lastName,phone:mob,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city,village,pincode,device_type:dev.deviceType,os_name:dev.osName,browser:dev.browser,ip_address:ip};
+      onRegistered(profile);
+    } catch(e) { setErr(e.message||'Verification failed.'); }
+    finally { setLoading(false); }
+  };
+
+  // ── LOCATION BANNER ──────────────────────────────────────────────────────
+  const locBanner = (
+    <div style={{background:`${C.acc}11`,borderBottom:`1px solid ${C.bdr}`,padding:'6px 16px',fontSize:11,color:C.dim,textAlign:'center'}}>
+      📍 ScanV uses your location to show services and enable deliveries · DPDP Act 2023
+    </div>
+  );
+
+  // ── SERVICES LIST ────────────────────────────────────────────────────────
+  if (screen==='services') return (
+    <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif",display:'flex',flexDirection:'column'}}>
+      <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{fontWeight:800,fontSize:22,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
+        <div style={{fontSize:11,color:C.dim}}>PCMC · Pune</div>
+      </div>
+      {locBanner}
+      <div style={{padding:'16px 16px 80px',flex:1,overflowY:'auto'}}>
+        <div style={{marginBottom:16}}>
+          <div style={{color:C.txt,fontSize:18,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",marginBottom:4}}>Services near you</div>
+          <div style={{color:C.sub,fontSize:12}}>{silentGeo?.city||'PCMC, Pune'} · {silentGeo?.pincode||'Detecting location…'}</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {SVCS.map(s=>{
+            const d=SVC_DETAIL[s.id]||{};
+            return (
+              <div key={s.id} style={{...S.card(),cursor:'pointer'}} onClick={()=>{setActiveSvc(s);setScreen('detail');}}>
+                <div style={{display:'flex',gap:14,alignItems:'center'}}>
+                  <div style={{width:54,height:54,borderRadius:12,background:C.deep,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,flexShrink:0}}>{s.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{color:C.txt,fontWeight:700,fontSize:15}}>{s.name}</div>
+                    <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
+                    <div style={{display:'flex',gap:8,marginTop:5,flexWrap:'wrap',alignItems:'center'}}>
+                      <span style={{color:C.gold,fontSize:11}}>{d.rating||'4.8 ⭐'}</span>
+                      <span style={{color:C.dim,fontSize:11}}>·</span>
+                      <span style={{color:C.dim,fontSize:11}}>{d.turnaround||'Same day'}</span>
+                      {s.cash&&<span style={{color:C.grn,fontSize:11,background:`${C.grn}22`,padding:'1px 6px',borderRadius:4}}>💵 Cash</span>}
+                    </div>
+                  </div>
+                  <div style={{color:C.acc,fontSize:20}}>›</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <AssistBanner/>
+      </div>
+    </div>
+  );
+
+  // ── SERVICE DETAIL ───────────────────────────────────────────────────────
+  if (screen==='detail'&&activeSvc) {
+    const d = SVC_DETAIL[activeSvc.id]||{};
+    return (
+      <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{activeSvc.name}</div>
+        </div>
+        {locBanner}
+        <div style={{padding:'16px 16px 80px',overflowY:'auto'}}>
+          <div style={{background:C.card,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
+            <div style={{fontSize:56,marginBottom:10}}>{activeSvc.icon}</div>
+            <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{activeSvc.name}</div>
+            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:14}}>{d.desc||activeSvc.sub}</div>
+            <div style={{display:'flex',justifyContent:'center',gap:24}}>
+              <div><div style={{color:C.gold,fontSize:15,fontWeight:700}}>{d.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
+              <div><div style={{color:C.grn,fontSize:15,fontWeight:700}}>{d.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
+              <div><div style={{color:C.cyan,fontSize:15,fontWeight:700}}>{d.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
+            </div>
+          </div>
+          <div style={S.card({marginBottom:14})}>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What's included</div>
+            {(d.features||[activeSvc.sub]).map(f=>(
+              <div key={f} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
+                <span style={{color:C.grn}}>✓</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
+              </div>
+            ))}
+          </div>
+          <div style={S.card({marginBottom:14})}>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>How it works</div>
+            {[['1','Pick a date','Choose when you need the service'],['2','Verify mobile','Quick OTP verification'],['3','Get matched','Best professional assigned near you'],['4','Pay securely','After service via UPI or cash']].map(([n,t,dd])=>(
+              <div key={n} style={{display:'flex',gap:12,padding:'8px 0',borderBottom:`1px solid ${C.bdr}`}}>
+                <div style={{width:24,height:24,borderRadius:'50%',background:C.acc,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',flexShrink:0}}>{n}</div>
+                <div><div style={{color:C.txt,fontSize:13,fontWeight:500}}>{t}</div><div style={{color:C.dim,fontSize:11,marginTop:2}}>{dd}</div></div>
+              </div>
+            ))}
+          </div>
+          {activeSvc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}><span>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
+          <Btn full onClick={()=>setScreen('book')}>Book now →</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // ── BOOK: Date/Time/Location ─────────────────────────────────────────────
+  if (screen==='book'&&activeSvc) {
+    const [bDate,setBDate] = [bookingDetail?.date||'',d=>setBookingDetail(b=>({...b,date:d}))];
+    const [bTime,setBTime] = [bookingDetail?.time||'10:00',t=>setBookingDetail(b=>({...b,time:t}))];
+    const [bNotes,setBNotes] = [bookingDetail?.notes||'',n=>setBookingDetail(b=>({...b,notes:n}))];
+    const [bLoc,setBLoc]  = [bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', '),l=>setBookingDetail(b=>({...b,loc:l}))];
+    const [gpsState,setGpsState] = useState('idle');
+
+    const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');},()=>setGpsState('idle'),{timeout:8000,enableHighAccuracy:true});};
+
+    const price=activeSvc.price||50000,fee=Math.round(price*0.10),gst=Math.round((price+fee)*0.18),total=price+fee+gst;
+
+    return (
+      <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{activeSvc.name}</div>
+        </div>
+        <div style={{padding:'16px 16px 40px'}}>
+          <div style={S.card({marginBottom:16,padding:'12px 16px'})}>
+            {[['Service',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:13}}>
+                <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+          <Field label="Date" req><input type="date" defaultValue={bookingDetail?.date||''} onChange={e=>setBookingDetail(b=>({...b,date:e.target.value}))} style={S.inp()}/></Field>
+          <Field label="Time"><input type="time" defaultValue={bookingDetail?.time||'10:00'} onChange={e=>setBookingDetail(b=>({...b,time:e.target.value}))} style={S.inp()}/></Field>
+          <Field label="Service location" note="Auto-filled from your GPS">
+            <div style={{display:'flex',gap:8}}>
+              <input defaultValue={bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', ')} onChange={e=>setBookingDetail(b=>({...b,loc:e.target.value}))} placeholder="Address, city, PIN" style={{...S.inp(),flex:1}}/>
+              <button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button>
+            </div>
+            {gpsState==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4}}>✅ Location updated</div>}
+          </Field>
+          <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
+          <Btn full onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue →</Btn>
+          {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── VERIFY: Name + Mobile + OTP or WhatsApp ────────────────────────────
+  if (screen==='verify') {
+    const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
+    const [waToken, setWaToken]     = useState('');
+    const [waChecking, setWaChecking] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(
+      !!localStorage.getItem('scanv_terms_accepted')
+    );
+    const acceptTerms = () => {
+      localStorage.setItem('scanv_terms_accepted', new Date().toISOString());
+      setTermsAccepted(true);
+    };
+
+    const sendWA = async () => {
+      if (!firstName.trim()) return setErr('Enter your first name');
+      if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+      if (!termsAccepted) return setErr('Please accept Terms & Conditions to continue');
+      setLoading(true); setErr('');
+      try {
+        const r = await sb().functions.invoke('whatsapp-verify',{body:{action:'generate',mobile:`+91${mobile}`}});
+        if (r.data?.token) {
+          setWaToken(r.data.token);
+          setOtpSent(true);
+          // Start polling for WA confirmation
+          setWaChecking(true);
+          const poll = setInterval(async()=>{
+            const res = await sb().functions.invoke('whatsapp-verify',{body:{action:'check',token:r.data.token}});
+            if (res.data?.verified) {
+              clearInterval(poll);
+              setWaChecking(false);
+              await verifyAndBook(true); // WA verified — skip OTP check
+            }
+          }, 3000);
+          setTimeout(()=>{ clearInterval(poll); setWaChecking(false); }, 600000);
+        } else throw new Error('Could not generate WhatsApp token');
+      } catch(e) { setErr(e.message||'WhatsApp verification failed'); }
+      finally { setLoading(false); }
+    };
+
+    return (
+      <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setScreen('book')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>Verify your identity</div>
+        </div>
+        <div style={{padding:'20px 16px'}}>
+          {err&&<div style={S.err}>{err}</div>}
+          <div style={{color:C.sub,fontSize:12,marginBottom:16,lineHeight:1.6}}>
+            📍 {city||'Pune'} {pincode||''} · Quick verification to confirm your booking.
+          </div>
+
+          {/* Name fields */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
+            <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
+            <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
+          </div>
+
+          {/* Mobile */}
+          <Field label="Mobile" req note="10-digit Indian mobile">
+            <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
+              <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
+              <input type="tel" maxLength={10} value={mobile} onChange={e=>setMobile(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+            </div>
+          </Field>
+
+          {/* Location */}
+          <Field label="Your location" note="Auto-detected from GPS">
+            <input value={city?(village?`${village}, ${city} ${pincode}`:`${city} ${pincode}`):'Detecting…'}
+              readOnly style={{...S.inp(),color:C.dim}}/>
+          </Field>
+
+          {/* DPDP + T&C acceptance — once only */}
+          {!termsAccepted&&(
+            <div style={{background:`${C.acc}11`,border:`1px solid ${C.acc}33`,borderRadius:10,padding:14,marginBottom:14}}>
+              <div style={{color:C.txt,fontSize:12,fontWeight:600,marginBottom:8}}>Before we continue</div>
+              <div style={{fontSize:11,color:C.sub,lineHeight:1.7,marginBottom:10}}>
+                By booking, you agree to our{' '}
+                <a href="https://www.dcoreglobal.com/termsandconditions" target="_blank" rel="noreferrer" style={{color:C.acc}}>Terms &amp; Conditions</a>,{' '}
+                <a href="https://www.dcoreglobal.com/privacypolicy" target="_blank" rel="noreferrer" style={{color:C.acc}}>Privacy Policy</a>,{' '}
+                <a href="https://www.dcoreglobal.com/refundpolicy" target="_blank" rel="noreferrer" style={{color:C.acc}}>Refund Policy</a> and acknowledge that DCORE Global Corporation collects your location and device data in compliance with the <strong style={{color:C.txt}}>DPDP Act 2023</strong>.
+              </div>
+              <label style={{display:'flex',gap:10,alignItems:'flex-start',cursor:'pointer'}}>
+                <input type="checkbox" onChange={e=>e.target.checked&&acceptTerms()} style={{marginTop:2,accentColor:C.acc,width:16,height:16,flexShrink:0}}/>
+                <span style={{fontSize:11,color:C.txt}}>I have read and accept the Terms, Privacy Policy, Refund Policy and DPDP Act 2023 compliance. <strong style={{color:C.acc}}>*</strong></span>
+              </label>
+            </div>
+          )}
+          {termsAccepted&&(
+            <div style={{fontSize:10,color:C.grn,marginBottom:10}}>✅ Terms &amp; DPDP Act 2023 accepted</div>
+          )}
+
+          {/* Verification method toggle */}
+          {!otpSent&&(
+            <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14}}>
+              {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
+                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'9px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:verifyMethod===v?600:400,background:verifyMethod===v?C.acc:'transparent',color:verifyMethod===v?'#fff':C.sub}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* SMS OTP flow */}
+          {verifyMethod==='sms'&&!otpSent&&(
+            <Btn full onClick={sendOTP} disabled={loading||!termsAccepted}>
+              {loading?<><Spin size={16}/>Sending OTP…</>:'Send SMS OTP →'}
+            </Btn>
+          )}
+          {verifyMethod==='sms'&&otpSent&&(
+            <>
+              <div style={{color:C.grn,fontSize:12,marginBottom:12}}>✅ OTP sent to +91 {mobile} · check SMS</div>
+              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
+                {otpCode.map((d,i)=>(
+                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
+                    onChange={e=>{const nd=[...otpCode];nd[i]=e.target.value.replace(/\D/g,'').slice(-1);setOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`votp-${i+1}`)?.focus();}}
+                    onKeyDown={e=>{if(e.key==='Backspace'&&!otpCode[i]&&i>0)document.getElementById(`votp-${i-1}`)?.focus();}}
+                    style={{width:44,height:52,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:10,color:C.acc,fontFamily:'monospace',fontSize:24,outline:'none'}}/>
+                ))}
+              </div>
+              <Btn full onClick={()=>verifyAndBook(false)} disabled={loading||otpCode.join('').length<6}>
+                {loading?<><Spin size={16}/>Verifying…</>:'Verify &amp; confirm booking →'}
+              </Btn>
+              <button onClick={sendOTP} disabled={loading} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
+            </>
+          )}
+
+          {/* WhatsApp flow */}
+          {verifyMethod==='whatsapp'&&!otpSent&&(
+            <Btn full onClick={sendWA} disabled={loading||!termsAccepted} style={{background:'#25D366'}}>
+              {loading?<><Spin size={16}/>Generating link…</>:<><span style={{fontSize:18}}>💬</span> Verify via WhatsApp →</>}
+            </Btn>
+          )}
+          {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
+            <div style={{background:`#25D36622`,border:`1.5px solid #25D366`,borderRadius:12,padding:14,textAlign:'center'}}>
+              <div style={{color:'#25D366',fontSize:13,fontWeight:600,marginBottom:8}}>📱 Open WhatsApp to verify</div>
+              <div style={{color:C.sub,fontSize:11,marginBottom:12,lineHeight:1.6}}>
+                Tap the button below — WhatsApp will open with a pre-filled message. Tap Send to verify your number.
+              </div>
+              <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`}
+                target="_blank" rel="noreferrer"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10}}>
+                <span style={{fontSize:20}}>💬</span>
+                <span style={{color:'#fff',fontWeight:700,fontSize:14}}>Open WhatsApp — Send VERIFY message</span>
+              </a>
+              {waChecking&&<div style={{fontSize:11,color:C.sub}}>⏳ Waiting for WhatsApp confirmation…</div>}
+              <div style={{fontSize:10,color:C.dim,marginTop:6}}>Token: <code style={{color:C.acc}}>{waToken}</code> · Send to +91-9270194842</div>
+            </div>
+          )}
+
+          <div style={{textAlign:'center',marginTop:16,fontSize:10,color:C.dim}}>
+            🔒 Stored securely in India · DPDP Act 2023 ·{' '}
+            <a href="https://www.dcoreglobal.com/privacypolicy" target="_blank" rel="noreferrer" style={{color:C.dim}}>Privacy</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/* ════════════════════════════════════════════════════════════════
    REGISTRATION FLOW
 ════════════════════════════════════════════════════════════════ */
 function RegistrationFlow({ onComplete, prefill }) {
@@ -1321,7 +1739,7 @@ function ProfileScreen() {
         <div style={{...S.card(),marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:600,color:C.txt,marginBottom:14}}>Edit profile</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} onChange={e=>f('firstName',e.target.value)} style={S.inp()}/></Field><Field label="Last name"><input value={frm.lastName} onChange={e=>f('lastName',e.target.value)} style={S.inp()}/></Field></div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="Age"><input type="number" value={frm.age} onChange={e=>f('age',e.target.value)} placeholder="32" style={S.inp()}/></Field><Field label="Gender"><select value={frm.gender} onChange={e=>f('gender',e.target.value)} style={S.inp()}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field></div>
+          {/* Age & Gender captured silently from device — not shown in form */}
           <Field label="Mobile"><input value={frm.phone} onChange={e=>f('phone',e.target.value)} style={S.inp()}/></Field>
           <Field label="Address"><input value={frm.address} onChange={e=>f('address',e.target.value)} style={S.inp()}/></Field>
           <Field label="Village / Area"><input value={frm.village} onChange={e=>f('village',e.target.value)} style={S.inp()}/></Field>
@@ -1409,7 +1827,140 @@ function LeaderHome() {
 /* ════════════════════════════════════════════════════════════════
    ROOT APP
 ════════════════════════════════════════════════════════════════ */
-export default function App() {
+export default /* ════════════════════════════════════════════════════════════════
+   LEGAL PAGES — Served at /privacy /terms /refund /payment
+════════════════════════════════════════════════════════════════ */
+function LegalPage({page}) {
+  const pages = {
+    privacy:  {
+      title:'Privacy Policy',
+      badge:'PRIVACY',
+      updated:'10 August 2026',
+      content: (
+        <>
+          <div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:14,marginBottom:24}}>
+            <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 All data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your data</p>
+          </div>
+          {[
+            ['Who We Are','ScanV is operated by DCORE Global Corporation, Pune, Maharashtra. We connect customers with independent service providers across PCMC, Pune and Maharashtra. DPO: privacy@dcoreglobal.com'],
+            ['Data We Collect','Identity (name), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city), Device (type, OS, browser, timezone, language, battery, canvas fingerprint), Booking details, and session behaviour. We do NOT collect Aadhaar, PAN, passport, card numbers, passwords, or biometrics.'],
+            ['How We Use It','Verify identity via OTP before any booking · Match you with nearby service providers · Send booking updates · Process payments for GST compliance · Prevent fraud · Improve platform quality through anonymised analytics · Comply with Indian law'],
+            ['Location Data','ScanV requests GPS when you open the app and when you book. Location is used only to show nearby services and enable delivery routing. IP-based location is used as fallback. We never sell location data to advertisers.'],
+            ['Data Sharing','Name, mobile, and location shared with your assigned Partner to fulfil the booking · Transaction data with Razorpay (PCI-DSS L1) for payments · Mobile with Twilio/MSG91 for OTP delivery · Government/courts only when legally required. We never share with advertisers or data brokers.'],
+            ['Retention','Bookings: 7 years (GST compliance) · OTP records: 30 days · Device/session data: 12 months · Account deletion: permanently removed within 30 days'],
+            ['Your Rights (DPDP Act 2023)','Access your data · Correct inaccurate data · Request erasure · Raise a grievance · Nominate a representative · Withdraw consent. Contact: privacy@dcoreglobal.com · Response within 30 days'],
+            ['Security','TLS 1.3 encryption in transit · AES-256 at rest · AWS Mumbai (data never leaves India) · OTP-only authentication (no passwords stored) · Row-level database security · Regular security audits'],
+            ['Children','ScanV is for users 18+. We do not knowingly collect data from minors. Contact privacy@dcoreglobal.com if you believe a minor has registered.'],
+          ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
+        </>
+      )
+    },
+    terms: {
+      title:'Terms & Conditions',
+      badge:'TERMS',
+      updated:'10 August 2026',
+      content: (
+        <>
+          <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By using ScanV or placing a booking, you agree to these terms in full.</p>
+          </div>
+          {[
+            ['ScanV as Marketplace Intermediary','DCORE Global Corporation operates ScanV as an IT Intermediary under the IT Act 2000. We connect Users with independent Partners. We do not employ Partners, do not deliver services, and are not responsible for service quality, safety, timeliness, or outcomes. DCORE's maximum liability for any booking is limited to the platform fee collected for that booking.'],
+            ['Eligibility','Must be 18+ · Valid Indian mobile · Legally capable of contracts under Indian law · Must accept Terms, Privacy Policy, and DPDP Act 2023 compliance before first booking'],
+            ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + Terms accepted + unique TXN ID generated + platform fee paid. DCORE may cancel bookings if no Partner is available or fraud is detected.'],
+            ['User Responsibilities','Provide accurate booking details · Be present at the agreed time and location · Treat Partners respectfully · Report disputes within 48 hours of service completion · Do not book for unlawful purposes'],
+            ['Payment & Fees','Platform fee: 10% of service value · GST at applicable rates on total · Service fees are indicative and agreed with the Partner · Cash-on-service: platform fee still payable online'],
+            ['Professional Services Disclaimer','Legal services: advice is between you and the advocate (DCORE has no liability). Healthcare: treatment is between you and the practitioner (DCORE has no liability). Training: results are between you and the trainer.'],
+            ['Liability Limitation','DCORE's total liability for any claim is capped at the platform fee for that booking. We are not liable for indirect, consequential, or punitive damages. Partners are independent contractors.'],
+            ['Prohibited Uses','Illegal purposes · Reverse engineering the platform · Fake bookings or reviews · Soliciting Partners outside ScanV · Abuse or harassment of Partners or Users'],
+            ['Governing Law','Laws of India · Courts of Pune, Maharashtra have exclusive jurisdiction · 30-day good-faith negotiation before legal action · Contact: legal@dcoreglobal.com'],
+          ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
+        </>
+      )
+    },
+    refund: {
+      title:'Refund Policy',
+      badge:'REFUNDS',
+      updated:'10 August 2026',
+      content: (
+        <>
+          <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ Refunds apply only to the platform fee (10%) collected by DCORE. Service fees paid to Partners — including cash — are outside DCORE's refund scope.</p>
+          </div>
+          <div style={{marginBottom:20}}>
+            <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>Cancellation Schedule</div>
+            {[['24+ hrs before','Platform fee: 100% refunded'],['2–24 hrs before','Platform fee: 50% refunded'],['Under 2 hrs','Platform fee: no refund'],['No-show','No refund'],['Cancelled by DCORE','100% refunded']].map(([k,v])=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:13}}>
+                <span style={{color:C.sub}}>{k}</span><span style={{color:C.txt,fontWeight:500}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          {[
+            ['What DCORE Refunds','DCORE cancels due to unavailable Partner · Technical error causing incorrect charge · Duplicate payment · Payment processed but no booking confirmed'],
+            ['What DCORE Does Not Refund','Service quality disputes (User vs Partner) · User cancellation after Partner assigned · User no-show · Change of mind · Cash payments to Partners · Professional service outcomes (legal, medical, training)'],
+            ['Non-Refundable Categories','Legal consultations (once conducted) · Cloud training (once batch started) · VIP appointments (deposit within 24hrs) · Food (once preparation started) · Healthcare (once consultation complete)'],
+            ['Refund Processing','5–7 business days · Returned to original payment method · UPI refunds: 3–5 business days post-processing · GST credit note issued for all refunds'],
+            ['How to Request','App: Open booking → Raise a dispute → Refund Request · Email: refunds@dcoreglobal.com with your TXN-XXXXXXXX · Response within 24 business hours'],
+          ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
+        </>
+      )
+    },
+    payment: {
+      title:'Payment Policy',
+      badge:'PAYMENTS',
+      updated:'10 August 2026',
+      content: (
+        <>
+          <div style={{background:`${C.cyan}22`,border:`1px solid ${C.cyan}44`,borderRadius:10,padding:14,marginBottom:24}}>
+            <p style={{margin:0,color:C.cyan,fontSize:13}}>💳 All online payments processed by Razorpay (PCI-DSS Level 1). We never store card or bank details.</p>
+          </div>
+          {[
+            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks) · Cash on service (Household, Delivery, Food categories)'],
+            ['How It Works','Platform fee (10%) paid online at booking. Service fee paid to Partner after completion (UPI or cash). GST added to total. Tax invoice auto-generated for every booking.'],
+            ['UPI Payment','Pay to: dcoreglobal@upi · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
+            ['Cash on Service','Platform fee still paid online · Service fee paid in cash to Partner after service completion · Applies to: Household Services, Deliveries, Food & Tiffin'],
+            ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
+            ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
+            ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner's registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],
+            ['Regulatory','RBI compliant payment aggregator · GST Act 2017 · Section 194-O TDS · 8-year payment record retention · GSTR-1 filed annually'],
+          ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
+        </>
+      )
+    },
+  };
+  const pg = pages[page] || pages.privacy;
+  return (
+    <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
+      {/* Header */}
+      <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{fontWeight:800,fontSize:20,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
+        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>← Back</button>
+      </div>
+      <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
+        {/* Hero */}
+        <div style={{background:`linear-gradient(135deg,${C.surf},${C.card})`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'28px 24px',marginBottom:28}}>
+          <div style={{display:'inline-block',background:C.acc,color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,letterSpacing:1,marginBottom:10}}>{pg.badge}</div>
+          <div style={{color:C.txt,fontSize:24,fontWeight:800,marginBottom:4}}>{pg.title}</div>
+          <div style={{color:C.sub,fontSize:12}}>DCORE Global Corporation · ScanV · Updated: {pg.updated}</div>
+        </div>
+        {/* Content */}
+        {pg.content}
+        {/* Footer links */}
+        <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:20,marginTop:20,display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center'}}>
+          {[['privacy','Privacy'],['terms','Terms'],['refund','Refund'],['payment','Payment']].map(([k,l])=>(
+            <a key={k} href={`/${k}`} style={{color:page===k?C.acc:C.dim,fontSize:12,textDecoration:'none'}}>{l} Policy</a>
+          ))}
+          <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global ↗</a>
+        </div>
+        <div style={{textAlign:'center',marginTop:16,color:C.dim,fontSize:11}}>
+          © 2026 DCORE Global Corporation · ScanV · Pune, India · DPDP Act 2023 Compliant
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
   const [state,setState]       = useState('boot');
   const [user,setUser]         = useState(null);
   const [screen,setScreen]     = useState('home');
@@ -1418,6 +1969,7 @@ export default function App() {
   const [notifs,setNotifs]     = useState([]);
   const [qrPrefill,setQrPrefill] = useState(null);
   const [,forceUpdate]         = useReducer(x=>x+1,0);
+  const [silentGeo, setSilentGeo] = useState(null); // GPS captured silently
 
   const addToast=useCallback((msg,type='info')=>{
     const id=Date.now(); setToasts(t=>[...t,{id,msg,type}]);
@@ -1430,26 +1982,54 @@ export default function App() {
     setUser(null); setState('register'); setScreen('home');
   },[]);
 
+  // Legal page routing
+  const legalPath = window.location.pathname.replace('/','');
+  if (['privacy','terms','refund','payment'].includes(legalPath)) {
+    return <Boundary><style>{CSS}</style><LegalPage page={legalPath}/></Boundary>;
+  }
+
   // Check if QR scan (?qr=1 in URL)
   const isQRScan = new URLSearchParams(window.location.search).get('qr')==='1';
+  // Pass silentGeo down via context
 
   useEffect(()=>{
     (async()=>{
-      // Try restoring session
+      // Silently capture device + IP + location in background
+      try {
+        const device = detectDevice();
+        const ipAddr = await getIP();
+        const battery = await getBattery();
+        const canvasFP = getCanvasFP();
+        // Store visitor session silently
+        sb().from('visitor_sessions').insert({
+          ip_address:ipAddr, user_agent:device.userAgent, device_type:device.deviceType,
+          os_name:device.osName, browser:device.browser, screen_res:device.screenRes,
+          language:device.language, timezone:device.timezone,
+          canvas_fp:canvasFP, battery_level:battery.level,
+          consent_given:true, consent_at:new Date().toISOString(), verified:false,
+        }).then(()=>{}).catch(()=>{});
+        // Silently get GPS
+        navigator.geolocation.getCurrentPosition(async pos=>{
+          const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
+          setSilentGeo({lat:pos.coords.latitude,lng:pos.coords.longitude,...geo,device,ip:ipAddr});
+        },()=>{}, {timeout:8000,enableHighAccuracy:true});
+      } catch(e){}
+
+      // Try restoring existing session
       try {
         const {data:{session}}=await sb().auth.getSession();
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) { setUser(p); setState('app'); return; }
         }
-        // Try localStorage UID
         const uid=localStorage.getItem('scanv_uid');
         if (uid) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) { setUser(p); setState('app'); return; }
         }
       } catch(e){ console.warn('[ScanV]',e.message); }
-      setState(isQRScan?'qr':'register');
+      // Always show services first — no registration wall
+      setState(isQRScan?'qr':'browse');
     })();
   },[]);
 
@@ -1485,13 +2065,24 @@ export default function App() {
     </Boundary>
   );
 
+  // BROWSE: Show services without registration wall
+  if (state==='browse') return (
+    <Boundary><style>{CSS}</style><Toast toasts={toasts}/>
+    <BrowseFlow
+      silentGeo={silentGeo}
+      onRegistered={(p)=>{setUser(p);setState('app');}}
+      addToast={addToast}
+    />
+    </Boundary>
+  );
+
   if (state==='register') return (
     <Boundary><style>{CSS}</style><Toast toasts={toasts}/>
     <RegistrationFlow prefill={qrPrefill} onComplete={p=>{setUser(p);setState('app');}}/>
     </Boundary>
   );
 
-  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout};
+  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,setUser};
 
   const renderScreen=()=>{
     if (screen==='book')     return <BookScreen/>;
