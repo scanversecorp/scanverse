@@ -418,6 +418,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const [otpCode, setOtpCode]     = useState(['','','','','','']);
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState('');
+  const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
+  const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
+  const [waToken, setWaToken]     = useState('');
+  const [waChecking, setWaChecking] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(!!localStorage.getItem('scanv_terms_accepted'));
+  const acceptTerms = () => { localStorage.setItem('scanv_terms_accepted', new Date().toISOString()); setTermsAccepted(true); };
 
   // Update address fields when GPS arrives
   useEffect(()=>{
@@ -588,7 +594,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             </div>
           </div>
           <div style={S.card({marginBottom:14})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What's included</div>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&apos;s included</div>
             {(d.features||[activeSvc.sub]).map(f=>(
               <div key={f} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn}}>✓</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
@@ -613,13 +619,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
   // ── BOOK: Date/Time/Location ─────────────────────────────────────────────
   if (screen==='book'&&activeSvc) {
-    const [bDate,setBDate] = [bookingDetail?.date||'',d=>setBookingDetail(b=>({...b,date:d}))];
-    const [bTime,setBTime] = [bookingDetail?.time||'10:00',t=>setBookingDetail(b=>({...b,time:t}))];
-    const [bNotes,setBNotes] = [bookingDetail?.notes||'',n=>setBookingDetail(b=>({...b,notes:n}))];
-    const [bLoc,setBLoc]  = [bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', '),l=>setBookingDetail(b=>({...b,loc:l}))];
-    const [gpsState,setGpsState] = useState('idle');
-
-    const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');},()=>setGpsState('idle'),{timeout:8000,enableHighAccuracy:true});};
+    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBookingDetail(b=>({...b,loc:[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ')}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true});};
 
     const price=activeSvc.price||50000,fee=Math.round(price*0.10),gst=Math.round((price+fee)*0.18),total=price+fee+gst;
 
@@ -642,9 +642,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <Field label="Service location" note="Auto-filled from your GPS">
             <div style={{display:'flex',gap:8}}>
               <input defaultValue={bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', ')} onChange={e=>setBookingDetail(b=>({...b,loc:e.target.value}))} placeholder="Address, city, PIN" style={{...S.inp(),flex:1}}/>
-              <button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button>
+              <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
             </div>
-            {gpsState==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4}}>✅ Location updated</div>}
+            {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4}}>✅ Location updated</div>}
           </Field>
           <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
           <Btn full onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue →</Btn>
@@ -656,16 +656,6 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
   // ── VERIFY: Name + Mobile + OTP or WhatsApp ────────────────────────────
   if (screen==='verify') {
-    const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
-    const [waToken, setWaToken]     = useState('');
-    const [waChecking, setWaChecking] = useState(false);
-    const [termsAccepted, setTermsAccepted] = useState(
-      !!localStorage.getItem('scanv_terms_accepted')
-    );
-    const acceptTerms = () => {
-      localStorage.setItem('scanv_terms_accepted', new Date().toISOString());
-      setTermsAccepted(true);
-    };
 
     const sendWA = async () => {
       if (!firstName.trim()) return setErr('Enter your first name');
@@ -1491,7 +1481,7 @@ function ServicesScreen() {
           </div>
           {/* Features */}
           <div style={S.card({marginBottom:16})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What's included</div>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&apos;s included</div>
             {(d.features||[]).map(f=>(
               <div key={f} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn,fontSize:14}}>✓</span>
