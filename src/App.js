@@ -1824,7 +1824,7 @@ function LeaderHome() {
 /* ================================================================
    ROOT APP
 ================================================================ */
-export default /* ================================================================
+/* ================================================================
    LEGAL PAGES -- Served at /privacy /terms /refund /payment
 ================================================================ */
 function LegalPage({page}) {
@@ -1957,7 +1957,7 @@ function LegalPage({page}) {
   );
 }
 
-function App() {
+export default function App() {
   const [state,setState]       = useState('boot');
   const [user,setUser]         = useState(null);
   const [screen,setScreen]     = useState('home');
