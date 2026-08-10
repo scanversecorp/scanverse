@@ -1979,10 +1979,10 @@ function App() {
     setUser(null); setState('register'); setScreen('home');
   },[]);
 
-  // Legal page routing
-  const legalPath = window.location.pathname.slice(1).split('?')[0];
-  if (['privacy','terms','refund','payment'].includes(legalPath)) {
-    return <Boundary><style>{CSS}</style><LegalPage page={legalPath}/></Boundary>;
+  // Legal page routing \u2014 check path strictly
+  const _lp = window.location.pathname.replace(/^\//,'').split('?')[0].split('#')[0];
+  if (_lp === 'privacy' || _lp === 'terms' || _lp === 'refund' || _lp === 'payment') {
+    return <Boundary><style>{CSS}</style><LegalPage page={_lp}/></Boundary>;
   }
 
   // Check if QR scan (?qr=1 in URL)
