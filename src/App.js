@@ -19,9 +19,51 @@ const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-/** Working Razorpay-issued UPI QR (rxairtel rail) — do not replace with dynamic upi:// links */
-const UPI_QR_STATIC = `${process.env.PUBLIC_URL || ''}/razorpay-upi-qr.png`;
+const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
+const UPI_PN   = 'DCORE Global Corporation';
 const ASSIST   = '+91-9270194842';
+
+function isAndroidUA() { return /Android/i.test(navigator.userAgent); }
+function buildUpiParams(amountPaise, txnRef, note) {
+  const am = (amountPaise / 100).toFixed(2);
+  const tn = encodeURIComponent(note || 'ScanV Booking');
+  const pn = encodeURIComponent(UPI_PN);
+  const tr = encodeURIComponent(txnRef || '');
+  return `pa=${UPI_PA}&pn=${pn}&am=${am}&cu=INR&tn=${tn}&tr=${tr}`;
+}
+function buildUpiLink(amountPaise, txnRef, note) {
+  return `upi://pay?${buildUpiParams(amountPaise, txnRef, note)}`;
+}
+/** Open UPI app directly — no QR modal; generic UPI uses plain upi:// only (never empty package intent) */
+function openUpiPay(app, amountPaise, txnRef, note) {
+  const params = buildUpiParams(amountPaise, txnRef, note);
+  const upiLink = buildUpiLink(amountPaise, txnRef, note);
+  const android = isAndroidUA();
+  if (app === 'GPay') {
+    if (android) {
+      window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+      setTimeout(() => { window.location.href = `tez://upi/pay?${params}`; }, 400);
+    } else {
+      window.location.href = upiLink;
+    }
+  } else if (app === 'PhonePe') {
+    if (android) {
+      window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+      setTimeout(() => { window.location.href = `phonepe://pay?${params}`; }, 400);
+    } else {
+      window.location.href = `phonepe://pay?${params}`;
+    }
+  } else if (app === 'Paytm') {
+    if (android) {
+      window.location.href = `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+      setTimeout(() => { window.location.href = `paytmmp://pay?${params}`; }, 400);
+    } else {
+      window.location.href = `paytmmp://pay?${params}`;
+    }
+  } else {
+    window.location.href = upiLink;
+  }
+}
 async function registerPaymentIntent(txnId, amountPaise, userId) {
   if (!txnId || !amountPaise) return;
   try {
@@ -74,13 +116,14 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     document.addEventListener('visibilitychange', onVis);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
   }, [upiOpened, txnId, paymentVerified, addToast]);
-  const [upiModalApp, setUpiModalApp] = useState(null);
-  const launchUpi = (app) => { setUpiModalApp(app); setUpiOpened(true); };
-  const closeUpiModal = () => setUpiModalApp(null);
-  const onUpiOpened = () => setUpiOpened(true);
+  const launchUpi = (app) => {
+    openUpiPay(app, amountPaise, txnId, 'ScanV Booking');
+    setUpiOpened(true);
+    addToast?.('Opening UPI app…', 'info');
+  };
   return {
     paymentVerified, upiOpened, checkingPay, launchUpi, setPaymentVerified, setUpiOpened,
-    upiModalApp, closeUpiModal, onUpiOpened, amountPaise, txnId,
+    amountPaise, txnId,
   };
 }
 const FEE_PCT  = 0.10;
@@ -183,36 +226,6 @@ function Btn({children,onClick,v='primary',full,disabled,sm,style}) {
   const b={borderRadius:11,fontFamily:FF,fontWeight:700,cursor:disabled?'not-allowed':'pointer',width:full?'100%':'auto',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,opacity:disabled?.6:1,border:'none',padding:sm?'8px 14px':'13px 22px',fontSize:sm?12:15,transition:'opacity .15s',...style};
   const vs={primary:{...b,background:disabled?C.deep:C.acc,color:disabled?C.dim:'#fff',boxShadow:disabled?'none':'0 4px 16px rgba(214,58,86,0.35)'},outline:{...b,background:'transparent',color:C.acc,border:`1.5px solid ${C.acc}`,boxShadow:'none'},ghost:{...b,background:C.gls,color:C.txt,border:BDR,boxShadow:'none'},secondary:{...b,background:C.deep,color:C.txt,border:BDR,boxShadow:'none'},danger:{...b,background:disabled?C.deep:C.red,color:disabled?C.dim:'#fff',boxShadow:'none'}};
   return <button onClick={onClick} disabled={disabled} style={vs[v]||vs.primary}>{children}</button>;
-}
-
-function UpiPayModal({ open, app, amountPaise, txnId, onClose, onOpened }) {
-  if (!open) return null;
-  const amountStr = `₹${(amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-  const openRazorpay = () => { window.open(RZP_URL, '_blank', 'noopener,noreferrer'); onOpened?.(); };
-  return (
-    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(18,18,18,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: C.surf, borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 28px', boxShadow: '0 -8px 32px rgba(18,18,18,0.18)' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Pay via UPI</div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: C.sub, lineHeight: 1 }}>×</button>
-        </div>
-        {app && app !== 'Any UPI' && <div style={{ fontSize: 12, color: C.dim, marginBottom: 10, fontWeight: 600 }}>{app}</div>}
-        <div style={{ textAlign: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 32, fontWeight: 800, color: C.acc, marginBottom: 4 }}>{amountStr}</div>
-          <div style={{ fontSize: 12, color: C.dim, fontWeight: 600 }}>Enter this exact amount when paying</div>
-        </div>
-        <div style={{ textAlign: 'center', marginBottom: 14 }}>
-          <img src={UPI_QR_STATIC} alt="Razorpay UPI QR" style={{ width: 260, maxHeight: 320, borderRadius: 12, border: `1.5px solid ${C.bdr}` }} />
-        </div>
-        <p style={{ textAlign: 'center', fontSize: 13, color: C.sub, margin: '0 0 8px', fontWeight: 600, lineHeight: 1.5 }}>
-          Scan with GPay, PhonePe, Paytm or any UPI app
-        </p>
-        <p style={{ textAlign: 'center', fontSize: 11, color: C.dim, margin: '0 0 16px' }}>Ref: {txnId}</p>
-        <Btn full onClick={openRazorpay} style={{ marginBottom: 10 }}>Open Razorpay payment link ↗</Btn>
-        <Btn full v="outline" onClick={() => { onOpened?.(); onClose(); }}>I&apos;ve paid — check status</Btn>
-      </div>
-    </div>
-  );
 }
 
 function Field({label,req,note,children}) {
@@ -775,7 +788,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   };
 
   const confirmPayment = (method) => {
-    if (!browsePay.paymentVerified) { addToast?.('Waiting for payment confirmation — complete UPI payment in your app','error'); return; }
+    if (!browsePay.upiOpened && !browsePay.paymentVerified) { addToast?.('Pay via UPI first','error'); return; }
     setPaymentMethod(method);
     setScreen('schedule');
     addToast?.('Payment confirmed — pick date & time','success');
@@ -943,10 +956,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- PAYMENT: UPI / Razorpay (after verify, before schedule) ------------
   if (screen==='payment'&&activeSvc) {
     const price=browsePrice,fee=browseFee,gst=browseGst,total=browseTotal;
-    const { paymentVerified, upiOpened, checkingPay, launchUpi, setUpiOpened, setPaymentVerified, upiModalApp, closeUpiModal, onUpiOpened } = browsePay;
+    const { paymentVerified, upiOpened, checkingPay, launchUpi, setUpiOpened, setPaymentVerified } = browsePay;
     return browseWrap(
       <>
-        <UpiPayModal open={!!upiModalApp} app={upiModalApp} amountPaise={total} txnId={txnId} onClose={closeUpiModal} onOpened={onUpiOpened} />
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
           <button onClick={()=>{setScreen('verify');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
@@ -966,7 +978,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           </div>
           {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
           <Btn full onClick={()=>launchUpi('Any UPI')} style={{marginBottom:14,boxShadow:'0 4px 16px rgba(214,58,86,0.35)'}}>💳 Pay via UPI →</Btn>
-          {upiOpened&&!paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{checkingPay?'⏳ Checking payment status…':'Complete payment via QR or Razorpay link — waiting for confirmation'}</div>}
+          {upiOpened&&!paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{checkingPay?'⏳ Checking payment status…':'Complete payment in your UPI app, then tap I\'ve paid — continue'}</div>}
           {paymentVerified&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment confirmed — you can continue</div>}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
             {[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=>(
@@ -978,7 +990,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <div style={{textAlign:'center',marginBottom:14}}>
             <a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.cyan,fontSize:13,fontWeight:600}}>Card / Net Banking via Razorpay ↗</a>
           </div>
-          <Btn full onClick={()=>confirmPayment('UPI')} disabled={loading||!paymentVerified}>{paymentVerified?'✅ I\'ve paid — continue →':upiOpened?'Waiting for payment confirmation…':'Pay via UPI first to continue'}</Btn>
+          <Btn full onClick={()=>confirmPayment('UPI')} disabled={loading||(!upiOpened&&!paymentVerified)}>{paymentVerified?'✅ Payment confirmed — continue →':upiOpened?'I\'ve paid — continue →':'Pay via UPI first to continue'}</Btn>
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
       </>
@@ -1908,7 +1920,7 @@ function BookScreen() {
   };
 
   const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');if(!payMethod)return addToast('Complete UPI payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});setBooking(data);addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
-  const confirmPaid=method=>{if(!bookPay.paymentVerified){addToast('Waiting for payment confirmation — complete UPI payment in your app','error');return;}setPayMethod(method);setStep(4);addToast('Payment confirmed — pick date & time','success');};
+  const confirmPaid=method=>{if(!bookPay.upiOpened&&!bookPay.paymentVerified){addToast('Pay via UPI first','error');return;}setPayMethod(method);setStep(4);addToast('Payment confirmed — pick date & time','success');};
   const goFromService=()=>{
     if(skipVerify){ setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); }
     else setStep(2);
@@ -1918,7 +1930,6 @@ function BookScreen() {
   const stepLabels=skipVerify?['Service','Pay','Schedule']:['Service','Verify','Pay','Schedule'];
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
-      <UpiPayModal open={!!bookPay.upiModalApp} app={bookPay.upiModalApp} amountPaise={total} txnId={txnId} onClose={bookPay.closeUpiModal} onOpened={bookPay.onUpiOpened} />
       <TopBar title={svc.name} back="services"/>
       <div style={{display:'flex',padding:'12px 16px',gap:4}}>{Array.from({length:progressTotal},(_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:progressIdx>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
       <div style={{padding:'8px 16px 40px'}}>
@@ -1961,7 +1972,7 @@ function BookScreen() {
             <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <Btn full onClick={()=>bookPay.launchUpi('Any UPI')} style={{marginBottom:14}}>💳 Pay via UPI →</Btn>
-          {bookPay.upiOpened&&!bookPay.paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{bookPay.checkingPay?'⏳ Checking payment status…':'Complete payment via QR or Razorpay link — waiting for confirmation'}</div>}
+          {bookPay.upiOpened&&!bookPay.paymentVerified&&<div style={{background:'#fff8e6',border:`1.5px solid rgba(184,134,11,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.gold,fontWeight:700}}>{bookPay.checkingPay?'⏳ Checking payment status…':'Complete payment in your UPI app, then tap I\'ve paid — continue'}</div>}
           {bookPay.paymentVerified&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment confirmed — you can continue</div>}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
             {[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=>(
@@ -1971,7 +1982,7 @@ function BookScreen() {
             ))}
           </div>
           <div style={{textAlign:'center',marginBottom:14}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.cyan,fontSize:13,fontWeight:600}}>Card / Net Banking via Razorpay ↗</a></div>
-          <Btn full onClick={()=>confirmPaid('UPI')} disabled={!bookPay.paymentVerified}>{bookPay.paymentVerified?'✅ I\'ve paid — continue →':bookPay.upiOpened?'Waiting for payment confirmation…':'Pay via UPI first to continue'}</Btn>
+          <Btn full onClick={()=>confirmPaid('UPI')} disabled={!bookPay.upiOpened&&!bookPay.paymentVerified}>{bookPay.paymentVerified?'✅ Payment confirmed — continue →':bookPay.upiOpened?'I\'ve paid — continue →':'Pay via UPI first to continue'}</Btn>
         </>}
 
         {step===4&&<>
