@@ -86,6 +86,24 @@ const S = {
   err: {background:`${C.red}15`,border:`1px solid ${C.red}40`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
 };
 
+const APP_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:${C.bg};color:${C.txt};font-family:'DM Sans',sans-serif;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+  input,select,textarea,button{font-family:'DM Sans',sans-serif}
+  input::placeholder,textarea::placeholder{color:${C.dim}}
+  select option{background:${C.deep};color:${C.txt}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  ::-webkit-scrollbar{width:0}
+  a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
+`;
+
+function legalPathname() {
+  return window.location.pathname.replace(/^\/+|\/+$/g,'').split('/')[0];
+}
+
 /* --- PRIMITIVES --------------------------------------------------- */
 function Spin({size=20}) {
   return <div style={{width:size,height:size,border:`2px solid ${C.bdr}`,borderTop:`2px solid ${C.acc}`,borderRadius:'50%',animation:'spin .7s linear infinite',flexShrink:0}}/>;
@@ -540,15 +558,23 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       </div>
       {locBanner}
       <div style={{padding:'16px 16px 80px',flex:1,overflowY:'auto'}}>
+        <div style={{background:`linear-gradient(135deg,${C.surf} 0%,${C.card} 55%,${C.deep} 100%)`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'18px 16px',marginBottom:18,animation:'fadeUp .45s ease'}}>
+          <div style={{fontSize:11,color:C.acc,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:6}}>Professional services · PCMC Pune</div>
+          <div style={{color:C.txt,fontSize:20,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",marginBottom:6}}>Book trusted experts near you</div>
+          <div style={{color:C.sub,fontSize:12,lineHeight:1.5}}>Browse 8 categories · OTP verify at checkout · Pay via UPI or cash</div>
+        </div>
         <div style={{marginBottom:16}}>
           <div style={{color:C.txt,fontSize:18,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",marginBottom:4}}>Services near you</div>
           <div style={{color:C.sub,fontSize:12}}>{silentGeo?.city||'PCMC, Pune'} · {silentGeo?.pincode||'Detecting location…'}</div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {SVCS.map(s=>{
+          {SVCS.map((s,i)=>{
             const d=SVC_DETAIL[s.id]||{};
             return (
-              <div key={s.id} style={{...S.card(),cursor:'pointer'}} onClick={()=>{setActiveSvc(s);setScreen('detail');}}>
+              <div key={s.id} style={{...S.card(),cursor:'pointer',transition:'transform .15s ease, border-color .15s ease, box-shadow .15s ease',animation:`fadeUp .4s ease ${i*0.04}s both`}}
+                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.borderColor='rgba(233,69,96,0.35)';e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.25)';}}
+                onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.borderColor='';e.currentTarget.style.boxShadow='';}}
+                onClick={()=>{setActiveSvc(s);setScreen('detail');}}>
                 <div style={{display:'flex',gap:14,alignItems:'center'}}>
                   <div style={{width:54,height:54,borderRadius:12,background:C.deep,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,flexShrink:0}}>{s.icon}</div>
                   <div style={{flex:1}}>
@@ -1979,12 +2005,6 @@ export default function App() {
     setUser(null); setState('register'); setScreen('home');
   },[]);
 
-  // Legal page routing
-  const legalPath = window.location.pathname.replace('/','');
-  if (['privacy','terms','refund','payment'].includes(legalPath)) {
-    return <Boundary><style>{CSS}</style><LegalPage page={legalPath}/></Boundary>;
-  }
-
   // Check if QR scan (?qr=1 in URL)
   const isQRScan = new URLSearchParams(window.location.search).get('qr')==='1';
   // Pass silentGeo down via context
@@ -2036,25 +2056,19 @@ export default function App() {
       .then(({data})=>setNotifs(data||[]));
   },[user]);
 
-  const CSS=`
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{background:${C.bg};color:${C.txt};font-family:'DM Sans',sans-serif;overscroll-behavior:none}
-    input,select,textarea,button{font-family:'DM Sans',sans-serif}
-    input::placeholder,textarea::placeholder{color:${C.dim}}
-    select option{background:${C.deep};color:${C.txt}}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    ::-webkit-scrollbar{width:0}
-  `;
+  const legalPath = legalPathname();
+  if (['privacy','terms','refund','payment'].includes(legalPath)) {
+    return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath}/></Boundary>;
+  }
 
   if (state==='boot') return (
-    <><style>{CSS}</style>
+    <><style>{APP_CSS}</style>
     <div style={S.center}><div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div><Spin size={32}/></div></>
   );
 
   // QR landing page -- capture data then proceed to register
   if (state==='qr') return (
-    <Boundary><style>{CSS}</style><Toast toasts={toasts}/>
+    <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
     <QRLandingPage onContinue={(scanId,dev,ip,geo,coords)=>{
       setQrPrefill({scanId,dev,ip,geo});
       setState('register');
@@ -2064,7 +2078,7 @@ export default function App() {
 
   // BROWSE: Show services without registration wall
   if (state==='browse') return (
-    <Boundary><style>{CSS}</style><Toast toasts={toasts}/>
+    <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
     <BrowseFlow
       silentGeo={silentGeo}
       onRegistered={(p)=>{setUser(p);setState('app');}}
@@ -2074,7 +2088,7 @@ export default function App() {
   );
 
   if (state==='register') return (
-    <Boundary><style>{CSS}</style><Toast toasts={toasts}/>
+    <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
     <RegistrationFlow prefill={qrPrefill} onComplete={p=>{setUser(p);setState('app');}}/>
     </Boundary>
   );
@@ -2095,7 +2109,7 @@ export default function App() {
   return (
     <Boundary>
       <Ctx.Provider value={ctx}>
-        <style>{CSS}</style>
+        <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
         <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.surf}}>
           <Boundary>{renderScreen()}</Boundary>

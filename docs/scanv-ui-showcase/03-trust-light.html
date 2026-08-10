@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 · Trust Light — ScanV UI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8f9fc;
+      --surf: #ffffff;
+      --card: #ffffff;
+      --deep: #eef1f7;
+      --acc: #c73652;
+      --rose: #e94560;
+      --cyan: #0077b6;
+      --gold: #b8860b;
+      --grn: #00875a;
+      --txt: #1a1a2e;
+      --sub: #4a5568;
+      --dim: #718096;
+      --bdr: rgba(26,26,46,0.1);
+      --shadow: 0 2px 12px rgba(26,26,46,0.08);
+      --shadow-lg: 0 8px 32px rgba(26,26,46,0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--txt);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surf);
+      border-bottom: 1px solid var(--bdr);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    .back { color: var(--sub); text-decoration: none; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; transition: color .15s; }
+    .back:hover { color: var(--acc); }
+    .page-title { font-family: 'Space Grotesk', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--txt); }
+    .page-title span { color: var(--acc); }
+    .badge { font-size: 0.65rem; font-weight: 600; background: #e8f5e9; color: var(--grn); padding: 4px 10px; border-radius: 99px; border: 1px solid rgba(0,135,90,0.2); }
+    .intro { text-align: center; padding: 36px 20px 28px; background: linear-gradient(180deg, #fff, var(--bg)); }
+    .intro h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.75rem; margin-bottom: 8px; color: var(--txt); }
+    .intro h1 span { color: var(--acc); }
+    .intro p { color: var(--sub); font-size: 0.9rem; max-width: 520px; margin: 0 auto; line-height: 1.6; }
+    .trust-badges {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--grn);
+      background: #e8f5e9;
+      border: 1px solid rgba(0,135,90,0.2);
+      padding: 6px 12px;
+      border-radius: 99px;
+    }
+    .trust-badge .icon { font-size: 0.85rem; }
+    .showcase { padding: 0 0 60px; }
+    .showcase-label { text-align: center; font-size: 0.75rem; color: var(--dim); margin-bottom: 16px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .phones { display: flex; gap: 28px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 24px 32px; -webkit-overflow-scrolling: touch; }
+    .phones::-webkit-scrollbar { height: 6px; }
+    .phones::-webkit-scrollbar-track { background: var(--deep); border-radius: 3px; }
+    .phones::-webkit-scrollbar-thumb { background: var(--acc); border-radius: 3px; }
+    .phone-wrap { flex: 0 0 auto; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .phone {
+      width: 280px;
+      background: #1a1a2e;
+      border-radius: 36px;
+      padding: 10px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+    }
+    .phone::before { content: ''; position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 72px; height: 22px; background: #1a1a2e; border-radius: 0 0 14px 14px; z-index: 5; }
+    .phone-screen {
+      background: var(--bg);
+      border-radius: 28px;
+      overflow: hidden;
+      height: 580px;
+      display: flex;
+      flex-direction: column;
+      font-size: 11px;
+    }
+    .screen-label { font-family: 'Space Grotesk', sans-serif; font-size: 0.8rem; font-weight: 700; color: var(--sub); }
+    .ph-header {
+      background: var(--surf);
+      border-bottom: 1px solid var(--bdr);
+      padding: 28px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 1px 4px rgba(26,26,46,0.04);
+    }
+    .ph-header.center { justify-content: center; gap: 8px; }
+    .ph-header .logo { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 16px; color: var(--txt); }
+    .ph-header .logo span { color: var(--acc); }
+    .ph-header .loc { font-size: 9px; color: var(--dim); }
+    .ph-header .back-btn { color: var(--sub); font-size: 16px; background: none; border: none; }
+    .ph-header .title { font-size: 12px; font-weight: 600; flex: 1; text-align: center; color: var(--txt); }
+    .loc-banner {
+      background: #fff3e0;
+      border-bottom: 1px solid rgba(184,134,11,0.2);
+      padding: 5px 10px;
+      font-size: 8px;
+      color: #8b6914;
+      text-align: center;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .loc-banner .shield { font-size: 10px; }
+    .ph-body { flex: 1; overflow: hidden; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .hero-card {
+      background: var(--surf);
+      border: 1px solid var(--bdr);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+    .hero-card .eyebrow { font-size: 8px; color: var(--acc); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+    .hero-card h2 { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 800; margin-bottom: 4px; color: var(--txt); }
+    .hero-card p { font-size: 9px; color: var(--sub); line-height: 1.4; }
+    .dpdp-strip {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .mini-badge {
+      font-size: 7px;
+      font-weight: 600;
+      color: var(--grn);
+      background: #e8f5e9;
+      border: 1px solid rgba(0,135,90,0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .section-head h3 { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: var(--txt); }
+    .section-head p { font-size: 9px; color: var(--sub); margin-top: 2px; }
+    .svc-card {
+      background: var(--card);
+      border: 1px solid var(--bdr);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      box-shadow: var(--shadow);
+    }
+    .svc-icon {
+      width: 38px; height: 38px; border-radius: 8px;
+      background: var(--deep);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .svc-info { flex: 1; min-width: 0; }
+    .svc-info .name { font-weight: 700; font-size: 11px; color: var(--txt); }
+    .svc-info .sub { font-size: 9px; color: var(--sub); margin-top: 1px; }
+    .svc-meta { display: flex; gap: 4px; margin-top: 3px; font-size: 8px; align-items: center; flex-wrap: wrap; }
+    .svc-meta .rating { color: var(--gold); }
+    .svc-meta .dim { color: var(--dim); }
+    .svc-meta .cash { color: var(--grn); background: #e8f5e9; padding: 1px 4px; border-radius: 3px; border: 1px solid rgba(0,135,90,0.15); }
+    .svc-meta .verified { color: var(--cyan); background: #e3f2fd; padding: 1px 4px; border-radius: 3px; }
+    .svc-arrow { color: var(--acc); font-size: 14px; }
+    .bottom-nav {
+      display: flex;
+      background: var(--surf);
+      border-top: 1px solid var(--bdr);
+      padding: 6px 0 10px;
+      flex-shrink: 0;
+      box-shadow: 0 -2px 8px rgba(26,26,46,0.04);
+    }
+    .nav-item { flex: 1; text-align: center; font-size: 7px; color: var(--dim); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .nav-item.active { color: var(--acc); font-weight: 600; }
+    .nav-item .icon { font-size: 14px; }
+    .detail-hero {
+      background: var(--surf);
+      border: 1px solid var(--bdr);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .detail-hero .big-icon { font-size: 36px; margin-bottom: 6px; }
+    .detail-hero h3 { font-size: 13px; font-weight: 700; margin-bottom: 4px; color: var(--txt); }
+    .detail-hero p { font-size: 9px; color: var(--sub); line-height: 1.5; margin-bottom: 10px; }
+    .trust-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .trust-pill {
+      font-size: 7px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 99px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .trust-pill.green { background: #e8f5e9; color: var(--grn); border: 1px solid rgba(0,135,90,0.2); }
+    .trust-pill.blue { background: #e3f2fd; color: var(--cyan); border: 1px solid rgba(0,119,182,0.2); }
+    .stats { display: flex; justify-content: center; gap: 16px; }
+    .stat .val { font-size: 11px; font-weight: 700; }
+    .stat .val.gold { color: var(--gold); }
+    .stat .val.grn { color: var(--grn); }
+    .stat .val.cyan { color: var(--cyan); }
+    .stat .lbl { font-size: 7px; color: var(--dim); margin-top: 1px; }
+    .info-card {
+      background: var(--surf);
+      border: 1px solid var(--bdr);
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: var(--shadow);
+    }
+    .info-card h4 { font-size: 10px; font-weight: 600; margin-bottom: 6px; color: var(--txt); }
+    .feat-row { display: flex; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--bdr); font-size: 9px; color: var(--sub); }
+    .feat-row:last-child { border-bottom: none; }
+    .feat-row .check { color: var(--grn); font-weight: 700; }
+    .step-row { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--bdr); }
+    .step-num {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--acc); color: #fff;
+      font-size: 8px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-text .t { font-size: 9px; font-weight: 500; color: var(--txt); }
+    .step-text .d { font-size: 8px; color: var(--dim); margin-top: 1px; }
+    .btn-primary {
+      background: var(--acc);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 11px;
+      width: 100%;
+      text-align: center;
+      margin-top: auto;
+      box-shadow: 0 4px 12px rgba(199,54,82,0.25);
+    }
+    .price-card {
+      background: var(--surf);
+      border: 1px solid var(--bdr);
+      border-radius: 10px;
+      padding: 8px 10px;
+      box-shadow: var(--shadow);
+    }
+    .price-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 9px; border-top: 1px solid var(--bdr); color: var(--txt); }
+    .price-row:first-child { border-top: none; }
+    .price-row.total { font-weight: 700; color: var(--acc); font-size: 11px; }
+    .field { margin-bottom: 8px; }
+    .field label { display: block; font-size: 8px; font-weight: 600; color: var(--sub); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3px; }
+    .field label .req { color: var(--acc); }
+    .field .fake-input {
+      width: 100%;
+      background: var(--deep);
+      border: 1px solid var(--bdr);
+      border-radius: 7px;
+      padding: 7px 8px;
+      color: var(--txt);
+      font-size: 10px;
+    }
+    .field .note { font-size: 7px; color: var(--dim); margin-top: 2px; }
+    .loc-row { display: flex; gap: 6px; }
+    .loc-row .fake-input { flex: 1; }
+    .gps-btn {
+      background: var(--surf);
+      border: 1px solid var(--acc);
+      border-radius: 7px;
+      padding: 7px 8px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .verify-note { font-size: 9px; color: var(--sub); line-height: 1.5; margin-bottom: 8px; }
+    .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mobile-input {
+      display: flex;
+      background: var(--deep);
+      border: 1px solid var(--bdr);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .mobile-input .prefix { padding: 7px 8px; background: var(--surf); border-right: 1px solid var(--bdr); color: var(--sub); font-size: 10px; font-weight: 600; }
+    .mobile-input input { border: none; background: transparent; flex: 1; padding: 7px 8px; color: var(--txt); font-size: 10px; }
+    .terms-box {
+      background: #fff8e1;
+      border: 1px solid rgba(184,134,11,0.25);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .terms-box .head { font-size: 9px; font-weight: 600; color: var(--txt); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+    .terms-box p { font-size: 8px; color: var(--sub); line-height: 1.5; }
+    .terms-box a { color: var(--acc); }
+    .terms-check {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      margin-top: 6px;
+      font-size: 8px;
+      color: var(--txt);
+    }
+    .terms-check input { accent-color: var(--acc); width: 12px; height: 12px; margin-top: 1px; flex-shrink: 0; }
+    .toggle { display: flex; background: var(--deep); border-radius: 8px; padding: 2px; gap: 2px; margin-bottom: 8px; border: 1px solid var(--bdr); }
+    .toggle span { flex: 1; text-align: center; padding: 6px; border-radius: 6px; font-size: 9px; font-weight: 600; }
+    .toggle span.on { background: var(--acc); color: #fff; }
+    .toggle span.off { color: var(--sub); }
+    .otp-sent { font-size: 9px; color: var(--grn); margin-bottom: 8px; font-weight: 500; }
+    .otp-boxes { display: flex; gap: 5px; justify-content: center; margin-bottom: 10px; }
+    .otp-box {
+      width: 32px; height: 38px; border-radius: 7px;
+      background: #fce4ec;
+      border: 1.5px solid var(--acc);
+      display: flex; align-items: center; justify-content: center;
+      font-family: monospace; font-size: 16px; color: var(--acc); font-weight: 700;
+    }
+    .otp-box.empty { background: var(--deep); border-color: var(--bdr); color: transparent; }
+    .secure-note {
+      text-align: center;
+      font-size: 7px;
+      color: var(--dim);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .secure-badge {
+      font-size: 7px;
+      font-weight: 600;
+      color: var(--grn);
+      background: #e8f5e9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,135,90,0.2);
+    }
+    @media (min-width: 900px) { .phones { justify-content: center; } }
+    @media (max-width: 640px) { .phone { width: 260px; } .phone-screen { height: 540px; } }
+    footer { text-align: center; padding: 24px; color: var(--dim); font-size: 0.75rem; border-top: 1px solid var(--bdr); background: var(--surf); }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <a class="back" href="index.html">← Showcase</a>
+    <div class="page-title">03 · Trust <span>Light</span></div>
+    <span class="badge">Accessible</span>
+  </header>
+
+  <section class="intro">
+    <h1>Scan<span>V</span> Trust</h1>
+    <p>Light mode for accessibility — high contrast, clear typography, prominent DPDP compliance badges. Ideal for legal &amp; health categories.</p>
+    <div class="trust-badges">
+      <span class="trust-badge"><span class="icon">🛡️</span> DPDP Act 2023</span>
+      <span class="trust-badge"><span class="icon">🇮🇳</span> Data stored in India</span>
+      <span class="trust-badge"><span class="icon">✓</span> Verified providers</span>
+    </div>
+  </section>
+
+  <section class="showcase">
+    <p class="showcase-label">Swipe through screen mockups →</p>
+    <div class="phones">
+
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="ph-header">
+              <div class="logo">Scan<span>V</span></div>
+              <div class="loc">PCMC · Pune</div>
+            </div>
+            <div class="loc-banner"><span class="shield">🛡️</span> DPDP compliant · Location used for nearby services only</div>
+            <div class="ph-body">
+              <div class="hero-card">
+                <div class="eyebrow">Trusted services · PCMC Pune</div>
+                <h2>Book verified experts near you</h2>
+                <p>8 categories · Secure OTP · Transparent pricing · UPI or cash</p>
+                <div class="dpdp-strip">
+                  <span class="mini-badge">🛡️ DPDP 2023</span>
+                  <span class="mini-badge">🇮🇳 India-hosted</span>
+                  <span class="mini-badge">✓ Verified</span>
+                </div>
+              </div>
+              <div class="section-head">
+                <h3>Services near you</h3>
+                <p>PCMC, Pune · 411057</p>
+              </div>
+              <div class="svc-card">
+                <div class="svc-icon">⚖️</div>
+                <div class="svc-info">
+                  <div class="name">Legal services</div>
+                  <div class="sub">Lawyers · docs · filings</div>
+                  <div class="svc-meta"><span class="rating">4.8 ⭐</span><span class="verified">✓ Verified</span></div>
+                </div>
+                <div class="svc-arrow">›</div>
+              </div>
+              <div class="svc-card">
+                <div class="svc-icon">🏥</div>
+                <div class="svc-info">
+                  <div class="name">Health care</div>
+                  <div class="sub">Doctors · tests · pharmacy</div>
+                  <div class="svc-meta"><span class="rating">4.7 ⭐</span><span class="verified">✓ Verified</span></div>
+                </div>
+                <div class="svc-arrow">›</div>
+              </div>
+              <div class="svc-card">
+                <div class="svc-icon">🏡</div>
+                <div class="svc-info">
+                  <div class="name">Property &amp; rentals</div>
+                  <div class="sub">Buy · sell · PG · flat · plots</div>
+                  <div class="svc-meta"><span class="rating">4.6 ⭐</span><span class="dim">24-48 hrs</span></div>
+                </div>
+                <div class="svc-arrow">›</div>
+              </div>
+              <div class="svc-card">
+                <div class="svc-icon">🔧</div>
+                <div class="svc-info">
+                  <div class="name">Household services</div>
+                  <div class="sub">Plumbing · electrical · cleaning</div>
+                  <div class="svc-meta"><span class="rating">4.7 ⭐</span><span class="cash">💵 Cash</span></div>
+                </div>
+                <div class="svc-arrow">›</div>
+              </div>
+            </div>
+            <nav class="bottom-nav">
+              <div class="nav-item active"><span class="icon">🏠</span>Home</div>
+              <div class="nav-item"><span class="icon">📋</span>Services</div>
+              <div class="nav-item"><span class="icon">📅</span>Bookings</div>
+              <div class="nav-item"><span class="icon">👤</span>Profile</div>
+            </nav>
+          </div>
+        </div>
+        <span class="screen-label">Services list</span>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="ph-header center">
+              <span class="back-btn">←</span>
+              <span class="title">Health care</span>
+            </div>
+            <div class="loc-banner"><span class="shield">🛡️</span> DPDP compliant · Health data protected</div>
+            <div class="ph-body">
+              <div class="detail-hero">
+                <div class="big-icon">🏥</div>
+                <h3>Health care</h3>
+                <p>Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.</p>
+                <div class="trust-row">
+                  <span class="trust-pill green">🛡️ DPDP Compliant</span>
+                  <span class="trust-pill blue">✓ Verified doctors</span>
+                </div>
+                <div class="stats">
+                  <div class="stat"><div class="val gold">4.7 ⭐</div><div class="lbl">Rating</div></div>
+                  <div class="stat"><div class="val grn">5,200+</div><div class="lbl">Bookings</div></div>
+                  <div class="stat"><div class="val cyan">2 hours</div><div class="lbl">Response</div></div>
+                </div>
+              </div>
+              <div class="info-card">
+                <h4>What's included</h4>
+                <div class="feat-row"><span class="check">✓</span> Doctor at home</div>
+                <div class="feat-row"><span class="check">✓</span> Lab tests</div>
+                <div class="feat-row"><span class="check">✓</span> Pharmacy delivery</div>
+              </div>
+              <div class="info-card">
+                <h4>How it works</h4>
+                <div class="step-row">
+                  <div class="step-num">1</div>
+                  <div class="step-text"><div class="t">Pick a date</div><div class="d">Choose when you need the service</div></div>
+                </div>
+                <div class="step-row">
+                  <div class="step-num">2</div>
+                  <div class="step-text"><div class="t">Verify mobile</div><div class="d">Quick OTP verification</div></div>
+                </div>
+              </div>
+              <div class="btn-primary">Book now →</div>
+            </div>
+          </div>
+        </div>
+        <span class="screen-label">Service detail</span>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="ph-header center">
+              <span class="back-btn">←</span>
+              <span class="title">Health care</span>
+            </div>
+            <div class="ph-body" style="padding-top:14px">
+              <div class="price-card">
+                <div class="price-row"><span>Service</span><span>₹800</span></div>
+                <div class="price-row"><span>Platform fee (10%)</span><span>₹80</span></div>
+                <div class="price-row"><span>GST (18%)</span><span>₹158</span></div>
+                <div class="price-row total"><span>Total</span><span>₹1,038</span></div>
+              </div>
+              <div class="field">
+                <label>Date <span class="req">*</span></label>
+                <div class="fake-input">2026-08-15</div>
+              </div>
+              <div class="field">
+                <label>Time</label>
+                <div class="fake-input">09:00</div>
+              </div>
+              <div class="field">
+                <label>Service location</label>
+                <div class="loc-row">
+                  <div class="fake-input">Baner, Pune 411045</div>
+                  <div class="gps-btn">📍</div>
+                </div>
+                <div class="note">Auto-filled from your GPS · DPDP consent given</div>
+              </div>
+              <div class="field">
+                <label>Notes (optional)</label>
+                <div class="fake-input" style="color:var(--dim)">Home visit preferred…</div>
+              </div>
+              <div class="btn-primary">Continue →</div>
+            </div>
+          </div>
+        </div>
+        <span class="screen-label">Book screen</span>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="ph-header center">
+              <span class="back-btn">←</span>
+              <span class="title">Verify your identity</span>
+            </div>
+            <div class="ph-body" style="padding-top:14px">
+              <div class="verify-note">📍 Pune 411045 · Quick verification to confirm your booking.</div>
+              <div class="name-row">
+                <div class="field"><label>First name <span class="req">*</span></label><div class="fake-input">Anita</div></div>
+                <div class="field"><label>Last name</label><div class="fake-input">Desai</div></div>
+              </div>
+              <div class="field">
+                <label>Mobile <span class="req">*</span></label>
+                <div class="mobile-input">
+                  <span class="prefix">+91</span>
+                  <input type="text" value="9876543210" readonly tabindex="-1">
+                </div>
+              </div>
+              <div class="field">
+                <label>Your location</label>
+                <div class="fake-input" style="color:var(--dim)">Baner, Pune 411045</div>
+              </div>
+              <div class="terms-box">
+                <div class="head">🛡️ DPDP Act 2023 compliance</div>
+                <p>By booking, you agree to our <a href="#">Terms</a>, <a href="#">Privacy Policy</a> and acknowledge data collection per DPDP Act 2023.</p>
+                <label class="terms-check">
+                  <input type="checkbox" checked disabled>
+                  <span>I accept Terms, Privacy &amp; DPDP compliance <strong style="color:var(--acc)">*</strong></span>
+                </label>
+              </div>
+              <div class="toggle">
+                <span class="on">📱 SMS OTP</span>
+                <span class="off">💬 WhatsApp</span>
+              </div>
+              <div class="otp-sent">✅ OTP sent to +91 9876543210 · check SMS</div>
+              <div class="otp-boxes">
+                <div class="otp-box">3</div>
+                <div class="otp-box">6</div>
+                <div class="otp-box">5</div>
+                <div class="otp-box empty"></div>
+                <div class="otp-box empty"></div>
+                <div class="otp-box empty"></div>
+              </div>
+              <div class="btn-primary">Verify &amp; confirm booking →</div>
+              <div class="secure-note">
+                <span class="secure-badge">🛡️ DPDP 2023</span>
+                <span class="secure-badge">🇮🇳 India-hosted</span>
+                Stored securely · <a href="#" style="color:var(--dim)">Privacy</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="screen-label">Verify OTP</span>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>ScanV · Trust Light · DCORE Global Corporation © 2026</footer>
+</body>
+</html>

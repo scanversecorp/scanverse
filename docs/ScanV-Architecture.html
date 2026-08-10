@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScanV v5.4 — Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root { --bg:#0d0f1a; --surf:#1a1a2e; --acc:#e94560; --txt:#f0f0f0; --sub:#a8a8c0; --cyan:#00d4ff; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--txt); font-family:'Segoe UI',system-ui,sans-serif; }
+    header { background:var(--surf); border-bottom:1px solid rgba(255,255,255,.08); padding:20px 24px; }
+    header h1 span { color:var(--acc); }
+    header p { color:var(--sub); font-size:.85rem; margin-top:4px; }
+    nav a { color:var(--acc); font-size:.8rem; margin-right:16px; }
+    main { max-width:960px; margin:0 auto; padding:32px 20px 80px; }
+    section { margin-bottom:48px; }
+    h2 { font-size:1.1rem; margin-bottom:16px; border-left:3px solid var(--cyan); padding-left:12px; }
+    .mermaid { background:var(--surf); border-radius:12px; padding:20px; border:1px solid rgba(255,255,255,.08); }
+    .card { background:var(--surf); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:16px; margin-bottom:12px; }
+    .card h3 { font-size:.9rem; color:var(--acc); margin-bottom:8px; }
+    .card p { font-size:.85rem; color:var(--sub); }
+    code { background:#0f3460; padding:2px 6px; border-radius:4px; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Scan<span>V</span> Architecture</h1>
+    <p>React PWA · Supabase · Vercel · Razorpay</p>
+    <nav style="margin-top:12px">
+      <a href="ScanV-App-Flowcharts.html">Flow charts</a>
+      <a href="scanv-ui-showcase/">UI Showcase</a>
+      <a href="README.md">Docs</a>
+    </nav>
+  </header>
+  <main>
+    <section>
+      <h2>System Context</h2>
+      <div class="mermaid">
+flowchart TB
+    U[Users] --> PWA[ScanV PWA on Vercel]
+    PWA --> SB[Supabase Auth + DB]
+    PWA --> OTP[send-otp Edge Function]
+    OTP --> MSG[MSG91 SMS]
+    PWA --> RZP[Razorpay UPI]
+      </div>
+    </section>
+    <section>
+      <h2>Deployment</h2>
+      <div class="card"><h3>Production</h3><p><code>https://scanv-tau.vercel.app</code> — primary ScanV v5.4</p></div>
+      <div class="card"><h3>Build</h3><p>CRA → <code>npm run build</code> → Vercel static + SPA rewrites</p></div>
+      <div class="card"><h3>Cache</h3><p><code>index.html</code> no-cache · <code>/static/*</code> immutable 1yr</p></div>
+    </section>
+    <section>
+      <h2>Core Tables</h2>
+      <div class="mermaid">
+erDiagram
+    profiles ||--o{ bookings : places
+    profiles ||--o{ notifications : receives
+    profiles { uuid id string role boolean mobile_verified }
+    bookings { uuid id int total string status }
+      </div>
+    </section>
+    <section>
+      <h2>Single-File App Structure</h2>
+      <div class="card"><p><code>src/App.js</code> — BrowseFlow, LegalPage, HomeScreen, CRM, App() state machine, ~2100 lines</p></div>
+    </section>
+  </main>
+  <script>mermaid.initialize({ startOnLoad:true, theme:'dark' });</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScanV UI Showcase — Design Directions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0d0f1a; --surf:#1a1a2e; --acc:#e94560; --txt:#f0f0f0; --sub:#a8a8c0; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--txt); font-family:'DM Sans',sans-serif; min-height:100vh; }
+    .hero { text-align:center; padding:48px 20px 32px; background:linear-gradient(180deg,#1a1a2e,transparent); }
+    .hero h1 { font-family:'Space Grotesk',sans-serif; font-size:2rem; }
+    .hero h1 span { color:var(--acc); }
+    .hero p { color:var(--sub); margin-top:8px; max-width:520px; margin-inline:auto; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; max-width:1100px; margin:0 auto; padding:0 20px 60px; }
+    .card { background:var(--surf); border:1px solid rgba(255,255,255,.08); border-radius:16px; overflow:hidden; transition:transform .2s, border-color .2s; text-decoration:none; color:inherit; display:block; }
+    .card:hover { transform:translateY(-4px); border-color:rgba(233,69,96,.4); }
+    .preview { height:320px; display:flex; align-items:center; justify-content:center; font-size:3rem; position:relative; }
+    .preview.rose { background:linear-gradient(135deg,#0d0f1a,#16213e); }
+    .preview.glass { background:linear-gradient(135deg,#0a1628,#1a0a2e); }
+    .preview.light { background:linear-gradient(135deg,#f8f9fc,#e8ecf4); }
+    .preview.light .mock { color:#1a1a2e; }
+    .mock { font-family:'Space Grotesk',sans-serif; font-size:1.5rem; font-weight:800; }
+    .mock span { color:var(--acc); }
+    .preview.light .mock span { color:#e94560; }
+    .info { padding:20px; }
+    .info h2 { font-family:'Space Grotesk',sans-serif; font-size:1.1rem; margin-bottom:6px; }
+    .info p { color:var(--sub); font-size:.85rem; line-height:1.5; }
+    .tag { display:inline-block; background:rgba(233,69,96,.15); color:var(--acc); font-size:.7rem; font-weight:600; padding:3px 8px; border-radius:99px; margin-top:10px; }
+    footer { text-align:center; padding:24px; color:var(--sub); font-size:.75rem; border-top:1px solid rgba(255,255,255,.06); }
+    footer a { color:var(--acc); }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>Scan<span>V</span> UI Showcase</h1>
+    <p>Three design directions for the ScanV v5.4 PWA. Direction 1 matches production; 2 & 3 are alternative explorations.</p>
+  </div>
+  <div class="grid">
+    <a class="card" href="01-rose-premium.html">
+      <div class="preview rose"><div class="mock">Scan<span>V</span></div></div>
+      <div class="info">
+        <h2>01 · Rose Premium</h2>
+        <p>Current production theme — dark navy, rose accent, Space Grotesk + DM Sans. Recommended for launch.</p>
+        <span class="tag">Production match</span>
+      </div>
+    </a>
+    <a class="card" href="02-glass-aurora.html">
+      <div class="preview glass"><div class="mock">Scan<span>V</span></div></div>
+      <div class="info">
+        <h2>02 · Glass Aurora</h2>
+        <p>Frosted glass cards, aurora gradients, cyan + rose dual accents. Premium feel for VIP services.</p>
+        <span class="tag">Alternative</span>
+      </div>
+    </a>
+    <a class="card" href="03-trust-light.html">
+      <div class="preview light"><div class="mock">Scan<span>V</span></div></div>
+      <div class="info">
+        <h2>03 · Trust Light</h2>
+        <p>Light mode for accessibility — high contrast, trust badges, ideal for legal & health categories.</p>
+        <span class="tag">Accessibility</span>
+      </div>
+    </a>
+  </div>
+  <footer>
+    <a href="../ScanV-App-Flowcharts.html">Flow charts</a> ·
+    <a href="../ScanV-Architecture.html">Architecture</a> ·
+    DCORE Global Corporation © 2026
+  </footer>
+</body>
+</html>
