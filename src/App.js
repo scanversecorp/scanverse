@@ -1980,7 +1980,7 @@ function App() {
   },[]);
 
   // Legal page routing
-  const legalPath = window.location.pathname.replace('/','');
+  const legalPath = window.location.pathname.slice(1).split('?')[0];
   if (['privacy','terms','refund','payment'].includes(legalPath)) {
     return <Boundary><style>{CSS}</style><LegalPage page={legalPath}/></Boundary>;
   }
