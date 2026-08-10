@@ -37,14 +37,14 @@ const C = {
 
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
-  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false },
-  { id:'cloud',    icon:'☁️', name:'Cloud training',     sub:'AWS · Azure · GCP · AI',           cat:'Cloud Training',     cash:false },
-  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false },
-  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false },
-  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false },
-  { id:'household',icon:'🔧', name:'Household services', sub:'Plumbing · electrical · cleaning', cat:'Household Services', cash:true  },
-  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:true  },
-  { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true  },
+  { id:'legal',    icon:'\u2696\ufe0f', name:'Legal services',     sub:'Lawyers \u00b7 docs \u00b7 filings',        cat:'Legal',              cash:false },
+  { id:'cloud',    icon:'\u2601\ufe0f', name:'Cloud training',     sub:'AWS \u00b7 Azure \u00b7 GCP \u00b7 AI',           cat:'Cloud Training',     cash:false },
+  { id:'vip',      icon:'\ud83d\udc51', name:'VIP appointments',   sub:'Priority \u00b7 concierge \u00b7 executive', cat:'VIP Appointments',   cash:false },
+  { id:'health',   icon:'\ud83c\udfe5', name:'Health care',        sub:'Doctors \u00b7 tests \u00b7 pharmacy',       cat:'Health Care',        cash:false },
+  { id:'property', icon:'\ud83c\udfe1', name:'Property & rentals', sub:'Buy \u00b7 sell \u00b7 PG \u00b7 flat \u00b7 plots',   cat:'Property & Rentals', cash:false },
+  { id:'household',icon:'\ud83d\udd27', name:'Household services', sub:'Plumbing \u00b7 electrical \u00b7 cleaning', cat:'Household Services', cash:true  },
+  { id:'delivery', icon:'\ud83d\udce6', name:'Deliveries',         sub:'Courier \u00b7 parcels \u00b7 documents',    cat:'Deliveries',         cash:true  },
+  { id:'food',     icon:'\ud83c\udf71', name:'Food',               sub:'Restaurants \u00b7 tiffin \u00b7 catering',  cat:'Food',               cash:true  },
 ];
 
 /* --- SUPABASE ----------------------------------------------------- */
@@ -68,7 +68,7 @@ class Boundary extends Component {
     if (!this.state.err) return this.props.children;
     return (
       <div style={S.center}>
-        <div style={{fontSize:40}}>⚠️</div>
+        <div style={{fontSize:40}}>\u26a0\ufe0f</div>
         <div style={{color:C.txt,fontSize:18,fontWeight:600}}>Something went wrong</div>
         <div style={{color:C.sub,fontSize:13,maxWidth:300,textAlign:'center'}}>{this.state.err.message}</div>
         <Btn onClick={()=>{this.setState({err:null});window.location.reload();}}>Reload</Btn>
@@ -126,9 +126,9 @@ function Toast({toasts}) {
 function AssistBanner() {
   return (
     <a href={`tel:${ASSIST}`} style={{display:'flex',alignItems:'center',gap:12,background:C.acc,borderRadius:12,padding:'12px 16px',textDecoration:'none',marginBottom:16}}>
-      <span style={{fontSize:22}}>📞</span>
-      <div><div style={{color:'#fff',fontSize:13,fontWeight:600}}>Quick assistance</div><div style={{color:'rgba(255,255,255,0.8)',fontSize:11}}>{ASSIST} · 24/7</div></div>
-      <div style={{marginLeft:'auto',color:'rgba(255,255,255,0.7)',fontSize:18}}>→</div>
+      <span style={{fontSize:22}}>\ud83d\udcde</span>
+      <div><div style={{color:'#fff',fontSize:13,fontWeight:600}}>Quick assistance</div><div style={{color:'rgba(255,255,255,0.8)',fontSize:11}}>{ASSIST} \u00b7 24/7</div></div>
+      <div style={{marginLeft:'auto',color:'rgba(255,255,255,0.7)',fontSize:18}}>\u2192</div>
     </a>
   );
 }
@@ -159,7 +159,7 @@ function detectDevice() {
     deviceType: tab?'Tablet':mob?'Mobile':'Desktop',
     osName:os, osVersion:osv,
     browser:br, browserVersion:brv,
-    screenRes:`${window.screen.width}×${window.screen.height}`,
+    screenRes:`${window.screen.width}\u00d7${window.screen.height}`,
     colorDepth: window.screen.colorDepth||0,
     pixelRatio: window.devicePixelRatio||1,
     touchPoints: navigator.maxTouchPoints||0,
@@ -212,7 +212,7 @@ function getCanvasFP() {
     const ctx=c.getContext('2d');
     ctx.textBaseline='top'; ctx.font="14px 'DM Sans'";
     ctx.fillStyle='#e94560'; ctx.fillRect(0,0,200,50);
-    ctx.fillStyle='#f0f0f0'; ctx.fillText('ScanV🔧📍',2,2);
+    ctx.fillStyle='#f0f0f0'; ctx.fillText('ScanV\ud83d\udd27\ud83d\udccd',2,2);
     return c.toDataURL().slice(-50);
   } catch(e) { return 'unavailable'; }
 }
@@ -228,9 +228,9 @@ async function getBattery() {
 
 /* --- OTP: FAST2SMS (India) --------------------------------------- */
 // 2Factor.in -- India OTP SMS (works instantly, no verification needed)
-// Get free API key: https://2factor.in/cp/ → API → Copy key
+// Get free API key: https://2factor.in/cp/ \u2192 API \u2192 Copy key
 const TWOFACTOR_KEY = '2e5ec291-9406-11f1-908b-0200cd936042';
-// Fast2SMS (blocked until website verified + ₹100 recharge -- keep for later)
+// Fast2SMS (blocked until website verified + \u20b9100 recharge -- keep for later)
 const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
 async function sendSMSViaSB(mobile, otp) {
@@ -298,7 +298,7 @@ function QRCodeDisplay({ url, size=220 }) {
         </div>
       </div>
       <div style={{fontSize:11,color:C.sub,textAlign:'center',lineHeight:1.6}}>
-        📱 Scan with any camera app<br/>
+        \ud83d\udcf1 Scan with any camera app<br/>
         <span style={{color:C.acc,fontWeight:600}}>{url}</span>
       </div>
     </div>
@@ -312,7 +312,7 @@ function QRCodeDisplay({ url, size=220 }) {
 function QRLandingPage({ onContinue }) {
   const [loading, setLoading] = useState(true);
   const [scanId, setScanId]   = useState(null);
-  const [gpsMsg, setGpsMsg]   = useState('Detecting location…');
+  const [gpsMsg, setGpsMsg]   = useState('Detecting location\u2026');
 
   useEffect(()=>{
     (async()=>{
@@ -355,11 +355,11 @@ function QRLandingPage({ onContinue }) {
       if (vs?.id) setScanId(vs.id);
 
       // Now get GPS
-      setGpsMsg('Getting your location…');
+      setGpsMsg('Getting your location\u2026');
       navigator.geolocation.getCurrentPosition(
         async pos=>{
           const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
-          setGpsMsg(`📍 ${geo.village||geo.city}`);
+          setGpsMsg(`\ud83d\udccd ${geo.village||geo.city}`);
           if (vs?.id) {
             await sb().from('qr_scans').update({
               lat:pos.coords.latitude, lng:pos.coords.longitude,
@@ -387,7 +387,7 @@ function QRLandingPage({ onContinue }) {
       </div>
       <Spin size={36}/>
       <div style={{color:C.txt,fontSize:15,fontWeight:600}}>
-        {loading?'Setting up for you…':'Ready!'}
+        {loading?'Setting up for you\u2026':'Ready!'}
       </div>
       <div style={{color:C.sub,fontSize:12}}>{gpsMsg}</div>
       <div style={{color:C.dim,fontSize:11,maxWidth:260,textAlign:'center'}}>
@@ -399,7 +399,7 @@ function QRLandingPage({ onContinue }) {
 
 /* ================================================================
    BROWSE FLOW -- Services first, no registration wall
-   User browses → picks service → books → THEN registers
+   User browses \u2192 picks service \u2192 books \u2192 THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const [screen, setScreen] = useState('services'); // services | detail | book | verify | payment
@@ -488,7 +488,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         device_type:dev.deviceType, os_name:dev.osName, browser:dev.browser,
         timezone:dev.timezone, language:dev.language,
         mobile_verified:true, mobile_verified_at:new Date().toISOString(),
-        role:'customer', status:'active', avatar:'👤',
+        role:'customer', status:'active', avatar:'\ud83d\udc64',
       },{onConflict:'id'});
 
       // Now create the booking if we have booking details
@@ -518,7 +518,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         setBookingDetail(bd=>({...bd,booking:bk,txn}));
       }
 
-      const profile = {id:userId,name:`${firstName} ${lastName}`.trim(),first_name:firstName,last_name:lastName,phone:mob,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city,village,pincode,device_type:dev.deviceType,os_name:dev.osName,browser:dev.browser,ip_address:ip};
+      const profile = {id:userId,name:`${firstName} ${lastName}`.trim(),first_name:firstName,last_name:lastName,phone:mob,role:'customer',status:'active',avatar:'\ud83d\udc64',mobile_verified:true,city,village,pincode,device_type:dev.deviceType,os_name:dev.osName,browser:dev.browser,ip_address:ip};
       onRegistered(profile);
     } catch(e) { setErr(e.message||'Verification failed.'); }
     finally { setLoading(false); }
@@ -527,7 +527,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- LOCATION BANNER ------------------------------------------------------
   const locBanner = (
     <div style={{background:`${C.acc}11`,borderBottom:`1px solid ${C.bdr}`,padding:'6px 16px',fontSize:11,color:C.dim,textAlign:'center'}}>
-      📍 ScanV uses your location to show services and enable deliveries · DPDP Act 2023
+      \ud83d\udccd ScanV uses your location to show services and enable deliveries \u00b7 DPDP Act 2023
     </div>
   );
 
@@ -536,13 +536,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif",display:'flex',flexDirection:'column'}}>
       <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div style={{fontWeight:800,fontSize:22,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
-        <div style={{fontSize:11,color:C.dim}}>PCMC · Pune</div>
+        <div style={{fontSize:11,color:C.dim}}>PCMC \u00b7 Pune</div>
       </div>
       {locBanner}
       <div style={{padding:'16px 16px 80px',flex:1,overflowY:'auto'}}>
         <div style={{marginBottom:16}}>
           <div style={{color:C.txt,fontSize:18,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",marginBottom:4}}>Services near you</div>
-          <div style={{color:C.sub,fontSize:12}}>{silentGeo?.city||'PCMC, Pune'} · {silentGeo?.pincode||'Detecting location…'}</div>
+          <div style={{color:C.sub,fontSize:12}}>{silentGeo?.city||'PCMC, Pune'} \u00b7 {silentGeo?.pincode||'Detecting location\u2026'}</div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {SVCS.map(s=>{
@@ -555,13 +555,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                     <div style={{color:C.txt,fontWeight:700,fontSize:15}}>{s.name}</div>
                     <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
                     <div style={{display:'flex',gap:8,marginTop:5,flexWrap:'wrap',alignItems:'center'}}>
-                      <span style={{color:C.gold,fontSize:11}}>{d.rating||'4.8 ⭐'}</span>
-                      <span style={{color:C.dim,fontSize:11}}>·</span>
+                      <span style={{color:C.gold,fontSize:11}}>{d.rating||'4.8 \u2b50'}</span>
+                      <span style={{color:C.dim,fontSize:11}}>\u00b7</span>
                       <span style={{color:C.dim,fontSize:11}}>{d.turnaround||'Same day'}</span>
-                      {s.cash&&<span style={{color:C.grn,fontSize:11,background:`${C.grn}22`,padding:'1px 6px',borderRadius:4}}>💵 Cash</span>}
+                      {s.cash&&<span style={{color:C.grn,fontSize:11,background:`${C.grn}22`,padding:'1px 6px',borderRadius:4}}>\ud83d\udcb5 Cash</span>}
                     </div>
                   </div>
-                  <div style={{color:C.acc,fontSize:20}}>›</div>
+                  <div style={{color:C.acc,fontSize:20}}>\u203a</div>
                 </div>
               </div>
             );
@@ -578,7 +578,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     return (
       <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>\u2190</button>
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{activeSvc.name}</div>
         </div>
         {locBanner}
@@ -588,7 +588,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{activeSvc.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:14}}>{d.desc||activeSvc.sub}</div>
             <div style={{display:'flex',justifyContent:'center',gap:24}}>
-              <div><div style={{color:C.gold,fontSize:15,fontWeight:700}}>{d.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
+              <div><div style={{color:C.gold,fontSize:15,fontWeight:700}}>{d.rating||'4.8 \u2b50'}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
               <div><div style={{color:C.grn,fontSize:15,fontWeight:700}}>{d.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
               <div><div style={{color:C.cyan,fontSize:15,fontWeight:700}}>{d.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
             </div>
@@ -597,7 +597,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
             {(d.features||[activeSvc.sub]).map(f=>(
               <div key={f} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
-                <span style={{color:C.grn}}>✓</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
+                <span style={{color:C.grn}}>\u2713</span><span style={{color:C.sub,fontSize:13}}>{f}</span>
               </div>
             ))}
           </div>
@@ -610,8 +610,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               </div>
             ))}
           </div>
-          {activeSvc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}><span>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
-          <Btn full onClick={()=>setScreen('book')}>Book now →</Btn>
+          {activeSvc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}><span>\ud83d\udcb5</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
+          <Btn full onClick={()=>setScreen('book')}>Book now \u2192</Btn>
         </div>
       </div>
     );
@@ -626,14 +626,14 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     return (
       <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>\u2190</button>
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{activeSvc.name}</div>
         </div>
         <div style={{padding:'16px 16px 40px'}}>
           <div style={S.card({marginBottom:16,padding:'12px 16px'})}>
             {[['Service',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=>(
               <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:13}}>
-                <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
+                <span>{k}</span><span>\u20b9{(v/100).toLocaleString('en-IN')}</span>
               </div>
             ))}
           </div>
@@ -642,12 +642,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <Field label="Service location" note="Auto-filled from your GPS">
             <div style={{display:'flex',gap:8}}>
               <input defaultValue={bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', ')} onChange={e=>setBookingDetail(b=>({...b,loc:e.target.value}))} placeholder="Address, city, PIN" style={{...S.inp(),flex:1}}/>
-              <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
+              <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'\ud83d\udccd'}</button>
             </div>
-            {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4}}>✅ Location updated</div>}
+            {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4}}>\u2705 Location updated</div>}
           </Field>
-          <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
-          <Btn full onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue →</Btn>
+          <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements\u2026" style={S.inp()}/></Field>
+          <Btn full onClick={()=>{if(!bookingDetail?.date)return setErr('Select a date');setErr('');setScreen('verify');}}>Continue \u2192</Btn>
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
       </div>
@@ -686,13 +686,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     return (
       <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setScreen('book')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>setScreen('book')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>\u2190</button>
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>Verify your identity</div>
         </div>
         <div style={{padding:'20px 16px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:12,marginBottom:16,lineHeight:1.6}}>
-            📍 {city||'Pune'} {pincode||''} · Quick verification to confirm your booking.
+            \ud83d\udccd {city||'Pune'} {pincode||''} \u00b7 Quick verification to confirm your booking.
           </div>
 
           {/* Name fields */}
@@ -711,7 +711,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
           {/* Location */}
           <Field label="Your location" note="Auto-detected from GPS">
-            <input value={city?(village?`${village}, ${city} ${pincode}`:`${city} ${pincode}`):'Detecting…'}
+            <input value={city?(village?`${village}, ${city} ${pincode}`:`${city} ${pincode}`):'Detecting\u2026'}
               readOnly style={{...S.inp(),color:C.dim}}/>
           </Field>
 
@@ -732,13 +732,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             </div>
           )}
           {termsAccepted&&(
-            <div style={{fontSize:10,color:C.grn,marginBottom:10}}>✅ Terms & DPDP Act 2023 accepted</div>
+            <div style={{fontSize:10,color:C.grn,marginBottom:10}}>\u2705 Terms & DPDP Act 2023 accepted</div>
           )}
 
           {/* Verification method toggle */}
           {!otpSent&&(
             <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14}}>
-              {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
+              {[['sms','\ud83d\udcf1 SMS OTP'],['whatsapp','\ud83d\udcac WhatsApp']].map(([v,l])=>(
                 <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'9px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:verifyMethod===v?600:400,background:verifyMethod===v?C.acc:'transparent',color:verifyMethod===v?'#fff':C.sub}}>
                   {l}
                 </button>
@@ -749,12 +749,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           {/* SMS OTP flow */}
           {verifyMethod==='sms'&&!otpSent&&(
             <Btn full onClick={sendOTP} disabled={loading||!termsAccepted}>
-              {loading?<><Spin size={16}/>Sending OTP…</>:'Send SMS OTP →'}
+              {loading?<><Spin size={16}/>Sending OTP\u2026</>:'Send SMS OTP \u2192'}
             </Btn>
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <div style={{color:C.grn,fontSize:12,marginBottom:12}}>✅ OTP sent to +91 {mobile} · check SMS</div>
+              <div style={{color:C.grn,fontSize:12,marginBottom:12}}>\u2705 OTP sent to +91 {mobile} \u00b7 check SMS</div>
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
@@ -764,7 +764,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                 ))}
               </div>
               <Btn full onClick={()=>verifyAndBook(false)} disabled={loading||otpCode.join('').length<6}>
-                {loading?<><Spin size={16}/>Verifying…</>:'Verify & confirm booking →'}
+                {loading?<><Spin size={16}/>Verifying\u2026</>:'Verify & confirm booking \u2192'}
               </Btn>
               <button onClick={sendOTP} disabled={loading} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
             </>
@@ -773,28 +773,28 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           {/* WhatsApp flow */}
           {verifyMethod==='whatsapp'&&!otpSent&&(
             <Btn full onClick={sendWA} disabled={loading||!termsAccepted} style={{background:'#25D366'}}>
-              {loading?<><Spin size={16}/>Generating link…</>:<><span style={{fontSize:18}}>💬</span> Verify via WhatsApp →</>}
+              {loading?<><Spin size={16}/>Generating link\u2026</>:<><span style={{fontSize:18}}>\ud83d\udcac</span> Verify via WhatsApp \u2192</>}
             </Btn>
           )}
           {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
             <div style={{background:`#25D36622`,border:`1.5px solid #25D366`,borderRadius:12,padding:14,textAlign:'center'}}>
-              <div style={{color:'#25D366',fontSize:13,fontWeight:600,marginBottom:8}}>📱 Open WhatsApp to verify</div>
+              <div style={{color:'#25D366',fontSize:13,fontWeight:600,marginBottom:8}}>\ud83d\udcf1 Open WhatsApp to verify</div>
               <div style={{color:C.sub,fontSize:11,marginBottom:12,lineHeight:1.6}}>
-                Tap the button below — WhatsApp will open with a pre-filled message. Tap Send to verify your number.
+                Tap the button below \u2014 WhatsApp will open with a pre-filled message. Tap Send to verify your number.
               </div>
               <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`}
                 target="_blank" rel="noreferrer"
                 style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10}}>
-                <span style={{fontSize:20}}>💬</span>
-                <span style={{color:'#fff',fontWeight:700,fontSize:14}}>Open WhatsApp — Send VERIFY message</span>
+                <span style={{fontSize:20}}>\ud83d\udcac</span>
+                <span style={{color:'#fff',fontWeight:700,fontSize:14}}>Open WhatsApp \u2014 Send VERIFY message</span>
               </a>
-              {waChecking&&<div style={{fontSize:11,color:C.sub}}>⏳ Waiting for WhatsApp confirmation…</div>}
-              <div style={{fontSize:10,color:C.dim,marginTop:6}}>Token: <code style={{color:C.acc}}>{waToken}</code> · Send to +91-9270194842</div>
+              {waChecking&&<div style={{fontSize:11,color:C.sub}}>\u23f3 Waiting for WhatsApp confirmation\u2026</div>}
+              <div style={{fontSize:10,color:C.dim,marginTop:6}}>Token: <code style={{color:C.acc}}>{waToken}</code> \u00b7 Send to +91-9270194842</div>
             </div>
           )}
 
           <div style={{textAlign:'center',marginTop:16,fontSize:10,color:C.dim}}>
-            🔒 Stored securely in India · DPDP Act 2023 ·{' '}
+            \ud83d\udd12 Stored securely in India \u00b7 DPDP Act 2023 \u00b7{' '}
             <a href="https://www.dcoreglobal.com/privacypolicy" target="_blank" rel="noreferrer" style={{color:C.dim}}>Privacy</a>
           </div>
         </div>
@@ -907,7 +907,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       sb().functions.invoke('send-otp', { body: { mobile: mob } })
         .then(r => {
           if (r.data?.success) {
-            console.log('[OTP] Sent via', r.data.provider, '✓');
+            console.log('[OTP] Sent via', r.data.provider, '\u2713');
             if (r.data.provider !== 'twilio-verify') setScreenOTP(''); // screen OTP only if not Twilio
           } else {
             console.warn('[OTP]', r.data);
@@ -921,7 +921,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       (async () => {
         try {
           const r = await sb().functions.invoke('send-otp', { body: { mobile: mob, otp } });
-          if (r.data?.success) console.log('[OTP] SMS also sent via', r.data.provider, '✓');
+          if (r.data?.success) console.log('[OTP] SMS also sent via', r.data.provider, '\u2713');
         } catch(e) { console.warn('[OTP] SMS background error:', e.message); }
       })();
     } catch(e) { setErr(e.message||'Could not prepare OTP. Try again.'); setLoading(false); }
@@ -1005,7 +1005,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         device_type:dev?.deviceType||'', os_name:dev?.osName||'',
         browser:dev?.browser||'', timezone:dev?.timezone||'', language:dev?.language||'',
         mobile_verified:true, mobile_verified_at:new Date().toISOString(),
-        role:'customer', status:'active', avatar:'👤',
+        role:'customer', status:'active', avatar:'\ud83d\udc64',
       },{onConflict:'id'}).select().single();
       if (error) console.warn('Profile upsert:', error.message);
 
@@ -1036,7 +1036,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         }).eq('id', prefill.scanId).then(()=>{});
       }
 
-      onComplete(profile || {id:userId,name:fullName,first_name:form.firstName.trim(),last_name:form.lastName.trim(),phone:mob,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city:form.city,village:form.village,pincode:form.pincode,device_type:dev?.deviceType||'',os_name:dev?.osName||'',browser:dev?.browser||'',ip_address:ipAddr});
+      onComplete(profile || {id:userId,name:fullName,first_name:form.firstName.trim(),last_name:form.lastName.trim(),phone:mob,role:'customer',status:'active',avatar:'\ud83d\udc64',mobile_verified:true,city:form.city,village:form.village,pincode:form.pincode,device_type:dev?.deviceType||'',os_name:dev?.osName||'',browser:dev?.browser||'',ip_address:ipAddr});
     } catch(e) { setErr(e.message||'Could not save profile. Try again.'); setPhase('form'); }
   };
 
@@ -1046,7 +1046,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       <div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'-0.02em'}}>
         <span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span>
       </div>
-      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCORE Global Corporation · PCMC, Pune</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCORE Global Corporation \u00b7 PCMC, Pune</div>
     </div>
   );
 
@@ -1060,7 +1060,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       {steps.map((l,i)=>(
         <div key={l} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,zIndex:1}}>
           <div style={{width:28,height:28,borderRadius:'50%',background:i<=si?C.acc:C.deep,border:`2px solid ${i<=si?C.acc:C.bdr}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',transition:'all .3s'}}>
-            {i<si?'✓':i+1}
+            {i<si?'\u2713':i+1}
           </div>
           <div style={{fontSize:9,color:i<=si?C.acc:C.dim}}>{l}</div>
         </div>
@@ -1077,7 +1077,7 @@ function RegistrationFlow({ onComplete, prefill }) {
           {content}
         </div>
         <div style={{textAlign:'center',marginTop:12,fontSize:10,color:C.dim}}>
-          © 2026 ScanV · DCORE Global Corporation · DPDP Act 2023
+          \u00a9 2026 ScanV \u00b7 DCORE Global Corporation \u00b7 DPDP Act 2023
         </div>
       </div>
     </div>
@@ -1086,16 +1086,16 @@ function RegistrationFlow({ onComplete, prefill }) {
   /* CONSENT */
   if (phase==='consent') return wrap(
     <>
-      <div style={{fontSize:40,textAlign:'center',marginBottom:12}}>📍</div>
+      <div style={{fontSize:40,textAlign:'center',marginBottom:12}}>\ud83d\udccd</div>
       <div style={{color:C.txt,fontSize:17,fontWeight:600,textAlign:'center',marginBottom:8}}>Welcome to ScanV</div>
       <div style={{color:C.sub,fontSize:12,textAlign:'center',lineHeight:1.65,marginBottom:10}}>
-        Find and book verified services near you — Legal, Health, Cloud Training, Property, Household, Food & more.
+        Find and book verified services near you \u2014 Legal, Health, Cloud Training, Property, Household, Food & more.
       </div>
       {/* DPDP consent -- compact as requested */}
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:18,fontSize:11,color:C.dim,lineHeight:1.6}}>
         <strong style={{color:C.sub}}>Before we begin:</strong> ScanV collects your GPS location, IP address and device details to show nearby services and enable local deliveries. Data is stored securely in India under the <strong style={{color:C.sub}}>DPDP Act 2023</strong>. You can update or delete your data anytime in Profile.
       </div>
-      <Btn full onClick={startCollection}>Allow location & get started →</Btn>
+      <Btn full onClick={startCollection}>Allow location & get started \u2192</Btn>
       <div style={{textAlign:'center',marginTop:10}}>
         <button onClick={()=>{setPhase('form');}} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>
           Enter location manually instead
@@ -1109,11 +1109,11 @@ function RegistrationFlow({ onComplete, prefill }) {
     <div style={{textAlign:'center',padding:'16px 0'}}>
       <Spin size={40}/>
       <div style={{color:C.txt,fontSize:15,fontWeight:600,marginTop:18,marginBottom:6}}>
-        {phase==='collecting'?'Detecting your device…':'Finding your location…'}
+        {phase==='collecting'?'Detecting your device\u2026':'Finding your location\u2026'}
       </div>
       <div style={{color:C.sub,fontSize:12}}>Just a moment</div>
       {dev&&<div style={{marginTop:14,background:C.card,borderRadius:8,padding:'8px 12px',textAlign:'left'}}>
-        <div style={{fontSize:11,color:C.dim,lineHeight:1.8}}>📱 {dev.deviceType} · {dev.osName} {dev.osVersion}<br/>🌐 {dev.browser} · {dev.language}<br/>🕐 {dev.timezone}</div>
+        <div style={{fontSize:11,color:C.dim,lineHeight:1.8}}>\ud83d\udcf1 {dev.deviceType} \u00b7 {dev.osName} {dev.osVersion}<br/>\ud83c\udf10 {dev.browser} \u00b7 {dev.language}<br/>\ud83d\udd50 {dev.timezone}</div>
       </div>}
     </div>
   );
@@ -1123,10 +1123,10 @@ function RegistrationFlow({ onComplete, prefill }) {
     <>
       <div style={{color:C.txt,fontSize:15,fontWeight:600,marginBottom:4}}>Your details</div>
       <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.5}}>
-        {geo?`📍 ${geo.village||geo.city||'Location detected'}`:' Enter your location below'}
+        {geo?`\ud83d\udccd ${geo.village||geo.city||'Location detected'}`:' Enter your location below'}
       </div>
       {dev&&<div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'7px 11px',marginBottom:14,fontSize:10,color:C.dim,lineHeight:1.7}}>
-        📱 {dev.deviceType} · {dev.osName} · {dev.browser} · IP: {ip}
+        \ud83d\udcf1 {dev.deviceType} \u00b7 {dev.osName} \u00b7 {dev.browser} \u00b7 IP: {ip}
       </div>}
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -1151,17 +1151,17 @@ function RegistrationFlow({ onComplete, prefill }) {
       </Field>
 
       <Field label="Address" note="House no, street, area"><input value={form.address} onChange={e=>f('address',e.target.value)} placeholder="House no, street, area" style={S.inp()}/></Field>
-      <Field label="Village / Area" note="e.g. Pimpri, Wakad, Chinchwad"><input value={form.village} onChange={e=>f('village',e.target.value)} placeholder="Pimpri, Wakad…" style={S.inp()}/></Field>
+      <Field label="Village / Area" note="e.g. Pimpri, Wakad, Chinchwad"><input value={form.village} onChange={e=>f('village',e.target.value)} placeholder="Pimpri, Wakad\u2026" style={S.inp()}/></Field>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
         <Field label="City" req><input value={form.city} onChange={e=>f('city',e.target.value)} placeholder="Pune" style={S.inp()}/></Field>
         <Field label="PIN code" req><input type="tel" maxLength={6} value={form.pincode} onChange={e=>f('pincode',e.target.value)} placeholder="411018" style={S.inp()}/></Field>
       </div>
 
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:11,color:C.dim}}>
-        🔒 Name, age, mobile, location & device stored in India per DPDP Act 2023
+        \ud83d\udd12 Name, age, mobile, location & device stored in India per DPDP Act 2023
       </div>
       <Btn full onClick={sendOTP} disabled={loading}>
-        {loading?<><Spin size={16}/>Sending OTP…</>:'Send OTP →'}
+        {loading?<><Spin size={16}/>Sending OTP\u2026</>:'Send OTP \u2192'}
       </Btn>
     </>
   );
@@ -1182,18 +1182,18 @@ function RegistrationFlow({ onComplete, prefill }) {
             setDigits([d[0]||'',d[1]||'',d[2]||'',d[3]||'',d[4]||'',d[5]||'']);
           }}
           style={{background:`${C.acc}`,borderRadius:12,padding:'16px',marginBottom:16,textAlign:'center',cursor:'pointer'}}>
-          <div style={{color:'rgba(255,255,255,0.85)',fontSize:11,fontWeight:600,marginBottom:6}}>🔐 Your OTP — tap to auto-fill</div>
+          <div style={{color:'rgba(255,255,255,0.85)',fontSize:11,fontWeight:600,marginBottom:6}}>\ud83d\udd10 Your OTP \u2014 tap to auto-fill</div>
           <div style={{color:'#fff',fontSize:44,fontFamily:'monospace',fontWeight:800,letterSpacing:10}}>{screenOTP}</div>
-          <div style={{color:'rgba(255,255,255,0.75)',fontSize:11,marginTop:6}}>Tap this box to fill automatically ↓</div>
+          <div style={{color:'rgba(255,255,255,0.75)',fontSize:11,marginTop:6}}>Tap this box to fill automatically \u2193</div>
         </div>
       )}
 
       {/* WhatsApp verification option */}
       {!screenOTP&&waLink&&(
         <div style={{background:`${C.grn}22`,border:`1.5px solid ${C.grn}`,borderRadius:12,padding:14,marginBottom:14}}>
-          <div style={{color:C.grn,fontSize:12,fontWeight:600,marginBottom:8}}>📱 Verify via WhatsApp</div>
+          <div style={{color:C.grn,fontSize:12,fontWeight:600,marginBottom:8}}>\ud83d\udcf1 Verify via WhatsApp</div>
           <div style={{color:C.sub,fontSize:11,lineHeight:1.6,marginBottom:10}}>
-            Tap below → WhatsApp opens with a pre-filled message → Send it → you're verified.<br/>
+            Tap below \u2192 WhatsApp opens with a pre-filled message \u2192 Send it \u2192 you're verified.<br/>
             <span style={{color:C.dim,fontSize:10}}>This proves you own this number.</span>
           </div>
           <a href={waLink} target="_blank" rel="noreferrer"
@@ -1220,14 +1220,14 @@ function RegistrationFlow({ onComplete, prefill }) {
               setTimeout(()=>{clearInterval(poll);setWaChecking(false);}, 600000);
             }}
             style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'11px 16px',textDecoration:'none'}}>
-            <span style={{fontSize:20}}>💬</span>
+            <span style={{fontSize:20}}>\ud83d\udcac</span>
             <span style={{color:'#fff',fontWeight:700,fontSize:14}}>Open WhatsApp to verify</span>
           </a>
           {waChecking&&<div style={{textAlign:'center',marginTop:8,fontSize:11,color:C.sub}}>
-            <span>Waiting for WhatsApp message… </span><span style={{color:C.grn}}>●</span>
+            <span>Waiting for WhatsApp message\u2026 </span><span style={{color:C.grn}}>\u25cf</span>
           </div>}
           <div style={{textAlign:'center',marginTop:8,fontSize:10,color:C.dim}}>
-            Send to: <strong style={{color:C.sub}}>+91-9270194842</strong> · Token: <code style={{color:C.acc}}>{waToken}</code>
+            Send to: <strong style={{color:C.sub}}>+91-9270194842</strong> \u00b7 Token: <code style={{color:C.acc}}>{waToken}</code>
           </div>
         </div>
       )}
@@ -1253,15 +1253,15 @@ function RegistrationFlow({ onComplete, prefill }) {
 
       {/* Setup instructions for OTP */}
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:14,fontSize:11,color:C.dim,lineHeight:1.7}}>
-        📱 OTP delivery: SMS (primary) → verify the number above.<br/>
+        \ud83d\udcf1 OTP delivery: SMS (primary) \u2192 verify the number above.<br/>
         Not received? Check if number is correct, then tap Resend.
       </div>
 
       <Btn full onClick={verifyOTP} disabled={loading||digits.join('').length<6}>
-        {loading?<><Spin size={16}/>Verifying…</>:'Verify & enter ScanV →'}
+        {loading?<><Spin size={16}/>Verifying\u2026</>:'Verify & enter ScanV \u2192'}
       </Btn>
       <div style={{textAlign:'center',marginTop:10}}>
-        <button onClick={()=>{setPhase('form');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>← Change number</button>
+        <button onClick={()=>{setPhase('form');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>\u2190 Change number</button>
       </div>
     </>
   );
@@ -1270,7 +1270,7 @@ function RegistrationFlow({ onComplete, prefill }) {
   return wrap(
     <div style={{textAlign:'center',padding:'20px 0'}}>
       <Spin size={40}/>
-      <div style={{color:C.txt,fontSize:15,fontWeight:600,marginTop:18,marginBottom:6}}>Setting up your account…</div>
+      <div style={{color:C.txt,fontSize:15,fontWeight:600,marginTop:18,marginBottom:6}}>Setting up your account\u2026</div>
       <div style={{color:C.sub,fontSize:12}}>Saving your details securely</div>
     </div>
   );
@@ -1285,7 +1285,7 @@ function QRScreen() {
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={()=>setScreen('home')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+        <button onClick={()=>setScreen('home')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>\u2190</button>
         <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>ScanV QR Code</div>
       </div>
       <div style={{padding:24,display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
@@ -1294,14 +1294,14 @@ function QRScreen() {
         <div style={S.card({width:'100%',textAlign:'center'})}>
           <div style={{color:C.txt,fontSize:14,fontWeight:600,marginBottom:8}}>What this QR captures</div>
           {[
-            ['📍','GPS location, address, city, PIN code'],
-            ['📱','Device type, OS, browser, screen resolution'],
-            ['🌐','IP address, connection type (4G/WiFi)'],
-            ['🔋','Battery level & charging status'],
-            ['🖥️','CPU cores, device memory, pixel ratio'],
-            ['🌍','Language, timezone, touch points'],
-            ['🎨','Canvas fingerprint (device identity)'],
-            ['📊','UTM source, medium, referrer URL'],
+            ['\ud83d\udccd','GPS location, address, city, PIN code'],
+            ['\ud83d\udcf1','Device type, OS, browser, screen resolution'],
+            ['\ud83c\udf10','IP address, connection type (4G/WiFi)'],
+            ['\ud83d\udd0b','Battery level & charging status'],
+            ['\ud83d\udda5\ufe0f','CPU cores, device memory, pixel ratio'],
+            ['\ud83c\udf0d','Language, timezone, touch points'],
+            ['\ud83c\udfa8','Canvas fingerprint (device identity)'],
+            ['\ud83d\udcca','UTM source, medium, referrer URL'],
           ].map(([ic,txt])=>(
             <div key={txt} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`,textAlign:'left'}}>
               <span style={{fontSize:16,flexShrink:0}}>{ic}</span>
@@ -1314,7 +1314,7 @@ function QRScreen() {
         <div style={S.card({width:'100%'})}>
           <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:8}}>Print this QR code on:</div>
           {['Business cards','Shop banners & standees','Vehicle stickers','Flyers & pamphlets','WhatsApp status','Website footer'].map(t=>(
-            <div key={t} style={{color:C.sub,fontSize:12,padding:'4px 0'}}>• {t}</div>
+            <div key={t} style={{color:C.sub,fontSize:12,padding:'4px 0'}}>\u2022 {t}</div>
           ))}
         </div>
 
@@ -1334,11 +1334,11 @@ function BottomNav() {
   const {screen,setScreen,user,notifs}=useApp();
   const unread=notifs.filter(n=>!n.read).length;
   const tabs=[
-    {id:'home',icon:'🏠',label:'Home'},
-    {id:'services',icon:'🔍',label:'Services'},
-    {id:'bookings',icon:'📅',label:'Bookings'},
-    ...(['admin','partner'].includes(user?.role)?[{id:'crm',icon:'📊',label:'CRM'}]:[]),
-    {id:'profile',icon:'👤',label:'Profile'},
+    {id:'home',icon:'\ud83c\udfe0',label:'Home'},
+    {id:'services',icon:'\ud83d\udd0d',label:'Services'},
+    {id:'bookings',icon:'\ud83d\udcc5',label:'Bookings'},
+    ...(['admin','partner'].includes(user?.role)?[{id:'crm',icon:'\ud83d\udcca',label:'CRM'}]:[]),
+    {id:'profile',icon:'\ud83d\udc64',label:'Profile'},
   ];
   return (
     <div style={{display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'8px 0 4px',position:'sticky',bottom:0,zIndex:50}}>
@@ -1359,7 +1359,7 @@ function TopBar({title,back}) {
   const {setScreen,logout}=useApp();
   return (
     <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
-      {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+      {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>\u2190</button>
            :<div style={{fontWeight:800,fontSize:20,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
       {!back&&<button onClick={logout} style={{background:C.gls,border:`1px solid ${C.bdr}`,color:C.sub,padding:'6px 12px',borderRadius:8,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Sign out</button>}
@@ -1388,14 +1388,14 @@ function HomeScreen() {
           <div style={{fontSize:22,fontWeight:700,color:C.txt,fontFamily:"'Space Grotesk',sans-serif"}}>{user.avatar} {user.first_name||user.name?.split(' ')[0]}</div>
           <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6,flexWrap:'wrap'}}>
             <Badge label={rl} color={rc}/>
-            <span style={{color:C.dim,fontSize:11}}>📍 {loc}</span>
-            {user.mobile_verified&&<span style={{color:C.grn,fontSize:11}}>📱 Verified</span>}
-            {user.device_type&&<span style={{color:C.dim,fontSize:10}}>💻 {user.device_type}</span>}
+            <span style={{color:C.dim,fontSize:11}}>\ud83d\udccd {loc}</span>
+            {user.mobile_verified&&<span style={{color:C.grn,fontSize:11}}>\ud83d\udcf1 Verified</span>}
+            {user.device_type&&<span style={{color:C.dim,fontSize:10}}>\ud83d\udcbb {user.device_type}</span>}
           </div>
         </div>
         <div onClick={()=>setScreen('services')} style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer'}}>
-          <span style={{fontSize:18}}>🔍</span>
-          <span style={{color:C.dim,fontSize:14}}>Search services near {user.village||user.city||'you'}…</span>
+          <span style={{fontSize:18}}>\ud83d\udd0d</span>
+          <span style={{color:C.dim,fontSize:14}}>Search services near {user.village||user.city||'you'}\u2026</span>
           <div style={{marginLeft:'auto',background:C.acc,color:'#fff',fontSize:11,padding:'4px 10px',borderRadius:6,fontWeight:600}}>Search</div>
         </div>
         <AssistBanner/>
@@ -1410,7 +1410,7 @@ function HomeScreen() {
                 style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'12px 6px',textAlign:'center',cursor:'pointer'}}>
                 <div style={{fontSize:24,marginBottom:5}}>{s.icon}</div>
                 <div style={{fontSize:10,color:C.sub,lineHeight:1.3}}>{s.name.split(' ').slice(0,2).join(' ')}</div>
-                {s.cash&&<div style={{fontSize:9,color:C.grn,marginTop:2}}>Cash ✓</div>}
+                {s.cash&&<div style={{fontSize:9,color:C.grn,marginTop:2}}>Cash \u2713</div>}
               </div>
             ))}
           </div>
@@ -1418,9 +1418,9 @@ function HomeScreen() {
         {/* QR code button for admin */}
         {user.role==='admin'&&(
           <div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
-            <span style={{fontSize:22}}>📲</span>
-            <div><div style={{color:C.txt,fontSize:13,fontWeight:600}}>ScanV QR Code</div><div style={{color:C.sub,fontSize:11}}>Print & share · captures user data on scan</div></div>
-            <span style={{marginLeft:'auto',color:C.acc,fontSize:16}}>→</span>
+            <span style={{fontSize:22}}>\ud83d\udcf2</span>
+            <div><div style={{color:C.txt,fontSize:13,fontWeight:600}}>ScanV QR Code</div><div style={{color:C.sub,fontSize:11}}>Print & share \u00b7 captures user data on scan</div></div>
+            <span style={{marginLeft:'auto',color:C.acc,fontSize:16}}>\u2192</span>
           </div>
         )}
         <div>
@@ -1432,7 +1432,7 @@ function HomeScreen() {
           :bookings.length?bookings.map(b=>(
             <div key={b.id} style={{...S.card(),padding:'12px 14px',marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <div><div style={{color:C.txt,fontWeight:600,fontSize:14}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'}</div></div>
-              <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:b.status==='completed'?C.grn:b.status==='confirmed'?C.cyan:C.gold,marginTop:2}}>{b.status}</div></div>
+              <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>\u20b9{((b.total||0)/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:b.status==='completed'?C.grn:b.status==='confirmed'?C.cyan:C.gold,marginTop:2}}>{b.status}</div></div>
             </div>
           )):<div style={{...S.card(),padding:20,textAlign:'center',color:C.dim,fontSize:13}}>No bookings yet</div>}
         </div>
@@ -1443,14 +1443,14 @@ function HomeScreen() {
 
 // Service detail data
 const SVC_DETAIL = {
-  legal:    { desc:'Connect with verified lawyers for consultation, document drafting, property registration, court filings, and legal advice.', features:['Initial consultation','Document review & drafting','Property registration','Court representation','Online & offline'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
-  cloud:    { desc:'Professional training in AWS, Azure, GCP, AI/ML and DevOps. Certified trainers, hands-on labs, placement assistance.', features:['Live & recorded sessions','Hands-on labs','Certification prep','Job placement support','Flexible timing'], turnaround:'Batch starts weekly', rating:'4.9 ⭐', bookings:'1,800+' },
-  vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
-  health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
-  property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
-  household:{ desc:'Trusted professionals for plumbing, electrical, carpentry, AC repair, painting and deep cleaning across PCMC/Pune.', features:['Background verified','Same day visits','Warranty on work','Transparent pricing','Cash accepted'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'8,900+' },
-  delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+  legal:    { desc:'Connect with verified lawyers for consultation, document drafting, property registration, court filings, and legal advice.', features:['Initial consultation','Document review & drafting','Property registration','Court representation','Online & offline'], turnaround:'Within 24 hours', rating:'4.8 \u2b50', bookings:'2,400+' },
+  cloud:    { desc:'Professional training in AWS, Azure, GCP, AI/ML and DevOps. Certified trainers, hands-on labs, placement assistance.', features:['Live & recorded sessions','Hands-on labs','Certification prep','Job placement support','Flexible timing'], turnaround:'Batch starts weekly', rating:'4.9 \u2b50', bookings:'1,800+' },
+  vip:      { desc:'Priority access to premium concierge services \u2014 executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 \u2b50', bookings:'800+' },
+  health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 \u2b50', bookings:'5,200+' },
+  property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 \u2b50', bookings:'3,100+' },
+  household:{ desc:'Trusted professionals for plumbing, electrical, carpentry, AC repair, painting and deep cleaning across PCMC/Pune.', features:['Background verified','Same day visits','Warranty on work','Transparent pricing','Cash accepted'], turnaround:'Same day', rating:'4.7 \u2b50', bookings:'8,900+' },
+  delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 \u2b50', bookings:'12,000+' },
+  food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 \u2b50', bookings:'18,000+' },
 };
 
 function ServicesScreen() {
@@ -1464,7 +1464,7 @@ function ServicesScreen() {
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setDetail(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>setDetail(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>\u2190</button>
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
         </div>
         <div style={{padding:16}}>
@@ -1484,7 +1484,7 @@ function ServicesScreen() {
             <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
             {(d.features||[]).map(f=>(
               <div key={f} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
-                <span style={{color:C.grn,fontSize:14}}>✓</span>
+                <span style={{color:C.grn,fontSize:14}}>\u2713</span>
                 <span style={{color:C.sub,fontSize:13}}>{f}</span>
               </div>
             ))}
@@ -1492,16 +1492,16 @@ function ServicesScreen() {
           {/* How it works */}
           <div style={S.card({marginBottom:16})}>
             <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>How it works</div>
-            {[['1','Book','Select date & time, add your requirements'],['2','Verify','OTP verification — confirm your mobile'],['3','Match','We assign the best professional near you'],['4','Complete','Service delivered, pay securely']].map(([n,t,d])=>(
+            {[['1','Book','Select date & time, add your requirements'],['2','Verify','OTP verification \u2014 confirm your mobile'],['3','Match','We assign the best professional near you'],['4','Complete','Service delivered, pay securely']].map(([n,t,d])=>(
               <div key={n} style={{display:'flex',gap:12,padding:'8px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <div style={{width:24,height:24,borderRadius:'50%',background:C.acc,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',flexShrink:0}}>{n}</div>
                 <div><div style={{color:C.txt,fontSize:13,fontWeight:500}}>{t}</div><div style={{color:C.dim,fontSize:11,marginTop:2}}>{d}</div></div>
               </div>
             ))}
           </div>
-          {detail.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
+          {detail.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>\ud83d\udcb5</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
           <AssistBanner/>
-          <Btn full onClick={()=>{setActiveSvc(detail);setScreen('book');}}>Book now →</Btn>
+          <Btn full onClick={()=>{setActiveSvc(detail);setScreen('book');}}>Book now \u2192</Btn>
         </div>
       </div>
     );
@@ -1512,9 +1512,9 @@ function ServicesScreen() {
       <TopBar title="Services"/>
       <div style={{padding:16}}>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:16}}>
-          <span>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
-          {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18}}>×</button>}
+          <span>\ud83d\udd0d</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services\u2026" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
+          {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18}}>\u00d7</button>}
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {list.map(s=>(
@@ -1526,13 +1526,13 @@ function ServicesScreen() {
                   <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
                   <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>
                     <span style={{color:C.gold,fontSize:11}}>{SVC_DETAIL[s.id]?.rating}</span>
-                    <span style={{color:C.dim,fontSize:11}}>·</span>
+                    <span style={{color:C.dim,fontSize:11}}>\u00b7</span>
                     <span style={{color:C.dim,fontSize:11}}>{SVC_DETAIL[s.id]?.turnaround}</span>
-                    {s.cash&&<span style={{color:C.grn,fontSize:11}}>· 💵 Cash</span>}
+                    {s.cash&&<span style={{color:C.grn,fontSize:11}}>\u00b7 \ud83d\udcb5 Cash</span>}
                   </div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
-                  <div style={{background:C.acc,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 12px',borderRadius:6}}>View →</div>
+                  <div style={{background:C.acc,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 12px',borderRadius:6}}>View \u2192</div>
                 </div>
               </div>
             </div>
@@ -1584,21 +1584,21 @@ function BookScreen() {
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
       const r=await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
-      if(r.data?.success){ setBookOtpVerified(true); setStep(3); addToast('Mobile verified ✓','success'); }
+      if(r.data?.success){ setBookOtpVerified(true); setStep(3); addToast('Mobile verified \u2713','success'); }
       else throw new Error('Invalid OTP');
     }catch(e){addToast(e.message||'Verification failed','error');}
     finally{setLoading(false);}
   };
 
   const create=async()=>{if(!date)return addToast('Select a date','error');setLoading(true);try{const txn='TXN-'+Date.now();const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'awaiting_payment',txn_id:txn}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txn,added_by:user.id});setBooking(data);setStep(4);}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
-  const confirmPaid=async method=>{if(!booking)return;setLoading(true);try{await sb().from('bookings').update({status:'confirmed',paid_at:new Date().toISOString()}).eq('id',booking.id);await sb().from('payments').insert({booking_id:booking.id,user_id:user.id,amount:total,method,status:'success',txn_id:booking.txn_id,gateway:'Razorpay'});addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast('Could not confirm payment','error');}finally{setLoading(false);}};
+  const confirmPaid=async method=>{if(!booking)return;setLoading(true);try{await sb().from('bookings').update({status:'confirmed',paid_at:new Date().toISOString()}).eq('id',booking.id);await sb().from('payments').insert({booking_id:booking.id,user_id:user.id,amount:total,method,status:'success',txn_id:booking.txn_id,gateway:'Razorpay'});addToast('Booking confirmed! \ud83c\udf89','success');setScreen('bookings');}catch(e){addToast('Could not confirm payment','error');}finally{setLoading(false);}};
   const upiLink=`upi://pay?pa=${UPI_PA}&pn=${encodeURIComponent(UPI_PN)}&am=${(total/100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(svc.name)}`;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title={svc.name} back="services"/>
       <div style={{display:'flex',padding:'12px 16px',gap:4}}>{[1,2,3,4].map(n=><div key={n} style={{flex:1,height:3,borderRadius:2,background:step>=n?C.acc:C.deep}}/>)}</div>
       <div style={{padding:'8px 16px 40px'}}>
-        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12}}>💵 Cash on service available</div>}</div><Btn full onClick={()=>setStep(2)}>Continue →</Btn></>}
+        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>\u20b9{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12}}>\ud83d\udcb5 Cash on service available</div>}</div><Btn full onClick={()=>setStep(2)}>Continue \u2192</Btn></>}
 
         {step===2&&<>
           <div style={{color:C.txt,fontSize:14,fontWeight:600,marginBottom:12}}>Verify your identity</div>
@@ -1612,9 +1612,9 @@ function BookScreen() {
               <input type="tel" maxLength={10} value={bookPhone} onChange={e=>setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
-          {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
+          {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending\u2026</>:'Send OTP \u2192'}</Btn>:(
             <>
-              <div style={{color:C.grn,fontSize:12,marginBottom:10}}>✅ OTP sent to +91 {bookPhone}</div>
+              <div style={{color:C.grn,fontSize:12,marginBottom:10}}>\u2705 OTP sent to +91 {bookPhone}</div>
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
                 {bookOtpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
@@ -1623,15 +1623,15 @@ function BookScreen() {
                     style={{width:40,height:48,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:8,color:C.acc,fontFamily:'monospace',fontSize:22,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & continue →'}</Btn>
+              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying\u2026</>:'Verify & continue \u2192'}</Btn>
               <button onClick={sendBookOTP} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
             </>
           )}
         </>}
 
-        {step===3&&<><Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field><Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field><Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn}}>✅ GPS captured</div>}</Field><Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field><Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Creating…</>:'Confirm booking →'}</Btn></>}
+        {step===3&&<><Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field><Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field><Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'\ud83d\udccd'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn}}>\u2705 GPS captured</div>}</Field><Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements\u2026" style={S.inp()}/></Field><Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Creating\u2026</>:'Confirm booking \u2192'}</Btn></>}
 
-        {step===4&&<><div style={{...S.card(),textAlign:'center',marginBottom:20,padding:24}}><div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount to pay</div><div style={{fontSize:40,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:C.dim}}>UPI: {UPI_PA} · Ref: {booking?.txn_id}</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>{[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=><a key={lbl} href={upiLink} target="_blank" rel="noreferrer" onClick={()=>confirmPaid(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),textDecoration:'none'}}><span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:14,fontWeight:600}}>{lbl}</span></a>)}</div>{svc.cash&&<Btn full v="secondary" onClick={()=>confirmPaid('Cash')} style={{marginBottom:10}}>💵 Pay cash on service</Btn>}<div style={{textAlign:'center',marginBottom:16}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.sub,fontSize:12}}>Card / Net Banking via Razorpay ↗</a></div><Btn full onClick={()=>confirmPaid('UPI')} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:"✅ I've paid — confirm booking"}</Btn></>}
+        {step===4&&<><div style={{...S.card(),textAlign:'center',marginBottom:20,padding:24}}><div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount to pay</div><div style={{fontSize:40,fontWeight:800,color:C.acc,marginBottom:4}}>\u20b9{(total/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:C.dim}}>UPI: {UPI_PA} \u00b7 Ref: {booking?.txn_id}</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>{[['\ud83d\udfe2','GPay'],['\ud83d\udfe3','PhonePe'],['\ud83d\udd35','Paytm'],['\u26a1','Any UPI']].map(([ic,lbl])=><a key={lbl} href={upiLink} target="_blank" rel="noreferrer" onClick={()=>confirmPaid(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),textDecoration:'none'}}><span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:14,fontWeight:600}}>{lbl}</span></a>)}</div>{svc.cash&&<Btn full v="secondary" onClick={()=>confirmPaid('Cash')} style={{marginBottom:10}}>\ud83d\udcb5 Pay cash on service</Btn>}<div style={{textAlign:'center',marginBottom:16}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.sub,fontSize:12}}>Card / Net Banking via Razorpay \u2197</a></div><Btn full onClick={()=>confirmPaid('UPI')} disabled={loading}>{loading?<><Spin size={16}/>Confirming\u2026</>:"\u2705 I've paid \u2014 confirm booking"}</Btn></>}
       </div>
     </div>
   );
@@ -1655,17 +1655,17 @@ function BookingsScreen() {
         :bookings.length?bookings.map(b=>(
           <div key={b.id} style={{...S.card(),marginBottom:10}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-              <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}</div>
-              <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div><Badge label={b.status} color={sc(b.status)}/></div>
+              <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>\ud83d\udccd {b.location_text}</div>}</div>
+              <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>\u20b9{((b.total||0)/100).toLocaleString('en-IN')}</div><Badge label={b.status} color={sc(b.status)}/></div>
             </div>
-            {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={async()=>{await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);addToast('Complete ✅','success');load();}}>✓ Mark complete</Btn>}
+            {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={async()=>{await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);addToast('Complete \u2705','success');load();}}>\u2713 Mark complete</Btn>}
             {b.status==='completed'&&user.role==='customer'&&(
               <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
-                {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>✅ Rated {stars[b.id]}⭐</div>}
+                {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}\u2b50`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>\u2b50</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>\u2705 Rated {stars[b.id]}\u2b50</div>}
                 <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",marginTop:8,display:'block'}}>Raise a dispute</button>
               </div>
             )}
-            {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});addToast('Dispute raised','success');setDisputing(null);setReason('');}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
+            {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue\u2026" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});addToast('Dispute raised','success');setDisputing(null);setReason('');}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
           </div>
         )):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>No bookings yet</div>}
       </div>
@@ -1697,7 +1697,7 @@ function CRMScreen() {
           <div key={r.id} style={{...S.card(),marginBottom:8}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}><div><div style={{color:C.txt,fontWeight:600,fontSize:14}}>{r.service_name||r.course||'Request'}</div><div style={{color:C.sub,fontSize:11,marginTop:2}}>{r.service_type||r.batch||''}</div></div><Badge label={r.status} color={SC[r.status]||C.dim}/></div>
             {r.notes&&<div style={{color:C.dim,fontSize:11,marginBottom:8}}>{r.notes}</div>}
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{(STATS[tab]||[]).filter(s=>s!==r.status).slice(0,3).map(s=><button key={s} onClick={async()=>{const tbl=tab==='service'?'service_requests':'training_requests';await sb().from(tbl).update({status:s}).eq('id',r.id);addToast(`→ ${s}`,'success');load();}} style={{background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:6,padding:'4px 10px',color:C.sub,fontSize:11,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>→ {s}</button>)}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{(STATS[tab]||[]).filter(s=>s!==r.status).slice(0,3).map(s=><button key={s} onClick={async()=>{const tbl=tab==='service'?'service_requests':'training_requests';await sb().from(tbl).update({status:s}).eq('id',r.id);addToast(`\u2192 ${s}`,'success');load();}} style={{background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:6,padding:'4px 10px',color:C.sub,fontSize:11,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>\u2192 {s}</button>)}</div>
           </div>
         )):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>No requests yet</div>}
       </div>
@@ -1710,7 +1710,7 @@ function ProfileScreen() {
   const [frm,setFrm]=useState({firstName:user?.first_name||'',lastName:user?.last_name||'',phone:user?.phone||'',age:user?.age||'',gender:user?.gender||'',upi_id:user?.upi_id||'',address:user?.address||'',village:user?.village||'',city:user?.city||'',pincode:user?.pincode||''});
   const [saving,setSaving]=useState(false);
   const f=(k,v)=>setFrm(p=>({...p,[k]:v}));
-  const save=async()=>{setSaving(true);try{const{data}=await sb().from('profiles').update({first_name:frm.firstName,last_name:frm.lastName,name:`${frm.firstName} ${frm.lastName}`,phone:frm.phone,age:parseInt(frm.age)||null,gender:frm.gender,upi_id:frm.upi_id,address:frm.address,village:frm.village,city:frm.city,pincode:frm.pincode}).eq('id',user.id).select().single();setUser(data);addToast('Profile saved ✅','success');}catch(e){addToast(e.message||'Save failed','error');}finally{setSaving(false);}};
+  const save=async()=>{setSaving(true);try{const{data}=await sb().from('profiles').update({first_name:frm.firstName,last_name:frm.lastName,name:`${frm.firstName} ${frm.lastName}`,phone:frm.phone,age:parseInt(frm.age)||null,gender:frm.gender,upi_id:frm.upi_id,address:frm.address,village:frm.village,city:frm.city,pincode:frm.pincode}).eq('id',user.id).select().single();setUser(data);addToast('Profile saved \u2705','success');}catch(e){addToast(e.message||'Save failed','error');}finally{setSaving(false);}};
   const rc=user.role==='admin'?C.gold:user.role==='partner'?C.cyan:user.role==='candidate'?C.vio:C.acc;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
@@ -1720,12 +1720,12 @@ function ProfileScreen() {
           <div style={{fontSize:56,marginBottom:8}}>{user?.avatar}</div>
           <div style={{color:C.txt,fontSize:18,fontWeight:700}}>{user?.first_name} {user?.last_name}</div>
           <Badge label={user?.role==='admin'?'Leader':user?.role} color={rc}/>
-          <div style={{color:C.sub,fontSize:12,marginTop:6}}>{user?.phone}{user?.mobile_verified?' · 📱 Verified':''}</div>
-          <div style={{color:C.dim,fontSize:11,marginTop:4}}>📍 {[user?.village,user?.city,user?.pincode].filter(Boolean).join(', ')||'Not set'}</div>
-          <div style={{color:C.dim,fontSize:10,marginTop:2}}>💻 {user?.device_type} · {user?.os_name} · {user?.browser}</div>
-          <div style={{color:C.dim,fontSize:10,marginTop:2}}>🌐 IP: {user?.ip_address||'—'} · Age: {user?.age||'—'}</div>
+          <div style={{color:C.sub,fontSize:12,marginTop:6}}>{user?.phone}{user?.mobile_verified?' \u00b7 \ud83d\udcf1 Verified':''}</div>
+          <div style={{color:C.dim,fontSize:11,marginTop:4}}>\ud83d\udccd {[user?.village,user?.city,user?.pincode].filter(Boolean).join(', ')||'Not set'}</div>
+          <div style={{color:C.dim,fontSize:10,marginTop:2}}>\ud83d\udcbb {user?.device_type} \u00b7 {user?.os_name} \u00b7 {user?.browser}</div>
+          <div style={{color:C.dim,fontSize:10,marginTop:2}}>\ud83c\udf10 IP: {user?.ip_address||'\u2014'} \u00b7 Age: {user?.age||'\u2014'}</div>
         </div>
-        {user.role==='admin'&&<div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}><span style={{fontSize:22}}>📲</span><div style={{color:C.txt,fontSize:13,fontWeight:600}}>View QR Code & share</div><span style={{marginLeft:'auto',color:C.acc}}>→</span></div>}
+        {user.role==='admin'&&<div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}><span style={{fontSize:22}}>\ud83d\udcf2</span><div style={{color:C.txt,fontSize:13,fontWeight:600}}>View QR Code & share</div><span style={{marginLeft:'auto',color:C.acc}}>\u2192</span></div>}
         <div style={{...S.card(),marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:600,color:C.txt,marginBottom:14}}>Edit profile</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} onChange={e=>f('firstName',e.target.value)} style={S.inp()}/></Field><Field label="Last name"><input value={frm.lastName} onChange={e=>f('lastName',e.target.value)} style={S.inp()}/></Field></div>
@@ -1735,7 +1735,7 @@ function ProfileScreen() {
           <Field label="Village / Area"><input value={frm.village} onChange={e=>f('village',e.target.value)} style={S.inp()}/></Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="City"><input value={frm.city} onChange={e=>f('city',e.target.value)} style={S.inp()}/></Field><Field label="PIN code"><input value={frm.pincode} onChange={e=>f('pincode',e.target.value)} style={S.inp()}/></Field></div>
           {user.role==='partner'&&<Field label="UPI ID"><input value={frm.upi_id} onChange={e=>f('upi_id',e.target.value)} placeholder="yourname@upi" style={S.inp()}/></Field>}
-          <Btn onClick={save} disabled={saving}>{saving?'Saving…':'Save changes'}</Btn>
+          <Btn onClick={save} disabled={saving}>{saving?'Saving\u2026':'Save changes'}</Btn>
         </div>
         <AssistBanner/>
         <Btn full v="outline" onClick={logout}>Sign out</Btn>
@@ -1767,21 +1767,21 @@ function LeaderHome() {
   return (
     <div style={{flex:1,overflowY:'auto',padding:16,fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:20}}>
-        {[['👥','Customers',stats.customers,C.cyan],['🤝','Partners',stats.partners,C.acc],['📅','Bookings',stats.bookings,C.gold],['💰','GMV',`₹${((stats.gmv||0)/100).toLocaleString('en-IN')}`,C.grn]].map(([ic,lbl,val,col])=>(
+        {[['\ud83d\udc65','Customers',stats.customers,C.cyan],['\ud83e\udd1d','Partners',stats.partners,C.acc],['\ud83d\udcc5','Bookings',stats.bookings,C.gold],['\ud83d\udcb0','GMV',`\u20b9${((stats.gmv||0)/100).toLocaleString('en-IN')}`,C.grn]].map(([ic,lbl,val,col])=>(
           <div key={lbl} style={S.card()}><div style={{fontSize:24,marginBottom:6}}>{ic}</div><div style={{color:C.sub,fontSize:12,marginBottom:4}}>{lbl}</div><div style={{color:col,fontWeight:700,fontSize:22}}>{val}</div></div>
         ))}
       </div>
       {/* QR Scans */}
       {qrScans.length>0&&<div style={{...S.card(),marginBottom:16}}>
-        <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>📲 QR Scans <Badge label={qrScans.length} color={C.acc}/></div>
+        <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>\ud83d\udcf2 QR Scans <Badge label={qrScans.length} color={C.acc}/></div>
         {qrScans.map((v,i)=>(
           <div key={i} style={{padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
-                <div style={{color:C.txt,fontSize:12,fontWeight:500}}>{[v.first_name,v.last_name].filter(Boolean).join(' ')||'Anonymous'} · {v.mobile||'—'}</div>
-                <div style={{color:C.dim,fontSize:10,marginTop:1}}>IP: {v.ip_address} · {v.city||'—'} · {v.connection_type||'—'}</div>
-                <div style={{color:C.dim,fontSize:10,marginTop:1}}>💻 {v.device_type} · {v.os_name} · {v.browser}</div>
-                <div style={{color:C.dim,fontSize:10,marginTop:1}}>🔋 {v.battery_level!=null?Math.round(v.battery_level*100)+'%':'—'} · {v.scanned_at?.slice(0,16).replace('T',' ')}</div>
+                <div style={{color:C.txt,fontSize:12,fontWeight:500}}>{[v.first_name,v.last_name].filter(Boolean).join(' ')||'Anonymous'} \u00b7 {v.mobile||'\u2014'}</div>
+                <div style={{color:C.dim,fontSize:10,marginTop:1}}>IP: {v.ip_address} \u00b7 {v.city||'\u2014'} \u00b7 {v.connection_type||'\u2014'}</div>
+                <div style={{color:C.dim,fontSize:10,marginTop:1}}>\ud83d\udcbb {v.device_type} \u00b7 {v.os_name} \u00b7 {v.browser}</div>
+                <div style={{color:C.dim,fontSize:10,marginTop:1}}>\ud83d\udd0b {v.battery_level!=null?Math.round(v.battery_level*100)+'%':'\u2014'} \u00b7 {v.scanned_at?.slice(0,16).replace('T',' ')}</div>
               </div>
               <Badge label={v.verified?'Verified':'Scanned'} color={v.verified?C.grn:C.gold}/>
             </div>
@@ -1790,19 +1790,19 @@ function LeaderHome() {
       </div>}
       {/* QR code shortcut */}
       <div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
-        <span style={{fontSize:22}}>📲</span>
-        <div><div style={{color:C.txt,fontSize:13,fontWeight:600}}>ScanV QR Code</div><div style={{color:C.sub,fontSize:11}}>Print & share · view scan analytics</div></div>
-        <span style={{marginLeft:'auto',color:C.acc,fontSize:16}}>→</span>
+        <span style={{fontSize:22}}>\ud83d\udcf2</span>
+        <div><div style={{color:C.txt,fontSize:13,fontWeight:600}}>ScanV QR Code</div><div style={{color:C.sub,fontSize:11}}>Print & share \u00b7 view scan analytics</div></div>
+        <span style={{marginLeft:'auto',color:C.acc,fontSize:16}}>\u2192</span>
       </div>
       {visitors.length>0&&<div style={{...S.card(),marginBottom:16}}>
-        <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>🌐 Recent visitors</div>
+        <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>\ud83c\udf10 Recent visitors</div>
         {visitors.map((v,i)=>(
           <div key={i} style={{padding:'7px 0',borderTop:i?`1px solid ${C.bdr}`:'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
-                <div style={{color:C.txt,fontSize:12,fontWeight:500}}>{[v.first_name,v.last_name].filter(Boolean).join(' ')||'Anonymous'} · {v.mobile||'—'}</div>
-                <div style={{color:C.dim,fontSize:10,marginTop:1}}>IP: {v.ip_address} · {v.city||'—'}</div>
-                <div style={{color:C.dim,fontSize:10,marginTop:1}}>💻 {v.device_type} · {v.os_name} · {v.browser}</div>
+                <div style={{color:C.txt,fontSize:12,fontWeight:500}}>{[v.first_name,v.last_name].filter(Boolean).join(' ')||'Anonymous'} \u00b7 {v.mobile||'\u2014'}</div>
+                <div style={{color:C.dim,fontSize:10,marginTop:1}}>IP: {v.ip_address} \u00b7 {v.city||'\u2014'}</div>
+                <div style={{color:C.dim,fontSize:10,marginTop:1}}>\ud83d\udcbb {v.device_type} \u00b7 {v.os_name} \u00b7 {v.browser}</div>
               </div>
               <Badge label={v.verified?'Verified':'Anonymous'} color={v.verified?C.grn:C.gold}/>
             </div>
@@ -1829,17 +1829,17 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 All data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your data</p>
+            <p style={{margin:0,color:C.grn,fontSize:13}}>\ud83d\udd12 All data stored in India (AWS Mumbai) \u00b7 DPDP Act 2023 compliant \u00b7 We never sell your data</p>
           </div>
           {[
             ['Who We Are','ScanV is operated by DCORE Global Corporation, Pune, Maharashtra. We connect customers with independent service providers across PCMC, Pune and Maharashtra. DPO: privacy@dcoreglobal.com'],
-            ['Data We Collect','Identity (name), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city), Device (type, OS, browser, timezone, language, battery, canvas fingerprint), Booking details, and session behaviour. We do NOT collect Aadhaar, PAN, passport, card numbers, passwords, or biometrics.'],
-            ['How We Use It','Verify identity via OTP before any booking · Match you with nearby service providers · Send booking updates · Process payments for GST compliance · Prevent fraud · Improve platform quality through anonymised analytics · Comply with Indian law'],
+            ['Data We Collect','Identity (name), Contact (mobile \u2014 OTP verified), Location (GPS, IP, PIN code, city), Device (type, OS, browser, timezone, language, battery, canvas fingerprint), Booking details, and session behaviour. We do NOT collect Aadhaar, PAN, passport, card numbers, passwords, or biometrics.'],
+            ['How We Use It','Verify identity via OTP before any booking \u00b7 Match you with nearby service providers \u00b7 Send booking updates \u00b7 Process payments for GST compliance \u00b7 Prevent fraud \u00b7 Improve platform quality through anonymised analytics \u00b7 Comply with Indian law'],
             ['Location Data','ScanV requests GPS when you open the app and when you book. Location is used only to show nearby services and enable delivery routing. IP-based location is used as fallback. We never sell location data to advertisers.'],
-            ['Data Sharing','Name, mobile, and location shared with your assigned Partner to fulfil the booking · Transaction data with Razorpay (PCI-DSS L1) for payments · Mobile with Twilio/MSG91 for OTP delivery · Government/courts only when legally required. We never share with advertisers or data brokers.'],
-            ['Retention','Bookings: 7 years (GST compliance) · OTP records: 30 days · Device/session data: 12 months · Account deletion: permanently removed within 30 days'],
-            ['Your Rights (DPDP Act 2023)','Access your data · Correct inaccurate data · Request erasure · Raise a grievance · Nominate a representative · Withdraw consent. Contact: privacy@dcoreglobal.com · Response within 30 days'],
-            ['Security','TLS 1.3 encryption in transit · AES-256 at rest · AWS Mumbai (data never leaves India) · OTP-only authentication (no passwords stored) · Row-level database security · Regular security audits'],
+            ['Data Sharing','Name, mobile, and location shared with your assigned Partner to fulfil the booking \u00b7 Transaction data with Razorpay (PCI-DSS L1) for payments \u00b7 Mobile with Twilio/MSG91 for OTP delivery \u00b7 Government/courts only when legally required. We never share with advertisers or data brokers.'],
+            ['Retention','Bookings: 7 years (GST compliance) \u00b7 OTP records: 30 days \u00b7 Device/session data: 12 months \u00b7 Account deletion: permanently removed within 30 days'],
+            ['Your Rights (DPDP Act 2023)','Access your data \u00b7 Correct inaccurate data \u00b7 Request erasure \u00b7 Raise a grievance \u00b7 Nominate a representative \u00b7 Withdraw consent. Contact: privacy@dcoreglobal.com \u00b7 Response within 30 days'],
+            ['Security','TLS 1.3 encryption in transit \u00b7 AES-256 at rest \u00b7 AWS Mumbai (data never leaves India) \u00b7 OTP-only authentication (no passwords stored) \u00b7 Row-level database security \u00b7 Regular security audits'],
             ['Children','ScanV is for users 18+. We do not knowingly collect data from minors. Contact privacy@dcoreglobal.com if you believe a minor has registered.'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
@@ -1852,18 +1852,18 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By using ScanV or placing a booking, you agree to these terms in full.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>\u26a0\ufe0f By using ScanV or placing a booking, you agree to these terms in full.</p>
           </div>
           {[
             ['ScanV as Marketplace Intermediary','DCORE Global Corporation operates ScanV as an IT Intermediary under the IT Act 2000. We connect Users with independent Partners. We do not employ Partners, do not deliver services, and are not responsible for service quality, safety, timeliness, or outcomes. DCORE's maximum liability for any booking is limited to the platform fee collected for that booking.'],
-            ['Eligibility','Must be 18+ · Valid Indian mobile · Legally capable of contracts under Indian law · Must accept Terms, Privacy Policy, and DPDP Act 2023 compliance before first booking'],
+            ['Eligibility','Must be 18+ \u00b7 Valid Indian mobile \u00b7 Legally capable of contracts under Indian law \u00b7 Must accept Terms, Privacy Policy, and DPDP Act 2023 compliance before first booking'],
             ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + Terms accepted + unique TXN ID generated + platform fee paid. DCORE may cancel bookings if no Partner is available or fraud is detected.'],
-            ['User Responsibilities','Provide accurate booking details · Be present at the agreed time and location · Treat Partners respectfully · Report disputes within 48 hours of service completion · Do not book for unlawful purposes'],
-            ['Payment & Fees','Platform fee: 10% of service value · GST at applicable rates on total · Service fees are indicative and agreed with the Partner · Cash-on-service: platform fee still payable online'],
+            ['User Responsibilities','Provide accurate booking details \u00b7 Be present at the agreed time and location \u00b7 Treat Partners respectfully \u00b7 Report disputes within 48 hours of service completion \u00b7 Do not book for unlawful purposes'],
+            ['Payment & Fees','Platform fee: 10% of service value \u00b7 GST at applicable rates on total \u00b7 Service fees are indicative and agreed with the Partner \u00b7 Cash-on-service: platform fee still payable online'],
             ['Professional Services Disclaimer','Legal services: advice is between you and the advocate (DCORE has no liability). Healthcare: treatment is between you and the practitioner (DCORE has no liability). Training: results are between you and the trainer.'],
             ['Liability Limitation','DCORE's total liability for any claim is capped at the platform fee for that booking. We are not liable for indirect, consequential, or punitive damages. Partners are independent contractors.'],
-            ['Prohibited Uses','Illegal purposes · Reverse engineering the platform · Fake bookings or reviews · Soliciting Partners outside ScanV · Abuse or harassment of Partners or Users'],
-            ['Governing Law','Laws of India · Courts of Pune, Maharashtra have exclusive jurisdiction · 30-day good-faith negotiation before legal action · Contact: legal@dcoreglobal.com'],
+            ['Prohibited Uses','Illegal purposes \u00b7 Reverse engineering the platform \u00b7 Fake bookings or reviews \u00b7 Soliciting Partners outside ScanV \u00b7 Abuse or harassment of Partners or Users'],
+            ['Governing Law','Laws of India \u00b7 Courts of Pune, Maharashtra have exclusive jurisdiction \u00b7 30-day good-faith negotiation before legal action \u00b7 Contact: legal@dcoreglobal.com'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
@@ -1875,22 +1875,22 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ Refunds apply only to the platform fee (10%) collected by DCORE. Service fees paid to Partners — including cash — are outside DCORE's refund scope.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>\u26a0\ufe0f Refunds apply only to the platform fee (10%) collected by DCORE. Service fees paid to Partners \u2014 including cash \u2014 are outside DCORE's refund scope.</p>
           </div>
           <div style={{marginBottom:20}}>
             <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>Cancellation Schedule</div>
-            {[['24+ hrs before','Platform fee: 100% refunded'],['2–24 hrs before','Platform fee: 50% refunded'],['Under 2 hrs','Platform fee: no refund'],['No-show','No refund'],['Cancelled by DCORE','100% refunded']].map(([k,v])=>(
+            {[['24+ hrs before','Platform fee: 100% refunded'],['2\u201324 hrs before','Platform fee: 50% refunded'],['Under 2 hrs','Platform fee: no refund'],['No-show','No refund'],['Cancelled by DCORE','100% refunded']].map(([k,v])=>(
               <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:13}}>
                 <span style={{color:C.sub}}>{k}</span><span style={{color:C.txt,fontWeight:500}}>{v}</span>
               </div>
             ))}
           </div>
           {[
-            ['What DCORE Refunds','DCORE cancels due to unavailable Partner · Technical error causing incorrect charge · Duplicate payment · Payment processed but no booking confirmed'],
-            ['What DCORE Does Not Refund','Service quality disputes (User vs Partner) · User cancellation after Partner assigned · User no-show · Change of mind · Cash payments to Partners · Professional service outcomes (legal, medical, training)'],
-            ['Non-Refundable Categories','Legal consultations (once conducted) · Cloud training (once batch started) · VIP appointments (deposit within 24hrs) · Food (once preparation started) · Healthcare (once consultation complete)'],
-            ['Refund Processing','5–7 business days · Returned to original payment method · UPI refunds: 3–5 business days post-processing · GST credit note issued for all refunds'],
-            ['How to Request','App: Open booking → Raise a dispute → Refund Request · Email: refunds@dcoreglobal.com with your TXN-XXXXXXXX · Response within 24 business hours'],
+            ['What DCORE Refunds','DCORE cancels due to unavailable Partner \u00b7 Technical error causing incorrect charge \u00b7 Duplicate payment \u00b7 Payment processed but no booking confirmed'],
+            ['What DCORE Does Not Refund','Service quality disputes (User vs Partner) \u00b7 User cancellation after Partner assigned \u00b7 User no-show \u00b7 Change of mind \u00b7 Cash payments to Partners \u00b7 Professional service outcomes (legal, medical, training)'],
+            ['Non-Refundable Categories','Legal consultations (once conducted) \u00b7 Cloud training (once batch started) \u00b7 VIP appointments (deposit within 24hrs) \u00b7 Food (once preparation started) \u00b7 Healthcare (once consultation complete)'],
+            ['Refund Processing','5\u20137 business days \u00b7 Returned to original payment method \u00b7 UPI refunds: 3\u20135 business days post-processing \u00b7 GST credit note issued for all refunds'],
+            ['How to Request','App: Open booking \u2192 Raise a dispute \u2192 Refund Request \u00b7 Email: refunds@dcoreglobal.com with your TXN-XXXXXXXX \u00b7 Response within 24 business hours'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
@@ -1902,17 +1902,17 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.cyan}22`,border:`1px solid ${C.cyan}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.cyan,fontSize:13}}>💳 All online payments processed by Razorpay (PCI-DSS Level 1). We never store card or bank details.</p>
+            <p style={{margin:0,color:C.cyan,fontSize:13}}>\ud83d\udcb3 All online payments processed by Razorpay (PCI-DSS Level 1). We never store card or bank details.</p>
           </div>
           {[
-            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks) · Cash on service (Household, Delivery, Food categories)'],
+            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) \u00b7 Debit/Credit cards (Visa, Mastercard, RuPay) \u00b7 Net banking (all major Indian banks) \u00b7 Cash on service (Household, Delivery, Food categories)'],
             ['How It Works','Platform fee (10%) paid online at booking. Service fee paid to Partner after completion (UPI or cash). GST added to total. Tax invoice auto-generated for every booking.'],
-            ['UPI Payment','Pay to: dcoreglobal@upi · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
-            ['Cash on Service','Platform fee still paid online · Service fee paid in cash to Partner after service completion · Applies to: Household Services, Deliveries, Food & Tiffin'],
-            ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
-            ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
-            ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner's registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],
-            ['Regulatory','RBI compliant payment aggregator · GST Act 2017 · Section 194-O TDS · 8-year payment record retention · GSTR-1 filed annually'],
+            ['UPI Payment','Pay to: dcoreglobal@upi \u00b7 Use your TXN-XXXXXXXX as payment reference \u00b7 Confirmation SMS within 5 minutes \u00b7 Always include TXN ID to avoid reconciliation delays'],
+            ['Cash on Service','Platform fee still paid online \u00b7 Service fee paid in cash to Partner after service completion \u00b7 Applies to: Household Services, Deliveries, Food & Tiffin'],
+            ['Security','Razorpay PCI-DSS L1 \u00b7 TLS 1.3 encryption \u00b7 AES-256 at rest \u00b7 No card/CVV/bank details stored by ScanV \u00b7 RBI-mandated 2FA for card payments'],
+            ['Failed Payments','No deduction on failure \u00b7 Booking stays "Pending Payment" for 24 hours \u00b7 Auto-refund in 5\u20137 days if deducted but booking not confirmed \u00b7 Contact: payments@dcoreglobal.com'],
+            ['Partner Payouts','Within 3 business days of service completion \u00b7 Via UPI to Partner's registered UPI ID \u00b7 TDS deducted under Section 194-O Income Tax Act \u00b7 Monthly payout statements issued'],
+            ['Regulatory','RBI compliant payment aggregator \u00b7 GST Act 2017 \u00b7 Section 194-O TDS \u00b7 8-year payment record retention \u00b7 GSTR-1 filed annually'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
@@ -1924,14 +1924,14 @@ function LegalPage({page}) {
       {/* Header */}
       <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
-        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>← Back</button>
+        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>\u2190 Back</button>
       </div>
       <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
         {/* Hero */}
         <div style={{background:`linear-gradient(135deg,${C.surf},${C.card})`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'28px 24px',marginBottom:28}}>
           <div style={{display:'inline-block',background:C.acc,color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,letterSpacing:1,marginBottom:10}}>{pg.badge}</div>
           <div style={{color:C.txt,fontSize:24,fontWeight:800,marginBottom:4}}>{pg.title}</div>
-          <div style={{color:C.sub,fontSize:12}}>DCORE Global Corporation · ScanV · Updated: {pg.updated}</div>
+          <div style={{color:C.sub,fontSize:12}}>DCORE Global Corporation \u00b7 ScanV \u00b7 Updated: {pg.updated}</div>
         </div>
         {/* Content */}
         {pg.content}
@@ -1940,10 +1940,10 @@ function LegalPage({page}) {
           {[['privacy','Privacy'],['terms','Terms'],['refund','Refund'],['payment','Payment']].map(([k,l])=>(
             <a key={k} href={`/${k}`} style={{color:page===k?C.acc:C.dim,fontSize:12,textDecoration:'none'}}>{l} Policy</a>
           ))}
-          <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global ↗</a>
+          <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global \u2197</a>
         </div>
         <div style={{textAlign:'center',marginTop:16,color:C.dim,fontSize:11}}>
-          © 2026 DCORE Global Corporation · ScanV · Pune, India · DPDP Act 2023 Compliant
+          \u00a9 2026 DCORE Global Corporation \u00b7 ScanV \u00b7 Pune, India \u00b7 DPDP Act 2023 Compliant
         </div>
       </div>
     </div>
