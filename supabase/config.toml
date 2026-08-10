@@ -1,0 +1,5 @@
+# ScanV Supabase project (edge functions + migrations)
+project_id = "rwlwrmmqtedugcreweut"
+
+[functions.whatsapp-verify]
+verify_jwt = false

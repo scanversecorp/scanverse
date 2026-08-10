@@ -24,7 +24,7 @@ C4Context
     Rel(partner, scanv, "Uses")
     Rel(leader, scanv, "Administers")
     Rel(scanv, supabase, "API + realtime")
-    Rel(supabase, msg91, "send-otp function")
+    Rel(supabase, msg91, "send-otp · whatsapp-verify")
     Rel(scanv, razorpay, "Payment links")
     Rel(scanv, maps, "GPS → address")
 ```
@@ -49,7 +49,7 @@ flowchart TB
     subgraph Supabase
         AUTH[GoTrue Auth]
         DB[(PostgreSQL)]
-        EF[Edge Functions<br/>send-otp]
+        EF[Edge Functions<br/>send-otp · whatsapp-verify]
         RLS[Row Level Security]
     end
 
@@ -144,9 +144,21 @@ erDiagram
 - **Session restore** — Supabase session + `localStorage scanv_uid` fallback
 - **Terms** — `localStorage scanv_terms_accepted` required before OTP send
 
+### Mobile verification paths
+
+| Path | Trigger | Flow |
+|------|---------|------|
+| **SMS OTP (primary)** | User chooses SMS or WA unavailable | `send-otp` → 6-digit code → verify |
+| **WhatsApp (backup)** | User chooses WA or SMS fails | `whatsapp-verify` generate → `wa.me` pre-filled message → poll `check` every 3s |
+
+WhatsApp deep link: `https://wa.me/919270194842?text=SCANV VERIFY {token}`  
+Tokens stored in `wa_verifications` (30 min TTL). See `supabase/functions/whatsapp-verify/README.md`.
+
 ---
 
-## 6. Edge Function: send-otp
+## 6. Edge Functions
+
+### send-otp
 
 ```
 POST /functions/v1/send-otp
@@ -155,6 +167,20 @@ Body: { mobile: "+91XXXXXXXXXX" }
 
 Providers: MSG91 (primary, India) · Twilio (fallback)
 ```
+
+### whatsapp-verify
+
+```
+POST /functions/v1/whatsapp-verify
+Body: { action: "generate", mobile: "+91XXXXXXXXXX" }
+     | { action: "check", token: "SCANV-XXXX" }
+     | { action: "webhook", token, secret? }  // optional strict mode
+
+Response generate: { success: true, token }
+Response check:     { verified: true|false, mobile? }
+```
+
+MVP uses honor-system verify-on-check (10s delay) unless `WHATSAPP_WEBHOOK_SECRET` is set.
 
 ---
 
