@@ -159,7 +159,7 @@ function GuestBottomNav({ screen, setScreen, addToast }) {
     {id:'home', icon:'🏠', label:'Home', go:()=>setScreen('services')},
     {id:'services', icon:'🔍', label:'Services', go:()=>setScreen('services')},
     {id:'bookings', icon:'📅', label:'Bookings', go:()=>addToast?.('Book & verify to see your bookings here','info')},
-    {id:'profile', icon:'👤', label:'Profile', go:()=>addToast?.('Profile created when you complete a booking','info')},
+    {id:'profile', icon:'👤', label:'Profile', go:()=>setScreen('login')},
   ];
   return (
     <div style={{position:'fixed',bottom:0,left:0,right:0,maxWidth:480,margin:'0 auto',background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50}}>
@@ -550,6 +550,66 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     finally { setLoading(false); }
   };
 
+  /** Profile sign-in (guest bottom nav): OTP required every login, not on bookings */
+  const loginProfile = async (waVerified=false) => {
+    if (!waVerified) {
+      const code = otpCode.join('');
+      if (code.length<6) return setErr('Enter 6-digit OTP');
+    }
+    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    setLoading(true); setErr('');
+    try {
+      const mob = `+91${mobile}`;
+      if (!waVerified) {
+        const code = otpCode.join('');
+        const r = await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
+        if (!r.data?.success) throw new Error('Invalid OTP. Try again.');
+      }
+      const {data:existing} = await sb().from('profiles').select('*').eq('phone',mob).maybeSingle();
+      if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
+      await sb().from('profiles').update({mobile_verified:true,mobile_verified_at:new Date().toISOString()}).eq('id',existing.id);
+      localStorage.setItem('scanv_uid',existing.id);
+      const prof = {...existing,mobile_verified:true};
+      addToast?.(`Welcome back, ${existing.first_name}!`,'success');
+      onRegistered(prof);
+    } catch(e) { setErr(e.message||'Sign-in failed.'); }
+    finally { setLoading(false); }
+  };
+
+  const sendLoginOTP = async () => {
+    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    setLoading(true); setErr('');
+    try {
+      const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
+      if (r.data?.success||r.data?.provider) { setOtpSent(true); }
+      else throw new Error('OTP send failed');
+    } catch(e) { setErr(e.message||'Could not send OTP'); }
+    finally { setLoading(false); }
+  };
+
+  const sendLoginWA = async () => {
+    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    setLoading(true); setErr('');
+    try {
+      const r = await sb().functions.invoke('whatsapp-verify',{body:{action:'generate',mobile:`+91${mobile}`}});
+      if (r.data?.token) {
+        setWaToken(r.data.token);
+        setOtpSent(true);
+        setWaChecking(true);
+        const poll = setInterval(async()=>{
+          const res = await sb().functions.invoke('whatsapp-verify',{body:{action:'check',token:r.data.token}});
+          if (res.data?.verified) {
+            clearInterval(poll);
+            setWaChecking(false);
+            await loginProfile(true);
+          }
+        }, 3000);
+        setTimeout(()=>{ clearInterval(poll); setWaChecking(false); }, 600000);
+      } else throw new Error('Could not generate WhatsApp token');
+    } catch(e) { setErr(e.message||'WhatsApp verification failed'); }
+    finally { setLoading(false); }
+  };
+
   const confirmPayment = (method) => {
     setPaymentMethod(method);
     setScreen('schedule');
@@ -838,6 +898,65 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           )}
           {verifyMethod==='whatsapp'&&!otpSent&&(
             <Btn full onClick={sendWA} disabled={loading||!termsAccepted} style={{background:'#25D366',boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>{loading?<><Spin size={16}/>…</>:<>💬 Verify via WhatsApp</>}</Btn>
+          )}
+          {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
+            <div style={{background:'#e8f8ef',border:'1.5px solid #25D366',borderRadius:12,padding:14,textAlign:'center'}}>
+              <div style={{color:'#128C7E',fontSize:13,fontWeight:700,marginBottom:8}}>📱 Open WhatsApp to verify</div>
+              <a href={`https://wa.me/919270194842?text=${encodeURIComponent('SCANV VERIFY '+waToken)}`} target="_blank" rel="noreferrer"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#25D366',borderRadius:10,padding:'12px 16px',textDecoration:'none',marginBottom:10,boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>
+                <span style={{color:'#fff',fontWeight:800,fontSize:14}}>💬 Open WhatsApp · Send VERIFY</span>
+              </a>
+              {waChecking&&<div style={{fontSize:11,color:C.dim,fontWeight:600}}>⏳ Waiting for confirmation…</div>}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // -- LOGIN: Guest Profile tab — OTP gate at sign-in -----------------------
+  if (screen==='login') {
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>{setScreen('services');setOtpSent(false);setOtpCode(['','','','','','']);setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Sign in</div>
+        </div>
+        <div style={{padding:'16px 16px 24px'}}>
+          {err&&<div style={S.err}>{err}</div>}
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Verify mobile to access bookings. OTP required each sign-in — skipped when already signed in.</div>
+          <Field label="Mobile" req note="10-digit Indian mobile">
+            <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
+              <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
+              <input type="tel" maxLength={10} value={mobile} onChange={e=>setMobile(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+            </div>
+          </Field>
+          {!otpSent&&(
+            <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
+              {[['whatsapp','💬 WhatsApp'],['sms','📱 SMS OTP']].map(([v,l])=>(
+                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:12,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
+              ))}
+            </div>
+          )}
+          {verifyMethod==='sms'&&!otpSent&&(
+            <Btn full onClick={sendLoginOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send SMS OTP →'}</Btn>
+          )}
+          {verifyMethod==='sms'&&otpSent&&(
+            <>
+              <div style={{color:C.grn,fontSize:12,marginBottom:12,fontWeight:700}}>✅ OTP sent to +91 {mobile}</div>
+              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
+                {otpCode.map((d,i)=>(
+                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
+                    onChange={e=>{const nd=[...otpCode];nd[i]=e.target.value.replace(/\D/g,'').slice(-1);setOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`lotp-${i+1}`)?.focus();}}
+                    onKeyDown={e=>{if(e.key==='Backspace'&&!otpCode[i]&&i>0)document.getElementById(`lotp-${i-1}`)?.focus();}}
+                    style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
+                ))}
+              </div>
+              <Btn full onClick={()=>loginProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Sign in →'}</Btn>
+            </>
+          )}
+          {verifyMethod==='whatsapp'&&!otpSent&&(
+            <Btn full onClick={sendLoginWA} disabled={loading} style={{background:'#25D366',boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>{loading?<><Spin size={16}/>…</>:<>💬 Verify via WhatsApp</>}</Btn>
           )}
           {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
             <div style={{background:'#e8f8ef',border:'1.5px solid #25D366',borderRadius:12,padding:14,textAlign:'center'}}>
@@ -1597,6 +1716,7 @@ function ServicesScreen() {
 
 function BookScreen() {
   const {activeSvc,user,addToast,setScreen}=useApp();
+  const skipVerify=!!(user?.mobile_verified&&user?.first_name);
   const [step,setStep]=useState(1);
   const [date,setDate]=useState('');
   const [time,setTime]=useState('10:00');
@@ -1647,15 +1767,21 @@ function BookScreen() {
   const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});setBooking(data);addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
   const confirmPaid=method=>{setPayMethod(method);setStep(4);addToast('Payment recorded — pick date & time','success');};
   const upiLink=`upi://pay?pa=${UPI_PA}&pn=${encodeURIComponent(UPI_PN)}&am=${(total/100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(svc.name+' '+(txnId||''))}`;
-  const stepLabels=['Service','Verify','Pay','Schedule'];
+  const goFromService=()=>{
+    if(skipVerify){ setTxnId('TXN-'+Date.now()); setStep(3); }
+    else setStep(2);
+  };
+  const progressTotal=skipVerify?3:4;
+  const progressIdx=step===1?1:step===2?2:step===3?(skipVerify?2:3):step===4?(skipVerify?3:4):1;
+  const stepLabels=skipVerify?['Service','Pay','Schedule']:['Service','Verify','Pay','Schedule'];
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title={svc.name} back="services"/>
-      <div style={{display:'flex',padding:'12px 16px',gap:4}}>{stepLabels.map((_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:step>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
+      <div style={{display:'flex',padding:'12px 16px',gap:4}}>{Array.from({length:progressTotal},(_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:progressIdx>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
       <div style={{padding:'8px 16px 40px'}}>
-        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>}</div><Btn full onClick={()=>setStep(2)}>Continue →</Btn></>}
+        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>}</div>{skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}<Btn full onClick={goFromService}>{skipVerify?'Continue to payment →':'Continue →'}</Btn></>}
 
-        {step===2&&<>
+        {step===2&&!skipVerify&&<>
           <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 2 · Verify identity</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
             <Field label="First name" req><input value={bookFirstName} onChange={e=>setBookFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
@@ -2048,7 +2174,7 @@ export default function App() {
   const logout=useCallback(async()=>{
     try{await sb().auth.signOut();}catch(e){}
     localStorage.removeItem('scanv_uid');
-    setUser(null); setState('register'); setScreen('home');
+    setUser(null); setState('browse'); setScreen('services');
   },[]);
 
   // Check if QR scan (?qr=1 in URL)
