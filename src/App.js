@@ -180,9 +180,28 @@ async function getIP() {
 
 async function reverseGeo(lat,lng) {
   try {
+    // Primary: Nominatim for address details
     const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`);
     const d=await r.json(); const a=d.address||{};
-    return { address:d.display_name?.split(',').slice(0,4).join(',').trim()||'', village:a.village||a.suburb||a.neighbourhood||a.town||a.residential||'', city:a.city||a.town||a.county||'Pune', state:a.state||'Maharashtra', pincode:a.postcode||'', country:a.country||'India' };
+    let pincode = a.postcode||'';
+    // Secondary: India Post API for accurate PIN code (Nominatim PIN is often wrong)
+    if (!pincode || pincode.length !== 6) {
+      try {
+        const r2 = await fetch(`https://api.postalpincode.in/latlong/${lat}/${lng}`);
+        const d2 = await r2.json();
+        if (d2&&d2[0]&&d2[0].Status==='Success'&&d2[0].PostOffice?.[0]?.Pincode) {
+          pincode = d2[0].PostOffice[0].Pincode;
+        }
+      } catch(e2) { /* fallback to Nominatim */ }
+    }
+    return {
+      address: d.display_name?.split(',').slice(0,4).join(',').trim()||'',
+      village: a.village||a.suburb||a.neighbourhood||a.town||a.residential||'',
+      city: a.city||a.town||a.county||'Pune',
+      state: a.state||'Maharashtra',
+      pincode,
+      country: a.country||'India'
+    };
   } catch(e) { return {address:'',village:'',city:'Pune',state:'Maharashtra',pincode:'',country:'India'}; }
 }
 
@@ -417,6 +436,20 @@ function RegistrationFlow({ onComplete, prefill }) {
     setPhase('collecting');
     const device = dev || detectDevice(); setDev(device);
     const ipAddr = ip  || await getIP(); setIp(ipAddr);
+
+    // Silent: try IP-based location as first estimate (before GPS)
+    try {
+      const ipGeo = await fetch(`https://ipapi.co/${ipAddr}/json/`).then(r=>r.json());
+      if (ipGeo?.city) {
+        setForm(p=>({
+          ...p,
+          city: p.city||ipGeo.city||'Pune',
+          state: p.state||ipGeo.region||'Maharashtra',
+          pincode: p.pincode||ipGeo.postal||'',
+        }));
+      }
+    } catch(e) { /* silent fail */ }
+
     setPhase('gps');
     navigator.geolocation.getCurrentPosition(
       async pos=>{
@@ -457,7 +490,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     if (!form.pincode.trim())   return setErr('Enter PIN code');
     setLoading(true); setErr('');
     try {
-      const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
+      const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
       // 1. Send OTP via Twilio Verify (server-side, no DLT needed)
       //    Twilio generates and sends the OTP — we don't need to store it
       setLoading(false);
@@ -511,7 +544,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     if (token.length<6) return setErr('Enter all 6 digits');
     setLoading(true); setErr('');
     try {
-      const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
+      const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
       // Try Twilio Verify first (if SMS came from Twilio)
       let ok = false;
       try {
@@ -703,7 +736,10 @@ function RegistrationFlow({ onComplete, prefill }) {
       </div>
 
       <Field label="Mobile number" req note="6-digit OTP will be sent via SMS">
-        <input type="tel" value={form.mobile} onChange={e=>f('mobile',e.target.value)} placeholder="+91 98765 43210" style={S.inp()}/>
+        <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
+          <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
+          <input type="tel" maxLength={10} value={form.mobile} onChange={e=>f('mobile',e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+        </div>
       </Field>
 
       <Field label="Address" note="House no, street, area"><input value={form.address} onChange={e=>f('address',e.target.value)} placeholder="House no, street, area" style={S.inp()}/></Field>
@@ -762,7 +798,7 @@ function RegistrationFlow({ onComplete, prefill }) {
                   clearInterval(poll);
                   setWaChecking(false);
                   // Mark as verified via WhatsApp — proceed to finalise
-                  const mob = form.mobile.startsWith('+')?form.mobile:`+91${form.mobile.replace(/\D/g,'')}`;
+                  const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
                   setPhase('completing');
                   // Store OTP as used
                   await sb().from('custom_otp').insert({
@@ -997,10 +1033,72 @@ function HomeScreen() {
   );
 }
 
+// Service detail data
+const SVC_DETAIL = {
+  legal:    { desc:'Connect with verified lawyers for consultation, document drafting, property registration, court filings, and legal advice.', features:['Initial consultation','Document review & drafting','Property registration','Court representation','Online & offline'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
+  cloud:    { desc:'Professional training in AWS, Azure, GCP, AI/ML and DevOps. Certified trainers, hands-on labs, placement assistance.', features:['Live & recorded sessions','Hands-on labs','Certification prep','Job placement support','Flexible timing'], turnaround:'Batch starts weekly', rating:'4.9 ⭐', bookings:'1,800+' },
+  vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
+  health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
+  property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
+  household:{ desc:'Trusted professionals for plumbing, electrical, carpentry, AC repair, painting and deep cleaning across PCMC/Pune.', features:['Background verified','Same day visits','Warranty on work','Transparent pricing','Cash accepted'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'8,900+' },
+  delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+};
+
 function ServicesScreen() {
   const {setActiveSvc,setScreen}=useApp();
   const [search,setSearch]=useState('');
+  const [detail,setDetail]=useState(null);
   const list=SVCS.filter(s=>!search||s.name.toLowerCase().includes(search.toLowerCase())||s.sub.toLowerCase().includes(search.toLowerCase()));
+
+  if(detail) {
+    const d = SVC_DETAIL[detail.id]||{};
+    return (
+      <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setDetail(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
+        </div>
+        <div style={{padding:16}}>
+          {/* Hero */}
+          <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
+            <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>
+            <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
+            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc}</div>
+            <div style={{display:'flex',justifyContent:'center',gap:20,flexWrap:'wrap'}}>
+              <div style={{textAlign:'center'}}><div style={{color:C.gold,fontSize:14,fontWeight:700}}>{d.rating}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.grn,fontSize:14,fontWeight:700}}>{d.bookings}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.cyan,fontSize:14,fontWeight:700}}>{d.turnaround}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
+            </div>
+          </div>
+          {/* Features */}
+          <div style={S.card({marginBottom:16})}>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What's included</div>
+            {(d.features||[]).map(f=>(
+              <div key={f} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
+                <span style={{color:C.grn,fontSize:14}}>✓</span>
+                <span style={{color:C.sub,fontSize:13}}>{f}</span>
+              </div>
+            ))}
+          </div>
+          {/* How it works */}
+          <div style={S.card({marginBottom:16})}>
+            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>How it works</div>
+            {[['1','Book','Select date & time, add your requirements'],['2','Verify','OTP verification — confirm your mobile'],['3','Match','We assign the best professional near you'],['4','Complete','Service delivered, pay securely']].map(([n,t,d])=>(
+              <div key={n} style={{display:'flex',gap:12,padding:'8px 0',borderBottom:`1px solid ${C.bdr}`}}>
+                <div style={{width:24,height:24,borderRadius:'50%',background:C.acc,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',flexShrink:0}}>{n}</div>
+                <div><div style={{color:C.txt,fontSize:13,fontWeight:500}}>{t}</div><div style={{color:C.dim,fontSize:11,marginTop:2}}>{d}</div></div>
+              </div>
+            ))}
+          </div>
+          {detail.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
+          <AssistBanner/>
+          <Btn full onClick={()=>{setActiveSvc(detail);setScreen('book');}}>Book now →</Btn>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="Services"/>
@@ -1010,14 +1108,25 @@ function ServicesScreen() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
           {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18}}>×</button>}
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {list.map(s=>(
-            <div key={s.id} onClick={()=>{setActiveSvc(s);setScreen('book');}} style={{...S.card(),display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center',gap:8,cursor:'pointer'}}>
-              <div style={{fontSize:32}}>{s.icon}</div>
-              <div style={{color:C.txt,fontWeight:600,fontSize:14}}>{s.name}</div>
-              <div style={{color:C.sub,fontSize:11,lineHeight:1.4}}>{s.sub}</div>
-              {s.cash&&<div style={{color:C.grn,fontSize:11}}>💵 Cash on service</div>}
-              <div style={{background:C.acc,color:'#fff',fontSize:12,fontWeight:600,padding:'6px 0',borderRadius:8,width:'100%'}}>Book now</div>
+            <div key={s.id} style={{...S.card(),cursor:'pointer',overflow:'hidden'}} onClick={()=>setDetail(s)}>
+              <div style={{display:'flex',gap:14,alignItems:'center'}}>
+                <div style={{width:56,height:56,borderRadius:12,background:C.deep,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,flexShrink:0}}>{s.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{color:C.txt,fontWeight:700,fontSize:15}}>{s.name}</div>
+                  <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
+                  <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>
+                    <span style={{color:C.gold,fontSize:11}}>{SVC_DETAIL[s.id]?.rating}</span>
+                    <span style={{color:C.dim,fontSize:11}}>·</span>
+                    <span style={{color:C.dim,fontSize:11}}>{SVC_DETAIL[s.id]?.turnaround}</span>
+                    {s.cash&&<span style={{color:C.grn,fontSize:11}}>· 💵 Cash</span>}
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
+                  <div style={{background:C.acc,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 12px',borderRadius:6}}>View →</div>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -1040,17 +1149,81 @@ function BookScreen() {
   if (!svc) { setScreen('services'); return null; }
   const price=svc.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
   const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');});};
-  const create=async()=>{if(!date)return addToast('Select a date','error');setLoading(true);try{const txn='TXN-'+Date.now();const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'awaiting_payment',txn_id:txn}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txn,added_by:user.id});setBooking(data);setStep(3);}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
+  const [bookOtpSent,setBookOtpSent]=useState(false);
+  const [bookOtpCode,setBookOtpCode]=useState(['','','','','','']);
+  const [bookOtpVerified,setBookOtpVerified]=useState(false);
+  const [bookPhone,setBookPhone]=useState(user?.phone?.replace(/^\+91/,'')||'');
+  const [bookFirstName,setBookFirstName]=useState(user?.first_name||'');
+  const [bookLastName,setBookLastName]=useState(user?.last_name||'');
+
+  const sendBookOTP=async()=>{
+    if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
+    if(!bookFirstName.trim()) return addToast('Enter first name','error');
+    setLoading(true);
+    try{
+      const mob='+91'+bookPhone.replace(/\D/g,'');
+      const r=await sb().functions.invoke('send-otp',{body:{mobile:mob}});
+      if(r.data?.success||r.data?.provider) { setBookOtpSent(true); addToast('OTP sent to '+mob,'success'); }
+      else throw new Error('OTP send failed');
+    }catch(e){addToast(e.message||'Could not send OTP','error');}
+    finally{setLoading(false);}
+  };
+
+  const verifyBookOTP=async()=>{
+    const code=bookOtpCode.join('');
+    if(code.length<6) return addToast('Enter 6-digit OTP','error');
+    setLoading(true);
+    try{
+      const mob='+91'+bookPhone.replace(/\D/g,'');
+      const r=await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
+      if(r.data?.success){ setBookOtpVerified(true); setStep(3); addToast('Mobile verified ✓','success'); }
+      else throw new Error('Invalid OTP');
+    }catch(e){addToast(e.message||'Verification failed','error');}
+    finally{setLoading(false);}
+  };
+
+  const create=async()=>{if(!date)return addToast('Select a date','error');setLoading(true);try{const txn='TXN-'+Date.now();const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'awaiting_payment',txn_id:txn}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txn,added_by:user.id});setBooking(data);setStep(4);}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
   const confirmPaid=async method=>{if(!booking)return;setLoading(true);try{await sb().from('bookings').update({status:'confirmed',paid_at:new Date().toISOString()}).eq('id',booking.id);await sb().from('payments').insert({booking_id:booking.id,user_id:user.id,amount:total,method,status:'success',txn_id:booking.txn_id,gateway:'Razorpay'});addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast('Could not confirm payment','error');}finally{setLoading(false);}};
   const upiLink=`upi://pay?pa=${UPI_PA}&pn=${encodeURIComponent(UPI_PN)}&am=${(total/100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(svc.name)}`;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title={svc.name} back="services"/>
-      <div style={{display:'flex',padding:'12px 16px',gap:4}}>{[1,2,3].map(n=><div key={n} style={{flex:1,height:3,borderRadius:2,background:step>=n?C.acc:C.deep}}/>)}</div>
+      <div style={{display:'flex',padding:'12px 16px',gap:4}}>{[1,2,3,4].map(n=><div key={n} style={{flex:1,height:3,borderRadius:2,background:step>=n?C.acc:C.deep}}/>)}</div>
       <div style={{padding:'8px 16px 40px'}}>
         {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12}}>💵 Cash on service available</div>}</div><Btn full onClick={()=>setStep(2)}>Continue →</Btn></>}
-        {step===2&&<><Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field><Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field><Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn}}>✅ GPS captured</div>}</Field><Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field><Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Creating…</>:'Confirm booking →'}</Btn></>}
-        {step===3&&<><div style={{...S.card(),textAlign:'center',marginBottom:20,padding:24}}><div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount to pay</div><div style={{fontSize:40,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:C.dim}}>UPI: {UPI_PA} · Ref: {booking?.txn_id}</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>{[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=><a key={lbl} href={upiLink} target="_blank" rel="noreferrer" onClick={()=>confirmPaid(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),textDecoration:'none'}}><span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:14,fontWeight:600}}>{lbl}</span></a>)}</div>{svc.cash&&<Btn full v="secondary" onClick={()=>confirmPaid('Cash')} style={{marginBottom:10}}>💵 Pay cash on service</Btn>}<div style={{textAlign:'center',marginBottom:16}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.sub,fontSize:12}}>Card / Net Banking via Razorpay ↗</a></div><Btn full onClick={()=>confirmPaid('UPI')} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:"✅ I've paid — confirm booking"}</Btn></>}
+
+        {step===2&&<>
+          <div style={{color:C.txt,fontSize:14,fontWeight:600,marginBottom:12}}>Verify your identity</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+            <Field label="First name" req><input value={bookFirstName} onChange={e=>setBookFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
+            <Field label="Last name"><input value={bookLastName} onChange={e=>setBookLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
+          </div>
+          <Field label="Mobile number" req note="OTP will be sent to verify">
+            <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
+              <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
+              <input type="tel" maxLength={10} value={bookPhone} onChange={e=>setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+            </div>
+          </Field>
+          {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
+            <>
+              <div style={{color:C.grn,fontSize:12,marginBottom:10}}>✅ OTP sent to +91 {bookPhone}</div>
+              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
+                {bookOtpCode.map((d,i)=>(
+                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
+                    onChange={e=>{const nd=[...bookOtpCode];nd[i]=e.target.value.replace(/\D/,'').slice(-1);setBookOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`botp-${i+1}`)?.focus();}}
+                    onKeyDown={e=>{if(e.key==='Backspace'&&!bookOtpCode[i]&&i>0)document.getElementById(`botp-${i-1}`)?.focus();}}
+                    style={{width:40,height:48,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:8,color:C.acc,fontFamily:'monospace',fontSize:22,outline:'none'}}/>
+                ))}
+              </div>
+              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & continue →'}</Btn>
+              <button onClick={sendBookOTP} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
+            </>
+          )}
+        </>}
+
+        {step===3&&<><Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field><Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field><Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.deep,border:`1px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn}}>✅ GPS captured</div>}</Field><Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field><Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Creating…</>:'Confirm booking →'}</Btn></>}
+
+        {step===4&&<><div style={{...S.card(),textAlign:'center',marginBottom:20,padding:24}}><div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount to pay</div><div style={{fontSize:40,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div><div style={{fontSize:11,color:C.dim}}>UPI: {UPI_PA} · Ref: {booking?.txn_id}</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>{[['🟢','GPay'],['🟣','PhonePe'],['🔵','Paytm'],['⚡','Any UPI']].map(([ic,lbl])=><a key={lbl} href={upiLink} target="_blank" rel="noreferrer" onClick={()=>confirmPaid(lbl)} style={{display:'flex',alignItems:'center',gap:10,...S.card(),textDecoration:'none'}}><span style={{fontSize:22}}>{ic}</span><span style={{color:C.txt,fontSize:14,fontWeight:600}}>{lbl}</span></a>)}</div>{svc.cash&&<Btn full v="secondary" onClick={()=>confirmPaid('Cash')} style={{marginBottom:10}}>💵 Pay cash on service</Btn>}<div style={{textAlign:'center',marginBottom:16}}><a href={RZP_URL} target="_blank" rel="noreferrer" style={{color:C.sub,fontSize:12}}>Card / Net Banking via Razorpay ↗</a></div><Btn full onClick={()=>confirmPaid('UPI')} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:"✅ I've paid — confirm booking"}</Btn></>}
       </div>
     </div>
   );
