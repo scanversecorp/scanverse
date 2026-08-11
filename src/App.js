@@ -489,6 +489,7 @@ const APP_CSS = `
   select option{background:${C.surf};color:${C.txt}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes heroPulse{0%,100%{opacity:0.45;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
   ::-webkit-scrollbar{width:0}
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
 `;
@@ -543,7 +544,8 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
         <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:`linear-gradient(135deg, ${theme.bgFrom} 0%, ${theme.bgTo} 100%)` }}>
           <div style={{ flex:1, padding:'18px 18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:7 }}>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>
+              {svc.household && <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>}
+              {theme.tag && !svc.household && <span style={{ background:theme.b2, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>{theme.tag}</span>}
               <span style={{ background:'#fef3c7', color:'#b45309', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>25% OFF</span>
             </div>
             <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
@@ -551,7 +553,9 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             <div style={{ color:C.sub, fontSize:11, fontWeight:600 }}>{meta.face}</div>
             <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:2 }}>
               <span style={{ color:C.acc, fontSize:14, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
-              <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{d.rating||'4.8 ⭐'} · {HOUSEHOLD_SVCS.length} options</span>
+              <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>
+                {d.rating||'4.8 ⭐'} · {svc.household ? `${HOUSEHOLD_SVCS.length} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
+              </span>
             </div>
           </div>
           <div style={{ width:148, flexShrink:0, position:'relative' }}>
@@ -597,6 +601,74 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
           <span style={{ color:C.acc, fontSize:12, fontWeight:800 }}>₹{fmtRs(svc.price)} →</span>
           <span style={{ color:C.dim, fontSize:9, fontWeight:600 }}>{d.rating||'4.8 ⭐'}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Auto-rotating hero carousel — slides all service cards right to left */
+function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
+  const [idx, setIdx] = useState(0);
+  const n = services.length;
+  const pauseRef = useRef(false);
+
+  useEffect(() => {
+    if (n <= 1) return undefined;
+    const id = setInterval(() => {
+      if (!pauseRef.current) setIdx(i => (i + 1) % n);
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [n, intervalMs]);
+
+  if (!n) return null;
+
+  return (
+    <div
+      style={{ marginBottom: 14 }}
+      onMouseEnter={() => { pauseRef.current = true; }}
+      onMouseLeave={() => { pauseRef.current = false; }}
+      onTouchStart={() => { pauseRef.current = true; }}
+      onTouchEnd={() => { setTimeout(() => { pauseRef.current = false; }, 2800); }}
+    >
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+        <div style={{ color:C.dim, fontSize:10, fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase' }}>Featured · swipe of care</div>
+        <div style={{ color:C.dim, fontSize:10, fontWeight:700 }}>{idx + 1} / {n}</div>
+      </div>
+      <div style={{ overflow:'hidden', borderRadius:20 }}>
+        <div
+          style={{
+            display:'flex',
+            transform:`translateX(-${idx * 100}%)`,
+            transition:'transform 0.72s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {services.map((svc, i) => (
+            <div key={svc.id} style={{ minWidth:'100%', flexShrink:0 }}>
+              <HomeModelCard svc={svc} onClick={() => onSelect(svc)} hero index={i} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display:'flex', justifyContent:'center', gap:6, marginTop:10 }}>
+        {services.map((svc, i) => (
+          <button
+            key={svc.id}
+            type="button"
+            aria-label={`Show ${svc.name}`}
+            onClick={() => setIdx(i)}
+            style={{
+              width: i === idx ? 18 : 7,
+              height: 7,
+              borderRadius: 99,
+              border:'none',
+              padding:0,
+              cursor:'pointer',
+              background: i === idx ? C.acc : `${C.dim}55`,
+              transition:'width 0.25s ease, background 0.25s ease',
+              animation: i === idx ? 'heroPulse 2.4s ease-in-out infinite' : 'none',
+            }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -1432,9 +1504,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
           <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
         </div>
+        {!search && svcList.length > 0 && (
+          <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />
+        )}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          {[...svcList].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
-            <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} hero={s.household && !search} />
+          {svcList.map((s,i)=>(
+            <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />
           ))}
         </div>
         <AssistBanner/>
@@ -2393,8 +2468,13 @@ function ServicesScreen() {
           {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18}}>×</button>}
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          {!search && list.length > 0 && (
+            <div style={{ gridColumn:'1 / -1' }}>
+              <HomeHeroCarousel services={list} onSelect={(s)=>s.household?setHhList(true):setDetail(s)} />
+            </div>
+          )}
           {list.map((s,i)=>(
-            <HomeModelCard key={s.id} svc={s} index={i} hero={s.household && !search} onClick={()=>s.household?setHhList(true):setDetail(s)} />
+            <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>s.household?setHhList(true):setDetail(s)} />
           ))}
         </div>
       </div>
