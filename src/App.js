@@ -156,25 +156,29 @@ function UpiPickerModal({ onPick, onClose }) {
 }
 function RazorpayPayButton({ onInteract }) {
   const formRef = useRef(null);
+  const onInteractRef = useRef(onInteract);
+  onInteractRef.current = onInteract;
   useEffect(() => {
     const form = formRef.current;
-    if (!form || form.querySelector('script[data-payment_button_id]')) return;
+    if (!form || form.querySelector('.razorpay-payment-button') || form.querySelector('script[data-payment_button_id]')) return;
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/payment-button.js';
     script.async = true;
     script.setAttribute('data-payment_button_id', RZP_BUTTON_ID);
     form.appendChild(script);
-    const mark = () => onInteract?.();
+    const mark = () => onInteractRef.current?.();
     form.addEventListener('click', mark);
     return () => {
       form.removeEventListener('click', mark);
-      script.remove();
+      form.innerHTML = '';
     };
-  }, [onInteract]);
+  }, []);
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 16, width: '100%', maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 10, textAlign: 'center' }}>Or pay via Razorpay</div>
-      <form ref={formRef} style={{ display: 'flex', justifyContent: 'center' }} />
+      <div className="rzp-pay-wrap" style={{ width: '100%', overflow: 'hidden' }}>
+        <form ref={formRef} className="rzp-pay-form" style={{ display: 'block', width: '100%', margin: 0, padding: 0, border: 'none', overflow: 'hidden' }} />
+      </div>
     </div>
   );
 }
@@ -1055,6 +1059,9 @@ const APP_CSS = `
   @keyframes heroPulse{0%,100%{opacity:0.45;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
   ::-webkit-scrollbar{width:0}
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
+  .rzp-pay-wrap,.rzp-pay-form{width:100%;max-width:480px;overflow:hidden}
+  .rzp-pay-form .razorpay-payment-button{width:100%!important;max-width:100%!important;display:block!important;margin:0 auto!important;overflow:hidden!important;background-repeat:no-repeat!important;background-size:100% auto!important}
+  .rzp-pay-form .razorpay-payment-button iframe,.rzp-pay-form .razorpay-payment-button form,.rzp-pay-form .razorpay-payment-button button{width:100%!important;max-width:100%!important;display:block!important;margin:0 auto!important}
 `;
 
 const LEGAL_ROUTES = new Set(['privacy','terms','refund','payment']);
