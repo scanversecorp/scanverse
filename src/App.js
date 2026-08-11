@@ -1809,12 +1809,7 @@ async function getBattery() {
   } catch(e) { return {level:null,charging:null}; }
 }
 
-/* --- OTP: FAST2SMS (India) --------------------------------------- */
-// 2Factor.in -- India OTP SMS (works instantly, no verification needed)
-// Get free API key: https://2factor.in/cp/ → API → Copy key
-const TWOFACTOR_KEY = '2e5ec291-9406-11f1-908b-0200cd936042';
-// Fast2SMS (blocked until website verified + ₹100 recharge -- keep for later)
-const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
+/* --- OTP: server-side via send-otp edge function (TWOFACTOR_API_KEY in Supabase secrets) --- */
 
 function emptyOtpDigits() { return ['','','','','','']; }
 
