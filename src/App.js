@@ -405,8 +405,6 @@ const HOUSEHOLD_SVCS = [
     features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Verified ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'5,200+' },
 ];
 
-const HH_BY_ID = Object.fromEntries(HOUSEHOLD_SVCS.map(s => [s.id, s]));
-
 /** ScanV cloud card themes — hosting, infrastructure, managed */
 const CL_THEME = {
   host:  { id:'host',  label:'Cloud hosting',    color:'#2563EB', bg:'#DBEAFE', border:'#93C5FD', gradFrom:'#BFDBFE', gradTo:'#60A5FA', tagline:'IaaS · PaaS · SaaS · hybrid models' },
@@ -472,7 +470,170 @@ const CLOUD_SVCS = [
     features:['Branded web & TV apps','Adaptive video delivery','Subscription / PPV setup','Content CMS & metadata','Launch & analytics training'], turnaround:'3–5 weeks', rating:'4.8 ⭐', bookings:'120+' },
 ];
 
-const CL_BY_ID = Object.fromEntries(CLOUD_SVCS.map(s => [s.id, s]));
+/** ScanV legal card themes */
+const LG_THEME = {
+  counsel: { id:'counsel', label:'Consultation & court', color:'#6366F1', bg:'#EEF2FF', border:'#A5B4FC', gradFrom:'#E0E7FF', gradTo:'#818CF8', tagline:'Verified advocates · online & offline' },
+  docs:    { id:'docs',    label:'Documents & registration', color:'#4F46E5', bg:'#E0E7FF', border:'#818CF8', gradFrom:'#C7D2FE', gradTo:'#6366F1', tagline:'Drafting · registration · notarisation' },
+};
+const LEGAL_SVCS = [
+  { id:'lg-consult', parent:'legal', theme:'counsel', icon:'⚖️', img:'/services/legal/consult.png', name:'Lawyer Consultation', sub:'30-min advice · civil · property · family', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV lawyer consultation — speak with a verified advocate for initial advice on civil, property, family, or business matters. Online or in-person across Pune & PCMC.',
+    features:['Verified advocates','30-min session','Written summary note','Follow-up quote if needed','Online or office'], turnaround:'Within 24 hrs', rating:'4.8 ⭐', bookings:'2,400+' },
+  { id:'lg-court', parent:'legal', theme:'counsel', icon:'🏛️', img:'/services/legal/court.png', name:'Court Filing & Notices', sub:'Draft · file · track · represent', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
+    desc:'ScanV court services — drafting and filing notices, plaints, and replies with status tracking. Advocate representation available for Pune district courts.',
+    features:['Draft & review','E-filing where supported','Case status updates','Court day briefing','Escalation support'], turnaround:'2–5 days', rating:'4.7 ⭐', bookings:'680+' },
+  { id:'lg-contract', parent:'legal', theme:'counsel', icon:'📋', img:'/services/legal/contract.png', name:'Business Contract Review', sub:'Vendor · lease · employment · NDAs', unit:'project', mrp:3999900, price:discPaise(3999900), cash:false,
+    desc:'ScanV contract review — protect your business with lawyer-reviewed agreements before you sign. Turnaround includes redlines and a short risk summary.',
+    features:['Full clause review','Risk summary memo','Suggested redlines','One revision round','Phone walkthrough'], turnaround:'3–5 days', rating:'4.8 ⭐', bookings:'420+' },
+  { id:'lg-doc-draft', parent:'legal', theme:'docs', icon:'📝', img:'/services/legal/doc-draft.png', name:'Document Drafting', sub:'Agreements · wills · affidavits · deeds', unit:'project', mrp:1999900, price:discPaise(1999900), cash:false,
+    desc:'ScanV document drafting — custom legal documents prepared by qualified advocates. Includes one revision and e-copy delivery.',
+    features:['Custom drafting','Legal formatting','One revision included','E-copy + print ready','Stamp duty guidance'], turnaround:'2–4 days', rating:'4.8 ⭐', bookings:'1,100+' },
+  { id:'lg-property-reg', parent:'legal', theme:'docs', icon:'🏠', img:'/services/legal/property-reg.png', name:'Property Registration', sub:'Sale deed · gift · lease · index II', unit:'project', mrp:4999900, price:discPaise(4999900), cash:false,
+    desc:'ScanV property registration — end-to-end support for sale deeds, gift deeds, and lease registration with document checklist and sub-registrar coordination.',
+    features:['Document checklist','Draft & vetting','Appointment booking','Registration day support','Index II follow-up'], turnaround:'5–10 days', rating:'4.9 ⭐', bookings:'890+' },
+  { id:'lg-notary', parent:'legal', theme:'docs', icon:'✍️', img:'/services/legal/notary.png', name:'Notary & Affidavit', sub:'Attestation · sworn statements · copies', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV notary services — affidavits, attestations, and certified copies through empanelled notaries. Home or office visit available in PCMC/Pune.',
+    features:['Affidavit drafting help','Notary attestation','Certified true copies','Same-day slots','Doorstep option'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,200+' },
+];
+
+const VIP_THEME = {
+  concierge: { id:'concierge', label:'Concierge & assistant', color:'#D97706', bg:'#FEF3C7', border:'#FCD34D', gradFrom:'#FDE68A', gradTo:'#FBBF24', tagline:'Priority support · executive care' },
+  travel:    { id:'travel',    label:'Travel & events', color:'#B45309', bg:'#FFEDD5', border:'#FDBA74', gradFrom:'#FED7AA', gradTo:'#FB923C', tagline:'Airport · events · premium hosting' },
+};
+const VIP_SVCS = [
+  { id:'vip-concierge', parent:'vip', theme:'concierge', icon:'👑', img:'/services/vip/concierge.png', name:'24×7 Personal Concierge', sub:'Tasks · bookings · reminders · errands', unit:'month', mrp:9999900, price:discPaise(9999900), cash:false,
+    desc:'ScanV personal concierge — a dedicated coordinator for reservations, errands, reminders, and day-to-day executive tasks. Available on phone and WhatsApp.',
+    features:['Dedicated coordinator','24×7 phone & chat','Restaurant & travel bookings','Gift & errand runs','Monthly activity log'], turnaround:'Starts in 24 hrs', rating:'5.0 ⭐', bookings:'180+' },
+  { id:'vip-assistant', parent:'vip', theme:'concierge', icon:'💼', img:'/services/vip/assistant.png', name:'Executive Assistant', sub:'Calendar · calls · research · hourly', unit:'hour', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV executive assistant — trained support for calendar management, call screening, research, and meeting prep. Book by the hour with NDAs in place.',
+    features:['Calendar management','Call screening','Research briefs','Meeting prep','NDA-backed staff'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'320+' },
+  { id:'vip-priority', parent:'vip', theme:'concierge', icon:'⭐', img:'/services/vip/priority.png', name:'Priority Appointments', sub:'Doctors · lawyers · govt · fast-track', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV priority appointments — skip the queue for hard-to-get slots with doctors, consultants, and government-related visits. Confirmation within hours.',
+    features:['Fast-track booking','Reminder calls','Reschedule support','Multi-category requests','Escalation desk'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'540+' },
+  { id:'vip-airport', parent:'vip', theme:'travel', icon:'✈️', img:'/services/vip/airport.png', name:'Airport Transfer', sub:'Pickup · drop · meet & greet · Pune', unit:'visit', mrp:1499900, price:discPaise(1499900), cash:false,
+    desc:'ScanV airport transfer — chauffeur pickup and drop for Pune airport with flight tracking, meet-and-greet, and clean premium vehicles.',
+    features:['Flight tracking','Meet & greet option','Premium sedans & SUVs','Bottled water & tissues','Corporate billing'], turnaround:'On schedule', rating:'4.9 ⭐', bookings:'760+' },
+  { id:'vip-event', parent:'vip', theme:'travel', icon:'🎉', img:'/services/vip/event.png', name:'Event Planning', sub:'Corporate · wedding · private · end-to-end', unit:'project', mrp:4999900, price:discPaise(4999900), cash:false,
+    desc:'ScanV event planning — venue shortlist, vendor coordination, run-of-show, and on-day management for corporate events and private celebrations.',
+    features:['Concept & budget plan','Vendor coordination','Run-of-show timeline','On-day manager','Post-event wrap-up'], turnaround:'1–3 weeks', rating:'5.0 ⭐', bookings:'210+' },
+];
+
+const HL_THEME = {
+  home:     { id:'home',     label:'Home care', color:'#DC2626', bg:'#FEE2E2', border:'#FCA5A5', gradFrom:'#FECACA', gradTo:'#F87171', tagline:'Doctors & specialists at your door' },
+  clinical: { id:'clinical', label:'Tests & pharmacy', color:'#E11D48', bg:'#FFE4E6', border:'#FDA4AF', gradFrom:'#FECDD3', gradTo:'#FB7185', tagline:'Labs · medicines · checkups' },
+};
+const HEALTH_SVCS = [
+  { id:'hl-doctor', parent:'health', theme:'home', icon:'🩺', img:'/services/health/doctor.png', name:'Doctor at Home', sub:'GP visit · vitals · prescription · PCMC', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV doctor at home — general physician visit with vitals check and e-prescription. Ideal for fever, minor illness, or elderly patients who prefer home care.',
+    features:['MBBS / MD doctors','Vitals & basic exam','E-prescription','Follow-up advice','Same-day slots'], turnaround:'Within 2 hrs', rating:'4.8 ⭐', bookings:'5,200+' },
+  { id:'hl-specialist', parent:'health', theme:'home', icon:'👨‍⚕️', img:'/services/health/specialist.png', name:'Specialist Consultation', sub:'Cardio · ortho · derma · paediatric', unit:'visit', mrp:1499900, price:discPaise(1499900), cash:false,
+    desc:'ScanV specialist consult — book verified specialists for second opinions or chronic care. Home or clinic visit based on availability in Pune & PCMC.',
+    features:['Verified specialists','Home or clinic','Report review','Care plan summary','Referral network'], turnaround:'24–48 hrs', rating:'4.7 ⭐', bookings:'1,400+' },
+  { id:'hl-elder', parent:'health', theme:'home', icon:'🤝', img:'/services/health/elder.png', name:'Elder Care Visit', sub:'Vitals · medication · mobility · hourly', unit:'hour', mrp:29900, price:discPaise(29900), cash:false,
+    desc:'ScanV elder care — trained caregivers for vitals monitoring, medication reminders, and companionship at home. Book hourly blocks with family updates.',
+    features:['Trained caregivers','Vitals logging','Medication reminders','Family WhatsApp updates','Flexible hours'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,800+' },
+  { id:'hl-checkup', parent:'health', theme:'clinical', icon:'📋', img:'/services/health/checkup.png', name:'Full Body Checkup', sub:'40+ tests · home sample · report', unit:'visit', mrp:1999900, price:discPaise(1999900), cash:false,
+    desc:'ScanV full body checkup — comprehensive preventive health package with home sample collection and digital report with doctor summary call.',
+    features:['40+ parameters','Home sample pickup','Digital report','Doctor summary call','Annual reminder'], turnaround:'24–48 hrs', rating:'4.7 ⭐', bookings:'3,600+' },
+  { id:'hl-lab', parent:'health', theme:'clinical', icon:'🧪', img:'/services/health/lab.png', name:'Lab Tests at Home', sub:'Blood · urine · single or panel', unit:'visit', mrp:79900, price:discPaise(79900), cash:false,
+    desc:'ScanV lab at home — certified phlebotomists collect samples at your doorstep. Choose individual tests or curated panels with app-tracked reports.',
+    features:['Certified phlebotomist','NABL partner labs','App-tracked reports','Fasting guidance','Bulk family booking'], turnaround:'Same day pickup', rating:'4.8 ⭐', bookings:'8,900+' },
+  { id:'hl-pharmacy', parent:'health', theme:'clinical', icon:'💊', img:'/services/health/pharmacy.png', name:'Pharmacy Delivery', sub:'Prescription · OTC · 60 min target', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV pharmacy delivery — upload prescription or order OTC essentials with fast delivery from verified pharmacies near you in PCMC/Pune.',
+    features:['Prescription upload','Verified pharmacies','60-min target zones','Cold-chain items','Reorder reminders'], turnaround:'30–60 min', rating:'4.6 ⭐', bookings:'12,000+' },
+];
+
+const PR_THEME = {
+  find:   { id:'find',   label:'Find property', color:'#EA580C', bg:'#FFEDD5', border:'#FDBA74', gradFrom:'#FED7AA', gradTo:'#FB923C', tagline:'Buy · rent · PG · site visits' },
+  verify: { id:'verify', label:'Verify & finance', color:'#C2410C', bg:'#FFF7ED', border:'#FDBA74', gradFrom:'#FFEDD5', gradTo:'#F97316', tagline:'Legal checks · loan assistance' },
+};
+const PROPERTY_SVCS = [
+  { id:'pr-buy', parent:'property', theme:'find', icon:'🏘️', img:'/services/property/buy-sell.png', name:'Buy / Sell Assistance', sub:'Shortlist · negotiate · close · PCMC', unit:'project', mrp:9999900, price:discPaise(9999900), cash:false,
+    desc:'ScanV buy/sell assistance — verified listings, site coordination, price benchmarking, and documentation support for flats, plots, and commercial units.',
+    features:['Verified listings','Price benchmarking','Site visit coordination','Negotiation support','Documentation checklist'], turnaround:'3–7 days', rating:'4.6 ⭐', bookings:'890+' },
+  { id:'pr-rent', parent:'property', theme:'find', icon:'🔑', img:'/services/property/rent.png', name:'Rent & PG Finder', sub:'Flat · PG · coliving · tenant match', unit:'project', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV rent & PG finder — curated options by budget, location, and amenities with virtual tours and landlord verification before you visit.',
+    features:['Budget & area match','Landlord verification','Virtual tour option','Visit scheduling','Agreement template'], turnaround:'24–48 hrs', rating:'4.7 ⭐', bookings:'2,400+' },
+  { id:'pr-site', parent:'property', theme:'find', icon:'📍', img:'/services/property/site-visit.png', name:'Site Visit Package', sub:'3–5 properties · agent · same day', unit:'visit', mrp:1999900, price:discPaise(1999900), cash:false,
+    desc:'ScanV site visit package — an assigned agent takes you through shortlisted properties in one trip with comparison notes and photos after the tour.',
+    features:['Pre-shortlisted list','Dedicated agent','Comparison sheet','Photos & notes','Follow-up call'], turnaround:'Same day', rating:'4.6 ⭐', bookings:'1,100+' },
+  { id:'pr-legal', parent:'property', theme:'verify', icon:'📑', img:'/services/property/legal-check.png', name:'Legal Verification', sub:'Title · encumbrance · approvals · report', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
+    desc:'ScanV legal verification — lawyer-led title search, encumbrance check, and approval review before you pay a token. Written risk report included.',
+    features:['Title search','Encumbrance certificate','Approval review','Written risk report','Lawyer call summary'], turnaround:'3–5 days', rating:'4.8 ⭐', bookings:'620+' },
+  { id:'pr-loan', parent:'property', theme:'verify', icon:'🏦', img:'/services/property/loan.png', name:'Home Loan Assistance', sub:'Compare banks · paperwork · faster sanction', unit:'project', mrp:1999900, price:discPaise(1999900), cash:false,
+    desc:'ScanV home loan assistance — compare offers, prepare paperwork, and coordinate with bank partners for faster sanction and disbursal tracking.',
+    features:['Bank comparison','Document prep','Application filing','Status tracking','Sanction guidance'], turnaround:'5–10 days', rating:'4.7 ⭐', bookings:'780+' },
+];
+
+const DL_THEME = {
+  local:   { id:'local',   label:'Local delivery', color:'#0891B2', bg:'#CFFAFE', border:'#67E8F9', gradFrom:'#A5F3FC', gradTo:'#22D3EE', tagline:'Same-day · documents · parcels' },
+  express: { id:'express', label:'Express & bulk', color:'#0E7490', bg:'#ECFEFF', border:'#A5F3FC', gradFrom:'#CFFAFE', gradTo:'#06B6D4', tagline:'Inter-city · business logistics' },
+};
+const DELIVERY_SVCS = [
+  { id:'dl-sameday', parent:'delivery', theme:'local', icon:'📦', img:'/services/delivery/sameday.png', name:'Same-Day Courier', sub:'Pickup in 60 min · PCMC · Pune', unit:'visit', mrp:9900, price:discPaise(9900), cash:false,
+    desc:'ScanV same-day courier — door pickup and delivery within Pune & PCMC city limits. Live status updates and OTP handover for security.',
+    features:['60-min pickup target','Live tracking','OTP delivery','Up to 5 kg standard','Insurance add-on'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  { id:'dl-doc', parent:'delivery', theme:'local', icon:'📄', img:'/services/delivery/document.png', name:'Document Delivery', sub:'Legal · bank · office · confidential', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
+    desc:'ScanV document delivery — confidential handover for legal papers, cheques, and contracts with chain-of-custody notes and photo proof.',
+    features:['Confidential handling','Photo proof','Chain-of-custody note','Return trip option','Corporate accounts'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'4,500+' },
+  { id:'dl-parcel', parent:'delivery', theme:'local', icon:'🎁', img:'/services/delivery/parcel.png', name:'Parcel Pickup & Drop', sub:'Gifts · ecommerce · returns · multi-stop', unit:'visit', mrp:19900, price:discPaise(19900), cash:false,
+    desc:'ScanV parcel service — flexible pickup and drop for personal parcels, returns, and multi-stop routes. Weight-based pricing shown upfront.',
+    features:['Door pickup','Multi-stop routes','Weight-based quote','Return pickups','Evening slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'6,200+' },
+  { id:'dl-intercity', parent:'delivery', theme:'express', icon:'🚚', img:'/services/delivery/intercity.png', name:'Inter-City Express', sub:'Maharashtra · overnight · tracked', unit:'project', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV inter-city express — overnight and next-day delivery across Maharashtra with tracking, insurance options, and business manifests.',
+    features:['Overnight lanes','Live tracking','Insurance optional','Business manifests','Pickup scheduling'], turnaround:'Next day', rating:'4.8 ⭐', bookings:'2,100+' },
+  { id:'dl-bulk', parent:'delivery', theme:'express', icon:'🏢', img:'/services/delivery/bulk.png', name:'Business Bulk Delivery', sub:'Daily routes · SLAs · invoicing', unit:'project', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV bulk delivery — recurring routes for shops, pharmacies, and offices with SLA-backed pickups, monthly invoicing, and dedicated coordinator.',
+    features:['Dedicated coordinator','SLA-backed routes','Monthly billing','Volume discounts','API-ready ops'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'380+' },
+];
+
+const FD_THEME = {
+  daily:  { id:'daily',  label:'Daily meals', color:'#DB2777', bg:'#FCE7F3', border:'#F9A8D4', gradFrom:'#FBCFE8', gradTo:'#F472B6', tagline:'Tiffin · restaurant · office lunch' },
+  events: { id:'events', label:'Catering & events', color:'#BE185D', bg:'#FFF1F2', border:'#FDA4AF', gradFrom:'#FFE4E6', gradTo:'#FB7185', tagline:'Parties · festivals · corporate' },
+};
+const FOOD_SVCS = [
+  { id:'fd-tiffin', parent:'food', theme:'daily', icon:'🍱', img:'/services/food/tiffin.png', name:'Home Tiffin Plan', sub:'Veg · non-veg · monthly · 2 meals', unit:'month', mrp:5999900, price:discPaise(5999900), cash:false,
+    desc:'ScanV home tiffin — hygienic home-style meals from verified kitchens with monthly plans, pause days, and allergy notes on every order.',
+    features:['Verified home kitchens','Veg & non-veg plans','Pause & skip days','Allergy notes','Monthly billing'], turnaround:'Starts in 48 hrs', rating:'4.7 ⭐', bookings:'8,400+' },
+  { id:'fd-restaurant', parent:'food', theme:'daily', icon:'🍽️', img:'/services/food/restaurant.png', name:'Restaurant Order', sub:'Local restaurants · 30–60 min · track', unit:'visit', mrp:19900, price:discPaise(19900), cash:false,
+    desc:'ScanV restaurant order — discover nearby restaurants and cloud kitchens with live tracking, UPI payment, and repeat favourites saved to your profile.',
+    features:['Local restaurant partners','Live order tracking','UPI at checkout','Repeat favourites','Group orders'], turnaround:'30–60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+  { id:'fd-office', parent:'food', theme:'daily', icon:'🥗', img:'/services/food/office.png', name:'Office Lunch Box', sub:'Team orders · invoicing · daily menu', unit:'month', mrp:1499900, price:discPaise(1499900), cash:false,
+    desc:'ScanV office lunch — daily lunch boxes for teams with rotating menus, bulk pricing, and GST invoices for Pune & PCMC offices.',
+    features:['Team dashboards','Rotating menus','Bulk pricing','GST invoices','Dedicated support'], turnaround:'Next day start', rating:'4.7 ⭐', bookings:'620+' },
+  { id:'fd-catering', parent:'food', theme:'events', icon:'🎂', img:'/services/food/catering.png', name:'Party Catering', sub:'Birthday · corporate · 20–500 guests', unit:'project', mrp:9999900, price:discPaise(9999900), cash:false,
+    desc:'ScanV party catering — menu planning, tasting, service staff, and live counters for birthdays, anniversaries, and corporate events.',
+    features:['Custom menu planning','Tasting session','Service staff option','Live counters','Leftover packaging'], turnaround:'3–7 days', rating:'4.8 ⭐', bookings:'940+' },
+  { id:'fd-festival', parent:'food', theme:'events', icon:'🪔', img:'/services/food/festival.png', name:'Festival Special Menu', sub:'Diwali · Ganesh · wedding sweets · bulk', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
+    desc:'ScanV festival menu — seasonal sweets, snacks, and feast packages from trusted caterers with advance booking and doorstep delivery.',
+    features:['Seasonal menus','Advance booking','Bulk sweet boxes','Doorstep delivery','Corporate gifting'], turnaround:'2–5 days', rating:'4.9 ⭐', bookings:'1,200+' },
+];
+
+const SUB_CATEGORIES = {
+  household: { title:'Household services', subtitle:'Deep cleaning & home help · 25% off · verified partners', cat:'Household Services', themes:HH_THEME, svcs:HOUSEHOLD_SVCS, themeOrder:['pink','green'] },
+  cloud:     { title:'Cloud services', subtitle:'Hosting · infrastructure · packages · 25% off', cat:'Cloud Services', themes:CL_THEME, svcs:CLOUD_SVCS, themeOrder:['host','build','care','pack'] },
+  legal:     { title:'Legal services', subtitle:'Lawyers · docs · registration · 25% off', cat:'Legal', themes:LG_THEME, svcs:LEGAL_SVCS, themeOrder:['counsel','docs'] },
+  vip:       { title:'VIP appointments', subtitle:'Concierge · travel · events · 25% off', cat:'VIP Appointments', themes:VIP_THEME, svcs:VIP_SVCS, themeOrder:['concierge','travel'] },
+  health:    { title:'Health care', subtitle:'Doctors · tests · pharmacy · 25% off', cat:'Health Care', themes:HL_THEME, svcs:HEALTH_SVCS, themeOrder:['home','clinical'] },
+  property:  { title:'Property & rentals', subtitle:'Buy · rent · verify · 25% off', cat:'Property & Rentals', themes:PR_THEME, svcs:PROPERTY_SVCS, themeOrder:['find','verify'] },
+  delivery:  { title:'Deliveries', subtitle:'Courier · parcels · express · 25% off', cat:'Deliveries', themes:DL_THEME, svcs:DELIVERY_SVCS, themeOrder:['local','express'] },
+  food:      { title:'Food', subtitle:'Tiffin · restaurant · catering · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
+};
+
+const ALL_SUB_SVCS = Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
+const SUB_BY_ID = Object.fromEntries(ALL_SUB_SVCS.map(s => [s.id, s]));
+
+function subCatId(svc) {
+  if (!svc) return null;
+  if (SUB_CATEGORIES[svc.id]) return svc.id;
+  if (svc.parent && SUB_CATEGORIES[svc.parent]) return svc.parent;
+  return null;
+}
+
+function subSvcCount(svc) {
+  const id = subCatId(svc);
+  return id ? SUB_CATEGORIES[id].svcs.length : 0;
+}
 
 /* --- LIVE PRICING (Supabase overrides) ----------------------------- */
 const PRICING_ADMIN_HASH = 'pricing-admin';
@@ -481,7 +642,7 @@ const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const PRICING_FN = `${SB_URL}/functions/v1/pricing-admin`;
 
 function findSvcById(id) {
-  return SVCS.find(s => s.id === id) || HH_BY_ID[id] || CL_BY_ID[id] || null;
+  return SVCS.find(s => s.id === id) || SUB_BY_ID[id] || null;
 }
 
 function applyLivePricingRows(rows) {
@@ -578,14 +739,14 @@ const paiseFromInp = (r) => Math.round((Number(r) || 0) * 100);
 
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
-  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false, ...svcDisc(999) },
+  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · registration · 6 services', cat:'Legal',              cash:false, ...svcDisc(999), legal:true },
   { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'Hosting · infra · packages · 18 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
-  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false, ...svcDisc(9999) },
-  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
-  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
+  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Concierge · travel · events · 5 services', cat:'VIP Appointments',   cash:false, ...svcDisc(9999), vip:true },
+  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 6 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
+  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 5 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 12 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
-  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:false, ...svcDisc(99) },
-  { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:false, ...svcDisc(199) },
+  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 5 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
+  { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurant · catering · 5 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
 ];
 
 const SVC_CARD_THEME = {
@@ -610,18 +771,21 @@ const HOME_CARD_META = {
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
 };
 
-/** Search categories + household & cloud sub-services */
+/** Search categories + all sub-services */
 function searchAllServices(query) {
   const q = query.trim().toLowerCase();
-  if (!q) return { categories: SVCS, household: [], cloud: [] };
+  const emptySubs = Object.fromEntries(Object.keys(SUB_CATEGORIES).map(k => [k, []]));
+  if (!q) return { categories: SVCS, ...emptySubs };
   const inText = (parts) => parts.filter(Boolean).join(' ').toLowerCase().includes(q);
   const categories = SVCS.filter(s => {
     const d = SVC_DETAIL[s.id] || {};
     return inText([s.name, s.sub, s.cat, SVC_SHORT[s.id], d.desc, ...(d.features || [])]);
   });
-  const household = HOUSEHOLD_SVCS.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
-  const cloud = CLOUD_SVCS.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
-  return { categories, household, cloud };
+  const subs = {};
+  for (const [id, cfg] of Object.entries(SUB_CATEGORIES)) {
+    subs[id] = cfg.svcs.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
+  }
+  return { categories, ...subs };
 }
 
 /* --- SUPABASE ----------------------------------------------------- */
@@ -738,7 +902,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:2 }}>
               <span style={{ color:C.acc, fontSize:14, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
               <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>
-                {d.rating||'4.8 ⭐'} · {svc.household ? `${HOUSEHOLD_SVCS.length} options` : svc.cloud ? `${CLOUD_SVCS.length} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
+                {d.rating||'4.8 ⭐'} · {subSvcCount(svc) ? `${subSvcCount(svc)} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
               </span>
             </div>
           </div>
@@ -861,8 +1025,8 @@ function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
 /** @deprecated use HomeModelCard — v1 backup in src/backup/homecards_v1.js */
 function ServiceFeaturedCard(props) { return <HomeModelCard {...props} hero={props.fullWidth && props.svc?.household} />; }
 
-function HhCategoryPill({ theme, sm }) {
-  const t = HH_THEME[theme];
+function CategoryPill({ categoryId, theme, sm }) {
+  const t = SUB_CATEGORIES[categoryId]?.themes?.[theme];
   if (!t) return null;
   return (
     <span style={{ background: t.bg, color: t.color, border: `1.5px solid ${t.border}`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 8px' : '3px 10px' }}>
@@ -870,16 +1034,8 @@ function HhCategoryPill({ theme, sm }) {
     </span>
   );
 }
-
-function CloudCategoryPill({ theme, sm }) {
-  const t = CL_THEME[theme];
-  if (!t) return null;
-  return (
-    <span style={{ background: t.bg, color: t.color, border: `1.5px solid ${t.border}`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 8px' : '3px 10px' }}>
-      {t.label}
-    </span>
-  );
-}
+function HhCategoryPill({ theme, sm }) { return <CategoryPill categoryId="household" theme={theme} sm={sm} />; }
+function CloudCategoryPill({ theme, sm }) { return <CategoryPill categoryId="cloud" theme={theme} sm={sm} />; }
 
 function PriceTag({ svc, sm }) {
   const mrp = svc.mrp || Math.round((svc.price || 0) / (1 - DISC_PCT));
@@ -911,46 +1067,14 @@ function ServiceThumb({ svc, height = 100 }) {
   );
 }
 
-function HouseholdListBody({ onSelect }) {
-  const [filter, setFilter] = useState('all');
-  const list = HOUSEHOLD_SVCS.filter(s => filter === 'all' || s.theme === filter);
-  return (
-    <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-        {[['all', 'All', C.acc, C.surf], ['pink', 'Deep cleaning', HH_THEME.pink.color, HH_THEME.pink.bg], ['green', 'Home help', HH_THEME.green.color, HH_THEME.green.bg]].map(([k, l, col, bg]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
-            {l}
-          </button>
-        ))}
-      </div>
-      {['pink', 'green'].map(theme => {
-        const items = list.filter(s => s.theme === theme);
-        if (!items.length) return null;
-        const t = HH_THEME[theme];
-        return (
-          <div key={theme} style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-              <HhCategoryPill theme={theme} />
-              <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {items.map(svc => <HouseholdSvcCard key={svc.id} svc={svc} onClick={() => onSelect(svc)} compact />)}
-            </div>
-          </div>
-        );
-      })}
-      <AssistBanner />
-    </div>
-  );
-}
-
-function HouseholdSvcCard({ svc, onClick, compact }) {
-  const t = HH_THEME[svc.theme] || HH_THEME.pink;
+function CategorySvcCard({ categoryId, svc, onClick, compact }) {
+  const cfg = SUB_CATEGORIES[categoryId];
+  const t = cfg?.themes?.[svc.theme] || Object.values(cfg?.themes || {})[0] || { bg: C.surf, border: C.bdr };
   return (
     <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2px solid ${t.border}` }}>
       <ServiceThumb svc={svc} height={compact ? 96 : 112} />
       <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: t.bg }}>
-        <div style={{ marginBottom: 6 }}><HhCategoryPill theme={svc.theme} sm={compact} /></div>
+        <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
         <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
         <PriceTag svc={svc} sm={compact} />
@@ -962,50 +1086,37 @@ function HouseholdSvcCard({ svc, onClick, compact }) {
     </div>
   );
 }
+function HouseholdSvcCard(props) { return <CategorySvcCard categoryId="household" {...props} />; }
+function CloudSvcCard(props) { return <CategorySvcCard categoryId="cloud" {...props} />; }
 
-function CloudSvcCard({ svc, onClick, compact }) {
-  const t = CL_THEME[svc.theme] || CL_THEME.host;
-  return (
-    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2px solid ${t.border}` }}>
-      <ServiceThumb svc={svc} height={compact ? 96 : 112} />
-      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: t.bg }}>
-        <div style={{ marginBottom: 6 }}><CloudCategoryPill theme={svc.theme} sm={compact} /></div>
-        <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
-        <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
-        <PriceTag svc={svc} sm={compact} />
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
-          <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CloudListBody({ onSelect }) {
+function CategoryListBody({ categoryId, onSelect }) {
+  const cfg = SUB_CATEGORIES[categoryId];
   const [filter, setFilter] = useState('all');
-  const list = CLOUD_SVCS.filter(s => filter === 'all' || s.theme === filter);
+  if (!cfg) return null;
+  const list = cfg.svcs.filter(s => filter === 'all' || s.theme === filter);
+  const accent = SVC_CARD_THEME[categoryId]?.b2 || C.acc;
+  const pills = [['all', 'All', accent, C.surf], ...cfg.themeOrder.map(k => [k, cfg.themes[k].label, cfg.themes[k].color, cfg.themes[k].bg])];
   return (
     <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-        {[['all', 'All', C.cyan, C.surf], ['host', 'Cloud hosting', CL_THEME.host.color, CL_THEME.host.bg], ['build', 'Infrastructure', CL_THEME.build.color, CL_THEME.build.bg], ['care', 'Managed & media', CL_THEME.care.color, CL_THEME.care.bg], ['pack', 'Turnkey packages', CL_THEME.pack.color, CL_THEME.pack.bg]].map(([k, l, col, bg]) => (
+        {pills.map(([k, l, col, bg]) => (
           <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
             {l}
           </button>
         ))}
       </div>
-      {['host', 'build', 'care', 'pack'].map(theme => {
+      {cfg.themeOrder.map(theme => {
         const items = list.filter(s => s.theme === theme);
         if (!items.length) return null;
-        const t = CL_THEME[theme];
+        const t = cfg.themes[theme];
         return (
           <div key={theme} style={{ marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-              <CloudCategoryPill theme={theme} />
+              <CategoryPill categoryId={categoryId} theme={theme} />
               <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {items.map(svc => <CloudSvcCard key={svc.id} svc={svc} onClick={() => onSelect(svc)} compact />)}
+              {items.map(svc => <CategorySvcCard key={svc.id} categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact />)}
             </div>
           </div>
         );
@@ -1014,17 +1125,22 @@ function CloudListBody({ onSelect }) {
     </div>
   );
 }
+function HouseholdListBody(props) { return <CategoryListBody categoryId="household" {...props} />; }
+function CloudListBody(props) { return <CategoryListBody categoryId="cloud" {...props} />; }
 
-function ServiceSearchResults({ query, categories, household, cloud, onCategory, onHousehold, onCloud, renderCategory }) {
+function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderCategory, ...searchSubs }) {
   const q = query.trim();
   if (!q) return null;
-  const total = categories.length + household.length + (cloud?.length || 0);
+  const subBlocks = Object.entries(SUB_CATEGORIES)
+    .map(([id, cfg]) => ({ id, title: cfg.title, items: searchSubs[id] || [] }))
+    .filter(b => b.items.length > 0);
+  const total = categories.length + subBlocks.reduce((a, b) => a + b.items.length, 0);
   if (!total) {
     return (
       <div style={{ ...S.card(), padding: 24, textAlign: 'center', marginBottom: 14 }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
         <div style={{ color: C.txt, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>No services found</div>
-        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;cloud hosting&rdquo;, &ldquo;IaaS&rdquo;, or &ldquo;legal&rdquo;</div>
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;doctor home&rdquo;, &ldquo;legal&rdquo;, or &ldquo;tiffin&rdquo;</div>
       </div>
     );
   }
@@ -1034,25 +1150,17 @@ function ServiceSearchResults({ query, categories, household, cloud, onCategory,
         <div style={{ color: C.txt, fontSize: 16, fontWeight: 800, marginBottom: 3 }}>Search results</div>
         <div style={{ color: C.dim, fontSize: 12, fontWeight: 500 }}>{total} found for &ldquo;{q}&rdquo;</div>
       </div>
-      {household.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Household services · {household.length}</div>
+      {subBlocks.map(({ id, title, items }) => (
+        <div key={id} style={{ marginBottom: 16 }}>
+          <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>{title} · {items.length}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {household.map(svc => <HouseholdSvcCard key={svc.id} svc={svc} onClick={() => onHousehold(svc)} compact />)}
+            {items.map(svc => <CategorySvcCard key={svc.id} categoryId={id} svc={svc} onClick={() => onSubSvc(id, svc)} compact />)}
           </div>
         </div>
-      )}
-      {(cloud?.length || 0) > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Cloud services · {cloud.length}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {cloud.map(svc => <CloudSvcCard key={svc.id} svc={svc} onClick={() => onCloud(svc)} compact />)}
-          </div>
-        </div>
-      )}
+      ))}
       {categories.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          {(household.length > 0 || (cloud?.length || 0) > 0) && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
+          {subBlocks.length > 0 && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {categories.map((s, i) => renderCategory(s, i))}
           </div>
@@ -1742,54 +1850,35 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     </div>
   );
 
-  const { categories: svcList, household: hhSearch, cloud: clSearch } = searchAllServices(search);
+  const searchResult = searchAllServices(search);
+  const { categories: svcList, ...searchSubs } = searchResult;
   const searching = !!search.trim();
 
   const openBrowseSvc = (s) => {
-    if (s.household) { setActiveSvc(s); setScreen('household-list'); return; }
-    if (s.cloud) { setActiveSvc(s); setScreen('cloud-list'); return; }
+    if (SUB_CATEGORIES[s.id]) { setActiveSvc(s); setScreen(`${s.id}-list`); return; }
     setActiveSvc(s);
     setScreen('detail');
   };
 
-  const openHouseholdSvc = (svc) => {
-    setActiveSvc({ ...svc, cat: 'Household Services', cash: false });
+  const openSubSvc = (catId, svc) => {
+    const cfg = SUB_CATEGORIES[catId];
+    setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
     setScreen('detail');
   };
 
-  const openCloudSvc = (svc) => {
-    setActiveSvc({ ...svc, cat: 'Cloud Services', cash: false });
-    setScreen('detail');
-  };
-
-  // -- CLOUD SUB-SERVICES LIST --------------------------------------------
-  if (screen==='cloud-list') {
+  const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
+  if (listCatId && SUB_CATEGORIES[listCatId]) {
+    const cfg = SUB_CATEGORIES[listCatId];
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
           <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Cloud services</div>
-            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>Hosting · infrastructure · packages · 25% off</div>
+            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
+            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>{cfg.subtitle}</div>
           </div>
         </div>
-        <CloudListBody onSelect={openCloudSvc} />
-      </>
-    );
-  }
-
-  // -- HOUSEHOLD SUB-SERVICES LIST ----------------------------------------
-  if (screen==='household-list') {
-    return browseWrap(
-      <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
-          <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Household services</div>
-            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>Deep cleaning & home help · 25% off · verified partners</div>
-          </div>
-        </div>
-        <HouseholdListBody onSelect={openHouseholdSvc} />
+        <CategoryListBody categoryId={listCatId} onSelect={(svc)=>openSubSvc(listCatId, svc)} />
       </>
     );
   }
@@ -1821,12 +1910,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <ServiceSearchResults
             query={search}
             categories={svcList}
-            household={hhSearch}
-            cloud={clSearch}
             onCategory={openBrowseSvc}
-            onHousehold={openHouseholdSvc}
-            onCloud={openCloudSvc}
+            onSubSvc={openSubSvc}
             renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />}
+            {...searchSubs}
           />
         ) : (
           <>
@@ -1855,10 +1942,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
     const d = activeSvc.desc ? activeSvc : (SVC_DETAIL[activeSvc.id]||{});
-    const isHh = activeSvc.parent === 'household';
-    const isCloud = activeSvc.parent === 'cloud';
-    const isSubSvc = isHh || isCloud;
-    const listBack = isHh ? 'household-list' : isCloud ? 'cloud-list' : 'services';
+    const parentCat = subCatId(activeSvc);
+    const isSubSvc = !!parentCat && !!activeSvc.parent;
+    const listBack = isSubSvc ? `${parentCat}-list` : 'services';
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
@@ -1868,8 +1954,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
           {isSubSvc && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} height={140} /></div>}
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
-            {isHh && <div style={{ marginBottom: 10 }}><HhCategoryPill theme={activeSvc.theme} /></div>}
-            {isCloud && <div style={{ marginBottom: 10 }}><CloudCategoryPill theme={activeSvc.theme} /></div>}
+            {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={activeSvc.theme} /></div>}
             {!isSubSvc && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
             <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
@@ -2683,7 +2768,7 @@ function HomeScreen() {
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {[...SVCS].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
-              <HomeModelCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen((s.household||s.cloud)?'services':'book');}} />
+              <HomeModelCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen(SUB_CATEGORIES[s.id]?'services':'book');}} />
             ))}
           </div>
         </div>
@@ -2715,65 +2800,61 @@ function HomeScreen() {
 
 // Service detail data
 const SVC_DETAIL = {
-  legal:    { desc:'Connect with verified lawyers for consultation, document drafting, property registration, court filings, and legal advice.', features:['Initial consultation','Document review & drafting','Property registration','Court representation','Online & offline'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
+  legal:    { desc:'Verified lawyers for consultation, drafting, registration, and court filings — 6 ScanV legal services · 25% off.', features:['Lawyer consultation','Document drafting','Property registration','Court filing support','Notary & affidavits'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
   cloud:    { desc:'Enterprise cloud hosting, infrastructure, managed IT, turnkey packages, and training — 18 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Datacenter & network design','Infrastructure audits & roadmaps','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,600+' },
-  vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
-  health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
-  property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
+  vip:      { desc:'Premium concierge, executive assistant, airport transfers, and event planning — 5 VIP services · 25% off.', features:['24×7 personal concierge','Executive assistant hourly','Airport transfers','Event planning','Priority appointments'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
+  health:   { desc:'Doctors at home, lab tests, pharmacy delivery, and specialist consults — 6 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Specialist consultations','Elder care visits'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
+  property: { desc:'Buy, sell, rent, verify, and finance property in PCMC/Pune — 5 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Site visit packages','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
   household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+  delivery: { desc:'Same-day courier, documents, parcels, and inter-city express across Maharashtra — 5 delivery services · 25% off.', features:['Same-day pickup','Document handover','Parcel routes','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  food:     { desc:'Home tiffin, restaurant orders, office lunch, and catering — 5 food services · 25% off.', features:['Monthly tiffin plans','Restaurant delivery','Office lunch boxes','Party catering','Festival menus'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
 };
 
 function ServicesScreen() {
   const {setActiveSvc,setScreen,activeSvc}=useApp();
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
-  const [hhList,setHhList]=useState(false);
-  const [clList,setClList]=useState(false);
-  const { categories: list, household: hhSearch, cloud: clSearch } = searchAllServices(search);
+  const [subListCat,setSubListCat]=useState(null);
+  const searchResult = searchAllServices(search);
+  const { categories: list, ...searchSubs } = searchResult;
   const searching = !!search.trim();
 
   useEffect(()=>{
-    if (activeSvc?.household && activeSvc?.id === 'household' && !detail) setHhList(true);
-    if (activeSvc?.cloud && activeSvc?.id === 'cloud' && !detail) setClList(true);
+    if (activeSvc && SUB_CATEGORIES[activeSvc.id] && !detail) setSubListCat(activeSvc.id);
   }, [activeSvc, detail]);
 
-  if (hhList) {
-    return (
-      <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setHhList(false)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Household services</div>
-            <div style={{fontSize:11,color:C.dim}}>Deep cleaning & home help · ScanV verified partners</div>
-          </div>
-        </div>
-        <HouseholdListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:false}); setDetail(svc); setHhList(false); }} />
-      </div>
-    );
-  }
+  const openSubSvc = (catId, svc) => {
+    const cfg = SUB_CATEGORIES[catId];
+    setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
+    setDetail(svc);
+    setSubListCat(null);
+  };
 
-  if (clList) {
+  const openCategory = (s) => {
+    if (SUB_CATEGORIES[s.id]) { setSubListCat(s.id); return; }
+    setDetail(s);
+  };
+
+  if (subListCat && SUB_CATEGORIES[subListCat]) {
+    const cfg = SUB_CATEGORIES[subListCat];
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setClList(false)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>setSubListCat(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Cloud services</div>
-            <div style={{fontSize:11,color:C.dim}}>Hosting · infrastructure · packages · 25% off</div>
+            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
+            <div style={{fontSize:11,color:C.dim}}>{cfg.subtitle}</div>
           </div>
         </div>
-        <CloudListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Cloud Services',cash:false}); setDetail(svc); setClList(false); }} />
+        <CategoryListBody categoryId={subListCat} onSelect={(svc)=>openSubSvc(subListCat, svc)} />
       </div>
     );
   }
 
   if(detail) {
     const d = detail.desc ? detail : (SVC_DETAIL[detail.id]||{});
-    const isHh = detail.parent === 'household';
-    const isCloud = detail.parent === 'cloud';
-    const isSubSvc = isHh || isCloud;
+    const parentCat = subCatId(detail);
+    const isSubSvc = !!parentCat && !!detail.parent;
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
@@ -2783,8 +2864,7 @@ function ServicesScreen() {
         <div style={{padding:16}}>
           {isSubSvc && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} height={160} /></div>}
           <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
-            {isHh && <div style={{ marginBottom: 10 }}><HhCategoryPill theme={detail.theme} /></div>}
-            {isCloud && <div style={{ marginBottom: 10 }}><CloudCategoryPill theme={detail.theme} /></div>}
+            {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={detail.theme} /></div>}
             {!isSubSvc && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
@@ -2808,9 +2888,8 @@ function ServicesScreen() {
           </div>
           <AssistBanner/>
           <Btn full onClick={()=>{
-            const payload = isHh ? {...detail,cat:'Household Services',cash:false}
-              : isCloud ? {...detail,cat:'Cloud Services',cash:false}
-              : detail;
+            const cfg = SUB_CATEGORIES[detail.parent];
+            const payload = isSubSvc ? {...detail, cat: cfg?.cat || detail.cat, cash:false} : detail;
             setActiveSvc(payload);
             setScreen('book');
           }}>Book now →</Btn>
@@ -2832,23 +2911,21 @@ function ServicesScreen() {
           <ServiceSearchResults
             query={search}
             categories={list}
-            household={hhSearch}
-            cloud={clSearch}
-            onCategory={(s)=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }}
-            onHousehold={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:false}); setDetail(svc); }}
-            onCloud={(svc)=>{ setActiveSvc({...svc,cat:'Cloud Services',cash:false}); setDetail(svc); }}
-            renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} index={i} onClick={()=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }} />}
+            onCategory={openCategory}
+            onSubSvc={openSubSvc}
+            renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} index={i} onClick={()=>openCategory(s)} />}
+            {...searchSubs}
           />
         ) : (
         <>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           {list.length > 0 && (
             <div style={{ gridColumn:'1 / -1' }}>
-              <HomeHeroCarousel services={list} onSelect={(s)=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }} />
+              <HomeHeroCarousel services={list} onSelect={openCategory} />
             </div>
           )}
           {list.map((s,i)=>(
-            <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }} />
+            <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>openCategory(s)} />
           ))}
         </div>
         </>
