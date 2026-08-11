@@ -415,9 +415,20 @@ const SVCS = [
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 12 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
-  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:true,  ...svcDisc(99) },
-  { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true,  ...svcDisc(199) },
+  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:false, ...svcDisc(99) },
+  { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:false, ...svcDisc(199) },
 ];
+
+const SVC_CARD_THEME = {
+  legal:    { bgFrom:'#EEF2FF', bgTo:'#E0E7FF', b1:'#818CF8', b2:'#6366F1', glow:'rgba(99,102,241,0.18)' },
+  cloud:    { bgFrom:'#DBEAFE', bgTo:'#BFDBFE', b1:'#60A5FA', b2:'#2563EB', glow:'rgba(37,99,235,0.18)' },
+  vip:      { bgFrom:'#FEF3C7', bgTo:'#FDE68A', b1:'#FBBF24', b2:'#D97706', glow:'rgba(217,119,6,0.2)',  tag:'👑 Premium' },
+  health:   { bgFrom:'#FEE2E2', bgTo:'#FECACA', b1:'#F87171', b2:'#DC2626', glow:'rgba(220,38,38,0.16)' },
+  property: { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)' },
+  household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/services/house-help.png' },
+  delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)' },
+  food:     { bgFrom:'#FCE7F3', bgTo:'#FBCFE8', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.18)' },
+};
 
 /* --- SUPABASE ----------------------------------------------------- */
 let _sb = null;
@@ -508,49 +519,51 @@ function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
 }
 
-function isHouseholdService(s) {
-  return !!(s?.household || s?.parent === 'household' || s?.theme);
-}
-
-function UpiOnlyPill({ sm }) {
-  return (
-    <span style={{ background: '#eef2ff', color: '#4338ca', border: '1.5px solid #c7d2fe', borderRadius: 99, fontSize: sm ? 8 : 10, fontWeight: 800, padding: sm ? '2px 7px' : '3px 9px' }}>
-      📱 UPI only
-    </span>
-  );
-}
-
-function HouseholdFeaturedCard({ onClick, compact }) {
-  const hh = SVCS.find(s => s.id === 'household');
-  if (!hh) return null;
+function ServiceFeaturedCard({ svc, onClick, compact, index = 0, fullWidth }) {
+  const theme = SVC_CARD_THEME[svc.id] || SVC_CARD_THEME.legal;
+  const d = SVC_DETAIL[svc.id] || {};
+  const title = SVC_SHORT[svc.id] ? `${SVC_SHORT[svc.id]} services` : svc.name;
+  const sub = svc.household ? `Deep clean · home help · ${HOUSEHOLD_SVCS.length} services` : svc.sub;
+  const meta = svc.household
+    ? `${d.rating || '4.8 ⭐'} · ${HOUSEHOLD_SVCS.length} options`
+    : `${d.rating || '4.8 ⭐'} · ${d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day'}`;
+  const wide = fullWidth || svc.household;
   return (
     <div
       onClick={onClick}
       style={{
-        gridColumn: compact ? 'auto' : '1 / -1',
+        gridColumn: wide && !compact ? '1 / -1' : 'auto',
         borderRadius: 16,
         overflow: 'hidden',
         cursor: 'pointer',
         border: '2px solid transparent',
-        background: 'linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, #FFD6E8, #86EFAC, #FFD6E8) border-box',
-        boxShadow: '0 8px 28px rgba(244,114,182,0.22), 0 4px 14px rgba(52,211,153,0.15)',
-        animation: 'fadeUp .4s ease both',
+        background: `linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`,
+        boxShadow: `0 8px 24px ${theme.glow}`,
+        animation: `fadeUp .35s ease ${index * 0.04}s both`,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: compact ? 88 : 118, background: 'linear-gradient(135deg, #FFF1F5 0%, #ECFDF5 100%)' }}>
-        <div style={{ flex: 1, padding: compact ? '12px 14px' : '16px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: compact ? 4 : 6 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ background: C.acc, color: '#fff', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>✨ POPULAR</span>
+      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: compact ? 84 : 112, background: `linear-gradient(135deg, ${theme.bgFrom} 0%, ${theme.bgTo} 100%)` }}>
+        <div style={{ flex: 1, padding: compact ? '11px 13px' : '15px 17px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: compact ? 3 : 5 }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {theme.tag && <span style={{ background: svc.household ? C.acc : theme.b2, color: '#fff', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>{theme.tag}</span>}
             <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>25% OFF</span>
-            <UpiOnlyPill sm />
           </div>
-          <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 14 : 16, lineHeight: 1.2 }}>Household services</div>
-          <div style={{ color: C.sub, fontSize: compact ? 10 : 11, fontWeight: 600, lineHeight: 1.4 }}>Deep clean · home help · {HOUSEHOLD_SVCS.length} services · pay via GPay, PhonePe & UPI</div>
-          <div style={{ color: C.acc, fontSize: compact ? 11 : 12, fontWeight: 800 }}>From ₹{fmtRs(hh.price)} →</div>
+          <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 13 : 15, lineHeight: 1.2 }}>{title}</div>
+          <div style={{ color: C.sub, fontSize: compact ? 10 : 11, fontWeight: 600, lineHeight: 1.35 }}>{sub}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ color: C.acc, fontSize: compact ? 11 : 12, fontWeight: 800 }}>From ₹{fmtRs(svc.price)} →</span>
+            <span style={{ color: C.dim, fontSize: compact ? 9 : 10, fontWeight: 600 }}>{meta}</span>
+          </div>
         </div>
-        <div style={{ width: compact ? 96 : 120, flexShrink: 0, position: 'relative' }}>
-          <img src="/services/house-help.png" alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #FFF1F5 0%, transparent 45%)' }} />
+        <div style={{ width: compact ? 72 : 108, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {theme.img ? (
+            <>
+              <img src={theme.img} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
+              <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${theme.bgFrom} 0%, transparent 50%)` }} />
+            </>
+          ) : (
+            <div style={{ fontSize: compact ? 36 : 44, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.08))' }}>{svc.icon}</div>
+          )}
         </div>
       </div>
     </div>
@@ -643,8 +656,6 @@ function HouseholdSvcCard({ svc, onClick, compact }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
           <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
-          {svc.cash && !isHouseholdService(svc) && <span style={{ color: C.grn, fontSize: 10, fontWeight: 700 }}>· 💵 Cash</span>}
-          {isHouseholdService(svc) && <UpiOnlyPill sm />}
         </div>
       </div>
     </div>
@@ -1341,7 +1352,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search legal, health, plumber…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
       </div>
       <div style={{display:'flex',gap:6,padding:'8px 16px 0',overflowX:'auto'}}>
-        {['✓ DPDP 2023','✓ Verified partners','UPI · Cash'].map(p=>(
+        {['✓ DPDP 2023','✓ Verified partners','✓ 25% off'].map(p=>(
           <span key={p} style={{flexShrink:0,fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99}}>{p}</span>
         ))}
       </div>
@@ -1351,35 +1362,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'}</div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          {!search && svcList.some(s=>s.household) && (
-            <HouseholdFeaturedCard onClick={()=>openBrowseSvc(SVCS.find(s=>s.id==='household'))} />
-          )}
-          {svcList.filter(s=>!s.household).map((s,i)=>{
-            const d=SVC_DETAIL[s.id]||{};
-            return (
-              <div key={s.id} style={{...S.card(),padding:'14px 10px',textAlign:'center',cursor:'pointer',minHeight:118,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,animation:`fadeUp .35s ease ${i*0.03}s both`}}
-                onClick={()=>openBrowseSvc(s)}>
-                <div style={{fontSize:28}}>{s.icon}</div>
-                <div style={{color:C.txt,fontWeight:800,fontSize:12,lineHeight:1.2}}>{SVC_SHORT[s.id]||s.name.split(' ')[0]}</div>
-                <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{fmtRs(s.price||discPaise(50000))}</div>
-                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {(d.turnaround?.split(' ').slice(0,2).join(' ')||'Same day')}</div>
-                {s.cash&&<span style={{color:C.grn,fontSize:8,fontWeight:800,background:'#e6f4ee',border:`1px solid rgba(0,122,77,0.35)`,padding:'2px 6px',borderRadius:4}}>💵 Cash</span>}
-              </div>
-            );
-          })}
-          {search && svcList.filter(s=>s.household).map((s,i)=>{
-            const d=SVC_DETAIL[s.id]||{};
-            return (
-              <div key={s.id} style={{...S.card(),padding:'14px 10px',textAlign:'center',cursor:'pointer',minHeight:118,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,animation:`fadeUp .35s ease ${i*0.03}s both`}}
-                onClick={()=>openBrowseSvc(s)}>
-                <div style={{fontSize:28}}>{s.icon}</div>
-                <div style={{color:C.txt,fontWeight:800,fontSize:12,lineHeight:1.2}}>{SVC_SHORT[s.id]||s.name.split(' ')[0]}</div>
-                <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{fmtRs(s.price||discPaise(50000))}</div>
-                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {HOUSEHOLD_SVCS.length} services</div>
-                <UpiOnlyPill sm />
-              </div>
-            );
-          })}
+          {[...svcList].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
+            <ServiceFeaturedCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} fullWidth={s.household && !search} />
+          ))}
         </div>
         <AssistBanner/>
         <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
@@ -1423,12 +1408,6 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               </div>
             ))}
           </div>
-          {isHouseholdService(activeSvc) && (
-            <div style={{ background: '#eef2ff', border: '1.5px solid #c7d2fe', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#4338ca', fontWeight: 700 }}>
-              📱 UPI only — pay via GPay, PhonePe, Paytm & all UPI apps
-            </div>
-          )}
-          {activeSvc.cash && !isHouseholdService(activeSvc) && <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:12,fontSize:12,color:C.grn,fontWeight:700}}>💵 Cash on service · platform fee paid online</div>}
         </div>
       </>,
       <StickyCta onClick={()=>setScreen('verify')}>Book now — verify & pay →</StickyCta>
@@ -1487,12 +1466,6 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               </div>
             ))}
           </div>
-          {isHouseholdService(activeSvc) && (
-            <div style={{ background: '#eef2ff', border: '1.5px solid #c7d2fe', borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: '#4338ca', fontWeight: 600 }}>
-              📱 Household bookings — UPI only (GPay, PhonePe, Paytm & all UPI apps)
-            </div>
-          )}
-          {activeSvc.cash && !isHouseholdService(activeSvc) && <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
           <UpiPaymentPanel
             pay={browsePay}
             addToast={addToast}
@@ -2229,17 +2202,9 @@ function HomeScreen() {
             <div style={{fontSize:14,fontWeight:600,color:C.txt}}>All services</div>
             <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.acc,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>View all</button>
           </div>
-          <div style={{marginBottom:10}}>
-            <HouseholdFeaturedCard compact onClick={()=>{setActiveSvc(SVCS.find(s=>s.id==='household'));setScreen('services');}} />
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:8}}>
-            {SVCS.filter(s=>!s.household).map(s=>(
-              <div key={s.id} onClick={()=>{setActiveSvc(s);setScreen('book');}}
-                style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'12px 6px',textAlign:'center',cursor:'pointer'}}>
-                <div style={{fontSize:24,marginBottom:5}}>{s.icon}</div>
-                <div style={{fontSize:10,color:C.sub,lineHeight:1.3}}>{s.name.split(' ').slice(0,2).join(' ')}</div>
-                {s.cash&&<div style={{fontSize:9,color:C.grn,marginTop:2}}>Cash ✓</div>}
-              </div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {[...SVCS].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
+              <ServiceFeaturedCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen(s.household?'services':'book');}} />
             ))}
           </div>
         </div>
@@ -2276,7 +2241,7 @@ const SVC_DETAIL = {
   vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
-  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off · UPI payment only.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','UPI — GPay, PhonePe & more'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
 };
@@ -2341,13 +2306,6 @@ function ServicesScreen() {
               </div>
             ))}
           </div>
-          {isHouseholdService(detail) && (
-            <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span style={{ fontSize: 18 }}>📱</span>
-              <span style={{ color: '#4338ca', fontSize: 13, fontWeight: 600 }}>UPI only — GPay, PhonePe, Paytm & all UPI apps</span>
-            </div>
-          )}
-          {detail.cash && !isHouseholdService(detail) && <div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
           <AssistBanner/>
           <Btn full onClick={()=>{setActiveSvc(isHh?{...detail,cat:'Household Services',cash:false}:detail);setScreen('book');}}>Book now →</Btn>
         </div>
@@ -2377,7 +2335,6 @@ function ServicesScreen() {
                     <span style={{color:C.gold,fontSize:11}}>{SVC_DETAIL[s.id]?.rating}</span>
                     <span style={{color:C.dim,fontSize:11}}>·</span>
                     <span style={{color:C.dim,fontSize:11}}>{s.household?`${HOUSEHOLD_SVCS.length} sub-services`:SVC_DETAIL[s.id]?.turnaround}</span>
-                    {s.household ? <UpiOnlyPill sm /> : s.cash ? <span style={{color:C.grn,fontSize:11}}>· 💵 Cash</span> : null}
                   </div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
@@ -2478,11 +2435,6 @@ function BookScreen() {
               <div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
               {[['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
-              {isHouseholdService(svc) ? (
-                <div style={{background:'#eef2ff',border:'1.5px solid #c7d2fe',borderRadius:8,padding:'8px 12px',marginTop:12,color:'#4338ca',fontSize:12,fontWeight:600}}>📱 UPI only — GPay, PhonePe, Paytm & all UPI</div>
-              ) : svc.cash ? (
-                <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>
-              ) : null}
             </div>
           </div>
           {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
@@ -2822,10 +2774,9 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.cyan,fontSize:13}}>💳 All online payments processed by Razorpay (PCI-DSS Level 1). We never store card or bank details.</p>
           </div>
           {[
-            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks) · Cash on service (Delivery, Food categories) · Household: UPI only'],
-            ['How It Works','Platform fee (10%) paid online at booking. Service fee paid to Partner after completion (UPI or cash). GST added to total. Tax invoice auto-generated for every booking.'],
+            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks)'],
+            ['How It Works','Platform fee (10%) paid online at booking via UPI. GST added to total. Tax invoice auto-generated for every booking.'],
             ['UPI Payment','Pay to: dcoreglobal@upi · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
-            ['Cash on Service','Platform fee still paid online · Service fee paid in cash to Partner after service completion · Applies to: Deliveries, Food & Tiffin · Household services: UPI only'],
             ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
             ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner’s registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],
