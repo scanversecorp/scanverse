@@ -359,49 +359,50 @@ const discPaise = (mrpPaise) => Math.round(mrpPaise * (1 - DISC_PCT));
 const fmtRs = (paise) => (paise / 100).toLocaleString('en-IN');
 const svcDisc = (mrpRupees) => ({ mrp: mrpRupees * 100, price: discPaise(mrpRupees * 100) });
 
-const PROVIDERS = {
-  x: { id:'x', name:'Xerodirt', badge:'X', color:'#0d9488', bg:'#ecfdf5', tagline:'Professional cleaning · Pune', rating:'4.9 ⭐' },
-  s: { id:'s', name:'Snabbit', badge:'S', color:'#7c3aed', bg:'#f5f3ff', tagline:'Trained house help · Mumbai', rating:'4.8 ⭐' },
+/** ScanV household card themes — user-facing only. fulfillVia is backend routing (not shown in UI). */
+const HH_THEME = {
+  pink: { id:'pink', label:'Deep cleaning', color:'#F472B6', bg:'#FFF1F5', border:'#FBCFE8', gradFrom:'#FFD6E8', gradTo:'#F9A8D4', tagline:'Professional deep clean · supplies included' },
+  green:{ id:'green', label:'Home help', color:'#34D399', bg:'#ECFDF5', border:'#A7F3D0', gradFrom:'#D1FAE5', gradTo:'#86EFAC', tagline:'Verified help · hourly · flexible booking' },
 };
 
-/* --- HOUSEHOLD SUB-SERVICES (Xerodirt + Snabbit) ------------------ */
+/* --- HOUSEHOLD SUB-SERVICES (ScanV-branded; fulfillVia routes backend later) --- */
 const HOUSEHOLD_SVCS = [
-  { id:'hh-x-bathroom', parent:'household', provider:'x', icon:'🚿', img:'/services/x-bathroom.svg', name:'X· Bathroom Cleaning', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:true,
-    desc:'Professional bathroom deep clean by Xerodirt-trained staff in Pune. Tiles, WC, taps, mirrors & exhaust — eco-friendly products, satisfaction guaranteed.',
+  { id:'hh-bathroom-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🚿', img:'/services/bathroom-deep.svg', name:'Bathroom Deep Clean', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:true,
+    desc:'ScanV bathroom deep clean — tiles, WC, taps, mirrors & exhaust fan. Eco-friendly products, background-verified professionals, satisfaction guaranteed.',
     features:['WC & basin deep scrub','Tile & grout cleaning','Mirror & tap polish','Exhaust fan wipe','Re-clean if not satisfied'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'5,000+' },
-  { id:'hh-x-kitchen', parent:'household', provider:'x', icon:'🍳', img:'/services/x-kitchen.svg', name:'X· Kitchen Cleaning', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:true,
-    desc:'Xerodirt kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. Background-verified professionals, all supplies included.',
+  { id:'hh-kitchen-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🍳', img:'/services/kitchen-deep.svg', name:'Kitchen Deep Clean', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:true,
+    desc:'ScanV kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. All supplies included, verified professionals across Pune & PCMC.',
     features:['Counter & cabinet wipe','Chimney exterior clean','Sink & tap descale','Floor mop & degrease','Eco-friendly products'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'3,200+' },
-  { id:'hh-x-flat', parent:'household', provider:'x', icon:'🏠', img:'/services/x-flat.svg', name:'X· Flat Cleaning', sub:'Full home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:true,
-    desc:'Complete flat cleaning by Xerodirt — every room, kitchen & bathroom. Ideal for move-in, festival or monthly deep clean across Pune/PCMC.',
+  { id:'hh-flat-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🏠', img:'/services/flat-clean.svg', name:'Full Flat Cleaning', sub:'Complete home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:true,
+    desc:'Complete flat cleaning through ScanV — every room, kitchen & bathroom. Ideal for move-in, festival prep or monthly deep clean.',
     features:['All rooms dust & mop','Kitchen + bathroom included','Balcony sweep','Furniture wipe-down','Team of 2 for 2BHK+'], turnaround:'24–48 hrs', rating:'4.9 ⭐', bookings:'2,100+' },
-  { id:'hh-x-subscription', parent:'household', provider:'x', icon:'📅', img:'/services/x-subscription.svg', name:'X· Bathroom Subscription', sub:'Weekly / fortnightly · no rebooking', unit:'month', mrp:149900, price:discPaise(149900), cash:true,
-    desc:'Xerodirt subscription — hassle-free recurring bathroom cleaning without rebooking every time. Fixed slot, same trusted professional.',
-    features:['4 visits per month','Fixed day & time slot','Same professional','Priority rescheduling','10% vs one-time rate'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'890+' },
-  { id:'hh-x-mini', parent:'household', provider:'x', icon:'✨', img:'/services/x-mini.svg', name:'X· Mini Services', sub:'Quick clean · single item · from ₹49', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
-    desc:'Xerodirt mini services — quick, affordable cleaning for a single bathroom, fan, or appliance. Perfect when you need just one thing done.',
-    features:['Single bathroom refresh','Fan / exhaust wipe','Appliance exterior','30-min quick visit','Lowest Xerodirt pricing'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,400+' },
-  { id:'hh-s-house-help', parent:'household', provider:'s', icon:'🏡', img:'/services/house-help-s.svg', name:'House Help S', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:true,
-    desc:'Snabbit house help in Mumbai — trained, Aadhaar-verified women experts at your door in ~10 min. Sweep, mop, dust, dishes & more in one booking.',
-    features:['Background verified experts','Aadhaar + 2-day training','Hourly — book 1–4 hrs','Instant or scheduled','35+ Mumbai localities'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'1,50,000+' },
-  { id:'hh-s-dishwashing', parent:'household', provider:'s', icon:'🍽️', img:'/services/dishwashing-s.svg', name:'Dishwashing S', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:true,
-    desc:'Snabbit dishwashing help — sink, utensils & platform cleaned efficiently. From ₹99/hr promotional rate, verified female workforce.',
-    features:['All utensils washed','Sink & platform clean','Soap & scrub included','Hourly booking','100% female experts'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'80,000+' },
-  { id:'hh-s-kitchen', parent:'household', provider:'s', icon:'🧽', img:'/services/kitchen-s.svg', name:'Kitchen Cleaning S', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
-    desc:'Snabbit kitchen tidy-up — platform, tiles, chimney exterior & sink. Hourly pricing, no contracts, cancel anytime before booking.',
-    features:['Platform & tile wipe','Chimney exterior','Sink clean','Cabinet exterior dust','Transparent hourly rate'], turnaround:'~10 min', rating:'4.7 ⭐', bookings:'45,000+' },
-  { id:'hh-s-fan', parent:'household', provider:'s', icon:'🌀', img:'/services/fan-s.svg', name:'Fan Cleaning S', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
-    desc:'Snabbit fan cleaning — blade wipe & dust removal for reachable ceiling fans. Safe, no ladder work — expert handles accessible fans only.',
-    features:['Blade dust & wipe','Cover clean','Safe reachable access','Add to hourly booking','No ladder tasks'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'22,000+' },
-  { id:'hh-s-window', parent:'household', provider:'s', icon:'🪟', img:'/services/window-s.svg', name:'Window Cleaning S', sub:'Glass · frames · reachable windows', unit:'visit', mrp:19900, price:discPaise(19900), cash:true,
-    desc:'Snabbit window cleaning — glass & frame wipe for accessible windows inside your Mumbai home. Streak-free finish by trained experts.',
-    features:['Glass wipe inside','Frame & sill clean','Reachable windows only','Streak-free finish','Bundle with house help'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'18,000+' },
-  { id:'hh-s-laundry', parent:'household', provider:'s', icon:'👕', img:'/services/laundry-s.svg', name:'Laundry Help S', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
-    desc:'Snabbit laundry help — folding, sorting & organising clean clothes. Does not include washing machine operation or ironing unless agreed.',
-    features:['Fold clean laundry','Sort by type/colour','Wardrobe organise','Bed linen change','Hourly booking'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'35,000+' },
-  { id:'hh-s-bathroom', parent:'household', provider:'s', icon:'🛁', img:'/services/bathroom-s.svg', name:'Bathroom Cleaning S', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:true,
-    desc:'Snabbit bathroom cleaning — WC, floor, taps & mirror within booked hours. Ideal for Mumbai flats with one bathroom — book 1–2 hours.',
-    features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Female verified staff'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'52,000+' },
+  { id:'hh-care-plan', parent:'household', theme:'pink', fulfillVia:'x', icon:'📅', img:'/services/care-plan.svg', name:'Bathroom Care Plan', sub:'Weekly / fortnightly · fixed slot', unit:'month', mrp:149900, price:discPaise(149900), cash:true,
+    desc:'ScanV recurring bathroom care — hassle-free scheduled cleaning without rebooking every time. Same trusted professional, fixed slot.',
+    features:['4 visits per month','Fixed day & time slot','Same professional','Priority rescheduling','Save vs one-time booking'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'890+' },
+  { id:'hh-quick-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'✨', img:'/services/quick-clean.svg', name:'Quick Clean', sub:'Single task · bathroom · fan · 30 min', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'ScanV quick clean — affordable single-task service for one bathroom, fan or appliance. Perfect when you need just one thing done fast.',
+    features:['Single bathroom refresh','Fan / exhaust wipe','Appliance exterior','30-min visit','Best-value quick booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,400+' },
+  { id:'hh-house-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🏡', img:'/services/house-help.svg', name:'House Help', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:true,
+    desc:'ScanV house help — trained, background-verified experts for sweeping, mopping, dusting, dishes & more. Book by the hour, instant or scheduled.',
+    features:['Background verified experts','Professional training','Hourly — book 1–4 hrs','Instant or scheduled','Flexible tasks in one visit'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  { id:'hh-dishwashing', parent:'household', theme:'green', fulfillVia:'s', icon:'🍽️', img:'/services/dishwashing.svg', name:'Dishwashing', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:true,
+    desc:'ScanV dishwashing help — sink, utensils & platform cleaned efficiently. Hourly booking, transparent pricing, verified professionals.',
+    features:['All utensils washed','Sink & platform clean','Supplies included','Hourly booking','Trusted ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'8,000+' },
+  { id:'hh-kitchen-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🧽', img:'/services/kitchen-help.svg', name:'Kitchen Tidy-Up', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'ScanV kitchen tidy-up — platform, tiles, chimney exterior & sink within your booked hours. No contracts, cancel anytime before the slot.',
+    features:['Platform & tile wipe','Chimney exterior','Sink clean','Cabinet exterior dust','Transparent hourly rate'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'4,500+' },
+  { id:'hh-fan-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🌀', img:'/services/fan-clean.svg', name:'Fan Cleaning', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'ScanV fan cleaning — blade wipe & dust removal for reachable ceiling fans. Safe service — no ladder or height work.',
+    features:['Blade dust & wipe','Cover clean','Safe reachable access','Add to hourly booking','No ladder tasks'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'2,200+' },
+  { id:'hh-window-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🪟', img:'/services/window-clean.svg', name:'Window Cleaning', sub:'Glass · frames · inside only', unit:'visit', mrp:19900, price:discPaise(19900), cash:true,
+    desc:'ScanV window cleaning — glass & frame wipe for accessible windows inside your home. Streak-free finish by trained experts.',
+    features:['Glass wipe inside','Frame & sill clean','Reachable windows only','Streak-free finish','Bundle with house help'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,800+' },
+  { id:'hh-laundry', parent:'household', theme:'green', fulfillVia:'s', icon:'👕', img:'/services/laundry.svg', name:'Laundry Help', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'ScanV laundry help — folding, sorting & organising clean clothes. Washing machine operation or ironing by separate agreement.',
+    features:['Fold clean laundry','Sort by type/colour','Wardrobe organise','Bed linen change','Hourly booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'3,500+' },
+  { id:'hh-bathroom-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🛁', img:'/services/bathroom-help.svg', name:'Bathroom Refresh', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:true,
+    desc:'ScanV bathroom refresh — WC, floor, taps & mirror within booked hours. Ideal for quick upkeep — book 1–2 hours.',
+    features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Verified ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'5,200+' },
 ];
 
 const HH_BY_ID = Object.fromEntries(HOUSEHOLD_SVCS.map(s => [s.id, s]));
@@ -413,7 +414,7 @@ const SVCS = [
   { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false, ...svcDisc(9999) },
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
-  { id:'household',icon:'🧹', name:'Household services', sub:'Xerodirt · Snabbit · cleaning',    cat:'Household Services', cash:true,  ...svcDisc(149), household:true },
+  { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 12 services', cat:'Household Services', cash:true,  ...svcDisc(149), household:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:true,  ...svcDisc(99) },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true,  ...svcDisc(199) },
 ];
@@ -507,13 +508,12 @@ function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
 }
 
-function ProviderBadge({ provider, sm }) {
-  const p = PROVIDERS[provider];
-  if (!p) return null;
+function HhCategoryPill({ theme, sm }) {
+  const t = HH_THEME[theme];
+  if (!t) return null;
   return (
-    <span style={{ background: p.bg, color: p.color, border: `1.5px solid ${p.color}44`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 7px' : '3px 9px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ background: p.color, color: '#fff', borderRadius: '50%', width: sm ? 14 : 16, height: sm ? 14 : 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: sm ? 8 : 9, fontWeight: 900 }}>{p.badge}</span>
-      {p.name}
+    <span style={{ background: t.bg, color: t.color, border: `1.5px solid ${t.border}`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 8px' : '3px 10px' }}>
+      {t.label}
     </span>
   );
 }
@@ -543,25 +543,25 @@ function ServiceThumb({ svc, height = 100 }) {
 
 function HouseholdListBody({ onSelect }) {
   const [filter, setFilter] = useState('all');
-  const list = HOUSEHOLD_SVCS.filter(s => filter === 'all' || s.provider === filter);
+  const list = HOUSEHOLD_SVCS.filter(s => filter === 'all' || s.theme === filter);
   return (
     <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
-        {[['all', 'All', ''], ['x', 'X· Xerodirt', PROVIDERS.x.color], ['s', 'Snabbit S', PROVIDERS.s.color]].map(([k, l, col]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col || C.acc}` : BDR, background: filter === k ? (col ? `${col}18` : '#fff0f3') : C.surf, color: filter === k ? (col || C.acc) : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
+        {[['all', 'All', C.acc, C.surf], ['pink', 'Deep cleaning', HH_THEME.pink.color, HH_THEME.pink.bg], ['green', 'Home help', HH_THEME.green.color, HH_THEME.green.bg]].map(([k, l, col, bg]) => (
+          <button key={k} onClick={() => setFilter(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
             {l}
           </button>
         ))}
       </div>
-      {['x', 's'].map(prov => {
-        const items = list.filter(s => s.provider === prov);
+      {['pink', 'green'].map(theme => {
+        const items = list.filter(s => s.theme === theme);
         if (!items.length) return null;
-        const p = PROVIDERS[prov];
+        const t = HH_THEME[theme];
         return (
-          <div key={prov} style={{ marginBottom: 18 }}>
+          <div key={theme} style={{ marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <ProviderBadge provider={prov} />
-              <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{p.tagline}</span>
+              <HhCategoryPill theme={theme} />
+              <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {items.map(svc => <HouseholdSvcCard key={svc.id} svc={svc} onClick={() => onSelect(svc)} compact />)}
@@ -575,12 +575,12 @@ function HouseholdListBody({ onSelect }) {
 }
 
 function HouseholdSvcCard({ svc, onClick, compact }) {
-  const p = PROVIDERS[svc.provider];
+  const t = HH_THEME[svc.theme] || HH_THEME.pink;
   return (
-    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer' }}>
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2px solid ${t.border}` }}>
       <ServiceThumb svc={svc} height={compact ? 80 : 96} />
-      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px' }}>
-        <div style={{ marginBottom: 6 }}><ProviderBadge provider={svc.provider} sm={compact} /></div>
+      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: t.bg }}>
+        <div style={{ marginBottom: 6 }}><HhCategoryPill theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
         <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
         <PriceTag svc={svc} sm={compact} />
@@ -1264,7 +1264,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
           <div style={{flex:1}}>
             <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Household services</div>
-            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>Xerodirt · Pune · X &nbsp;|&nbsp; Snabbit · Mumbai · S</div>
+            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>Deep cleaning & home help · 25% off · verified partners</div>
           </div>
         </div>
         <HouseholdListBody onSelect={openHouseholdSvc} />
@@ -1321,7 +1321,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
     const d = activeSvc.desc ? activeSvc : (SVC_DETAIL[activeSvc.id]||{});
-    const isHh = !!activeSvc.provider;
+    const isHh = !!activeSvc.theme;
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
@@ -1331,7 +1331,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
           {isHh && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} height={140} /></div>}
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
-            {isHh && <div style={{ marginBottom: 10 }}><ProviderBadge provider={activeSvc.provider} /></div>}
+            {isHh && <div style={{ marginBottom: 10 }}><HhCategoryPill theme={activeSvc.theme} /></div>}
             {!isHh && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
             <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
@@ -2190,7 +2190,7 @@ const SVC_DETAIL = {
   vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
-  household:{ desc:'Professional home cleaning via Xerodirt (Pune) and trained house help via Snabbit (Mumbai). 12 services · 25% off · cash accepted.', features:['X· Xerodirt deep cleaning','Snabbit hourly house help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off · cash accepted.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
 };
@@ -2213,7 +2213,7 @@ function ServicesScreen() {
           <button onClick={()=>setHhList(false)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{flex:1}}>
             <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Household services</div>
-            <div style={{fontSize:11,color:C.dim}}>X· Xerodirt · Pune &nbsp;|&nbsp; Snabbit S · Mumbai</div>
+            <div style={{fontSize:11,color:C.dim}}>Deep cleaning & home help · ScanV verified partners</div>
           </div>
         </div>
         <HouseholdListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:true}); setDetail(svc); setHhList(false); }} />
@@ -2223,7 +2223,7 @@ function ServicesScreen() {
 
   if(detail) {
     const d = detail.desc ? detail : (SVC_DETAIL[detail.id]||{});
-    const isHh = !!detail.provider;
+    const isHh = !!detail.theme;
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
@@ -2233,7 +2233,7 @@ function ServicesScreen() {
         <div style={{padding:16}}>
           {isHh && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} height={160} /></div>}
           <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
-            {isHh && <div style={{ marginBottom: 10 }}><ProviderBadge provider={detail.provider} /></div>}
+            {isHh && <div style={{ marginBottom: 10 }}><HhCategoryPill theme={detail.theme} /></div>}
             {!isHh && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
@@ -2380,7 +2380,7 @@ function BookScreen() {
           <div style={{...S.card(),marginBottom:20,padding:0,overflow:'hidden'}}>
             {svc.img && <ServiceThumb svc={svc} height={120} />}
             <div style={{padding:16}}>
-              {svc.provider && <div style={{marginBottom:8}}><ProviderBadge provider={svc.provider} /></div>}
+              {svc.theme && <div style={{marginBottom:8}}><HhCategoryPill theme={svc.theme} /></div>}
               {!svc.img && <div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div>}
               <div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div>
               <div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
