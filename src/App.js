@@ -191,7 +191,7 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
   const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, setPaymentVerified, amountPaise, txnId } = pay;
   const [confirming, setConfirming] = useState(false);
   const inApp = isInAppBrowser();
-  const amountRu = amountPaise ? (amountPaise / 100).toFixed(0) : '0';
+  const amountRu = amountPaise ? (amountPaise / 100).toLocaleString('en-IN') : '0';
   const handleContinue = async () => {
     if (loading || disabled || confirming) return;
     if (!paymentVerified) {
