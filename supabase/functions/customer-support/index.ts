@@ -40,8 +40,8 @@ function resolveRole(req: Request): SupportRole {
   const agentPin = Deno.env.get("SUPPORT_AGENT_PIN") || "";
   if (adminPin.length >= 6 && pin === adminPin) return "support_admin";
   if (agentPin.length >= 6 && pin === agentPin) return "support_agent";
-  // Fallback: pricing/vendor admin PIN for leaders
-  const leaderPin = Deno.env.get("PRICING_ADMIN_PIN") || Deno.env.get("VENDOR_ADMIN_PIN") || "";
+  // Fallback: pricing/vendor/hub admin PIN for leaders
+  const leaderPin = Deno.env.get("PRICING_ADMIN_PIN") || Deno.env.get("VENDOR_ADMIN_PIN") || Deno.env.get("ADMIN_HUB_PIN") || "";
   if (leaderPin.length >= 6 && pin === leaderPin) return "support_admin";
   return null;
 }
