@@ -935,9 +935,15 @@ const ADMIN_HUB_HASH = 'admin';
 const ADMIN_HUB_ALIASES = new Set(['admin', 'admin-hub']);
 const EXEC_DASHBOARD_HASH = 'exec';
 const EXEC_DASHBOARD_ALIASES = new Set(['exec', 'exec-dashboard']);
+const OTP_DELIVERY_REPORT_HASH = 'otp-delivery-report';
+const OTP_DELIVERY_CALLBACK_URL = 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/otp-delivery-report?key=ScanV2026';
 
 function isExecDashboardRoute() {
   return EXEC_DASHBOARD_ALIASES.has(hashBase());
+}
+
+function isOtpDeliveryReportRoute() {
+  return hashBase() === OTP_DELIVERY_REPORT_HASH;
 }
 
 function isCustomerSupportRoute() {
@@ -6203,6 +6209,143 @@ function ExecDashboardPage() {
 }
 
 /* ================================================================
+   OTP DELIVERY REPORTS — #otp-delivery-report (admin PIN)
+================================================================ */
+function otpStatusColor(status) {
+  if (status === 'delivered') return C.grn;
+  if (status === 'failed') return C.red;
+  if (status === 'pending') return C.gold;
+  return C.dim;
+}
+
+function AdminOtpDeliveryTab({ pin, showCallbackUrl }) {
+  const [reports, setReports] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [todayOnly, setTodayOnly] = useState(true);
+  const [failedOnly, setFailedOnly] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true); setErr('');
+    try {
+      const data = await adminHubFetch('otp_delivery_reports', { today_only: todayOnly, failed_only: failedOnly, limit: 200 }, pin);
+      setReports(data.reports || []);
+      setStats(data.stats || null);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [pin, todayOnly, failedOnly]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div>
+      {showCallbackUrl && (
+        <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>2Factor.in Delivery Report URL</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>
+            Paste this in 2Factor control panel → Callback / Delivery Report settings. Statuses recorded: <strong>delivered</strong>, <strong>failed</strong> (incl. REJECTED), <strong>pending</strong>, <strong>unknown</strong>.
+          </div>
+          <pre style={{ fontSize: 11, color: C.acc, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{OTP_DELIVERY_CALLBACK_URL}</pre>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" onClick={() => setTodayOnly(t => !t)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${todayOnly ? C.acc : C.bdr}`, background: todayOnly ? `${C.acc}18` : C.surf, color: todayOnly ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>Today only</button>
+        <button type="button" onClick={() => setFailedOnly(f => !f)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${failedOnly ? C.red : C.bdr}`, background: failedOnly ? `${C.red}18` : C.surf, color: failedOnly ? C.red : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>Failed only</button>
+        <Btn v="outline" sm onClick={load} disabled={loading}>{loading ? '…' : 'Refresh'}</Btn>
+      </div>
+      {stats && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <AdminStatCard label="Delivered" value={stats.delivered ?? 0} color={C.grn} />
+          <AdminStatCard label="Failed" value={stats.failed ?? 0} color={C.red} />
+          <AdminStatCard label="Pending" value={stats.pending ?? 0} color={C.gold} />
+          <AdminStatCard label="Unknown" value={stats.unknown ?? 0} />
+        </div>
+      )}
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {reports.map(r => (
+        <div key={r.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: C.txt }}>{r.mobile || '—'}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{fmtDt(r.created_at)} · {r.otp_context || 'general'}</div>
+              {r.session_id && <div style={{ fontSize: 10, color: C.dim, marginTop: 4, wordBreak: 'break-all' }}>Session {r.session_id}</div>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+              <Badge label={r.status} color={otpStatusColor(r.status)} />
+              {r.raw_status && r.raw_status !== r.status && <span style={{ fontSize: 10, color: C.dim }}>{r.raw_status}</span>}
+            </div>
+          </div>
+        </div>
+      ))}
+      {!reports.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 32 }}>No delivery reports yet — configure callback URL in 2Factor.in</div>}
+    </div>
+  );
+}
+
+function OtpDeliveryReportPage() {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
+  const [authed, setAuthed] = useState(adminAuthOk());
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const login = async () => {
+    if (!pin) { setErr('Enter admin PIN'); return; }
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('whoami', {}, pin);
+      sessionStorage.setItem(ADMIN_PIN_KEY, pin);
+      setAdminAuth(pin);
+      setAuthed(true);
+    } catch {
+      setErr('Incorrect PIN — set ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN in Supabase secrets');
+      setAuthed(false);
+    } finally { setLoading(false); }
+  };
+
+  const usePin = pin || getAdminAuth()?.pin;
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 440, width: '100%', padding: 24 }}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>ADMIN ONLY</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>SMS OTP Delivery Reports</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>2Factor.in delivery status callbacks recorded in real time.</div>
+          <Field label="Admin PIN">
+            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+          </Field>
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock'}</Btn>
+          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#otp-delivery-report</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 20 }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 1 }}>2FACTOR DELIVERY REPORTS</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>SMS OTP Status</div>
+          </div>
+          <AdminDeepLinkBtn hash="admin" label="Admin hub →" />
+        </div>
+      </div>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
+        <AdminOtpDeliveryTab pin={usePin} showCallbackUrl />
+      </div>
+      <CopyrightLine style={{ padding: 16 }} />
+    </div>
+  );
+}
+
+/* ================================================================
    ADMIN CONTROL CENTER — #admin / #admin-hub
 ================================================================ */
 const ADMIN_TABS = [
@@ -6213,6 +6356,7 @@ const ADMIN_TABS = [
   { id: 'agents', label: 'Support Agents', icon: '👥' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
+  { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -6555,6 +6699,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <AdminDeepLinkBtn hash="customer-support" label="Support desk →" />
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
+                <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />
               </div>
             </div>
           </div>
@@ -6611,6 +6756,16 @@ function AdminControlCenter({ onPricesUpdated }) {
         )}
 
         {tab === 'bookings' && <AdminBookingsTab pin={usePin} />}
+
+        {tab === 'otp' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 13, color: C.sub }}>2Factor.in SMS delivery callbacks — delivered vs failed in real time.</div>
+              <AdminDeepLinkBtn hash="otp-delivery-report" label="Open full page →" />
+            </div>
+            <AdminOtpDeliveryTab pin={usePin} showCallbackUrl />
+          </div>
+        )}
 
         {tab === 'database' && (
           <div>
@@ -6965,6 +7120,15 @@ export default function App() {
       <Boundary>
         <style>{APP_CSS}</style>
         <ExecDashboardPage/>
+      </Boundary>
+    );
+  }
+
+  if (isOtpDeliveryReportRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <OtpDeliveryReportPage/>
       </Boundary>
     );
   }

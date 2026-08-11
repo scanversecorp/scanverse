@@ -10,6 +10,7 @@
  *   deactivate_agent — { id }  sets active=false
  *   search_bookings  — { q?, status?, limit? }
  *   list_payments    — { q?, limit? }
+ *   otp_delivery_reports — { today_only?, failed_only?, limit? }
  *   exec_stats       — executive dashboard KPIs + chart data (owner PIN only)
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
  *
@@ -610,6 +611,39 @@ async function listPayments(sb: ReturnType<typeof adminSb>, body: Record<string,
   return json({ payment_intents: data || [] });
 }
 
+function isoTodayStart(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+async function otpDeliveryReports(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  const todayOnly = !!body.today_only;
+  const failedOnly = !!body.failed_only;
+  const limit = Math.min(Number(body.limit) || 100, 500);
+
+  let query = sb
+    .from("otp_delivery_reports")
+    .select("id,provider,session_id,mobile,status,raw_status,otp_context,vendor_otp_id,created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (todayOnly) query = query.gte("created_at", isoTodayStart());
+  if (failedOnly) query = query.eq("status", "failed");
+
+  const { data, error } = await query;
+  if (error) return json({ error: error.message }, 500);
+
+  const rows = data || [];
+  const stats = { delivered: 0, failed: 0, pending: 0, unknown: 0, total: rows.length };
+  for (const r of rows) {
+    const s = (r as { status?: string }).status || "unknown";
+    if (s in stats && s !== "total") (stats as Record<string, number>)[s]++;
+  }
+
+  return json({ reports: rows, stats });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -664,6 +698,10 @@ Deno.serve(async (req) => {
 
   if (action === "list_payments") {
     return listPayments(sb, body);
+  }
+
+  if (action === "otp_delivery_reports") {
+    return otpDeliveryReports(sb, body);
   }
 
   if (action === "exec_stats" || action === "exec_charts") {

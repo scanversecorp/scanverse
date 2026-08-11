@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.admin-hub]
 verify_jwt = false
+
+[functions.otp-delivery-report]
+verify_jwt = false

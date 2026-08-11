@@ -71,15 +71,31 @@ Deno.serve(async (req: Request) => {
     const otpHash = await hashOtp(otp);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    await supabase.from("vendor_otp").insert({
-      mobile,
-      otp_hash: otpHash,
-      purpose: String(body.purpose || "general"),
-      expires_at: expiresAt,
-    });
+    const purpose = String(body.purpose || "general");
+    const { data: otpRow, error: insertErr } = await supabase
+      .from("vendor_otp")
+      .insert({
+        mobile,
+        otp_hash: otpHash,
+        purpose,
+        expires_at: expiresAt,
+      })
+      .select("id")
+      .single();
+
+    if (insertErr) {
+      return json({ success: false, error: insertErr.message }, 500);
+    }
 
     const message = `ScanV OTP: ${otp}. Valid 10 min. Do not share.`;
     const sms = await sendSms(mobile, message, otp);
+
+    if (sms.ref && otpRow?.id) {
+      await supabase
+        .from("vendor_otp")
+        .update({ session_id: sms.ref })
+        .eq("id", otpRow.id);
+    }
 
     // Dev fallback: return OTP when no provider (never in production with providers set)
     const devMode = !sms.ok && Deno.env.get("OTP_DEV_MODE") === "1";

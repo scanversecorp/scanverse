@@ -29,6 +29,34 @@ All functions have `verify_jwt = false` in `supabase/config.toml`. Auth via head
 
 **Secrets used:** `TWOFACTOR_API_KEY`, `MSG91_AUTH_KEY`, `TWILIO_*`, `OTP_DEV_MODE`
 
+Stores 2Factor `SessionId` on `vendor_otp.session_id` for delivery report correlation.
+
+---
+
+### 1b. `otp-delivery-report`
+
+| | |
+|---|---|
+| **URL** | `GET/POST /functions/v1/otp-delivery-report` |
+| **Auth** | Optional `?key=` matching `OTP_REPORT_SECRET` |
+| **Purpose** | Webhook from 2Factor.in for SMS OTP delivery status |
+
+**Configure in 2Factor.in Delivery Report settings:**
+
+```
+https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/otp-delivery-report?key=ScanV2026
+```
+
+**POST params from 2Factor:** `mode`, `SessionId`, `To`, `Status`
+
+**Statuses recorded:** `delivered`, `failed`, `pending`, `unknown`
+
+**Admin UI:** `#otp-delivery-report` or `#admin` → OTP Delivery tab
+
+**Secrets used:** `OTP_REPORT_SECRET` (optional), `SUPABASE_SERVICE_ROLE_KEY`
+
+See [OTP-DELIVERY-REPORT.md](./OTP-DELIVERY-REPORT.md) for full details.
+
 ---
 
 ### 2. `whatsapp-verify`
@@ -202,6 +230,7 @@ Events: payment.captured, payment_link.paid
 | Twilio WhatsApp | `whatsapp-verify` | Twilio request validation |
 | Twilio Voice | `booking-dispatch` | Twilio signature |
 | Twilio SMS | `booking-dispatch` | Twilio signature |
+| 2Factor.in | `otp-delivery-report` | Optional `?key=` (`OTP_REPORT_SECRET`) |
 | pg_cron (internal) | `booking-dispatch?action=tick` | Service role bearer |
 
 ---
@@ -213,7 +242,7 @@ Events: payment.captured, payment_link.paid
 | `send-otp` | Registration, login, booking OTP |
 | `razorpay-payment` | Payment screen register + poll check |
 | `pricing-admin` | `#pricing-admin` CRUD |
-| `admin-hub` | `#admin`, `#exec` dashboards |
+| `admin-hub` | `#admin`, `#exec`, `#otp-delivery-report` dashboards |
 | `customer-support` | `#customer-support` search |
 | `support-tickets` | `#report`, `#track-ticket`, admin ticket desk |
 | `vendor-onboard` | `#vendor-onboard`, `#vendor-admin` |

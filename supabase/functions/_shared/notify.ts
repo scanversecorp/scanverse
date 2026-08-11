@@ -118,9 +118,19 @@ export async function sendSms(
       ? `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`
       : `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/AUTOGEN/ScanV%20OTP`;
     const res = await fetch(url);
-    if (res.ok) return { ok: true, provider: "2factor" };
-    const body = await res.text().catch(() => "");
-    return { ok: false, error: body || "2Factor SMS failed" };
+    const bodyText = await res.text().catch(() => "");
+    if (res.ok) {
+      let ref: string | undefined;
+      try {
+        const data = JSON.parse(bodyText);
+        if (data?.Details) ref = String(data.Details);
+        else if (data?.SessionId) ref = String(data.SessionId);
+      } catch {
+        if (bodyText && bodyText.length < 80) ref = bodyText.trim();
+      }
+      return { ok: true, provider: "2factor", ref };
+    }
+    return { ok: false, error: bodyText || "2Factor SMS failed" };
   }
 
   return { ok: false, error: "No SMS provider configured (MSG91/Twilio/2Factor)" };
