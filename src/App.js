@@ -20,7 +20,7 @@ const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
 const UPI_PA   = 'vyapar.172928067841@hdfcbank';
-const UPI_PN   = 'Vyapar';
+const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const ASSIST   = '+91-9270194842';
 
 const UPI_PACKAGES = {
