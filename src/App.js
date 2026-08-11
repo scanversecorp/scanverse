@@ -721,6 +721,8 @@ function subSvcCount(svc) {
 const PRICING_ADMIN_HASH = 'pricing-admin';
 const VENDOR_ONBOARD_HASH = 'vendor-onboard';
 const VENDOR_ADMIN_HASH = 'vendor-admin';
+const TRACK_HASH = 'track';
+const TRACK_BOOKING_KEY = 'scanv_track_booking';
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const VENDOR_PIN_KEY = 'scanv_vendor_pin';
@@ -827,6 +829,27 @@ function isVendorOnboardRoute() {
 
 function isVendorAdminRoute() {
   return window.location.hash.replace(/^#/, '') === VENDOR_ADMIN_HASH;
+}
+
+function isTrackRoute() {
+  const h = window.location.hash.replace(/^#/, '');
+  return h === TRACK_HASH || h.startsWith(`${TRACK_HASH}?`) || h.startsWith(`${TRACK_HASH}/`);
+}
+
+function trackBookingIdFromHash() {
+  const raw = window.location.hash.replace(/^#/, '');
+  if (!raw.startsWith(TRACK_HASH)) return null;
+  const q = raw.includes('?') ? raw.split('?')[1] : '';
+  const params = new URLSearchParams(q);
+  return params.get('id') || params.get('booking') || null;
+}
+
+function goToTrack(setTrackBookingId, setScreen, bookingId) {
+  if (!bookingId) return;
+  sessionStorage.setItem(TRACK_BOOKING_KEY, bookingId);
+  setTrackBookingId?.(bookingId);
+  setScreen?.('track');
+  window.location.hash = `${TRACK_HASH}?id=${encodeURIComponent(bookingId)}`;
 }
 
 /** All bookable services for vendor onboarding selection */
@@ -2016,7 +2039,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         date: bookingDetail.date,
         time: bookingDetail.time || '10:00',
       });
-      onRegistered(pendingProfile);
+      sessionStorage.setItem(TRACK_BOOKING_KEY, bk.id);
+      onRegistered(pendingProfile, bk.id);
     } catch(e) { setErr(e.message||'Booking failed.'); }
     finally { setLoading(false); }
   };
@@ -3117,7 +3141,7 @@ function ServicesScreen() {
 }
 
 function BookScreen() {
-  const {activeSvc,user,addToast,setScreen}=useApp();
+  const {activeSvc,user,addToast,setScreen,setTrackBookingId}=useApp();
   const skipVerify=!!(user?.mobile_verified&&user?.first_name);
   const [step,setStep]=useState(1);
   const [date,setDate]=useState('');
@@ -3178,7 +3202,7 @@ function BookScreen() {
     finally{setLoading(false);}
   };
 
-  const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');if(!payMethod)return addToast('Complete UPI payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});invokeBookingDispatch({bookingId:data.id,serviceId:svc.id||svc.parent||'',serviceName:svc.name,lat:user.last_lat||null,lng:user.last_lng||null,location:loc,date,time});setBooking(data);addToast('Booking confirmed! Partner notified 🎉','success');setScreen('bookings');}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
+  const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');if(!payMethod)return addToast('Complete UPI payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});invokeBookingDispatch({bookingId:data.id,serviceId:svc.id||svc.parent||'',serviceName:svc.name,lat:user.last_lat||null,lng:user.last_lng||null,location:loc,date,time});setBooking(data);addToast('Booking confirmed! Track your partner live 📍','success');goToTrack(setTrackBookingId,setScreen,data.id);}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
   const confirmPaid=method=>{if(!bookPay.upiOpened&&!bookPay.paymentVerified){addToast('Pay via UPI first','error');return;}setPayMethod(method);setStep(4);addToast('Payment confirmed — pick date & time','success');};
   const goFromService=()=>{
     if(skipVerify){ setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); }
@@ -3286,34 +3310,187 @@ function osmEmbedUrl(vLat, vLng, cLat, cLng) {
   return url;
 }
 
-function LiveVendorMap({ live, booking, partnerName }) {
-  if (!live?.tracking_active || !live.lat || !live.lng) return null;
-  const updated = live.updated_at ? new Date(live.updated_at) : null;
+function LiveVendorMap({ live, booking, partnerName, large }) {
+  const mapH = large ? 320 : 180;
+  const hasLive = live?.tracking_active && live.lat && live.lng;
+  const updated = live?.updated_at ? new Date(live.updated_at) : null;
   const minsAgo = updated ? Math.max(0, Math.round((Date.now() - updated.getTime()) / 60000)) : null;
-  const mapsLink = `https://www.google.com/maps/dir/?api=1&destination=${live.lat},${live.lng}`;
+  const mapsLink = hasLive ? `https://www.google.com/maps/dir/?api=1&destination=${live.lat},${live.lng}` : null;
+  const embedSrc = hasLive
+    ? osmEmbedUrl(live.lat, live.lng, booking?.customer_lat, booking?.customer_lng)
+    : osmEmbedUrl(booking?.customer_lat, booking?.customer_lng, null, null);
+
   return (
-    <div style={{ marginTop: 12, borderTop: `1px solid ${C.bdr}`, paddingTop: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.grn, boxShadow: `0 0 0 3px ${C.grn}44`, animation: 'heroPulse 1.5s ease infinite' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.grn }}>Live partner location</span>
+    <div style={{ marginTop: large ? 0 : 12, borderTop: large ? 'none' : `1px solid ${C.bdr}`, paddingTop: large ? 0 : 12 }}>
+      {hasLive && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.grn, boxShadow: `0 0 0 3px ${C.grn}44`, animation: 'heroPulse 1.5s ease infinite' }} />
+              <span style={{ fontSize: large ? 14 : 12, fontWeight: 700, color: C.grn }}>Live partner location</span>
+            </div>
+            <span style={{ fontSize: 10, color: C.dim }}>{minsAgo === 0 ? 'Just now' : minsAgo != null ? `${minsAgo}m ago` : ''}</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>
+            {partnerName || 'Your partner'} is en route · tracking until service is closed
+          </div>
+        </>
+      )}
+      <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: mapH, background: C.deep }}>
+        <iframe title="Live partner map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
+      </div>
+      {mapsLink && (
+        <a href={mapsLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 11, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>
+          Open in Google Maps ↗
+        </a>
+      )}
+    </div>
+  );
+}
+
+function useLiveBookingTrack(bookingId) {
+  const [booking, setBooking] = useState(null);
+  const [live, setLive] = useState(null);
+  const [dispatch, setDispatch] = useState(null);
+  const [partnerName, setPartnerName] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (!bookingId) { setLoading(false); return; }
+    const { data: bk } = await sb().from('bookings').select('*').eq('id', bookingId).maybeSingle();
+    setBooking(bk || null);
+    if (bk?.partner_id) {
+      const { data: vendor } = await sb().from('vendor_partners').select('business_name').eq('profile_id', bk.partner_id).maybeSingle();
+      if (vendor?.business_name) setPartnerName(vendor.business_name);
+      else {
+        const { data: prof } = await sb().from('profiles').select('first_name,last_name').eq('id', bk.partner_id).maybeSingle();
+        if (prof) setPartnerName(`${prof.first_name || ''} ${prof.last_name || ''}`.trim());
+      }
+    }
+    const { data: loc } = await sb().from('vendor_live_locations').select('*').eq('booking_id', bookingId).maybeSingle();
+    setLive(loc?.tracking_active ? loc : null);
+    try {
+      const r = await sb().functions.invoke('booking-dispatch', { body: { action: 'status', booking_id: bookingId } });
+      setDispatch(r.data?.dispatch || null);
+    } catch { /* optional */ }
+    setLoading(false);
+  }, [bookingId]);
+
+  useEffect(() => {
+    refresh();
+    if (!bookingId) return undefined;
+    const poll = setInterval(refresh, 5000);
+    let channel;
+    try {
+      channel = sb().channel(`track-${bookingId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `id=eq.${bookingId}` }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_live_locations', filter: `booking_id=eq.${bookingId}` }, refresh)
+        .subscribe();
+    } catch { /* ignore */ }
+    return () => { clearInterval(poll); if (channel) sb().removeChannel(channel); };
+  }, [bookingId, refresh]);
+
+  return { booking, live, dispatch, partnerName, loading, refresh };
+}
+
+function trackStatusLabel(booking, dispatch, live) {
+  if (!booking) return { label: 'Loading…', color: C.dim, step: 0 };
+  if (booking.status === 'completed') return { label: 'Service completed', color: C.grn, step: 4 };
+  if (booking.status === 'cancelled' || booking.status === 'disputed') return { label: booking.status, color: C.red, step: 0 };
+  if (dispatch?.status === 'exhausted') return { label: 'Finding partner — trying more vendors', color: C.gold, step: 1 };
+  if (live?.tracking_active) return { label: 'Partner en route — live GPS', color: C.grn, step: 3 };
+  if (booking.partner_id) return { label: 'Partner assigned — awaiting GPS', color: C.cyan, step: 2 };
+  if (dispatch?.status === 'dispatching') return { label: 'Contacting nearest partner…', color: C.cyan, step: 1 };
+  return { label: 'Booking confirmed — finding partner', color: C.acc, step: 1 };
+}
+
+function TrackServiceScreen() {
+  const { user, setScreen, trackBookingId, setTrackBookingId, addToast } = useApp();
+  const bookingId = trackBookingId || trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
+  const { booking, live, dispatch, partnerName, loading } = useLiveBookingTrack(bookingId);
+  const status = trackStatusLabel(booking, dispatch, live);
+  const steps = ['Confirmed', 'Finding partner', 'Partner assigned', 'Live tracking', 'Complete'];
+
+  useEffect(() => {
+    if (bookingId) sessionStorage.setItem(TRACK_BOOKING_KEY, bookingId);
+  }, [bookingId]);
+
+  useEffect(() => {
+    if (booking?.status === 'completed') {
+      addToast?.('Service completed ✅', 'success');
+      sessionStorage.removeItem(TRACK_BOOKING_KEY);
+      setTrackBookingId?.(null);
+      window.location.hash = '';
+    }
+  }, [booking?.status, addToast, setTrackBookingId]);
+
+  if (!bookingId) {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF }}>
+        <TopBar title="Track my service" back="bookings" />
+        <div style={{ ...S.card(), margin: 16, padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
+          <div style={{ color: C.txt, fontWeight: 700, marginBottom: 8 }}>No active booking to track</div>
+          <Btn onClick={() => setScreen('bookings')}>View bookings</Btn>
         </div>
-        <span style={{ fontSize: 10, color: C.dim }}>{minsAgo === 0 ? 'Just now' : minsAgo != null ? `${minsAgo}m ago` : ''}</span>
       </div>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>
-        {partnerName || 'Your partner'} is en route · tracking until service is closed
-      </div>
-      <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: 180, background: C.deep }}>
-        <iframe
-          title="Live partner map"
-          src={osmEmbedUrl(live.lat, live.lng, booking?.customer_lat, booking?.customer_lng)}
-          style={{ width: '100%', height: '100%', border: 0 }}
-          loading="lazy"
-        />
-      </div>
-      <a href={mapsLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 11, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>
-        Open in Google Maps ↗
-      </a>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
+      <TopBar title="Track my service" back="bookings" />
+      {loading && !booking ? (
+        <div style={{ textAlign: 'center', padding: 48 }}><Spin size={32} /></div>
+      ) : (
+        <div style={{ padding: '0 16px 24px', flex: 1 }}>
+          <div style={{ ...S.card(), marginBottom: 12, padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: C.txt }}>{booking?.service_name || 'Your service'}</div>
+                <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{booking?.date} · {booking?.time || 'TBD'}</div>
+                {booking?.location_text && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>📍 {booking.location_text}</div>}
+              </div>
+              <Badge label={status.label} color={status.color} />
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+              {steps.map((s, i) => (
+                <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: status.step >= i ? (i === 3 && live ? C.grn : C.acc) : C.deep }} title={s} />
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: C.dim, textAlign: 'center' }}>{steps[status.step] || status.label}</div>
+          </div>
+
+          {!booking?.partner_id && booking?.status === 'confirmed' && (
+            <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
+              <strong style={{ color: C.txt }}>Notifying nearest partners</strong> — SMS, phone call & WhatsApp. Map updates when a partner accepts and shares GPS.
+            </div>
+          )}
+
+          <div style={{ ...S.card(), padding: 12, marginBottom: 12 }}>
+            <LiveVendorMap live={live} booking={booking} partnerName={partnerName} large />
+            {!live?.tracking_active && booking?.partner_id && (
+              <div style={{ marginTop: 12, fontSize: 12, color: C.sub, textAlign: 'center' }}>
+                Waiting for {partnerName || 'partner'} to share live location…
+              </div>
+            )}
+          </div>
+
+          {dispatch?.accept_code && !booking?.partner_id && (
+            <div style={{ fontSize: 11, color: C.dim, textAlign: 'center', marginBottom: 12 }}>
+              Dispatch code {dispatch.accept_code} · attempt {dispatch.attempt_num || 1} of 2 per partner
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Btn full onClick={() => { setScreen('bookings'); window.location.hash = ''; }}>All bookings</Btn>
+            <Btn v="outline" full onClick={() => window.location.reload()}>Refresh map</Btn>
+          </div>
+          <div style={{ marginTop: 16, fontSize: 10, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#track?id={bookingId}</code>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3354,7 +3531,7 @@ function usePartnerLocationShare(user, bookings, addToast) {
 }
 
 function BookingsScreen() {
-  const {user,addToast}=useApp();
+  const {user,addToast,setScreen,setTrackBookingId}=useApp();
   const [bookings,setBookings]=useState([]);
   const [loading,setLoading]=useState(true);
   const [stars,setStars]=useState({});
@@ -3443,6 +3620,9 @@ function BookingsScreen() {
               <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div><Badge label={b.status} color={sc(b.status)}/></div>
             </div>
             {showLive(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]}/>}
+            {user.role==='customer'&&b.status==='confirmed'&&(
+              <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
+            )}
             {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={()=>markComplete(b)}>✓ Mark complete</Btn>}
             {b.status==='completed'&&user.role==='customer'&&(
               <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
@@ -4322,6 +4502,7 @@ export default function App() {
   const [qrPrefill,setQrPrefill] = useState(null);
   const [,forceUpdate]         = useReducer(x=>x+1,0);
   const [silentGeo, setSilentGeo] = useState(null); // GPS captured silently
+  const [trackBookingId, setTrackBookingId] = useState(() => trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY) || null);
   const refreshPricing = useCallback(() => { forceUpdate(); }, []);
 
   const addToast=useCallback((msg,type='info')=>{
@@ -4370,12 +4551,22 @@ export default function App() {
         const {data:{session}}=await sb().auth.getSession();
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
-          if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) { setUser(p); setState('app'); return; }
+          if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
+            setUser(p); setState('app');
+            const tid = trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
+            if (isTrackRoute() && tid) { setTrackBookingId(tid); setScreen('track'); }
+            return;
+          }
         }
         const uid=localStorage.getItem('scanv_uid');
         if (uid) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
-          if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) { setUser(p); setState('app'); return; }
+          if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
+            setUser(p); setState('app');
+            const tid = trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
+            if (isTrackRoute() && tid) { setTrackBookingId(tid); setScreen('track'); }
+            return;
+          }
         }
       } catch(e){ console.warn('[ScanV]',e.message); }
       // Always show services first -- no registration wall
@@ -4396,6 +4587,16 @@ export default function App() {
     } catch { /* supabase not ready */ }
     return () => { if (channel) sb().removeChannel(channel); };
   }, [refreshPricing]);
+
+  useEffect(()=>{
+    if (state!=='app'||!user) return;
+    const onHash=()=>{
+      const tid=trackBookingIdFromHash();
+      if(isTrackRoute()&&tid){ setTrackBookingId(tid); setScreen('track'); }
+    };
+    window.addEventListener('hashchange',onHash);
+    return ()=>window.removeEventListener('hashchange',onHash);
+  },[state,user]);
 
   useEffect(()=>{
     if (!user) return;
@@ -4455,7 +4656,7 @@ export default function App() {
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
     <BrowseFlow
       silentGeo={silentGeo}
-      onRegistered={(p)=>{setUser(p);setState('app');}}
+      onRegistered={(p, bookingId)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else setScreen('home');}}
       addToast={addToast}
     />
     </Boundary>
@@ -4467,10 +4668,11 @@ export default function App() {
     </Boundary>
   );
 
-  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,setUser,refreshPricing};
+  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,setUser,refreshPricing,trackBookingId,setTrackBookingId};
 
   const renderScreen=()=>{
     if (screen==='book')     return <BookScreen/>;
+    if (screen==='track')    return <TrackServiceScreen/>;
     if (screen==='services') return <ServicesScreen/>;
     if (screen==='bookings') return <BookingsScreen/>;
     if (screen==='crm')      return <CRMScreen/>;
@@ -4487,7 +4689,7 @@ export default function App() {
         <Toast toasts={toasts}/>
         <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.bg}}>
           <Boundary>{renderScreen()}</Boundary>
-          {!['book'].includes(screen)&&<BottomNav/>}
+          {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>
       </Ctx.Provider>
     </Boundary>
