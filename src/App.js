@@ -382,6 +382,9 @@ const HOUSEHOLD_SVCS = [
   { id:'hh-quick-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'✨', img:'/services/quick-clean.png', name:'Quick Clean', sub:'Single task · bathroom · fan · 30 min', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV quick clean — affordable single-task service for one bathroom, fan or appliance. Perfect when you need just one thing done fast.',
     features:['Single bathroom refresh','Fan / exhaust wipe','Appliance exterior','30-min visit','Best-value quick booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,400+' },
+  { id:'hh-sofa-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🛋️', img:'/services/sofa-clean.png', name:'Sofa & Upholstery Clean', sub:'Fabric · cushions · stain treatment · 1–2 hrs', unit:'visit', mrp:24900, price:discPaise(24900), cash:false,
+    desc:'ScanV sofa & upholstery deep clean — fabric-safe shampoo, cushion refresh, and stain treatment for sofas, chairs, and dining seats. Ideal before guests or after monsoon.',
+    features:['Fabric-safe shampoo','Cushion & armrest clean','Stain spot treatment','Quick-dry method','All supplies included'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,600+' },
   { id:'hh-house-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🏡', img:'/services/house-help.png', name:'House Help', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:false,
     desc:'ScanV house help — trained, background-verified experts for sweeping, mopping, dusting, dishes & more. Book by the hour, instant or scheduled.',
     features:['Background verified experts','Professional training','Hourly — book 1–4 hrs','Instant or scheduled','Flexible tasks in one visit'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
@@ -403,6 +406,9 @@ const HOUSEHOLD_SVCS = [
   { id:'hh-bathroom-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🛁', img:'/services/bathroom-help.png', name:'Bathroom Refresh', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:false,
     desc:'ScanV bathroom refresh — WC, floor, taps & mirror within booked hours. Ideal for quick upkeep — book 1–2 hours.',
     features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Verified ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'5,200+' },
+  { id:'hh-ironing', parent:'household', theme:'green', fulfillVia:'s', icon:'👔', img:'/services/ironing.png', name:'Ironing & Pressing', sub:'Shirts · sarees · formals · hourly', unit:'hour', mrp:14900, price:discPaise(14900), cash:false,
+    desc:'ScanV ironing help — crisp pressing for office wear, sarees, and daily clothes at home. Book by the hour with your iron or ours.',
+    features:['Shirt & trouser press','Saree & kurta care','Steam finish','Hourly booking','Neat folding included'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'2,900+' },
 ];
 
 /** ScanV cloud card themes — hosting, infrastructure, managed */
@@ -485,6 +491,9 @@ const LEGAL_SVCS = [
   { id:'lg-contract', parent:'legal', theme:'counsel', icon:'📋', img:'/services/legal/contract.png', name:'Business Contract Review', sub:'Vendor · lease · employment · NDAs', unit:'project', mrp:3999900, price:discPaise(3999900), cash:false,
     desc:'ScanV contract review — protect your business with lawyer-reviewed agreements before you sign. Turnaround includes redlines and a short risk summary.',
     features:['Full clause review','Risk summary memo','Suggested redlines','One revision round','Phone walkthrough'], turnaround:'3–5 days', rating:'4.8 ⭐', bookings:'420+' },
+  { id:'lg-family', parent:'legal', theme:'counsel', icon:'👨‍👩‍👧', img:'/services/legal/family.png', name:'Family & Divorce Consult', sub:'Marriage · custody · maintenance · mediation', unit:'visit', mrp:149900, price:discPaise(149900), cash:false,
+    desc:'ScanV family law consultation — sensitive guidance on divorce, custody, maintenance, and mediation with verified family court advocates in Pune & PCMC.',
+    features:['Confidential session','Custody & maintenance advice','Mediation options','Document checklist','Court roadmap if needed'], turnaround:'Within 48 hrs', rating:'4.8 ⭐', bookings:'960+' },
   { id:'lg-doc-draft', parent:'legal', theme:'docs', icon:'📝', img:'/services/legal/doc-draft.png', name:'Document Drafting', sub:'Agreements · wills · affidavits · deeds', unit:'project', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV document drafting — custom legal documents prepared by qualified advocates. Includes one revision and e-copy delivery.',
     features:['Custom drafting','Legal formatting','One revision included','E-copy + print ready','Stamp duty guidance'], turnaround:'2–4 days', rating:'4.8 ⭐', bookings:'1,100+' },
@@ -494,6 +503,9 @@ const LEGAL_SVCS = [
   { id:'lg-notary', parent:'legal', theme:'docs', icon:'✍️', img:'/services/legal/notary.png', name:'Notary & Affidavit', sub:'Attestation · sworn statements · copies', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV notary services — affidavits, attestations, and certified copies through empanelled notaries. Home or office visit available in PCMC/Pune.',
     features:['Affidavit drafting help','Notary attestation','Certified true copies','Same-day slots','Doorstep option'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,200+' },
+  { id:'lg-rental', parent:'legal', theme:'docs', icon:'🔑', img:'/services/legal/rental-agreement.png', name:'Rental Agreement Pack', sub:'Draft · stamp · registration guidance · 11-month', unit:'project', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV rental agreement pack — lawyer-drafted leave & licence or rent agreement with stamp duty guidance and registration steps for landlords and tenants.',
+    features:['Custom draft for both parties','Stamp duty estimate','Registration checklist','One revision','E-copy + print ready'], turnaround:'1–2 days', rating:'4.8 ⭐', bookings:'2,700+' },
 ];
 
 const VIP_THEME = {
@@ -510,6 +522,9 @@ const VIP_SVCS = [
   { id:'vip-priority', parent:'vip', theme:'concierge', icon:'⭐', img:'/services/vip/priority.png', name:'Priority Appointments', sub:'Doctors · lawyers · govt · fast-track', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
     desc:'ScanV priority appointments — skip the queue for hard-to-get slots with doctors, consultants, and government-related visits. Confirmation within hours.',
     features:['Fast-track booking','Reminder calls','Reschedule support','Multi-category requests','Escalation desk'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'540+' },
+  { id:'vip-dining', parent:'vip', theme:'concierge', icon:'🍷', img:'/services/vip/dining.png', name:'Premium Dining Reservations', sub:'Top restaurants · private tables · occasions', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV dining concierge — secure hard-to-get tables at premium Pune restaurants with preference notes for birthdays, anniversaries, and client dinners.',
+    features:['Priority table holds','Special occasion notes','Dietary preferences sent','Reminder & directions','Cancel / change support'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'410+' },
   { id:'vip-airport', parent:'vip', theme:'travel', icon:'✈️', img:'/services/vip/airport.png', name:'Airport Transfer', sub:'Pickup · drop · meet & greet · Pune', unit:'visit', mrp:1499900, price:discPaise(1499900), cash:false,
     desc:'ScanV airport transfer — chauffeur pickup and drop for Pune airport with flight tracking, meet-and-greet, and clean premium vehicles.',
     features:['Flight tracking','Meet & greet option','Premium sedans & SUVs','Bottled water & tissues','Corporate billing'], turnaround:'On schedule', rating:'4.9 ⭐', bookings:'760+' },
@@ -532,6 +547,9 @@ const HEALTH_SVCS = [
   { id:'hl-elder', parent:'health', theme:'home', icon:'🤝', img:'/services/health/elder.png', name:'Elder Care Visit', sub:'Vitals · medication · mobility · hourly', unit:'hour', mrp:29900, price:discPaise(29900), cash:false,
     desc:'ScanV elder care — trained caregivers for vitals monitoring, medication reminders, and companionship at home. Book hourly blocks with family updates.',
     features:['Trained caregivers','Vitals logging','Medication reminders','Family WhatsApp updates','Flexible hours'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,800+' },
+  { id:'hl-nursing', parent:'health', theme:'home', icon:'💉', img:'/services/health/nursing.png', name:'Nursing Care at Home', sub:'Post-op · injections · wound dressings', unit:'hour', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV nursing at home — qualified nurses for post-operative care, injections, IV support, and wound dressing under doctor prescription in PCMC/Pune.',
+    features:['Registered nurses','Post-op monitoring','Injection & dressing','Doctor prescription required','Shift booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,100+' },
   { id:'hl-checkup', parent:'health', theme:'clinical', icon:'📋', img:'/services/health/checkup.png', name:'Full Body Checkup', sub:'40+ tests · home sample · report', unit:'visit', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV full body checkup — comprehensive preventive health package with home sample collection and digital report with doctor summary call.',
     features:['40+ parameters','Home sample pickup','Digital report','Doctor summary call','Annual reminder'], turnaround:'24–48 hrs', rating:'4.7 ⭐', bookings:'3,600+' },
@@ -541,6 +559,9 @@ const HEALTH_SVCS = [
   { id:'hl-pharmacy', parent:'health', theme:'clinical', icon:'💊', img:'/services/health/pharmacy.png', name:'Pharmacy Delivery', sub:'Prescription · OTC · 60 min target', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV pharmacy delivery — upload prescription or order OTC essentials with fast delivery from verified pharmacies near you in PCMC/Pune.',
     features:['Prescription upload','Verified pharmacies','60-min target zones','Cold-chain items','Reorder reminders'], turnaround:'30–60 min', rating:'4.6 ⭐', bookings:'12,000+' },
+  { id:'hl-vaccine', parent:'health', theme:'clinical', icon:'💉', img:'/services/health/vaccine.png', name:'Vaccination at Home', sub:'Flu · hepatitis · travel · corporate camps', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV vaccination at home — certified nurses administer approved vaccines at your doorstep with cold-chain handling and digital records.',
+    features:['Certified nurse visit','Cold-chain vaccines','Digital record card','Family & corporate slots','Doctor helpline'], turnaround:'24–48 hrs', rating:'4.8 ⭐', bookings:'2,200+' },
 ];
 
 const PR_THEME = {
@@ -557,6 +578,9 @@ const PROPERTY_SVCS = [
   { id:'pr-site', parent:'property', theme:'find', icon:'📍', img:'/services/property/site-visit.png', name:'Site Visit Package', sub:'3–5 properties · agent · same day', unit:'visit', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV site visit package — an assigned agent takes you through shortlisted properties in one trip with comparison notes and photos after the tour.',
     features:['Pre-shortlisted list','Dedicated agent','Comparison sheet','Photos & notes','Follow-up call'], turnaround:'Same day', rating:'4.6 ⭐', bookings:'1,100+' },
+  { id:'pr-commercial', parent:'property', theme:'find', icon:'🏢', img:'/services/property/commercial.png', name:'Commercial Space Finder', sub:'Office · shop · warehouse · PCMC', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
+    desc:'ScanV commercial finder — shortlist offices, retail shops, and warehouses by size, budget, and connectivity with landlord verification before you visit.',
+    features:['Size & budget match','Connectivity check','Landlord verification','Comparison sheet','Lease term guidance'], turnaround:'3–5 days', rating:'4.7 ⭐', bookings:'480+' },
   { id:'pr-legal', parent:'property', theme:'verify', icon:'📑', img:'/services/property/legal-check.png', name:'Legal Verification', sub:'Title · encumbrance · approvals · report', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
     desc:'ScanV legal verification — lawyer-led title search, encumbrance check, and approval review before you pay a token. Written risk report included.',
     features:['Title search','Encumbrance certificate','Approval review','Written risk report','Lawyer call summary'], turnaround:'3–5 days', rating:'4.8 ⭐', bookings:'620+' },
@@ -579,6 +603,9 @@ const DELIVERY_SVCS = [
   { id:'dl-parcel', parent:'delivery', theme:'local', icon:'🎁', img:'/services/delivery/parcel.png', name:'Parcel Pickup & Drop', sub:'Gifts · ecommerce · returns · multi-stop', unit:'visit', mrp:19900, price:discPaise(19900), cash:false,
     desc:'ScanV parcel service — flexible pickup and drop for personal parcels, returns, and multi-stop routes. Weight-based pricing shown upfront.',
     features:['Door pickup','Multi-stop routes','Weight-based quote','Return pickups','Evening slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'6,200+' },
+  { id:'dl-grocery', parent:'delivery', theme:'local', icon:'🛒', img:'/services/delivery/grocery.png', name:'Grocery & Essentials Run', sub:'Kirana · milk · bread · 90 min target', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
+    desc:'ScanV grocery run — send your list and we pick up from nearby stores and deliver to your door. Perfect when you cannot step out.',
+    features:['Custom shopping list','Local kirana partners','Bill photo before pay','90-min target','OTP handover'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'9,800+' },
   { id:'dl-intercity', parent:'delivery', theme:'express', icon:'🚚', img:'/services/delivery/intercity.png', name:'Inter-City Express', sub:'Maharashtra · overnight · tracked', unit:'project', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV inter-city express — overnight and next-day delivery across Maharashtra with tracking, insurance options, and business manifests.',
     features:['Overnight lanes','Live tracking','Insurance optional','Business manifests','Pickup scheduling'], turnaround:'Next day', rating:'4.8 ⭐', bookings:'2,100+' },
@@ -601,6 +628,9 @@ const FOOD_SVCS = [
   { id:'fd-office', parent:'food', theme:'daily', icon:'🥗', img:'/services/food/office.png', name:'Office Lunch Box', sub:'Team orders · invoicing · daily menu', unit:'month', mrp:1499900, price:discPaise(1499900), cash:false,
     desc:'ScanV office lunch — daily lunch boxes for teams with rotating menus, bulk pricing, and GST invoices for Pune & PCMC offices.',
     features:['Team dashboards','Rotating menus','Bulk pricing','GST invoices','Dedicated support'], turnaround:'Next day start', rating:'4.7 ⭐', bookings:'620+' },
+  { id:'fd-breakfast', parent:'food', theme:'daily', icon:'🥐', img:'/services/food/breakfast.png', name:'Breakfast & Snacks Plan', sub:'Morning tiffin · poha · idli · monthly', unit:'month', mrp:3499900, price:discPaise(3499900), cash:false,
+    desc:'ScanV breakfast plan — hot morning meals and evening snacks delivered on schedule from verified home kitchens. Pause days supported.',
+    features:['Daily morning slot','Veg & egg options','Pause & skip days','Evening snack add-on','Monthly billing'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'1,450+' },
   { id:'fd-catering', parent:'food', theme:'events', icon:'🎂', img:'/services/food/catering.png', name:'Party Catering', sub:'Birthday · corporate · 20–500 guests', unit:'project', mrp:9999900, price:discPaise(9999900), cash:false,
     desc:'ScanV party catering — menu planning, tasting, service staff, and live counters for birthdays, anniversaries, and corporate events.',
     features:['Custom menu planning','Tasting session','Service staff option','Live counters','Leftover packaging'], turnaround:'3–7 days', rating:'4.8 ⭐', bookings:'940+' },
@@ -739,14 +769,14 @@ const paiseFromInp = (r) => Math.round((Number(r) || 0) * 100);
 
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
-  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · registration · 6 services', cat:'Legal',              cash:false, ...svcDisc(999), legal:true },
+  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · registration · 8 services', cat:'Legal',              cash:false, ...svcDisc(999), legal:true },
   { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'Hosting · infra · packages · 18 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
-  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Concierge · travel · events · 5 services', cat:'VIP Appointments',   cash:false, ...svcDisc(9999), vip:true },
-  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 6 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
-  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 5 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
-  { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 12 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
-  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 5 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
-  { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurant · catering · 5 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
+  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Concierge · travel · events · 6 services', cat:'VIP Appointments',   cash:false, ...svcDisc(9999), vip:true },
+  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 8 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
+  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 6 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
+  { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
+  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
+  { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurant · catering · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
 ];
 
 const SVC_CARD_THEME = {
@@ -2800,14 +2830,14 @@ function HomeScreen() {
 
 // Service detail data
 const SVC_DETAIL = {
-  legal:    { desc:'Verified lawyers for consultation, drafting, registration, and court filings — 6 ScanV legal services · 25% off.', features:['Lawyer consultation','Document drafting','Property registration','Court filing support','Notary & affidavits'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
+  legal:    { desc:'Verified lawyers for consultation, drafting, registration, and court filings — 8 ScanV legal services · 25% off.', features:['Lawyer consultation','Document drafting','Property registration','Court filing support','Rental agreements & notary'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
   cloud:    { desc:'Enterprise cloud hosting, infrastructure, managed IT, turnkey packages, and training — 18 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Datacenter & network design','Infrastructure audits & roadmaps','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,600+' },
-  vip:      { desc:'Premium concierge, executive assistant, airport transfers, and event planning — 5 VIP services · 25% off.', features:['24×7 personal concierge','Executive assistant hourly','Airport transfers','Event planning','Priority appointments'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
-  health:   { desc:'Doctors at home, lab tests, pharmacy delivery, and specialist consults — 6 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Specialist consultations','Elder care visits'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
-  property: { desc:'Buy, sell, rent, verify, and finance property in PCMC/Pune — 5 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Site visit packages','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
-  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  delivery: { desc:'Same-day courier, documents, parcels, and inter-city express across Maharashtra — 5 delivery services · 25% off.', features:['Same-day pickup','Document handover','Parcel routes','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  food:     { desc:'Home tiffin, restaurant orders, office lunch, and catering — 5 food services · 25% off.', features:['Monthly tiffin plans','Restaurant delivery','Office lunch boxes','Party catering','Festival menus'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+  vip:      { desc:'Premium concierge, executive assistant, airport transfers, and event planning — 6 VIP services · 25% off.', features:['24×7 personal concierge','Executive assistant hourly','Premium dining reservations','Airport transfers','Event planning'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
+  health:   { desc:'Doctors at home, lab tests, pharmacy delivery, nursing, and vaccinations — 8 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Nursing care at home','Vaccination at home'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
+  property: { desc:'Buy, sell, rent, verify, and finance property in PCMC/Pune — 6 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Commercial space search','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
+  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 14 services · 25% off.', features:['Deep cleaning visits','Sofa & upholstery clean','Hourly home help','Ironing & pressing','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  delivery: { desc:'Same-day courier, documents, parcels, groceries, and inter-city express — 6 delivery services · 25% off.', features:['Same-day pickup','Document handover','Grocery & essentials run','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  food:     { desc:'Home tiffin, breakfast plans, restaurant orders, office lunch, and catering — 6 food services · 25% off.', features:['Monthly tiffin plans','Breakfast & snacks plan','Restaurant delivery','Office lunch boxes','Party catering'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
 };
 
 function ServicesScreen() {
