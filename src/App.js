@@ -3326,16 +3326,18 @@ function PricingAdminPage({ onPricesUpdated }) {
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1100 }}>
             <thead>
               <tr>
-                {[['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['','save']].map(([label])=>(
-                  <th key={label||'save'} style={th}>{label}</th>
+                {[['#','num'],['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['','save']].map(([label, key])=>(
+                  <th key={key} style={{ ...th, ...(key === 'num' ? { width:36, textAlign:'center' } : {}) }}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {shown.map((r) => {
                 const idx = rows.indexOf(r);
+                const rowNum = idx + 1;
                 return (
                   <tr key={r.service_id}>
+                    <td style={{ ...td, textAlign:'center', fontWeight:700, color:C.acc, fontSize:11 }} title={`Row ${rowNum} · ${r.service_id}`}>{rowNum}</td>
                     <td style={{ ...td, color:C.sub, maxWidth:100 }}>{r.card}</td>
                     <td style={{ ...td, color:C.dim, fontSize:10 }}>{r.sub_card}</td>
                     <td style={{ ...td, fontWeight:600, color:C.txt }}>{r.service_name}</td>
@@ -3355,7 +3357,7 @@ function PricingAdminPage({ onPricesUpdated }) {
           {!shown.length && !loading && <div style={{ padding:40, textAlign:'center', color:C.dim }}>No rows — deploy migration & edge function first</div>}
         </div>
         <div style={{ marginTop:14, fontSize:11, color:C.dim, lineHeight:1.6 }}>
-          Change <strong>New ₹</strong> to update card prices on the live app. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
+          <strong>#</strong> is the fixed row number (1–{rows.length}) — use it when asking to change a specific row. Change <strong>New ₹</strong> to update card prices on the live app. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
         </div>
       </div>
     </div>
