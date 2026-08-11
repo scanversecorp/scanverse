@@ -437,6 +437,9 @@ const CLOUD_SVCS = [
   { id:'cl-hardware', parent:'cloud', theme:'build', icon:'💻', img:'/services/cloud/hardware.png', name:'IT Hardware Supply', sub:'Servers · storage · laptops · networking', unit:'project', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV hardware supply — source, configure, and deliver enterprise servers, storage, switches, and end-user devices. Pre-staging and imaging available so equipment arrives ready to plug in.',
     features:['Enterprise-grade sourcing','Pre-config & imaging','Warranty registration','Delivery & rack-mount','Asset tagging'], turnaround:'3–7 days', rating:'4.7 ⭐', bookings:'520+' },
+  { id:'cl-infra-audit', parent:'cloud', theme:'build', icon:'📋', img:'/services/cloud/infra-audit.png', name:'Infrastructure Audit & Roadmap', sub:'Assess · benchmark · 12-month upgrade plan', unit:'project', mrp:899900, price:discPaise(899900), cash:false,
+    desc:'ScanV infrastructure audit — we review your servers, network, storage, and security posture, then deliver a prioritised roadmap with cost options. Ideal before expansion, compliance reviews, or cloud migration.',
+    features:['On-site or remote assessment','Performance & risk report','Costed upgrade options','12-month phased roadmap','Executive presentation'], turnaround:'1–2 weeks', rating:'4.8 ⭐', bookings:'275+' },
   { id:'cl-managed', parent:'cloud', theme:'care', icon:'🛡️', img:'/services/cloud/managed.png', name:'Managed IT Services', sub:'24×7 monitoring · IAM · proactive ops', unit:'month', mrp:249900, price:discPaise(249900), cash:false,
     desc:'ScanV managed services — we watch your systems around the clock, patch vulnerabilities, manage identities, and respond to incidents before users notice. SLA-driven delivery with monthly health reports.',
     features:['24×7 monitoring & alerts','Patch & vulnerability mgmt','Identity & access reviews','Monthly health reports','Dedicated service desk'], turnaround:'Starts in 72 hrs', rating:'4.9 ⭐', bookings:'760+' },
@@ -474,7 +477,7 @@ const CL_BY_ID = Object.fromEntries(CLOUD_SVCS.map(s => [s.id, s]));
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
   { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false, ...svcDisc(999) },
-  { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'Hosting · infra · packages · 17 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
+  { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'Hosting · infra · packages · 18 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
   { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false, ...svcDisc(9999) },
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
@@ -496,7 +499,7 @@ const SVC_CARD_THEME = {
 
 const HOME_CARD_META = {
   legal:    { commitment:'Justice with a human touch.',     face:'Adv. Priya · verified lawyer' },
-  cloud:    { commitment:'Scale with confidence.',          face:'Cloud · infra · 17 services' },
+  cloud:    { commitment:'Scale with confidence.',          face:'Cloud · infra · 18 services' },
   vip:      { commitment:'You first. Every single time.',   face:'Meera · concierge lead' },
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
   property: { commitment:'Find home. Find peace.',          face:'Verified listings · PCMC' },
@@ -2611,7 +2614,7 @@ function HomeScreen() {
 // Service detail data
 const SVC_DETAIL = {
   legal:    { desc:'Connect with verified lawyers for consultation, document drafting, property registration, court filings, and legal advice.', features:['Initial consultation','Document review & drafting','Property registration','Court representation','Online & offline'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
-  cloud:    { desc:'Enterprise cloud hosting, infrastructure, managed IT, turnkey packages, and training — 17 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Datacenter & network design','Managed 24×7 operations','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,400+' },
+  cloud:    { desc:'Enterprise cloud hosting, infrastructure, managed IT, turnkey packages, and training — 18 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Datacenter & network design','Infrastructure audits & roadmaps','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,600+' },
   vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
