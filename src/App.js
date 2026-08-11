@@ -176,8 +176,8 @@ function RazorpayPayButton({ onInteract }) {
   return (
     <div style={{ marginBottom: 16, width: '100%', maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 10, textAlign: 'center' }}>Or pay via Razorpay</div>
-      <div className="rzp-pay-wrap" style={{ width: '100%', overflow: 'hidden' }}>
-        <form ref={formRef} className="rzp-pay-form" style={{ display: 'block', width: '100%', margin: 0, padding: 0, border: 'none', overflow: 'hidden' }} />
+      <div className="rzp-pay-wrap">
+        <form ref={formRef} className="rzp-pay-form" />
       </div>
     </div>
   );
@@ -1268,9 +1268,10 @@ const APP_CSS = `
   @keyframes heroPulse{0%,100%{opacity:0.45;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
   ::-webkit-scrollbar{width:0}
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
-  .rzp-pay-wrap,.rzp-pay-form{width:100%;max-width:480px;overflow:hidden}
-  .rzp-pay-form .razorpay-payment-button{width:100%!important;max-width:100%!important;display:block!important;margin:0 auto!important;overflow:hidden!important;background-repeat:no-repeat!important;background-size:100% auto!important}
-  .rzp-pay-form .razorpay-payment-button iframe,.rzp-pay-form .razorpay-payment-button form,.rzp-pay-form .razorpay-payment-button button{width:100%!important;max-width:100%!important;display:block!important;margin:0 auto!important}
+  .rzp-pay-wrap{display:flex;justify-content:center;width:100%;max-width:480px;margin:0 auto;overflow:hidden}
+  .rzp-pay-form{display:flex!important;flex-direction:column!important;align-items:center!important;width:100%!important;max-width:480px;margin:0!important;padding:0!important;border:none!important;overflow:hidden!important}
+  .rzp-pay-form .razorpay-payment-button{width:100%!important;max-width:480px!important;display:block!important;margin:0 auto!important;overflow:hidden!important;background-repeat:no-repeat!important;background-size:100% auto!important}
+  .rzp-pay-form .razorpay-payment-button iframe,.rzp-pay-form .razorpay-payment-button form,.rzp-pay-form .razorpay-payment-button button{width:100%!important;max-width:480px!important;display:block!important;margin:0 auto!important}
 `;
 
 const LEGAL_ROUTES = new Set(['privacy','terms','refund','payment']);
