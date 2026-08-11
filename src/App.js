@@ -19,7 +19,7 @@ const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-const UPI_PA   = 'samir.0288-3@wahdfcbank';
+const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE Global Corporation';
 const ASSIST   = '+91-9270194842';
 
@@ -28,6 +28,11 @@ const UPI_PACKAGES = {
   PhonePe: 'com.phonepe.app',
   Paytm: 'net.one97.paytm',
 };
+
+/** @wahdfcbank / @wa* handles are WhatsApp Pay only — GPay/PhonePe always route to WhatsApp */
+function isWhatsAppOnlyVpa(vpa = UPI_PA) {
+  return /@wa/i.test(vpa);
+}
 
 function isAndroidUA() { return /Android/i.test(navigator.userAgent); }
 function isInAppBrowser() {
@@ -47,7 +52,7 @@ function buildUpiLink(amountPaise, txnRef, note) {
   return `upi://pay?${buildUpiParams(amountPaise, txnRef, note)}`;
 }
 function buildUpiIntent(params, pkg) {
-  return `intent://pay?${params}#Intent;scheme=upi;package=${pkg};end`;
+  return `intent://pay?${params}#Intent;action=android.intent.action.VIEW;scheme=upi;package=${pkg};end`;
 }
 /** Open URL via hidden anchor — avoids WhatsApp intercept from window.location on intent:// */
 function openUrlViaAnchor(url) {
@@ -65,6 +70,7 @@ function openUrlViaAnchor(url) {
  * iOS: upi:// via anchor.
  */
 function openUpiPay(app, amountPaise, txnRef, note) {
+  if (isWhatsAppOnlyVpa()) return false;
   const params = buildUpiParams(amountPaise, txnRef, note);
   if (isAndroidUA()) {
     if (app === 'Any UPI') return false;
@@ -129,8 +135,8 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
       {inApp && <InAppBrowserBanner addToast={addToast} />}
       <UpiVpaCopy addToast={addToast} />
       {UPI_PA.includes('@wa') && (
-        <div style={{ background: '#e8f4fd', border: `1.5px solid rgba(13,71,161,0.25)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 11, color: C.cyan, lineHeight: 1.5 }}>
-          This UPI ID uses WhatsApp Pay rail. If GPay/PhonePe fail, copy the ID below and pay manually in your UPI app with the exact amount shown.
+        <div style={{ background: '#fde8e8', border: `1.5px solid rgba(198,40,40,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 11, color: C.red, lineHeight: 1.5 }}>
+          ⚠️ <strong>@wahdfcbank</strong> is WhatsApp Pay only — buttons will open WhatsApp, not GPay/PhonePe. Use a standard UPI ID ending in <strong>@hdfcbank</strong>, <strong>@ybl</strong>, or <strong>@paytm</strong>.
         </div>
       )}
       <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
@@ -253,6 +259,10 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
   const triggerUpi = (app) => {
     if (isInAppBrowser()) {
       addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
+      return;
+    }
+    if (isWhatsAppOnlyVpa()) {
+      addToast?.('This UPI ID is WhatsApp Pay only — use Copy and pay in GPay/PhonePe manually', 'error');
       return;
     }
     if (openUpiPay(app, amountPaise, txnId, 'ScanV Booking')) {
