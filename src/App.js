@@ -384,7 +384,7 @@ const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', pr
 
 const DISC_PCT = 0.25;
 const discPaise = (mrpPaise) => Math.round(mrpPaise * (1 - DISC_PCT));
-const fmtRs = (paise) => (paise / 100).toLocaleString('en-IN');
+const fmtRs = (paise) => ((Number(paise) || 0) / 100).toLocaleString('en-IN');
 const svcDisc = (mrpRupees) => ({ mrp: mrpRupees * 100, price: discPaise(mrpRupees * 100) });
 
 /** ScanV household card themes — user-facing only. fulfillVia is backend routing (not shown in UI). */
@@ -5483,10 +5483,6 @@ function TicketDeskPanel({ pin, useAdminPin = false, readOnly = false }) {
 /* ================================================================
    CUSTOMER SUPPORT — #customer-support (read-only agents, admin update)
 ================================================================ */
-function fmtRs(paise) {
-  return `₹${((Number(paise) || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`;
-}
-
 function fmtDt(iso) {
   if (!iso) return '—';
   try { return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); }
@@ -5736,7 +5732,7 @@ function CustomerSupportPage() {
                   <div style={{ fontWeight: 700, color: C.txt, fontSize: 13 }}>{b.service_name}</div>
                   <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text}</div>
                   <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
-                    Status: <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} /> · {fmtRs(b.total)} · TXN {b.txn_id}
+                    Status: <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} /> · ₹{fmtRs(b.total)} · TXN {b.txn_id}
                     {b.paid_at ? ` · Paid ${fmtDt(b.paid_at)}` : ''}
                   </div>
                   {isAdmin && (
@@ -5754,7 +5750,7 @@ function CustomerSupportPage() {
               <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Payments ({detail.payments?.length || 0})</div>
               {(detail.payments || []).length ? (detail.payments || []).map(p => (
                 <div key={p.id} style={{ borderBottom: `1px solid ${C.bdr}`, padding: '8px 0', fontSize: 11 }}>
-                  <span style={{ fontWeight: 700, color: C.txt }}>{fmtRs(p.amount)}</span>
+                  <span style={{ fontWeight: 700, color: C.txt }}>₹{fmtRs(p.amount)}</span>
                   <span style={{ color: C.sub }}> · {p.method} · </span>
                   <Badge label={p.status} color={p.status === 'success' ? C.grn : C.gold} />
                   <span style={{ color: C.dim }}> · {p.gateway} · TXN {p.txn_id}</span>
@@ -5767,7 +5763,7 @@ function CustomerSupportPage() {
               {(detail.payment_intents || []).length ? (detail.payment_intents || []).map(pi => (
                 <div key={pi.id} style={{ borderBottom: `1px solid ${C.bdr}`, padding: '8px 0', fontSize: 11 }}>
                   <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
-                  <span style={{ color: C.sub }}> · {fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
+                  <span style={{ color: C.sub }}> · ₹{fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
                   {pi.verified_via && <span style={{ color: C.dim }}> · via {pi.verified_via}</span>}
                   {pi.paid_at && <span style={{ color: C.dim }}> · {fmtDt(pi.paid_at)}</span>}
                 </div>
@@ -6014,14 +6010,14 @@ function AdminBookingsTab({ pin }) {
           <div style={{ fontWeight: 700, color: C.txt }}>{b.service_name}</div>
           <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text || '—'}</div>
           <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
-            <Badge label={b.status} color={C.acc} /> · {fmtRs(b.total)} · TXN {b.txn_id || '—'}
+            <Badge label={b.status} color={C.acc} /> · ₹{fmtRs(b.total)} · TXN {b.txn_id || '—'}
           </div>
         </div>
       ))}
       {subTab === 'payments' && payments.map(pi => (
         <div key={pi.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
           <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
-          <span style={{ fontSize: 11, color: C.sub }}> · {fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
+          <span style={{ fontSize: 11, color: C.sub }}> · ₹{fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
           {pi.paid_at && <span style={{ fontSize: 10, color: C.dim }}> · {fmtDt(pi.paid_at)}</span>}
         </div>
       ))}
@@ -6134,7 +6130,7 @@ function AdminControlCenter({ onPricesUpdated }) {
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
               <AdminStatCard label="Bookings" value={stats?.bookings_count ?? '—'} sub={stats?.bookings_by_status ? Object.entries(stats.bookings_by_status).map(([k,v]) => `${k}: ${v}`).join(' · ') : ''} />
-              <AdminStatCard label="Revenue (payments)" value={stats ? fmtRs(stats.revenue_paise) : '—'} color={C.grn} />
+              <AdminStatCard label="Revenue (payments)" value={stats ? `₹${fmtRs(stats.revenue_paise)}` : '—'} color={C.grn} />
               <AdminStatCard label="Active vendors" value={stats?.active_vendors ?? '—'} color={C.cyan} />
               <AdminStatCard label="Pending dispatches" value={stats?.pending_dispatches ?? '—'} color={C.gold} />
               <AdminStatCard label="Support agents" value={stats?.active_support_agents ?? '—'} />
