@@ -18,8 +18,6 @@ import {
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
-const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-const RZP_BUTTON_ID = 'pl_TORikAHmO4yfg5';
 const UPI_PA   = 'vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const ASSIST   = '+91-9270194842';
@@ -154,36 +152,25 @@ function UpiPickerModal({ onPick, onClose }) {
     </div>
   );
 }
-function RazorpayPayButton({ onInteract }) {
-  const formRef = useRef(null);
-  const onInteractRef = useRef(onInteract);
-  onInteractRef.current = onInteract;
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form || form.querySelector('.razorpay-payment-button') || form.querySelector('script[data-payment_button_id]')) return;
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/payment-button.js';
-    script.async = true;
-    script.setAttribute('data-payment_button_id', RZP_BUTTON_ID);
-    form.appendChild(script);
-    const mark = () => onInteractRef.current?.();
-    form.addEventListener('click', mark);
-    return () => {
-      form.removeEventListener('click', mark);
-      form.innerHTML = '';
-    };
-  }, []);
+function RazorpayPayButton({ linkUrl, loading, onPay, amountPaise }) {
+  const amountRu = amountPaise ? (amountPaise / 100).toLocaleString('en-IN') : '0';
   return (
-    <div style={{ marginBottom: 16, width: '100%', maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 16 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 10, textAlign: 'center' }}>Or pay via Razorpay</div>
-      <div className="rzp-pay-wrap">
-        <form ref={formRef} className="rzp-pay-form" />
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+        <Btn
+          onClick={onPay}
+          disabled={loading || !linkUrl}
+          style={{ minWidth: 220, textAlign: 'center', margin: '0 auto' }}
+        >
+          {loading ? 'Loading Razorpay…' : linkUrl ? `Pay ₹${amountRu} with Razorpay →` : 'Razorpay unavailable — use UPI'}
+        </Btn>
       </div>
     </div>
   );
 }
-async function requirePaymentVerified(txnId, onStale) {
-  const ok = await checkPaymentVerified(txnId);
+async function requirePaymentVerified(txnId, expectedAmountPaise, onStale) {
+  const ok = await checkPaymentVerified(txnId, expectedAmountPaise);
   if (!ok) onStale?.();
   return ok;
 }
@@ -200,7 +187,7 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
     }
     setConfirming(true);
     try {
-      const ok = await requirePaymentVerified(txnId, () => setPaymentVerified(false));
+      const ok = await requirePaymentVerified(txnId, amountPaise, () => setPaymentVerified(false));
       if (!ok) {
         addToast?.('Payment not found yet. Finish paying — we check automatically every few seconds.', 'error');
         return;
@@ -233,7 +220,12 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
       {inApp && (
         <div style={{ fontSize: 11, color: C.dim, textAlign: 'center', marginBottom: 14 }}>Open in Chrome/Safari to launch UPI apps</div>
       )}
-      <RazorpayPayButton onInteract={() => setUpiOpened(true)} />
+      <RazorpayPayButton
+        linkUrl={pay.razorpayLinkUrl}
+        loading={pay.razorpayLinkLoading}
+        amountPaise={amountPaise}
+        onPay={() => pay.openRazorpay?.()}
+      />
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
           {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app — we confirm automatically (no manual “I\'ve paid” needed)'}
@@ -276,24 +268,35 @@ function UpiVpaCopy({ addToast }) {
   );
 }
 async function registerPaymentIntent(txnId, amountPaise, userId) {
-  if (!txnId || !amountPaise) return;
+  if (!txnId || !amountPaise) return null;
   try {
-    await sb().functions.invoke('razorpay-payment', { body: { action: 'register', txn_id: txnId, amount_paise: amountPaise, user_id: userId || null } });
+    const r = await sb().functions.invoke('razorpay-payment', { body: { action: 'register', txn_id: txnId, amount_paise: amountPaise, user_id: userId || null } });
+    return r.data || null;
   } catch (_) {
     try {
       await sb().from('payment_intents').upsert({ txn_id: txnId, amount_paise: amountPaise, user_id: userId || null, status: 'pending' }, { onConflict: 'txn_id', ignoreDuplicates: true });
     } catch (_2) {}
+    return null;
   }
 }
-async function checkPaymentVerified(txnId) {
+async function checkPaymentVerified(txnId, expectedAmountPaise) {
   if (!txnId) return false;
   try {
-    const r = await sb().functions.invoke('razorpay-payment', { body: { action: 'check', txn_id: txnId } });
-    if (r.data?.verified) return true;
+    const r = await sb().functions.invoke('razorpay-payment', {
+      body: {
+        action: 'check',
+        txn_id: txnId,
+        amount_paise: expectedAmountPaise || undefined,
+      },
+    });
+    if (r.data?.verified && r.data?.amount_ok !== false) return true;
+    if (r.data?.verified === false && r.data?.amount_ok === false) return false;
   } catch (_) {}
   try {
-    const { data } = await sb().from('payment_intents').select('status').eq('txn_id', txnId).maybeSingle();
-    return data?.status === 'paid';
+    const { data } = await sb().from('payment_intents').select('status, amount_paise').eq('txn_id', txnId).maybeSingle();
+    if (data?.status !== 'paid') return false;
+    if (expectedAmountPaise && data.amount_paise !== expectedAmountPaise) return false;
+    return true;
   } catch (_) { return false; }
 }
 function usePaymentVerification(txnId, amountPaise, userId, addToast) {
@@ -301,21 +304,30 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
   const [upiOpened, setUpiOpened] = useState(false);
   const [checkingPay, setCheckingPay] = useState(false);
   const [showUpiPicker, setShowUpiPicker] = useState(false);
+  const [razorpayLinkUrl, setRazorpayLinkUrl] = useState(null);
+  const [razorpayLinkLoading, setRazorpayLinkLoading] = useState(false);
   useEffect(() => {
     if (!txnId || !amountPaise) return;
-    registerPaymentIntent(txnId, amountPaise, userId);
+    let cancelled = false;
+    setRazorpayLinkLoading(true);
+    setRazorpayLinkUrl(null);
+    registerPaymentIntent(txnId, amountPaise, userId).then((data) => {
+      if (cancelled) return;
+      if (data?.payment_link_url) setRazorpayLinkUrl(data.payment_link_url);
+      setRazorpayLinkLoading(false);
+    });
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === txnId && params.get('razorpay_payment_link_status') === 'paid') {
-      setPaymentVerified(true);
       setUpiOpened(true);
     }
+    return () => { cancelled = true; };
   }, [txnId, amountPaise, userId]);
   useEffect(() => {
     if (!upiOpened || !txnId || paymentVerified) return;
     let cancelled = false;
     const poll = async () => {
       setCheckingPay(true);
-      const ok = await checkPaymentVerified(txnId);
+      const ok = await checkPaymentVerified(txnId, amountPaise);
       if (!cancelled && ok) {
         setPaymentVerified(true);
         addToast?.('Payment confirmed ✓', 'success');
@@ -327,7 +339,16 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     const onVis = () => { if (document.visibilityState === 'visible') poll(); };
     document.addEventListener('visibilitychange', onVis);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
-  }, [upiOpened, txnId, paymentVerified, addToast]);
+  }, [upiOpened, txnId, amountPaise, paymentVerified, addToast]);
+  const openRazorpay = () => {
+    if (!razorpayLinkUrl) {
+      addToast?.('Razorpay link not ready — use UPI or wait a moment', 'error');
+      return;
+    }
+    setUpiOpened(true);
+    window.open(razorpayLinkUrl, '_blank', 'noopener,noreferrer');
+    addToast?.('Complete payment in Razorpay — we confirm automatically', 'info');
+  };
   const triggerUpi = (app) => {
     if (isInAppBrowser()) {
       addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
@@ -364,7 +385,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
   return {
     paymentVerified, upiOpened, checkingPay, launchUpi, launchUpiDirect,
     showUpiPicker, setShowUpiPicker, setPaymentVerified, setUpiOpened,
-    amountPaise, txnId,
+    amountPaise, txnId, razorpayLinkUrl, razorpayLinkLoading, openRazorpay,
   };
 }
 const FEE_PCT  = 0.10;
@@ -1268,10 +1289,7 @@ const APP_CSS = `
   @keyframes heroPulse{0%,100%{opacity:0.45;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
   ::-webkit-scrollbar{width:0}
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
-  .rzp-pay-wrap{display:flex;justify-content:center;width:100%;max-width:480px;margin:0 auto;overflow:hidden}
-  .rzp-pay-form{display:flex!important;flex-direction:column!important;align-items:center!important;width:100%!important;max-width:480px;margin:0!important;padding:0!important;border:none!important;overflow:hidden!important}
-  .rzp-pay-form .razorpay-payment-button{width:100%!important;max-width:480px!important;display:block!important;margin:0 auto!important;overflow:hidden!important;background-repeat:no-repeat!important;background-size:100% auto!important}
-  .rzp-pay-form .razorpay-payment-button iframe,.rzp-pay-form .razorpay-payment-button form,.rzp-pay-form .razorpay-payment-button button{width:100%!important;max-width:480px!important;display:block!important;margin:0 auto!important}
+  .rzp-pay-wrap{display:flex;justify-content:center;align-items:center;width:100%;max-width:480px;margin:0 auto}
 `;
 
 const LEGAL_ROUTES = new Set(['privacy','terms','refund','payment']);
@@ -2285,7 +2303,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       addToast?.('Payment not confirmed yet — complete payment first', 'error');
       return;
     }
-    const ok = await requirePaymentVerified(txnId, () => browsePay.setPaymentVerified(false));
+    const ok = await requirePaymentVerified(txnId, browseTotal, () => browsePay.setPaymentVerified(false));
     if (!ok) {
       addToast?.('Payment not verified. Finish paying — we check automatically.', 'error');
       return;
@@ -2301,7 +2319,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     if (!paymentMethod || !browsePay.paymentVerified) return setErr('Complete payment first');
     setLoading(true); setErr('');
     try {
-      const paid = await checkPaymentVerified(txnId);
+      const paid = await checkPaymentVerified(txnId, browseTotal);
       if (!paid) {
         browsePay.setPaymentVerified(false);
         setPaymentMethod(null);
@@ -3603,7 +3621,7 @@ function BookScreen() {
     if (!payMethod || !bookPay.paymentVerified) return addToast('Complete UPI payment first', 'error');
     setLoading(true);
     try {
-      const paid = await checkPaymentVerified(txnId);
+      const paid = await checkPaymentVerified(txnId, total);
       if (!paid) {
         bookPay.setPaymentVerified(false);
         setPayMethod(null);
@@ -3657,7 +3675,7 @@ function BookScreen() {
       addToast('Payment not confirmed yet — complete payment first', 'error');
       return;
     }
-    const ok = await requirePaymentVerified(txnId, () => bookPay.setPaymentVerified(false));
+    const ok = await requirePaymentVerified(txnId, total, () => bookPay.setPaymentVerified(false));
     if (!ok) {
       addToast('Payment not verified. Finish paying — we check automatically.', 'error');
       return;
