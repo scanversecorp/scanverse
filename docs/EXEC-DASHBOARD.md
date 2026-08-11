@@ -46,11 +46,12 @@ npx supabase functions deploy admin-hub --no-verify-jwt
 npm run build
 ```
 
-Set secrets (if not already):
+Set via Supabase secrets — owner/admin use `ScanV2026`, agents use `ScanV2026Agent`. Do not commit PIN values to git.
 
 ```bash
-npx supabase secrets set ADMIN_HUB_PIN=YourOwnerPin123
-npx supabase secrets set SUPPORT_ADMIN_PIN=YourSupportAdminPin123
+npx supabase secrets set \
+  ADMIN_HUB_PIN=<admin-pin> \
+  SUPPORT_ADMIN_PIN=<admin-pin>
 ```
 
 ## Notes

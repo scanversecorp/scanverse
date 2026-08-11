@@ -21,12 +21,14 @@ Leaders who already use `PRICING_ADMIN_PIN` or `VENDOR_ADMIN_PIN` are treated as
 
 ## PIN setup (Supabase secrets)
 
+Set via Supabase secrets — owner/admin use `ScanV2026`, agents use `ScanV2026Agent`. Do not commit PIN values to git.
+
 From the project root, linked to project `rwlwrmmqtedugcreweut`:
 
 ```bash
 npx supabase secrets set \
-  SUPPORT_AGENT_PIN=YourAgentPin123 \
-  SUPPORT_ADMIN_PIN=YourAdminPin456
+  SUPPORT_AGENT_PIN=<agent-pin> \
+  SUPPORT_ADMIN_PIN=<admin-pin>
 ```
 
 Then deploy the edge function:

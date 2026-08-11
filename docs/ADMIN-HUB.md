@@ -67,9 +67,16 @@ Auth is PIN-based via env secrets — the registry is for audit, not per-row PIN
 
 ## Setup
 
+Set via Supabase secrets — owner/admin use `ScanV2026`, agents use `ScanV2026Agent`. Do not commit PIN values to git.
+
 ```bash
 # From project root (linked to rwlwrmmqtedugcreweut)
-npx supabase secrets set ADMIN_HUB_PIN=YourHubPin123
+npx supabase secrets set \
+  ADMIN_HUB_PIN=<admin-pin> \
+  SUPPORT_ADMIN_PIN=<admin-pin> \
+  PRICING_ADMIN_PIN=<admin-pin> \
+  VENDOR_ADMIN_PIN=<admin-pin> \
+  SUPPORT_AGENT_PIN=<agent-pin>
 
 npx supabase functions deploy admin-hub --no-verify-jwt
 npx supabase functions deploy customer-support --no-verify-jwt
