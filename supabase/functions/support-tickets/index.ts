@@ -159,7 +159,7 @@ async function trackTicket(sb: ReturnType<typeof adminSb>, body: Record<string, 
 
   const { data: ticket, error } = await sb
     .from("support_tickets")
-    .select("*, support_agents(name)")
+    .select("id, ticket_number, status, subject, reporter_mobile, updated_at, closure_note")
     .eq("ticket_number", ticketNumber)
     .maybeSingle();
 
@@ -169,30 +169,15 @@ async function trackTicket(sb: ReturnType<typeof adminSb>, body: Record<string, 
     return json({ error: "Mobile number does not match this ticket" }, 403);
   }
 
-  const { data: comments } = await sb
-    .from("support_ticket_comments")
-    .select("*")
-    .eq("ticket_id", ticket.id)
-    .eq("is_internal", false)
-    .order("created_at", { ascending: true });
-
-  const agentName = (ticket as { support_agents?: { name?: string } }).support_agents?.name || null;
-
+  // Customer-safe minimal fields only — full desk is agent/admin (#customer-support, #admin)
   return json({
     ticket: {
       ticket_number: ticket.ticket_number,
       status: ticket.status,
       subject: ticket.subject,
-      description: ticket.description,
-      category: ticket.category,
-      priority: ticket.priority,
       updated_at: ticket.updated_at,
-      created_at: ticket.created_at,
-      resolved_at: ticket.resolved_at,
-      assigned_agent_name: agentName,
       closure_note: ticket.closure_note,
     },
-    comments: comments || [],
   });
 }
 

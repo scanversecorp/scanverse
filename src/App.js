@@ -4900,7 +4900,7 @@ function FaqPage() {
     ['How do refunds work?', 'Refunds apply to the platform fee only, per our Refund Policy. Cancel 24+ hours before for full platform fee refund. See /refund for details.'],
     ['My payment failed but money was deducted — what now?', 'Failed payments are auto-refunded in 5–7 business days. Email payments@dcoreglobal.com with your TXN ID if not resolved.'],
     ['How do I report an issue or complaint?', 'Use Report in the footer (#report) to submit a support ticket. You receive a ticket number (TKT-…) for reference.'],
-    ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). View status pipeline, agent updates, and resolution note.'],
+    ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). You will see basic status, subject, and resolution note when closed.'],
     ['Can I change or cancel a booking?', 'Contact support before the service time. Admins can update booking status. Cancellation refunds follow the schedule in our Refund Policy.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
     ['Who operates ScanV?', 'DCORE Global Corporation, Pune. Marketplace connecting customers with independent service partners. Call +91-9270194842 for help.'],
@@ -5057,7 +5057,7 @@ function TrackTicketPage() {
         {!t ? (
           <>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>
-              Enter your ticket number and mobile (full number or last 4 digits) to view status, pipeline, and updates.
+              Enter your ticket number and mobile (full number or last 4 digits) to check basic status.
             </div>
             <Field label="Ticket number" req><input value={ticketNum} onChange={e => setTicketNum(e.target.value)} style={S.inp()} placeholder="TKT-1786479760941" /></Field>
             <Field label="Mobile" req><input value={mobile} onChange={e => setMobile(e.target.value)} style={S.inp()} placeholder="10-digit or last 4 digits" inputMode="tel" /></Field>
@@ -5077,20 +5077,8 @@ function TrackTicketPage() {
                 </div>
                 <Badge label={TICKET_STATUS_LABEL[t.status] || t.status} color={TICKET_STATUS_COLOR[t.status] || C.sub} />
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, marginBottom: 6 }}>{t.subject}</div>
-              {t.description && <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>{t.description}</div>}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11, color: C.dim }}>
-                <div>Category: <span style={{ color: C.sub }}>{t.category}</span></div>
-                <div>Priority: <span style={{ color: C.sub }}>{t.priority}</span></div>
-                <div>Created: <span style={{ color: C.sub }}>{fmtDt(t.created_at)}</span></div>
-                <div>Updated: <span style={{ color: C.sub }}>{fmtDt(t.updated_at)}</span></div>
-                {t.assigned_agent_name && <div>Agent: <span style={{ color: C.sub }}>{t.assigned_agent_name}</span></div>}
-                {t.resolved_at && <div>Resolved: <span style={{ color: C.grn }}>{fmtDt(t.resolved_at)}</span></div>}
-              </div>
-            </div>
-            <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 12 }}>Status pipeline</div>
-              <TicketStatusPipeline status={t.status} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, marginBottom: 8 }}>{t.subject}</div>
+              <div style={{ fontSize: 11, color: C.dim }}>Last updated: <span style={{ color: C.sub }}>{fmtDt(t.updated_at)}</span></div>
             </div>
             {t.closure_note && (
               <div style={{ ...S.card(), padding: 16, marginBottom: 14, borderLeft: `4px solid ${C.grn}` }}>
@@ -5098,10 +5086,9 @@ function TrackTicketPage() {
                 <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{t.closure_note}</div>
               </div>
             )}
-            <div style={{ ...S.card(), padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 12 }}>Activity timeline</div>
-              <TicketActivityFeed comments={data.comments} />
-            </div>
+            {!t.closure_note && (t.status === 'resolved' || t.status === 'closed') && (
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 14, lineHeight: 1.6 }}>This ticket has been closed. Our team will contact you if needed.</div>
+            )}
             <div style={{ marginTop: 14 }}>
               <Btn v="outline" sm onClick={() => { setData(null); setErr(''); }}>← Look up another ticket</Btn>
             </div>
