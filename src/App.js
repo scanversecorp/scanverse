@@ -479,7 +479,6 @@ const PRICING_ADMIN_HASH = 'pricing-admin';
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const PRICING_FN = `${SB_URL}/functions/v1/pricing-admin`;
-const PRICING_PIN = process.env.REACT_APP_PRICING_PIN || '';
 
 function findSvcById(id) {
   return SVCS.find(s => s.id === id) || HH_BY_ID[id] || CL_BY_ID[id] || null;
@@ -509,7 +508,7 @@ function pricingAuthOk() {
     const raw = sessionStorage.getItem(PRICING_AUTH_KEY);
     if (!raw) return false;
     const { pin, exp } = JSON.parse(raw);
-    return pin === PRICING_PIN && Date.now() < exp;
+    return !!pin && Date.now() < exp;
   } catch { return false; }
 }
 
@@ -3226,12 +3225,20 @@ function PricingAdminPage({ onPricesUpdated }) {
   }, [authed, pin, load]);
 
   const login = async () => {
-    if (!PRICING_PIN) { setErr('REACT_APP_PRICING_PIN not set on server'); return; }
-    if (pin !== PRICING_PIN) { setErr('Incorrect PIN'); return; }
-    sessionStorage.setItem(PRICING_PIN_KEY, pin);
-    setPricingAuth(pin);
-    setAuthed(true);
-    setErr('');
+    if (!pin) { setErr('Enter your PIN'); return; }
+    setLoading(true); setErr('');
+    try {
+      const { rows: data } = await pricingAdminFetch(pin);
+      sessionStorage.setItem(PRICING_PIN_KEY, pin);
+      setPricingAuth(pin);
+      setRows(data || []);
+      setAuthed(true);
+      setMsg(`Loaded ${data?.length || 0} services`);
+    } catch {
+      setErr('Incorrect PIN — set it in Supabase: npx supabase secrets set PRICING_ADMIN_PIN=YourPin');
+      setAuthed(false);
+      sessionStorage.removeItem(PRICING_AUTH_KEY);
+    } finally { setLoading(false); }
   };
 
   const updateRow = (idx, field, rawVal) => {
