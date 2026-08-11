@@ -757,31 +757,62 @@ async function getIP() {
   catch(e) { return 'unknown'; }
 }
 
+async function lookupPinByPlaceName(name, stateHint='Maharashtra') {
+  if (!name || name.length < 3) return '';
+  try {
+    const r=await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(name)}`);
+    const d=await r.json();
+    if (!d?.[0]||d[0].Status!=='Success'||!d[0].PostOffice?.length) return '';
+    const offices=d[0].PostOffice;
+    const stateLow=(stateHint||'').toLowerCase();
+    const nameLow=name.toLowerCase();
+    const exact=offices.find(o=>o.Name?.toLowerCase()===nameLow&&(!stateLow||o.State?.toLowerCase().includes(stateLow.slice(0,4))));
+    if (exact?.Pincode) return exact.Pincode;
+    const inState=offices.find(o=>!stateLow||o.State?.toLowerCase()===stateLow||o.State?.toLowerCase().includes(stateLow.slice(0,4)));
+    if (inState?.Pincode) return inState.Pincode;
+    return offices[0]?.Pincode||'';
+  } catch(e) { return ''; }
+}
+
 async function reverseGeo(lat,lng) {
   try {
-    // Primary: Nominatim for address details
-    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`);
+    // Nominatim for address text — zoom=18 for locality; OSM postcodes are often wrong in India
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en&zoom=18&addressdetails=1`,{
+      headers:{'User-Agent':'ScanV/5.5 (https://scanv-tau.vercel.app; dcoreglobal.com)'}
+    });
     const d=await r.json(); const a=d.address||{};
-    let pincode = a.postcode||'';
-    // Secondary: India Post API for accurate PIN code (Nominatim PIN is often wrong)
-    if (!pincode || pincode.length !== 6) {
-      try {
-        const r2 = await fetch(`https://api.postalpincode.in/latlong/${lat}/${lng}`);
-        const d2 = await r2.json();
-        if (d2&&d2[0]&&d2[0].Status==='Success'&&d2[0].PostOffice?.[0]?.Pincode) {
-          pincode = d2[0].PostOffice[0].Pincode;
-        }
-      } catch(e2) { /* fallback to Nominatim */ }
+    const state=a.state||'Maharashtra';
+    const isIndia=(a.country_code==='in')||(a.country==='India');
+
+    let pincode='';
+    if (isIndia) {
+      const places=[a.village,a.suburb,a.neighbourhood,a.town,a.city_district]
+        .filter(Boolean)
+        .filter((v,i,arr)=>arr.indexOf(v)===i);
+      for (const place of places) {
+        pincode=await lookupPinByPlaceName(place,state);
+        if (/^\d{6}$/.test(pincode)) break;
+        pincode='';
+      }
     }
+    if (!pincode) pincode=(a.postcode||'').replace(/\D/g,'').slice(0,6);
+
+    const street=[a.house_number,a.road].filter(Boolean).join(' ').trim();
+    const locality=[a.suburb,a.village,a.neighbourhood].filter(Boolean).filter((v,i,arr)=>arr.indexOf(v)===i);
+    const address=street
+      ? [street,...locality].join(', ')
+      : (d.display_name?.split(',').slice(0,4).join(',').trim()||'');
+
     return {
-      address: d.display_name?.split(',').slice(0,4).join(',').trim()||'',
-      village: a.village||a.suburb||a.neighbourhood||a.town||a.residential||'',
-      city: a.city||a.town||a.county||'Pune',
-      state: a.state||'Maharashtra',
+      address,
+      village: a.village||a.suburb||a.neighbourhood||a.town||'',
+      city: a.city||a.state_district||a.town||a.county?.replace(/\s*Subdistrict$/i,'')||'Pune',
+      state,
       pincode,
-      country: a.country||'India'
+      country: a.country||'India',
+      lat,lng,
     };
-  } catch(e) { return {address:'',village:'',city:'Pune',state:'Maharashtra',pincode:'',country:'India'}; }
+  } catch(e) { return {address:'',village:'',city:'Pune',state:'Maharashtra',pincode:'',country:'India',lat,lng}; }
 }
 
 /* --- CANVAS FINGERPRINT ------------------------------------------- */
@@ -1041,7 +1072,7 @@ function QRLandingPage({ onContinue }) {
           setLoading(false);
           setTimeout(()=> onContinue(vs?.id, dev, ip, null, null), 800);
         },
-        {timeout:8000, enableHighAccuracy:true}
+        {timeout:8000, enableHighAccuracy:true, maximumAge:0}
       );
     })();
   },[]);
@@ -1416,7 +1447,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
   // -- SCHEDULE: Date/Time/Location (after payment) -----------------------
   if (screen==='schedule'&&activeSvc) {
-    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBookingDetail(b=>({...b,loc:[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ')}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true});};
+    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBookingDetail(b=>({...b,loc:[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ')}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
 
     return browseWrap(
       <>
@@ -1672,7 +1703,7 @@ function RegistrationFlow({ onComplete, prefill }) {
     const device = dev || detectDevice(); setDev(device);
     const ipAddr = ip  || await getIP(); setIp(ipAddr);
 
-    // Silent: try IP-based location as first estimate (before GPS)
+    // Silent: try IP-based city estimate (PIN from IP is unreliable — GPS resolves it)
     try {
       const ipGeo = await fetch(`https://ipapi.co/${ipAddr}/json/`).then(r=>r.json());
       if (ipGeo?.city) {
@@ -1680,7 +1711,6 @@ function RegistrationFlow({ onComplete, prefill }) {
           ...p,
           city: p.city||ipGeo.city||'Pune',
           state: p.state||ipGeo.region||'Maharashtra',
-          pincode: p.pincode||ipGeo.postal||'',
         }));
       }
     } catch(e) { /* silent fail */ }
@@ -1712,7 +1742,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         if (vs?.id) setSessionId(vs.id);
         setPhase('form');
       },
-      {timeout:8000,maximumAge:300000,enableHighAccuracy:true}
+      {timeout:8000,maximumAge:0,enableHighAccuracy:true}
     );
   };
 
@@ -2366,7 +2396,7 @@ function BookScreen() {
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
   const bookPay=usePaymentVerification(step===3?txnId:null,step===3?total:0,user?.id,addToast);
   if (!svc) { setScreen('services'); return null; }
-  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');});};
+  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
   const [bookOtpSent,setBookOtpSent]=useState(false);
   const [bookOtpCode,setBookOtpCode]=useState(['','','','','','']);
   const [bookOtpTarget,setBookOtpTarget]=useState('');
@@ -2865,7 +2895,7 @@ export default function App() {
         navigator.geolocation.getCurrentPosition(async pos=>{
           const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
           setSilentGeo({lat:pos.coords.latitude,lng:pos.coords.longitude,...geo,device,ip:ipAddr});
-        },()=>{}, {timeout:8000,enableHighAccuracy:true});
+        },()=>{}, {timeout:8000,enableHighAccuracy:true,maximumAge:0});
       } catch(e){}
 
       // Try restoring existing session
