@@ -19,7 +19,7 @@ const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-const UPI_PA   = '8484850288.1@hdfc';
+const UPI_PA   = 'samir.0288-3@wahdfcbank';
 const UPI_PN   = 'DCORE Global Corporation';
 const ASSIST   = '+91-9270194842';
 
@@ -41,7 +41,6 @@ function buildUpiParams(amountPaise, txnRef, note) {
   sp.set('am', (amountPaise / 100).toFixed(2));
   sp.set('cu', 'INR');
   sp.set('tn', note || 'ScanV Booking');
-  if (txnRef) sp.set('tr', txnRef);
   return sp.toString();
 }
 function buildUpiLink(amountPaise, txnRef, note) {
@@ -54,16 +53,16 @@ function buildUpiIntent(params, pkg) {
 function openUrlViaAnchor(url) {
   const a = document.createElement('a');
   a.href = url;
+  a.rel = 'noopener noreferrer';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
 /**
- * Open UPI app with platform-specific deep links.
- * Android: explicit package only — NEVER bare upi:// (WhatsApp intercepts it).
+ * Open UPI app — one link per tap (no fallback chain; double-opens triggered WhatsApp).
+ * Android: intent with explicit package only — never bare upi://.
  * iOS: upi:// via anchor.
- * Returns true if a link was triggered.
  */
 function openUpiPay(app, amountPaise, txnRef, note) {
   const params = buildUpiParams(amountPaise, txnRef, note);
@@ -71,13 +70,7 @@ function openUpiPay(app, amountPaise, txnRef, note) {
     if (app === 'Any UPI') return false;
     const pkg = UPI_PACKAGES[app];
     if (!pkg) return false;
-    let primary = null;
-    if (app === 'GPay') primary = `tez://upi/pay?${params}`;
-    else if (app === 'PhonePe') primary = `phonepe://pay?${params}`;
-    else if (app === 'Paytm') primary = `paytmmp://cash_wallet?${params}`;
-    const intent = buildUpiIntent(params, pkg);
-    if (primary) openUrlViaAnchor(primary);
-    setTimeout(() => openUrlViaAnchor(intent), primary ? 500 : 0);
+    openUrlViaAnchor(buildUpiIntent(params, pkg));
     return true;
   }
   openUrlViaAnchor(buildUpiLink(amountPaise, txnRef, note));
@@ -135,6 +128,11 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
       <UpiVpaCopy addToast={addToast} />
+      {UPI_PA.includes('@wa') && (
+        <div style={{ background: '#e8f4fd', border: `1.5px solid rgba(13,71,161,0.25)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 11, color: C.cyan, lineHeight: 1.5 }}>
+          This UPI ID uses WhatsApp Pay rail. If GPay/PhonePe fail, copy the ID below and pay manually in your UPI app with the exact amount shown.
+        </div>
+      )}
       <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
         {android ? '💳 Choose UPI app →' : '💳 Pay via UPI →'}
       </Btn>
