@@ -1455,7 +1455,7 @@ function GuestBottomNav({ screen, setScreen, addToast }) {
   const tabs = [
     {id:'home', icon:'🏠', label:'Home', go:()=>setScreen('services')},
     {id:'services', icon:'🔍', label:'Services', go:()=>setScreen('services')},
-    {id:'bookings', icon:'📅', label:'Bookings', go:()=>addToast?.('Book & verify to see your bookings here','info')},
+    {id:'bookings', icon:'📅', label:'Bookings', go:()=>setScreen('login')},
     {id:'profile', icon:'👤', label:'Profile', go:()=>setScreen('login')},
   ];
   return (
@@ -1748,6 +1748,69 @@ async function verifyCustomOTP(mobile, enteredOtp) {
   return true;
 }
 
+/** E.164 India mobile (+91XXXXXXXXXX) */
+function normalizeMobileE164(mobile) {
+  const d = String(mobile || '').replace(/\D/g, '').slice(-10);
+  if (d.length !== 10) return mobile?.startsWith('+') ? mobile : `+91${d}`;
+  return `+91${d}`;
+}
+
+/** Stable TEXT profile id from mobile — profiles.id is TEXT, not UUID */
+function customerProfileId(mob) {
+  return `cust_${mob.replace(/\D/g, '')}`;
+}
+
+/** Resolve profile id: existing phone match → stored uid → mobile-based id */
+async function resolveCustomerProfileId(mob) {
+  const { data: existing } = await sb().from('profiles').select('id').eq('phone', mob).maybeSingle();
+  if (existing?.id) return existing.id;
+  const stored = localStorage.getItem('scanv_uid');
+  if (stored) {
+    const { data: p } = await sb().from('profiles').select('id,phone').eq('id', stored).maybeSingle();
+    if (p?.phone === mob) return p.id;
+  }
+  return customerProfileId(mob);
+}
+
+/** Upsert customer profile in Supabase and persist uid locally */
+async function upsertCustomerProfile({
+  id, mob, firstName, lastName, address, village, city, pincode, email,
+  lastLat, lastLng, silentGeo, ip, dev, mobileVerified = true,
+}) {
+  const fakeEmail = email || `${mob.replace(/\D/g, '').slice(-10)}@scanv.app`;
+  const device = dev || detectDevice();
+  const ipAddr = ip || await getIP();
+  const row = {
+    id,
+    email: fakeEmail,
+    name: `${firstName} ${lastName}`.trim(),
+    first_name: (firstName || '').trim(),
+    last_name: (lastName || '').trim(),
+    phone: mob,
+    address: address || '',
+    village: village || '',
+    city: city || '',
+    pincode: pincode || '',
+    ip_address: ipAddr,
+    last_lat: lastLat ?? silentGeo?.lat ?? null,
+    last_lng: lastLng ?? silentGeo?.lng ?? null,
+    device_type: device.deviceType,
+    os_name: device.osName,
+    browser: device.browser,
+    timezone: device.timezone,
+    language: device.language,
+    mobile_verified: mobileVerified,
+    mobile_verified_at: mobileVerified ? new Date().toISOString() : null,
+    role: 'customer',
+    status: 'active',
+    avatar: '👤',
+  };
+  const { data, error } = await sb().from('profiles').upsert(row, { onConflict: 'id' }).select().single();
+  if (error) throw error;
+  localStorage.setItem('scanv_uid', data.id);
+  return data;
+}
+
 /* ================================================================
    QR CODE GENERATOR COMPONENT
 ================================================================ */
@@ -1952,42 +2015,22 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     }
     setLoading(true); setErr('');
     try {
-      const mob = `+91${mobile}`;
+      const mob = normalizeMobileE164(mobile);
       if (!waVerified) {
         const code = otpCode.join('');
         const ok = await verifyOtpCode(mob, code);
         if (!ok) throw new Error('Invalid OTP. Try again.');
       }
 
-      const fakeEmail = `${mobile}@scanv.app`;
-      const fakePass  = `ScanV_${mobile.slice(-4)}_${Date.now()}`;
-      let uid;
-      try {
-        const {data:su,error:se} = await sb().auth.signUp({email:fakeEmail,password:fakePass});
-        if (se?.message?.includes('already registered')) {
-          const {data:si} = await sb().auth.signInWithPassword({email:fakeEmail,password:fakePass});
-          uid = si?.user?.id;
-        } else { uid = su?.user?.id; }
-      } catch(e) {}
-      if (!uid) { uid = localStorage.getItem('scanv_uid')||crypto.randomUUID(); localStorage.setItem('scanv_uid',uid); }
-
+      const uid = await resolveCustomerProfileId(mob);
       const dev = detectDevice();
-      const ip  = await getIP();
+      const profile = await upsertCustomerProfile({
+        id: uid, mob, firstName, lastName, address, village, city, pincode,
+        silentGeo, dev,
+      });
 
-      await sb().from('profiles').upsert({
-        id:uid, email:fakeEmail, name:`${firstName} ${lastName}`.trim(),
-        first_name:firstName.trim(), last_name:lastName.trim(),
-        phone:mob, address, village, city, pincode,
-        ip_address:ip, last_lat:silentGeo?.lat||null, last_lng:silentGeo?.lng||null,
-        device_type:dev.deviceType, os_name:dev.osName, browser:dev.browser,
-        timezone:dev.timezone, language:dev.language,
-        mobile_verified:true, mobile_verified_at:new Date().toISOString(),
-        role:'customer', status:'active', avatar:'👤',
-      },{onConflict:'id'});
-
-      const prof = {id:uid,name:`${firstName} ${lastName}`.trim(),first_name:firstName,last_name:lastName,phone:mob,email:fakeEmail,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city,village,pincode,device_type:dev.deviceType,os_name:dev.osName,browser:dev.browser,ip_address:ip};
-      setUserId(uid);
-      setPendingProfile(prof);
+      setUserId(profile.id);
+      setPendingProfile(profile);
       setTxnId('TXN-'+Date.now());
       browsePay.setUpiOpened(false);
       browsePay.setPaymentVerified(false);
@@ -2006,7 +2049,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
     setLoading(true); setErr('');
     try {
-      const mob = `+91${mobile}`;
+      const mob = normalizeMobileE164(mobile);
       if (!waVerified) {
         const code = otpCode.join('');
         const ok = await verifyOtpCode(mob, code);
@@ -2014,11 +2057,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       }
       const {data:existing} = await sb().from('profiles').select('*').eq('phone',mob).maybeSingle();
       if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
-      await sb().from('profiles').update({mobile_verified:true,mobile_verified_at:new Date().toISOString()}).eq('id',existing.id);
+      const {data:prof} = await sb().from('profiles').update({
+        mobile_verified:true,
+        mobile_verified_at:new Date().toISOString(),
+      }).eq('id',existing.id).select().single();
       localStorage.setItem('scanv_uid',existing.id);
-      const prof = {...existing,mobile_verified:true};
       addToast?.(`Welcome back, ${existing.first_name}!`,'success');
-      onRegistered(prof);
+      onRegistered(prof || {...existing,mobile_verified:true});
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
   };
@@ -2123,8 +2168,16 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         date: bookingDetail.date,
         time: bookingDetail.time || '10:00',
       });
+      const profile = await upsertCustomerProfile({
+        id: userId,
+        mob: normalizeMobileE164(mobile),
+        firstName, lastName, address, village, city, pincode,
+        silentGeo,
+        lastLat: silentGeo?.lat || bookingDetail.lat || null,
+        lastLng: silentGeo?.lng || bookingDetail.lng || null,
+      });
       sessionStorage.setItem(TRACK_BOOKING_KEY, bk.id);
-      onRegistered(pendingProfile, bk.id);
+      onRegistered(profile, bk.id);
     } catch(e) { setErr(e.message||'Booking failed.'); }
     finally { setLoading(false); }
   };
@@ -2687,34 +2740,34 @@ function RegistrationFlow({ onComplete, prefill }) {
 
   const finalise = async (userId, userEmail, mob) => {
     try {
-      const ipAddr = ip||await getIP();
-      const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`;
-      const {data:profile,error} = await sb().from('profiles').upsert({
-        id:userId, email:userEmail||'', name:fullName,
-        first_name:form.firstName.trim(), last_name:form.lastName.trim(),
-        age:parseInt(form.age)||null, gender:form.gender||'',
-        phone:mob, address:form.address, village:form.village,
-        city:form.city, state:form.state, pincode:form.pincode,
-        ip_address:ipAddr, last_lat:geo?.lat||null, last_lng:geo?.lng||null,
-        last_address:form.address||geo?.address||'',
-        device_type:dev?.deviceType||'', os_name:dev?.osName||'',
-        browser:dev?.browser||'', timezone:dev?.timezone||'', language:dev?.language||'',
-        mobile_verified:true, mobile_verified_at:new Date().toISOString(),
-        role:'customer', status:'active', avatar:'👤',
-      },{onConflict:'id'}).select().single();
-      if (error) console.warn('Profile upsert:', error.message);
+      const resolvedId = await resolveCustomerProfileId(mob);
+      const profile = await upsertCustomerProfile({
+        id: resolvedId || userId,
+        mob,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        address: form.address,
+        village: form.village,
+        city: form.city,
+        pincode: form.pincode,
+        email: userEmail,
+        lastLat: geo?.lat,
+        lastLng: geo?.lng,
+        dev,
+        ip,
+      });
 
       await sb().from('user_locations').insert({
-        user_id:userId, lat:geo?.lat||null, lng:geo?.lng||null,
+        user_id: profile.id, lat:geo?.lat||null, lng:geo?.lng||null,
         address:form.address, village:form.village, city:form.city,
-        state:form.state, pincode:form.pincode, ip_address:ipAddr,
+        state:form.state, pincode:form.pincode, ip_address:ip||await getIP(),
         source:geo?.source||'manual', consent_given:true,
         consent_at:new Date().toISOString(), is_primary:true,
       }).then(()=>{});
 
       if (sessionId) {
         await sb().from('visitor_sessions').update({
-          user_id:userId, mobile:mob, first_name:form.firstName.trim(),
+          user_id:profile.id, mobile:mob, first_name:form.firstName.trim(),
           last_name:form.lastName.trim(), verified:true,
           verified_at:new Date().toISOString(),
           lat:geo?.lat||null, lng:geo?.lng||null,
@@ -2722,16 +2775,15 @@ function RegistrationFlow({ onComplete, prefill }) {
         }).eq('id',sessionId).then(()=>{});
       }
 
-      // Update QR scan record if came via QR
       if (prefill?.scanId) {
         await sb().from('qr_scans').update({
-          user_id:userId, mobile:mob, first_name:form.firstName.trim(),
+          user_id:profile.id, mobile:mob, first_name:form.firstName.trim(),
           last_name:form.lastName.trim(), age:parseInt(form.age)||null,
           gender:form.gender||'', verified:true, verified_at:new Date().toISOString(),
         }).eq('id', prefill.scanId).then(()=>{});
       }
 
-      onComplete(profile || {id:userId,name:fullName,first_name:form.firstName.trim(),last_name:form.lastName.trim(),phone:mob,role:'customer',status:'active',avatar:'👤',mobile_verified:true,city:form.city,village:form.village,pincode:form.pincode,device_type:dev?.deviceType||'',os_name:dev?.osName||'',browser:dev?.browser||'',ip_address:ipAddr});
+      onComplete(profile);
     } catch(e) { setErr(e.message||'Could not save profile. Try again.'); setPhase('form'); }
   };
 
@@ -3227,7 +3279,7 @@ function ServicesScreen() {
 }
 
 function BookScreen() {
-  const {activeSvc,user,addToast,setScreen,setTrackBookingId}=useApp();
+  const {activeSvc,user,setUser,addToast,setScreen,setTrackBookingId}=useApp();
   const skipVerify=!!(user?.mobile_verified&&user?.first_name);
   const [step,setStep]=useState(1);
   const [date,setDate]=useState('');
@@ -3280,10 +3332,25 @@ function BookScreen() {
     if(code.length<6) return addToast('Enter 6-digit OTP','error');
     setLoading(true);
     try{
-      const mob='+91'+bookPhone.replace(/\D/g,'');
+      const mob=normalizeMobileE164(bookPhone);
       const ok=await verifyOtpCode(mob,code);
-      if(ok){ setBookOtpVerified(true); setLoc([bookAddress,bookCity,bookPincode].filter(Boolean).join(', ')); setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); addToast('Mobile verified — proceed to payment ✓','success'); }
-      else throw new Error('Invalid OTP');
+      if(!ok) throw new Error('Invalid OTP');
+      const uid=await resolveCustomerProfileId(mob);
+      const profile=await upsertCustomerProfile({
+        id:uid, mob,
+        firstName:bookFirstName, lastName:bookLastName,
+        address:bookAddress, village:user?.village||'', city:bookCity, pincode:bookPincode,
+        lastLat:user?.last_lat, lastLng:user?.last_lng,
+      });
+      setUser(profile);
+      setBookOtpVerified(true);
+      setLoc([bookAddress,bookCity,bookPincode].filter(Boolean).join(', '));
+      setTxnId('TXN-'+Date.now());
+      bookPay.setUpiOpened(false);
+      bookPay.setPaymentVerified(false);
+      setPayMethod(null);
+      setStep(3);
+      addToast('Mobile verified — proceed to payment ✓','success');
     }catch(e){addToast(e.message||'Verification failed','error');}
     finally{setLoading(false);}
   };
@@ -3301,29 +3368,41 @@ function BookScreen() {
         setStep(3);
         return addToast('Payment not verified. Complete payment before booking.', 'error');
       }
-      const mob = '+91' + bookPhone.replace(/\D/g, '');
-      const fullName = bookFirstName + ' ' + bookLastName;
+      const mob = normalizeMobileE164(bookPhone || user?.phone || '');
+      const custId = user?.id || await resolveCustomerProfileId(mob);
+      const profile = await upsertCustomerProfile({
+        id: custId, mob,
+        firstName: bookFirstName || user?.first_name || '',
+        lastName: bookLastName || user?.last_name || '',
+        address: bookAddress || user?.address || '',
+        village: user?.village || '',
+        city: bookCity || user?.city || '',
+        pincode: bookPincode || user?.pincode || '',
+        lastLat: user?.last_lat, lastLng: user?.last_lng,
+      });
+      setUser(profile);
+      const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
       const { data, error } = await sb().from('bookings').insert({
-        customer_id: user.id, service_name: svc.name,
-        customer_name: fullName.trim() || user.name, customer_email: user.email || '',
+        customer_id: profile.id, service_name: svc.name,
+        customer_name: fullName || user.name, customer_email: profile.email || user.email || '',
         date, time, notes, location_text: loc,
         price, platform_fee: fee, gst_amt: gst, total,
         status: 'confirmed', txn_id: txnId, paid_at: new Date().toISOString(),
       }).select().single();
       if (error) throw error;
       await sb().from('service_requests').insert({
-        customer_id: user.id, service_name: svc.name, service_type: svc.cat,
+        customer_id: profile.id, service_name: svc.name, service_type: svc.cat,
         preferred_date: date, preferred_time: time, notes, location_text: loc,
         price, platform_fee: fee, gst_amount: gst, total,
-        status: 'new', txn_id: txnId, added_by: user.id,
+        status: 'new', txn_id: txnId, added_by: profile.id,
       });
       await sb().from('payments').insert({
-        booking_id: data.id, user_id: user.id, amount: total,
+        booking_id: data.id, user_id: profile.id, amount: total,
         method: payMethod || 'UPI', status: 'success', txn_id: txnId, gateway: 'Razorpay',
       }).catch(() => {});
       invokeBookingDispatch({
         bookingId: data.id, serviceId: svc.id || svc.parent || '', serviceName: svc.name,
-        lat: user.last_lat || null, lng: user.last_lng || null, location: loc, date, time,
+        lat: profile.last_lat || user.last_lat || null, lng: profile.last_lng || user.last_lng || null, location: loc, date, time,
       });
       setBooking(data);
       addToast('Booking confirmed! Track your partner live 📍', 'success');
@@ -3607,7 +3686,7 @@ function trackStatusLabel(booking, dispatch, live) {
 }
 
 function TrackServiceScreen() {
-  const { user, setScreen, trackBookingId, setTrackBookingId, addToast } = useApp();
+  const { user, setScreen, setActiveSvc, trackBookingId, setTrackBookingId, addToast } = useApp();
   const bookingId = trackBookingId || trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
   const { booking, live, dispatch, partnerName, loading } = useLiveBookingTrack(bookingId);
   const status = trackStatusLabel(booking, dispatch, live);
@@ -3685,6 +3764,26 @@ function TrackServiceScreen() {
           )}
 
           {booking?.status === 'confirmed' && <WaitEngagementPanel />}
+
+          <div style={{ ...S.card(), marginBottom: 12, padding: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Explore more services</div>
+            <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>
+              While we find your partner, browse other ScanV services — your tracking link stays saved.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {SVCS.filter(s => !SUB_CATEGORIES[s.id]).slice(0, 4).map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => { setActiveSvc(s); setScreen('book'); }}
+                  style={{ background: C.deep, border: BDR, borderRadius: 10, padding: '8px 12px', cursor: 'pointer', fontFamily: FF, fontSize: 11, fontWeight: 700, color: C.txt, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <span>{s.icon}</span> {s.name}
+                </button>
+              ))}
+            </div>
+            <Btn full onClick={() => setScreen('services')}>Browse all services →</Btn>
+          </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Btn full onClick={() => { setScreen('bookings'); window.location.hash = ''; }}>All bookings</Btn>
