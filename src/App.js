@@ -20,7 +20,7 @@ const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
 const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
-const UPI_PN   = 'DCORE Global Corporation';
+const UPI_PN   = 'Vyapar';
 const ASSIST   = '+91-9270194842';
 
 const UPI_PACKAGES = {
@@ -35,6 +35,7 @@ function isWhatsAppOnlyVpa(vpa = UPI_PA) {
 }
 
 function isAndroidUA() { return /Android/i.test(navigator.userAgent); }
+function isIOSUA() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
 function isInAppBrowser() {
   const ua = navigator.userAgent;
   return /WhatsApp/i.test(ua) || /FBAN|FBAV/i.test(ua) || /Instagram/i.test(ua);
@@ -43,16 +44,36 @@ function buildUpiParams(amountPaise, txnRef, note) {
   const sp = new URLSearchParams();
   sp.set('pa', UPI_PA);
   sp.set('pn', UPI_PN);
-  sp.set('am', (amountPaise / 100).toFixed(2));
+  if (amountPaise) sp.set('am', (amountPaise / 100).toFixed(2));
   sp.set('cu', 'INR');
-  sp.set('tn', note || 'ScanV Booking');
+  if (note) sp.set('tn', note);
   return sp.toString();
 }
 function buildUpiLink(amountPaise, txnRef, note) {
   return `upi://pay?${buildUpiParams(amountPaise, txnRef, note)}`;
 }
-function buildUpiIntent(params, pkg) {
-  return `intent://pay?${params}#Intent;action=android.intent.action.VIEW;scheme=upi;package=${pkg};end`;
+/** Android Chrome: force target app via Intent scheme (bypasses WhatsApp default handler) */
+function buildAndroidIntent(params, pkg) {
+  return `intent://pay?${params}#Intent;scheme=upi;package=${pkg};end`;
+}
+/** iOS: app-specific URL schemes (Android intents do not work on iOS) */
+function buildIOSAppLink(app, params) {
+  if (app === 'GPay') return `gpay://upi/pay?${params}`;
+  if (app === 'PhonePe') return `phonepe://upi/pay?${params}`;
+  if (app === 'Paytm') return `paytmmp://pay?${params}`;
+  return `upi://pay?${params}`;
+}
+function buildAppPayUrl(app, amountPaise, txnRef, note) {
+  const params = buildUpiParams(amountPaise, txnRef, note);
+  if (isAndroidUA()) {
+    const pkg = UPI_PACKAGES[app];
+    if (!pkg) return null;
+    return buildAndroidIntent(params, pkg);
+  }
+  if (isIOSUA()) {
+    return buildIOSAppLink(app, params);
+  }
+  return `upi://pay?${params}`;
 }
 /** Open URL via hidden anchor — avoids WhatsApp intercept from window.location on intent:// */
 function openUrlViaAnchor(url) {
@@ -65,21 +86,14 @@ function openUrlViaAnchor(url) {
   document.body.removeChild(a);
 }
 /**
- * Open UPI app — one link per tap (no fallback chain; double-opens triggered WhatsApp).
- * Android: intent with explicit package only — never bare upi://.
- * iOS: upi:// via anchor.
+ * Open UPI app — Android Intent per app (Chrome), iOS custom schemes, desktop fallback upi://
  */
 function openUpiPay(app, amountPaise, txnRef, note) {
   if (isWhatsAppOnlyVpa()) return false;
-  const params = buildUpiParams(amountPaise, txnRef, note);
-  if (isAndroidUA()) {
-    if (app === 'Any UPI') return false;
-    const pkg = UPI_PACKAGES[app];
-    if (!pkg) return false;
-    openUrlViaAnchor(buildUpiIntent(params, pkg));
-    return true;
-  }
-  openUrlViaAnchor(buildUpiLink(amountPaise, txnRef, note));
+  if (isAndroidUA() && app === 'Any UPI') return false;
+  const url = buildAppPayUrl(app, amountPaise, txnRef, note || 'ScanV Booking');
+  if (!url) return false;
+  openUrlViaAnchor(url);
   return true;
 }
 function InAppBrowserBanner({ addToast }) {
