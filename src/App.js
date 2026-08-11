@@ -14,6 +14,7 @@ import {
   useState, useEffect, useRef, useCallback,
   createContext, useContext, useReducer, Component
 } from 'react';
+import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
@@ -123,37 +124,84 @@ function InAppBrowserBanner({ addToast }) {
     </div>
   );
 }
-function UpiPickerModal({ onPick, onClose }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: C.surf, borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, textAlign: 'center', marginBottom: 6 }}>Pick your UPI app</div>
-        <div style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginBottom: 16 }}>Opens the app directly — avoids WhatsApp Pay</div>
-        {[['🟢', 'GPay'], ['🟣', 'PhonePe'], ['🔵', 'Paytm']].map(([ic, lbl]) => (
-          <button key={lbl} type="button" onClick={() => onPick(lbl)} style={{ display: 'flex', alignItems: 'center', gap: 14, ...S.card(), padding: '16px 18px', cursor: 'pointer', background: C.card, border: BDR, width: '100%', textAlign: 'left', marginBottom: 10 }}>
-            <span style={{ fontSize: 28 }}>{ic}</span>
-            <span style={{ color: C.txt, fontSize: 16, fontWeight: 700 }}>{lbl}</span>
-          </button>
-        ))}
-        <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'block', margin: '4px auto 0' }}>Cancel</button>
+function UpiQrCode({ amountPaise, txnRef, note, onReady }) {
+  const [dataUrl, setDataUrl] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const link = buildUpiLink(amountPaise, txnRef, note || 'ScanV Booking');
+    QRCode.toDataURL(link, { width: 280, margin: 2, color: { dark: '#121212', light: '#ffffff' } })
+      .then(url => {
+        if (!cancelled) {
+          setDataUrl(url);
+          onReady?.();
+        }
+      })
+      .catch(() => { if (!cancelled) setErr(true); });
+    return () => { cancelled = true; };
+  }, [amountPaise, txnRef, note, onReady]);
+  if (err) {
+    return (
+      <div style={{ textAlign: 'center', padding: 20, color: C.red, fontSize: 13 }}>
+        Could not generate QR — use Copy UPI ID below
       </div>
+    );
+  }
+  if (!dataUrl) {
+    return (
+      <div style={{ textAlign: 'center', padding: 32, color: C.dim, fontSize: 13 }}>
+        Generating payment QR…
+      </div>
+    );
+  }
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 14 }}>
+      <img src={dataUrl} alt="Scan to pay via UPI" style={{ width: 280, height: 280, borderRadius: 12, border: BDR, background: '#fff' }} />
     </div>
   );
 }
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
-  const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect } = pay;
+  const { paymentVerified, upiOpened, checkingPay, setUpiOpened, amountPaise, txnId } = pay;
   const inApp = isInAppBrowser();
-  const android = isAndroidUA();
+  const [linkCopied, setLinkCopied] = useState(false);
+  const onQrReady = useCallback(() => setUpiOpened(true), [setUpiOpened]);
+  const copyUpiLink = async () => {
+    try {
+      await navigator.clipboard.writeText(buildUpiLink(amountPaise, txnId, 'ScanV Booking'));
+      setLinkCopied(true);
+      addToast?.('UPI payment link copied', 'success');
+      setUpiOpened(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (_) {
+      addToast?.('Copy failed', 'error');
+    }
+  };
+  const amountRu = amountPaise ? (amountPaise / 100).toFixed(0) : '0';
   return (
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
+      <div style={{ background: '#e8f4fd', border: `1.5px solid rgba(13,71,161,0.25)`, borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 12, color: C.cyan, lineHeight: 1.5 }}>
+        <strong>Scan QR to pay</strong> — Open GPay, PhonePe, or Paytm → Scan &amp; Pay. Direct app links will be enabled once your bank completes UPI setup.
+      </div>
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: C.dim, marginBottom: 4 }}>Pay exactly</div>
+        <div style={{ fontSize: 36, fontWeight: 900, color: C.acc, fontFamily: FF }}>₹{amountRu}</div>
+        {txnId && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Ref: {txnId}</div>}
+      </div>
+      {!inApp && (
+        <UpiQrCode amountPaise={amountPaise} txnRef={txnId} note="ScanV Booking" onReady={onQrReady} />
+      )}
       <UpiVpaCopy addToast={addToast} />
-      <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
-        {android ? '💳 Choose UPI app →' : '💳 Pay via UPI →'}
-      </Btn>
+      <div style={{ fontSize: 12, color: C.sub, textAlign: 'center', marginBottom: 14, lineHeight: 1.5 }}>
+        Pay to <strong>DCORE GLOBAL CORPORATION</strong><br />
+        Scan the QR above with any UPI app
+      </div>
+      <button type="button" onClick={copyUpiLink} style={{ ...S.card(), background: C.card, border: BDR, borderRadius: 10, padding: '12px 14px', width: '100%', fontSize: 13, fontWeight: 700, color: C.cyan, cursor: 'pointer', marginBottom: 14 }}>
+        {linkCopied ? 'Payment link copied ✓' : 'Copy UPI payment link'}
+      </button>
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
-          {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app, then tap I\'ve paid — continue'}
+          {checkingPay ? '⏳ Checking payment status…' : 'After scanning & paying, tap I\'ve paid — continue'}
         </div>
       )}
       {paymentVerified && (
@@ -161,32 +209,12 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
           ✅ Payment confirmed — you can continue
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-        {[['🟢', 'GPay'], ['🟣', 'PhonePe'], ['🔵', 'Paytm'], ['⚡', android ? 'Choose app' : 'Any UPI']].map(([ic, lbl]) => {
-          const app = lbl === 'Choose app' ? 'Any UPI' : lbl;
-          return (
-            <button key={lbl} type="button" onClick={() => launchUpi(app)} disabled={inApp} style={{ display: 'flex', alignItems: 'center', gap: 10, ...S.card(), padding: '12px 14px', cursor: inApp ? 'not-allowed' : 'pointer', background: C.card, border: BDR, width: '100%', textAlign: 'left', opacity: inApp ? 0.5 : 1 }}>
-              <span style={{ fontSize: 22 }}>{ic}</span>
-              <span style={{ color: C.txt, fontSize: 13, fontWeight: 700 }}>{lbl}</span>
-            </button>
-          );
-        })}
-      </div>
-      {android && !inApp && (
-        <div style={{ fontSize: 11, color: C.dim, textAlign: 'center', marginBottom: 14 }}>On Android, pick a specific app — generic UPI links open WhatsApp Pay</div>
-      )}
       <div style={{ textAlign: 'center', marginBottom: 14 }}>
         <a href={RZP_URL} target="_blank" rel="noreferrer" style={{ color: C.cyan, fontSize: 13, fontWeight: 600 }}>Card / Net Banking via Razorpay ↗</a>
       </div>
       <Btn full onClick={onConfirm} disabled={loading || disabled || (!upiOpened && !paymentVerified)}>
-        {paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'I\'ve paid — continue →' : 'Pay via UPI first to continue'}
+        {paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'I\'ve paid — continue →' : 'Scan QR to pay first'}
       </Btn>
-      {showUpiPicker && (
-        <UpiPickerModal
-          onPick={launchUpiDirect}
-          onClose={() => setShowUpiPicker(false)}
-        />
-      )}
     </>
   );
 }
@@ -237,7 +265,6 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [upiOpened, setUpiOpened] = useState(false);
   const [checkingPay, setCheckingPay] = useState(false);
-  const [showUpiPicker, setShowUpiPicker] = useState(false);
   useEffect(() => {
     if (!txnId || !amountPaise) return;
     registerPaymentIntent(txnId, amountPaise, userId);
@@ -265,38 +292,8 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     document.addEventListener('visibilitychange', onVis);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
   }, [upiOpened, txnId, paymentVerified, addToast]);
-  const triggerUpi = (app) => {
-    if (isInAppBrowser()) {
-      addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
-      return;
-    }
-    if (isWhatsAppOnlyVpa()) {
-      addToast?.('This UPI ID is WhatsApp Pay only — use Copy and pay in GPay/PhonePe manually', 'error');
-      return;
-    }
-    if (openUpiPay(app, amountPaise, txnId, 'ScanV Booking')) {
-      setUpiOpened(true);
-      addToast?.('Opening UPI app…', 'info');
-    }
-  };
-  const launchUpi = (app) => {
-    if (isInAppBrowser()) {
-      addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
-      return;
-    }
-    if (isAndroidUA() && app === 'Any UPI') {
-      setShowUpiPicker(true);
-      return;
-    }
-    triggerUpi(app);
-  };
-  const launchUpiDirect = (app) => {
-    setShowUpiPicker(false);
-    triggerUpi(app);
-  };
   return {
-    paymentVerified, upiOpened, checkingPay, launchUpi, launchUpiDirect,
-    showUpiPicker, setShowUpiPicker, setPaymentVerified, setUpiOpened,
+    paymentVerified, upiOpened, checkingPay, setPaymentVerified, setUpiOpened,
     amountPaise, txnId,
   };
 }
