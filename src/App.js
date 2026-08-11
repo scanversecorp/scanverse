@@ -407,10 +407,74 @@ const HOUSEHOLD_SVCS = [
 
 const HH_BY_ID = Object.fromEntries(HOUSEHOLD_SVCS.map(s => [s.id, s]));
 
+/** ScanV cloud card themes — hosting, infrastructure, managed */
+const CL_THEME = {
+  host:  { id:'host',  label:'Cloud hosting',    color:'#2563EB', bg:'#DBEAFE', border:'#93C5FD', gradFrom:'#BFDBFE', gradTo:'#60A5FA', tagline:'IaaS · PaaS · SaaS · hybrid models' },
+  build: { id:'build', label:'Infrastructure',   color:'#6366F1', bg:'#EEF2FF', border:'#A5B4FC', gradFrom:'#E0E7FF', gradTo:'#818CF8', tagline:'Design · deploy · enterprise supply' },
+  care:  { id:'care',  label:'Managed & media',  color:'#0891B2', bg:'#CFFAFE', border:'#67E8F9', gradFrom:'#A5F3FC', gradTo:'#22D3EE', tagline:'24×7 ops · backup · streaming · training' },
+  pack:  { id:'pack',  label:'Turnkey packages', color:'#7C3AED', bg:'#F3E8FF', border:'#C4B5FD', gradFrom:'#EDE9FE', gradTo:'#A78BFA', tagline:'Ready bundles · faster go-live · one partner' },
+};
+
+const CLOUD_SVCS = [
+  { id:'cl-iaas', parent:'cloud', theme:'host', icon:'🖥️', img:'/services/cloud/iaas.png', name:'Cloud Compute (IaaS)', sub:'Virtual servers · storage · scale on demand', unit:'month', mrp:999900, price:discPaise(999900), cash:false,
+    desc:'ScanV infrastructure-as-a-service — provision virtual machines, block storage, and networking without owning hardware. Scale up or down as your workload changes, with monitoring and SLA-backed uptime.',
+    features:['Virtual servers & volumes','Auto-scale options','Private network segments','Usage-based billing','99.9% uptime SLA'], turnaround:'Live in 24 hrs', rating:'4.9 ⭐', bookings:'620+' },
+  { id:'cl-paas', parent:'cloud', theme:'host', icon:'⚙️', img:'/services/cloud/paas.png', name:'App Platform (PaaS)', sub:'Deploy apps · skip server management', unit:'month', mrp:799900, price:discPaise(799900), cash:false,
+    desc:'ScanV platform-as-a-service — push code, containers, or APIs and we handle the runtime, patches, and scaling. Ideal for startups and product teams that want speed without ops overhead.',
+    features:['Container & app hosting','CI/CD ready pipelines','Managed databases add-on','Staging & production slots','DevSecOps best practices'], turnaround:'Live in 48 hrs', rating:'4.8 ⭐', bookings:'410+' },
+  { id:'cl-saas', parent:'cloud', theme:'host', icon:'📱', img:'/services/cloud/saas.png', name:'Business Apps (SaaS)', sub:'Ready software · subscribe & go', unit:'month', mrp:499900, price:discPaise(499900), cash:false,
+    desc:'ScanV software-as-a-service — curated business tools delivered over the cloud with updates, backups, and support included. Pay per user or per module with transparent monthly pricing.',
+    features:['Pre-configured business suites','Automatic updates & patches','Role-based access control','Mobile & web access','Onboarding assistance'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'890+' },
+  { id:'cl-hybrid', parent:'cloud', theme:'host', icon:'🔀', img:'/services/cloud/hybrid.png', name:'Hybrid Cloud Setup', sub:'On-prem + cloud · unified control', unit:'project', mrp:1499900, price:discPaise(1499900), cash:false,
+    desc:'ScanV hybrid cloud — connect your office or private rack with public cloud resources under one governance model. Perfect when compliance, latency, or legacy apps need a blended architecture.',
+    features:['Architecture assessment','Secure VPN / interconnect','Workload placement plan','Migration roadmap','Unified monitoring'], turnaround:'1–2 weeks', rating:'4.9 ⭐', bookings:'280+' },
+  { id:'cl-datacenter', parent:'cloud', theme:'build', icon:'🏢', img:'/services/cloud/datacenter.png', name:'Datacenter Consulting', sub:'Design · build · optimise facilities', unit:'project', mrp:4999900, price:discPaise(4999900), cash:false,
+    desc:'ScanV datacenter consulting — from capacity planning and rack layout to power, cooling, and compliance documentation. We help you build or refresh facilities that are secure, efficient, and future-ready.',
+    features:['Site & capacity planning','Rack & power design','Compliance documentation','Vendor-neutral advice','Handover runbooks'], turnaround:'2–4 weeks', rating:'4.9 ⭐', bookings:'150+' },
+  { id:'cl-network', parent:'cloud', theme:'build', icon:'🌐', img:'/services/cloud/network.png', name:'Enterprise Networking', sub:'LAN · WAN · secure connectivity', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
+    desc:'ScanV enterprise networking — structured cabling, switching, routing, Wi‑Fi, and WAN links designed for reliability. We segment traffic, enforce policies, and document every connection for your team.',
+    features:['Office LAN / Wi‑Fi design','Firewall & segmentation','VPN & remote access','Performance tuning','As-built documentation'], turnaround:'1–3 weeks', rating:'4.8 ⭐', bookings:'340+' },
+  { id:'cl-hardware', parent:'cloud', theme:'build', icon:'💻', img:'/services/cloud/hardware.png', name:'IT Hardware Supply', sub:'Servers · storage · laptops · networking', unit:'project', mrp:1999900, price:discPaise(1999900), cash:false,
+    desc:'ScanV hardware supply — source, configure, and deliver enterprise servers, storage, switches, and end-user devices. Pre-staging and imaging available so equipment arrives ready to plug in.',
+    features:['Enterprise-grade sourcing','Pre-config & imaging','Warranty registration','Delivery & rack-mount','Asset tagging'], turnaround:'3–7 days', rating:'4.7 ⭐', bookings:'520+' },
+  { id:'cl-managed', parent:'cloud', theme:'care', icon:'🛡️', img:'/services/cloud/managed.png', name:'Managed IT Services', sub:'24×7 monitoring · IAM · proactive ops', unit:'month', mrp:249900, price:discPaise(249900), cash:false,
+    desc:'ScanV managed services — we watch your systems around the clock, patch vulnerabilities, manage identities, and respond to incidents before users notice. SLA-driven delivery with monthly health reports.',
+    features:['24×7 monitoring & alerts','Patch & vulnerability mgmt','Identity & access reviews','Monthly health reports','Dedicated service desk'], turnaround:'Starts in 72 hrs', rating:'4.9 ⭐', bookings:'760+' },
+  { id:'cl-backup', parent:'cloud', theme:'care', icon:'💾', img:'/services/cloud/backup.png', name:'Backup & Disaster Recovery', sub:'Snapshots · replication · restore drills', unit:'month', mrp:149900, price:discPaise(149900), cash:false,
+    desc:'ScanV backup & DR — automated snapshots, off-site replication, and tested restore runbooks so a outage does not become a crisis. RPO/RTO targets agreed upfront and reviewed quarterly.',
+    features:['Automated backup schedules','Off-site replication','Restore testing drills','RPO / RTO planning','Compliance-ready logs'], turnaround:'Live in 48 hrs', rating:'4.9 ⭐', bookings:'680+' },
+  { id:'cl-video', parent:'cloud', theme:'care', icon:'🎬', img:'/services/cloud/video.png', name:'Video & Streaming Platform', sub:'Secure delivery · education · media', unit:'month', mrp:399900, price:discPaise(399900), cash:false,
+    desc:'ScanV video platform — host lectures, webinars, or OTT-style libraries with adaptive streaming, access control, and usage analytics. White-label player options for institutes and creators.',
+    features:['Adaptive bitrate streaming','Access control & DRM options','Viewer analytics','CDN-backed delivery','Embed & mobile apps'], turnaround:'1 week', rating:'4.8 ⭐', bookings:'290+' },
+  { id:'cl-training', parent:'cloud', theme:'care', icon:'🎓', img:'/services/cloud/training.png', name:'Cloud & IT Training', sub:'Hands-on labs · certs · career tracks', unit:'course', mrp:499900, price:discPaise(499900), cash:false,
+    desc:'ScanV cloud training — instructor-led and lab-based programmes covering cloud fundamentals, DevOps, networking, and security. Learn on live infrastructure, not slides alone.',
+    features:['Live instructor sessions','Hands-on lab access','Certification pathways','Weekend & evening batches','Career guidance sessions'], turnaround:'Batch weekly', rating:'4.9 ⭐', bookings:'1,200+' },
+  { id:'cl-office-box', parent:'cloud', theme:'pack', icon:'📦', img:'/services/cloud/office-box.png', name:'Office IT-in-a-Box', sub:'Desks · Wi‑Fi · PCs · phones · go-live ready', unit:'project', mrp:3499900, price:discPaise(3499900), cash:false,
+    desc:'ScanV office-in-a-box — a pre-tested bundle that wires up your new branch or startup floor: cabling, Wi‑Fi, workstations, printers, and baseline security policies. Arrive Monday, work Tuesday.',
+    features:['Structured cabling & Wi‑Fi','Workstation imaging','Firewall baseline config','User onboarding guide','30-day hypercare support'], turnaround:'5–10 days', rating:'4.9 ⭐', bookings:'190+' },
+  { id:'cl-dc-operate', parent:'cloud', theme:'pack', icon:'🏗️', img:'/services/cloud/dc-operate.png', name:'Datacenter Build & Run', sub:'Design · rack · power · operate · handover', unit:'project', mrp:7999900, price:discPaise(7999900), cash:false,
+    desc:'ScanV datacenter build & operate — we take you from empty floor to production-ready facility, then optionally run day-two ops. Capacity, cooling, security, and monitoring included in one programme.',
+    features:['Facility & rack design','Power / cooling planning','Security & access layers','Monitoring from day one','Optional managed operate'], turnaround:'4–8 weeks', rating:'4.9 ⭐', bookings:'95+' },
+  { id:'cl-dr-pack', parent:'cloud', theme:'pack', icon:'🔒', img:'/services/cloud/dr-pack.png', name:'Business Continuity Pack', sub:'Backup · failover · tested recovery playbooks', unit:'project', mrp:2499900, price:discPaise(2499900), cash:false,
+    desc:'ScanV business continuity pack — a fixed-scope programme that maps critical apps, configures replication, and runs a live restore drill with your team. Know your RPO/RTO before an incident, not during one.',
+    features:['Critical app inventory','Replication setup','Failover runbook','Quarterly restore test','Executive summary report'], turnaround:'2–3 weeks', rating:'4.9 ⭐', bookings:'210+' },
+  { id:'cl-maas', parent:'cloud', theme:'pack', icon:'📊', img:'/services/cloud/maas.png', name:'Monitoring-as-a-Service', sub:'Dashboards · alerts · compliance views', unit:'month', mrp:199900, price:discPaise(199900), cash:false,
+    desc:'ScanV monitoring-as-a-service — unified dashboards for servers, networks, apps, and cloud resources with alert routing and audit-friendly reports. We tune thresholds so on-call teams see signal, not noise.',
+    features:['Unified metric dashboards','Smart alert routing','Uptime & SLA reports','Compliance export packs','Monthly tuning review'], turnaround:'Live in 72 hrs', rating:'4.8 ⭐', bookings:'430+' },
+  { id:'cl-edtech', parent:'cloud', theme:'pack', icon:'📚', img:'/services/cloud/edtech-lms.png', name:'Learning Platform Pack', sub:'LMS · secure video · student portal', unit:'project', mrp:5999900, price:discPaise(5999900), cash:false,
+    desc:'ScanV learning platform pack — launch classes online with course pages, assignments, secure lecture streaming, and parent or admin portals. Ideal for institutes moving from classroom-only to blended learning.',
+    features:['Course & batch management','Secure lecture streaming','Quiz & assignment module','Admin & teacher roles','Mobile-friendly portal'], turnaround:'2–4 weeks', rating:'4.9 ⭐', bookings:'160+' },
+  { id:'cl-ott-pack', parent:'cloud', theme:'pack', icon:'📺', img:'/services/cloud/ott-pack.png', name:'Streaming Platform Pack', sub:'Catalogue · player · CDN · monetisation ready', unit:'project', mrp:6999900, price:discPaise(6999900), cash:false,
+    desc:'ScanV streaming platform pack — go from content library to branded viewer experience with adaptive playback, catalogue management, and subscription or pay-per-view options. Built for creators, studios, and niche OTT brands.',
+    features:['Branded web & TV apps','Adaptive video delivery','Subscription / PPV setup','Content CMS & metadata','Launch & analytics training'], turnaround:'3–5 weeks', rating:'4.8 ⭐', bookings:'120+' },
+];
+
+const CL_BY_ID = Object.fromEntries(CLOUD_SVCS.map(s => [s.id, s]));
+
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
   { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false, ...svcDisc(999) },
-  { id:'cloud',    icon:'☁️', name:'Cloud training',     sub:'AWS · Azure · GCP · AI',           cat:'Cloud Training',     cash:false, ...svcDisc(4999) },
+  { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'Hosting · infra · packages · 17 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
   { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false, ...svcDisc(9999) },
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
@@ -432,7 +496,7 @@ const SVC_CARD_THEME = {
 
 const HOME_CARD_META = {
   legal:    { commitment:'Justice with a human touch.',     face:'Adv. Priya · verified lawyer' },
-  cloud:    { commitment:'Skills that lift your tomorrow.', face:'Rahul · certified trainer' },
+  cloud:    { commitment:'Scale with confidence.',          face:'Cloud · infra · 17 services' },
   vip:      { commitment:'You first. Every single time.',   face:'Meera · concierge lead' },
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
   property: { commitment:'Find home. Find peace.',          face:'Verified listings · PCMC' },
@@ -441,17 +505,18 @@ const HOME_CARD_META = {
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
 };
 
-/** Search categories + household sub-services (name, sub, desc, features) */
+/** Search categories + household & cloud sub-services */
 function searchAllServices(query) {
   const q = query.trim().toLowerCase();
-  if (!q) return { categories: SVCS, household: [] };
+  if (!q) return { categories: SVCS, household: [], cloud: [] };
   const inText = (parts) => parts.filter(Boolean).join(' ').toLowerCase().includes(q);
   const categories = SVCS.filter(s => {
     const d = SVC_DETAIL[s.id] || {};
     return inText([s.name, s.sub, s.cat, SVC_SHORT[s.id], d.desc, ...(d.features || [])]);
   });
   const household = HOUSEHOLD_SVCS.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
-  return { categories, household };
+  const cloud = CLOUD_SVCS.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
+  return { categories, household, cloud };
 }
 
 /* --- SUPABASE ----------------------------------------------------- */
@@ -558,7 +623,8 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
           <div style={{ flex:1, padding:'18px 18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:7 }}>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {svc.household && <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>}
-              {theme.tag && !svc.household && <span style={{ background:theme.b2, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>{theme.tag}</span>}
+              {svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>☁️ ENTERPRISE</span>}
+              {theme.tag && !svc.household && !svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>{theme.tag}</span>}
               <span style={{ background:'#fef3c7', color:'#b45309', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>25% OFF</span>
             </div>
             <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
@@ -567,7 +633,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:2 }}>
               <span style={{ color:C.acc, fontSize:14, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
               <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>
-                {d.rating||'4.8 ⭐'} · {svc.household ? `${HOUSEHOLD_SVCS.length} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
+                {d.rating||'4.8 ⭐'} · {svc.household ? `${HOUSEHOLD_SVCS.length} options` : svc.cloud ? `${CLOUD_SVCS.length} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
               </span>
             </div>
           </div>
@@ -700,9 +766,19 @@ function HhCategoryPill({ theme, sm }) {
   );
 }
 
+function CloudCategoryPill({ theme, sm }) {
+  const t = CL_THEME[theme];
+  if (!t) return null;
+  return (
+    <span style={{ background: t.bg, color: t.color, border: `1.5px solid ${t.border}`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 8px' : '3px 10px' }}>
+      {t.label}
+    </span>
+  );
+}
+
 function PriceTag({ svc, sm }) {
   const mrp = svc.mrp || Math.round((svc.price || 0) / (1 - DISC_PCT));
-  const unit = svc.unit === 'hour' ? '/hr' : svc.unit === 'month' ? '/mo' : '';
+  const unit = svc.unit === 'hour' ? '/hr' : svc.unit === 'month' ? '/mo' : svc.unit === 'project' ? '/project' : svc.unit === 'course' ? '/course' : '';
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
       <span style={{ color: C.dim, fontSize: sm ? 10 : 11, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>
@@ -782,16 +858,68 @@ function HouseholdSvcCard({ svc, onClick, compact }) {
   );
 }
 
-function ServiceSearchResults({ query, categories, household, onCategory, onHousehold, renderCategory }) {
+function CloudSvcCard({ svc, onClick, compact }) {
+  const t = CL_THEME[svc.theme] || CL_THEME.host;
+  return (
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2px solid ${t.border}` }}>
+      <ServiceThumb svc={svc} height={compact ? 96 : 112} />
+      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: t.bg }}>
+        <div style={{ marginBottom: 6 }}><CloudCategoryPill theme={svc.theme} sm={compact} /></div>
+        <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
+        <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
+        <PriceTag svc={svc} sm={compact} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
+          <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CloudListBody({ onSelect }) {
+  const [filter, setFilter] = useState('all');
+  const list = CLOUD_SVCS.filter(s => filter === 'all' || s.theme === filter);
+  return (
+    <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+        {[['all', 'All', C.cyan, C.surf], ['host', 'Cloud hosting', CL_THEME.host.color, CL_THEME.host.bg], ['build', 'Infrastructure', CL_THEME.build.color, CL_THEME.build.bg], ['care', 'Managed & media', CL_THEME.care.color, CL_THEME.care.bg], ['pack', 'Turnkey packages', CL_THEME.pack.color, CL_THEME.pack.bg]].map(([k, l, col, bg]) => (
+          <button key={k} onClick={() => setFilter(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {['host', 'build', 'care', 'pack'].map(theme => {
+        const items = list.filter(s => s.theme === theme);
+        if (!items.length) return null;
+        const t = CL_THEME[theme];
+        return (
+          <div key={theme} style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <CloudCategoryPill theme={theme} />
+              <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {items.map(svc => <CloudSvcCard key={svc.id} svc={svc} onClick={() => onSelect(svc)} compact />)}
+            </div>
+          </div>
+        );
+      })}
+      <AssistBanner />
+    </div>
+  );
+}
+
+function ServiceSearchResults({ query, categories, household, cloud, onCategory, onHousehold, onCloud, renderCategory }) {
   const q = query.trim();
   if (!q) return null;
-  const total = categories.length + household.length;
+  const total = categories.length + household.length + (cloud?.length || 0);
   if (!total) {
     return (
       <div style={{ ...S.card(), padding: 24, textAlign: 'center', marginBottom: 14 }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
         <div style={{ color: C.txt, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>No services found</div>
-        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;doctor&rdquo;, &ldquo;bathroom&rdquo;, or &ldquo;legal&rdquo;</div>
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;cloud hosting&rdquo;, &ldquo;IaaS&rdquo;, or &ldquo;legal&rdquo;</div>
       </div>
     );
   }
@@ -809,9 +937,17 @@ function ServiceSearchResults({ query, categories, household, onCategory, onHous
           </div>
         </div>
       )}
+      {(cloud?.length || 0) > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Cloud services · {cloud.length}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {cloud.map(svc => <CloudSvcCard key={svc.id} svc={svc} onClick={() => onCloud(svc)} compact />)}
+          </div>
+        </div>
+      )}
       {categories.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          {household.length > 0 && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
+          {(household.length > 0 || (cloud?.length || 0) > 0) && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {categories.map((s, i) => renderCategory(s, i))}
           </div>
@@ -1501,11 +1637,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     </div>
   );
 
-  const { categories: svcList, household: hhSearch } = searchAllServices(search);
+  const { categories: svcList, household: hhSearch, cloud: clSearch } = searchAllServices(search);
   const searching = !!search.trim();
 
   const openBrowseSvc = (s) => {
     if (s.household) { setActiveSvc(s); setScreen('household-list'); return; }
+    if (s.cloud) { setActiveSvc(s); setScreen('cloud-list'); return; }
     setActiveSvc(s);
     setScreen('detail');
   };
@@ -1514,6 +1651,27 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setActiveSvc({ ...svc, cat: 'Household Services', cash: false });
     setScreen('detail');
   };
+
+  const openCloudSvc = (svc) => {
+    setActiveSvc({ ...svc, cat: 'Cloud Services', cash: false });
+    setScreen('detail');
+  };
+
+  // -- CLOUD SUB-SERVICES LIST --------------------------------------------
+  if (screen==='cloud-list') {
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Cloud services</div>
+            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>Hosting · infrastructure · packages · 25% off</div>
+          </div>
+        </div>
+        <CloudListBody onSelect={openCloudSvc} />
+      </>
+    );
+  }
 
   // -- HOUSEHOLD SUB-SERVICES LIST ----------------------------------------
   if (screen==='household-list') {
@@ -1545,7 +1703,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       </div>
       <div style={{margin:'12px 16px 0',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
         <span>🔍</span>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search kitchen clean, legal, doctor…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
         {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
       </div>
       <div style={{display:'flex',gap:6,padding:'10px 16px 0',overflowX:'auto'}}>
@@ -1559,8 +1717,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             query={search}
             categories={svcList}
             household={hhSearch}
+            cloud={clSearch}
             onCategory={openBrowseSvc}
             onHousehold={openHouseholdSvc}
+            onCloud={openCloudSvc}
             renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />}
           />
         ) : (
@@ -1590,21 +1750,25 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
     const d = activeSvc.desc ? activeSvc : (SVC_DETAIL[activeSvc.id]||{});
-    const isHh = !!activeSvc.theme;
+    const isHh = activeSvc.parent === 'household';
+    const isCloud = activeSvc.parent === 'cloud';
+    const isSubSvc = isHh || isCloud;
+    const listBack = isHh ? 'household-list' : isCloud ? 'cloud-list' : 'services';
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-          <button onClick={()=>setScreen(isHh?'household-list':'services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
+          <button onClick={()=>setScreen(listBack)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{activeSvc.name}</div>
         </div>
         <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
-          {isHh && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} height={140} /></div>}
+          {isSubSvc && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} height={140} /></div>}
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
             {isHh && <div style={{ marginBottom: 10 }}><HhCategoryPill theme={activeSvc.theme} /></div>}
-            {!isHh && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
+            {isCloud && <div style={{ marginBottom: 10 }}><CloudCategoryPill theme={activeSvc.theme} /></div>}
+            {!isSubSvc && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
             <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
-            {isHh && <div style={{ marginBottom: 12 }}><PriceTag svc={activeSvc} /></div>}
+            {isSubSvc && <div style={{ marginBottom: 12 }}><PriceTag svc={activeSvc} /></div>}
             <div style={{display:'flex',justifyContent:'center',gap:22}}>
               <div><div style={{color:C.acc,fontSize:14,fontWeight:800}}>{d.rating||activeSvc.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Rating</div></div>
               <div><div style={{color:C.grn,fontSize:14,fontWeight:800}}>{d.bookings||activeSvc.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Bookings</div></div>
@@ -2141,7 +2305,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       <div style={{fontSize:40,textAlign:'center',marginBottom:12}}>📍</div>
       <div style={{color:C.txt,fontSize:17,fontWeight:600,textAlign:'center',marginBottom:8}}>Welcome to ScanV</div>
       <div style={{color:C.sub,fontSize:12,textAlign:'center',lineHeight:1.65,marginBottom:10}}>
-        Find and book verified services near you — Legal, Health, Cloud Training, Property, Household, Food & more.
+        Find and book verified services near you — Legal, Health, Cloud Services, Property, Household, Food & more.
       </div>
       {/* DPDP consent -- compact as requested */}
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:18,fontSize:11,color:C.dim,lineHeight:1.6}}>
@@ -2414,7 +2578,7 @@ function HomeScreen() {
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {[...SVCS].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
-              <HomeModelCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen(s.household?'services':'book');}} />
+              <HomeModelCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen((s.household||s.cloud)?'services':'book');}} />
             ))}
           </div>
         </div>
@@ -2447,7 +2611,7 @@ function HomeScreen() {
 // Service detail data
 const SVC_DETAIL = {
   legal:    { desc:'Connect with verified lawyers for consultation, document drafting, property registration, court filings, and legal advice.', features:['Initial consultation','Document review & drafting','Property registration','Court representation','Online & offline'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
-  cloud:    { desc:'Professional training in AWS, Azure, GCP, AI/ML and DevOps. Certified trainers, hands-on labs, placement assistance.', features:['Live & recorded sessions','Hands-on labs','Certification prep','Job placement support','Flexible timing'], turnaround:'Batch starts weekly', rating:'4.9 ⭐', bookings:'1,800+' },
+  cloud:    { desc:'Enterprise cloud hosting, infrastructure, managed IT, turnkey packages, and training — 17 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Datacenter & network design','Managed 24×7 operations','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,400+' },
   vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
@@ -2461,11 +2625,13 @@ function ServicesScreen() {
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [hhList,setHhList]=useState(false);
-  const { categories: list, household: hhSearch } = searchAllServices(search);
+  const [clList,setClList]=useState(false);
+  const { categories: list, household: hhSearch, cloud: clSearch } = searchAllServices(search);
   const searching = !!search.trim();
 
   useEffect(()=>{
     if (activeSvc?.household && activeSvc?.id === 'household' && !detail) setHhList(true);
+    if (activeSvc?.cloud && activeSvc?.id === 'cloud' && !detail) setClList(true);
   }, [activeSvc, detail]);
 
   if (hhList) {
@@ -2483,9 +2649,26 @@ function ServicesScreen() {
     );
   }
 
+  if (clList) {
+    return (
+      <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setClList(false)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Cloud services</div>
+            <div style={{fontSize:11,color:C.dim}}>Hosting · infrastructure · packages · 25% off</div>
+          </div>
+        </div>
+        <CloudListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Cloud Services',cash:false}); setDetail(svc); setClList(false); }} />
+      </div>
+    );
+  }
+
   if(detail) {
     const d = detail.desc ? detail : (SVC_DETAIL[detail.id]||{});
-    const isHh = !!detail.theme;
+    const isHh = detail.parent === 'household';
+    const isCloud = detail.parent === 'cloud';
+    const isSubSvc = isHh || isCloud;
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
@@ -2493,13 +2676,14 @@ function ServicesScreen() {
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
         </div>
         <div style={{padding:16}}>
-          {isHh && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} height={160} /></div>}
+          {isSubSvc && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} height={160} /></div>}
           <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
             {isHh && <div style={{ marginBottom: 10 }}><HhCategoryPill theme={detail.theme} /></div>}
-            {!isHh && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
+            {isCloud && <div style={{ marginBottom: 10 }}><CloudCategoryPill theme={detail.theme} /></div>}
+            {!isSubSvc && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
-            {isHh ? <div style={{ marginBottom: 12 }}><PriceTag svc={detail} /></div> : (
+            {isSubSvc ? <div style={{ marginBottom: 12 }}><PriceTag svc={detail} /></div> : (
               <div style={{ marginBottom: 12 }}><PriceTag svc={detail} sm /></div>
             )}
             <div style={{display:'flex',justifyContent:'center',gap:20,flexWrap:'wrap'}}>
@@ -2518,7 +2702,13 @@ function ServicesScreen() {
             ))}
           </div>
           <AssistBanner/>
-          <Btn full onClick={()=>{setActiveSvc(isHh?{...detail,cat:'Household Services',cash:false}:detail);setScreen('book');}}>Book now →</Btn>
+          <Btn full onClick={()=>{
+            const payload = isHh ? {...detail,cat:'Household Services',cash:false}
+              : isCloud ? {...detail,cat:'Cloud Services',cash:false}
+              : detail;
+            setActiveSvc(payload);
+            setScreen('book');
+          }}>Book now →</Btn>
         </div>
       </div>
     );
@@ -2530,7 +2720,7 @@ function ServicesScreen() {
       <div style={{padding:16}}>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:16}}>
           <span>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search kitchen clean, legal, doctor…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
           {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
         </div>
         {searching ? (
@@ -2538,20 +2728,22 @@ function ServicesScreen() {
             query={search}
             categories={list}
             household={hhSearch}
-            onCategory={(s)=>s.household?setHhList(true):setDetail(s)}
+            cloud={clSearch}
+            onCategory={(s)=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }}
             onHousehold={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:false}); setDetail(svc); }}
-            renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} index={i} onClick={()=>s.household?setHhList(true):setDetail(s)} />}
+            onCloud={(svc)=>{ setActiveSvc({...svc,cat:'Cloud Services',cash:false}); setDetail(svc); }}
+            renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} index={i} onClick={()=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }} />}
           />
         ) : (
         <>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           {list.length > 0 && (
             <div style={{ gridColumn:'1 / -1' }}>
-              <HomeHeroCarousel services={list} onSelect={(s)=>s.household?setHhList(true):setDetail(s)} />
+              <HomeHeroCarousel services={list} onSelect={(s)=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }} />
             </div>
           )}
           {list.map((s,i)=>(
-            <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>s.household?setHhList(true):setDetail(s)} />
+            <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>{ if(s.household) setHhList(true); else if(s.cloud) setClList(true); else setDetail(s); }} />
           ))}
         </div>
         </>
