@@ -3,7 +3,7 @@
 -- ── Vendor partners ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS vendor_partners (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id          UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  profile_id          TEXT REFERENCES profiles(id) ON DELETE SET NULL,
   business_name       TEXT NOT NULL,
   contact_name        TEXT NOT NULL,
   phone               TEXT NOT NULL UNIQUE,
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_otp_mobile ON vendor_otp(mobile, verified,
 -- ── Booking dispatch state machine ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS booking_dispatch (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id            UUID NOT NULL,
+  booking_id            TEXT NOT NULL,
   service_id            TEXT,
   service_name          TEXT NOT NULL,
   customer_lat          DOUBLE PRECISION,

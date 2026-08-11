@@ -2,9 +2,9 @@
 
 CREATE TABLE IF NOT EXISTS vendor_live_locations (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id       UUID NOT NULL UNIQUE,
+  booking_id       TEXT NOT NULL UNIQUE,
   vendor_id        UUID REFERENCES vendor_partners(id) ON DELETE SET NULL,
-  partner_id       UUID,
+  partner_id       TEXT,
   lat              DOUBLE PRECISION NOT NULL,
   lng              DOUBLE PRECISION NOT NULL,
   heading          DOUBLE PRECISION,
