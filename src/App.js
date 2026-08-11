@@ -14,7 +14,6 @@ import {
   useState, useEffect, useRef, useCallback,
   createContext, useContext, useReducer, Component
 } from 'react';
-import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
@@ -22,6 +21,7 @@ const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
 const UPI_PA   = 'vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
+const UPI_QR   = `${process.env.PUBLIC_URL || ''}/hdfc-vyapar-qr.png`;
 const ASSIST   = '+91-9270194842';
 
 const UPI_PACKAGES = {
@@ -124,81 +124,44 @@ function InAppBrowserBanner({ addToast }) {
     </div>
   );
 }
-function UpiQrCode({ amountPaise, txnRef, note, onReady }) {
-  const [dataUrl, setDataUrl] = useState(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const link = buildUpiLink(amountPaise, txnRef, note || 'ScanV Booking');
-    QRCode.toDataURL(link, { width: 280, margin: 2, color: { dark: '#121212', light: '#ffffff' } })
-      .then(url => {
-        if (!cancelled) {
-          setDataUrl(url);
-          onReady?.();
-        }
-      })
-      .catch(() => { if (!cancelled) setErr(true); });
-    return () => { cancelled = true; };
-  }, [amountPaise, txnRef, note, onReady]);
-  if (err) {
-    return (
-      <div style={{ textAlign: 'center', padding: 20, color: C.red, fontSize: 13 }}>
-        Could not generate QR — use Copy UPI ID below
-      </div>
-    );
-  }
-  if (!dataUrl) {
-    return (
-      <div style={{ textAlign: 'center', padding: 32, color: C.dim, fontSize: 13 }}>
-        Generating payment QR…
-      </div>
-    );
-  }
+function StaticBankQr({ onReady }) {
+  useEffect(() => { onReady?.(); }, [onReady]);
   return (
     <div style={{ textAlign: 'center', marginBottom: 14 }}>
-      <img src={dataUrl} alt="Scan to pay via UPI" style={{ width: 280, height: 280, borderRadius: 12, border: BDR, background: '#fff' }} />
+      <div style={{ ...S.card(), background: '#fff', border: BDR, borderRadius: 12, padding: 12, display: 'inline-block', maxWidth: '100%' }}>
+        <img
+          src={UPI_QR}
+          alt="HDFC SmartHub Vyapar — Scan & Pay DCORE GLOBAL CORPORATION"
+          onLoad={() => onReady?.()}
+          style={{ width: '100%', maxWidth: 300, height: 'auto', display: 'block', borderRadius: 8 }}
+        />
+      </div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>HDFC SmartHub Vyapar · Scan &amp; Pay</div>
     </div>
   );
 }
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
   const { paymentVerified, upiOpened, checkingPay, setUpiOpened, amountPaise, txnId } = pay;
   const inApp = isInAppBrowser();
-  const [linkCopied, setLinkCopied] = useState(false);
   const onQrReady = useCallback(() => setUpiOpened(true), [setUpiOpened]);
-  const copyUpiLink = async () => {
-    try {
-      await navigator.clipboard.writeText(buildUpiLink(amountPaise, txnId, 'ScanV Booking'));
-      setLinkCopied(true);
-      addToast?.('UPI payment link copied', 'success');
-      setUpiOpened(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    } catch (_) {
-      addToast?.('Copy failed', 'error');
-    }
-  };
   const amountRu = amountPaise ? (amountPaise / 100).toFixed(0) : '0';
   return (
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
       <div style={{ background: '#e8f4fd', border: `1.5px solid rgba(13,71,161,0.25)`, borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 12, color: C.cyan, lineHeight: 1.5 }}>
-        <strong>Scan QR to pay</strong> — Open GPay, PhonePe, or Paytm → Scan &amp; Pay. Direct app links will be enabled once your bank completes UPI setup.
+        <strong>Scan bank QR to pay</strong> — Open GPay, PhonePe, or Paytm → Scan &amp; Pay → enter the exact amount below.
       </div>
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 13, color: C.dim, marginBottom: 4 }}>Pay exactly</div>
         <div style={{ fontSize: 36, fontWeight: 900, color: C.acc, fontFamily: FF }}>₹{amountRu}</div>
         {txnId && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Ref: {txnId}</div>}
       </div>
-      {!inApp && (
-        <UpiQrCode amountPaise={amountPaise} txnRef={txnId} note="ScanV Booking" onReady={onQrReady} />
-      )}
+      <StaticBankQr onReady={onQrReady} />
       <UpiVpaCopy addToast={addToast} />
       <div style={{ fontSize: 12, color: C.sub, textAlign: 'center', marginBottom: 14, lineHeight: 1.5 }}>
         Pay to <strong>DCORE GLOBAL CORPORATION</strong><br />
-        Scan the QR above with any UPI app
+        Enter <strong>₹{amountRu}</strong> when your UPI app asks for amount
       </div>
-      <button type="button" onClick={copyUpiLink} style={{ ...S.card(), background: C.card, border: BDR, borderRadius: 10, padding: '12px 14px', width: '100%', fontSize: 13, fontWeight: 700, color: C.cyan, cursor: 'pointer', marginBottom: 14 }}>
-        {linkCopied ? 'Payment link copied ✓' : 'Copy UPI payment link'}
-      </button>
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
           {checkingPay ? '⏳ Checking payment status…' : 'After scanning & paying, tap I\'ve paid — continue'}
