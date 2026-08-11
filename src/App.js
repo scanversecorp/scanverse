@@ -19,16 +19,27 @@ const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
+const RZP_BUTTON_ID = 'pl_TORikAHmO4yfg5';
 const UPI_PA   = 'vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
-const UPI_QR   = `${process.env.PUBLIC_URL || ''}/hdfc-vyapar-qr.png`;
 const ASSIST   = '+91-9270194842';
 
 const UPI_PACKAGES = {
   GPay: 'com.google.android.apps.nbu.paisa.user',
   PhonePe: 'com.phonepe.app',
   Paytm: 'net.one97.paytm',
+  Navi: 'com.naviapp',
+  BHIM: 'in.org.npci.upiapp',
 };
+
+const UPI_APPS = [
+  ['🟢', 'GPay'],
+  ['🟣', 'PhonePe'],
+  ['🔵', 'Paytm'],
+  ['🟠', 'Navi'],
+  ['🇮🇳', 'BHIM'],
+  ['⚡', 'Any UPI'],
+];
 
 /** @wahdfcbank / @wa* handles are WhatsApp Pay only — GPay/PhonePe always route to WhatsApp */
 function isWhatsAppOnlyVpa(vpa = UPI_PA) {
@@ -62,6 +73,8 @@ function buildIOSAppLink(app, params) {
   if (app === 'GPay') return `gpay://upi/pay?${params}`;
   if (app === 'PhonePe') return `phonepe://upi/pay?${params}`;
   if (app === 'Paytm') return `paytmmp://pay?${params}`;
+  if (app === 'BHIM') return `bhim://upi/pay?${params}`;
+  if (app === 'Navi') return `upi://pay?${params}`;
   return `upi://pay?${params}`;
 }
 function buildAppPayUrl(app, amountPaise, txnRef, note) {
@@ -124,47 +137,78 @@ function InAppBrowserBanner({ addToast }) {
     </div>
   );
 }
-function StaticBankQr({ onReady }) {
-  useEffect(() => { onReady?.(); }, [onReady]);
+function UpiPickerModal({ onPick, onClose }) {
   return (
-    <div style={{ textAlign: 'center', marginBottom: 14 }}>
-      <div style={{ ...S.card(), background: '#fff', border: BDR, borderRadius: 12, padding: 12, display: 'inline-block', maxWidth: '100%' }}>
-        <img
-          src={UPI_QR}
-          alt="HDFC SmartHub Vyapar — Scan & Pay DCORE GLOBAL CORPORATION"
-          onLoad={() => onReady?.()}
-          style={{ width: '100%', maxWidth: 300, height: 'auto', display: 'block', borderRadius: 8 }}
-        />
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: C.surf, borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, textAlign: 'center', marginBottom: 6 }}>Pick your UPI app</div>
+        <div style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginBottom: 16 }}>Opens the app directly on your phone</div>
+        {UPI_APPS.filter(([, lbl]) => lbl !== 'Any UPI').map(([ic, lbl]) => (
+          <button key={lbl} type="button" onClick={() => onPick(lbl)} style={{ display: 'flex', alignItems: 'center', gap: 14, ...S.card(), padding: '16px 18px', cursor: 'pointer', background: C.card, border: BDR, width: '100%', textAlign: 'left', marginBottom: 10 }}>
+            <span style={{ fontSize: 28 }}>{ic}</span>
+            <span style={{ color: C.txt, fontSize: 16, fontWeight: 700 }}>{lbl}</span>
+          </button>
+        ))}
+        <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'block', margin: '4px auto 0' }}>Cancel</button>
       </div>
-      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>HDFC SmartHub Vyapar · Scan &amp; Pay</div>
+    </div>
+  );
+}
+function RazorpayPayButton({ onInteract }) {
+  const formRef = useRef(null);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form || form.querySelector('script[data-payment_button_id]')) return;
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/payment-button.js';
+    script.async = true;
+    script.setAttribute('data-payment_button_id', RZP_BUTTON_ID);
+    form.appendChild(script);
+    const mark = () => onInteract?.();
+    form.addEventListener('click', mark);
+    return () => {
+      form.removeEventListener('click', mark);
+      script.remove();
+    };
+  }, [onInteract]);
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 10, textAlign: 'center' }}>Or pay via Razorpay</div>
+      <form ref={formRef} style={{ display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
-  const { paymentVerified, upiOpened, checkingPay, setUpiOpened, amountPaise, txnId } = pay;
+  const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, amountPaise, txnId } = pay;
   const inApp = isInAppBrowser();
-  const onQrReady = useCallback(() => setUpiOpened(true), [setUpiOpened]);
   const amountRu = amountPaise ? (amountPaise / 100).toFixed(0) : '0';
   return (
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
-      <div style={{ background: '#e8f4fd', border: `1.5px solid rgba(13,71,161,0.25)`, borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 12, color: C.cyan, lineHeight: 1.5 }}>
-        <strong>Scan bank QR to pay</strong> — Open GPay, PhonePe, or Paytm → Scan &amp; Pay → enter the exact amount below.
-      </div>
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 13, color: C.dim, marginBottom: 4 }}>Pay exactly</div>
+        <div style={{ fontSize: 13, color: C.dim, marginBottom: 4 }}>Pay now</div>
         <div style={{ fontSize: 36, fontWeight: 900, color: C.acc, fontFamily: FF }}>₹{amountRu}</div>
         {txnId && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Ref: {txnId}</div>}
       </div>
-      <StaticBankQr onReady={onQrReady} />
       <UpiVpaCopy addToast={addToast} />
-      <div style={{ fontSize: 12, color: C.sub, textAlign: 'center', marginBottom: 14, lineHeight: 1.5 }}>
-        Pay to <strong>DCORE GLOBAL CORPORATION</strong><br />
-        Enter <strong>₹{amountRu}</strong> when your UPI app asks for amount
+      <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
+        💳 Pay via UPI →
+      </Btn>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+        {UPI_APPS.map(([ic, lbl]) => (
+          <button key={lbl} type="button" onClick={() => launchUpi(lbl)} disabled={inApp} style={{ display: 'flex', alignItems: 'center', gap: 10, ...S.card(), padding: '12px 14px', cursor: inApp ? 'not-allowed' : 'pointer', background: C.card, border: BDR, width: '100%', textAlign: 'left', opacity: inApp ? 0.5 : 1 }}>
+            <span style={{ fontSize: 22 }}>{ic}</span>
+            <span style={{ color: C.txt, fontSize: 13, fontWeight: 700 }}>{lbl}</span>
+          </button>
+        ))}
       </div>
+      {inApp && (
+        <div style={{ fontSize: 11, color: C.dim, textAlign: 'center', marginBottom: 14 }}>Open in Chrome/Safari to launch UPI apps</div>
+      )}
+      <RazorpayPayButton onInteract={() => setUpiOpened(true)} />
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
-          {checkingPay ? '⏳ Checking payment status…' : 'After scanning & paying, tap I\'ve paid — continue'}
+          {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app, then tap I\'ve paid — continue'}
         </div>
       )}
       {paymentVerified && (
@@ -172,12 +216,12 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
           ✅ Payment confirmed — you can continue
         </div>
       )}
-      <div style={{ textAlign: 'center', marginBottom: 14 }}>
-        <a href={RZP_URL} target="_blank" rel="noreferrer" style={{ color: C.cyan, fontSize: 13, fontWeight: 600 }}>Card / Net Banking via Razorpay ↗</a>
-      </div>
       <Btn full onClick={onConfirm} disabled={loading || disabled || (!upiOpened && !paymentVerified)}>
-        {paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'I\'ve paid — continue →' : 'Scan QR to pay first'}
+        {paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'I\'ve paid — continue →' : 'Pay via UPI or Razorpay first'}
       </Btn>
+      {showUpiPicker && (
+        <UpiPickerModal onPick={launchUpiDirect} onClose={() => setShowUpiPicker(false)} />
+      )}
     </>
   );
 }
@@ -228,6 +272,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [upiOpened, setUpiOpened] = useState(false);
   const [checkingPay, setCheckingPay] = useState(false);
+  const [showUpiPicker, setShowUpiPicker] = useState(false);
   useEffect(() => {
     if (!txnId || !amountPaise) return;
     registerPaymentIntent(txnId, amountPaise, userId);
@@ -255,8 +300,42 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     document.addEventListener('visibilitychange', onVis);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
   }, [upiOpened, txnId, paymentVerified, addToast]);
+  const triggerUpi = (app) => {
+    if (isInAppBrowser()) {
+      addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
+      return;
+    }
+    if (isWhatsAppOnlyVpa()) {
+      addToast?.('This UPI ID is WhatsApp Pay only — use Razorpay below', 'error');
+      return;
+    }
+    if (openUpiPay(app, amountPaise, txnId, 'ScanV Booking')) {
+      setUpiOpened(true);
+      addToast?.('Opening UPI app…', 'info');
+    }
+  };
+  const launchUpi = (app) => {
+    if (isInAppBrowser()) {
+      addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
+      return;
+    }
+    if (app === 'Any UPI') {
+      if (isAndroidUA()) {
+        setShowUpiPicker(true);
+        return;
+      }
+      triggerUpi('Any UPI');
+      return;
+    }
+    triggerUpi(app);
+  };
+  const launchUpiDirect = (app) => {
+    setShowUpiPicker(false);
+    triggerUpi(app);
+  };
   return {
-    paymentVerified, upiOpened, checkingPay, setPaymentVerified, setUpiOpened,
+    paymentVerified, upiOpened, checkingPay, launchUpi, launchUpiDirect,
+    showUpiPicker, setShowUpiPicker, setPaymentVerified, setUpiOpened,
     amountPaise, txnId,
   };
 }
