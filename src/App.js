@@ -1624,20 +1624,20 @@ function AssistBanner() {
   );
 }
 
-function GuestBottomNav({ screen, setScreen, addToast }) {
-  const active = screen==='services' ? 'home' : 'services';
+function GuestBottomNav({ activeTab, onHome, onServices, onBookings, onProfile }) {
   const tabs = [
-    {id:'home', icon:'🏠', label:'Home', go:()=>setScreen('services')},
-    {id:'services', icon:'🔍', label:'Services', go:()=>setScreen('services')},
-    {id:'bookings', icon:'📅', label:'Bookings', go:()=>setScreen('login')},
-    {id:'profile', icon:'👤', label:'Profile', go:()=>setScreen('login')},
+    {id:'home', icon:'🏠', label:'Home', go:onHome},
+    {id:'services', icon:'🔍', label:'Services', go:onServices},
+    {id:'bookings', icon:'📅', label:'Bookings', go:onBookings},
+    {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
     <div style={{position:'fixed',bottom:0,left:0,right:0,maxWidth:480,margin:'0 auto',background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50}}>
       {tabs.map(t=>(
-        <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0'}}>
+        <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
-          <span style={{fontSize:10,fontWeight:700,fontFamily:FF,color:active===t.id?C.acc:C.dim}}>{t.label}</span>
+          <span style={{fontSize:10,fontWeight:700,fontFamily:FF,color:activeTab===t.id?C.acc:C.dim}}>{t.label}</span>
+          {activeTab===t.id&&<div style={{position:'absolute',bottom:0,left:'25%',right:'25%',height:2,background:C.acc,borderRadius:2}}/>}
         </button>
       ))}
     </div>
@@ -2106,7 +2106,9 @@ function QRLandingPage({ onContinue }) {
    User browses → picks service → books → THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, addToast }) {
-  const [screen, setScreen] = useState('services'); // services | detail | verify | payment | schedule
+  const [screen, setScreen] = useState('services'); // services | detail | verify | payment | schedule | login
+  const [navTab, setNavTab] = useState('home');
+  const [loginIntent, setLoginIntent] = useState(null); // 'bookings' | 'profile'
   const [activeSvc, setActiveSvc] = useState(null);
   const [bookingDetail, setBookingDetail] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -2238,7 +2240,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       }).eq('id',existing.id).select().single();
       localStorage.setItem('scanv_uid',existing.id);
       addToast?.(`Welcome back, ${existing.first_name}!`,'success');
-      onRegistered(prof || {...existing,mobile_verified:true});
+      onRegistered(prof || {...existing,mobile_verified:true}, null, loginIntent);
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
   };
@@ -2357,12 +2359,71 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     finally { setLoading(false); }
   };
 
+  const resetBrowseLanding = () => {
+    setActiveSvc(null);
+    setSearch('');
+    setBookingDetail(null);
+    setErr('');
+  };
+
+  const goBrowseHome = () => {
+    resetBrowseLanding();
+    setScreen('services');
+    setNavTab('home');
+  };
+
+  const goBrowseServices = () => {
+    resetBrowseLanding();
+    setScreen('services');
+    setNavTab('services');
+  };
+
+  const tryExistingSession = async (intent) => {
+    const uid = localStorage.getItem('scanv_uid');
+    if (!uid) return false;
+    const { data: prof } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
+    if (!prof?.first_name) return false;
+    onRegistered(prof, null, intent);
+    return true;
+  };
+
+  const goBrowseBookings = async () => {
+    setNavTab('bookings');
+    if (await tryExistingSession('bookings')) return;
+    setLoginIntent('bookings');
+    resetOtpFlow();
+    setErr('');
+    setScreen('login');
+  };
+
+  const goBrowseProfile = async () => {
+    setNavTab('profile');
+    if (await tryExistingSession('profile')) return;
+    setLoginIntent('profile');
+    resetOtpFlow();
+    setErr('');
+    setScreen('login');
+  };
+
+  const guestActiveTab = (() => {
+    if (screen === 'login') return loginIntent || 'bookings';
+    if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'services';
+    if (screen === 'services') return navTab;
+    return navTab;
+  })();
+
   const browseWrap = (content, sticky=null) => (
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:72}}>
       {content}
       {sticky}
       <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
-      <GuestBottomNav screen={screen} setScreen={setScreen} addToast={addToast}/>
+      <GuestBottomNav
+        activeTab={guestActiveTab}
+        onHome={goBrowseHome}
+        onServices={goBrowseServices}
+        onBookings={goBrowseBookings}
+        onProfile={goBrowseProfile}
+      />
     </div>
   );
 
@@ -2659,17 +2720,21 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     );
   }
 
-  // -- LOGIN: Guest Profile tab — OTP gate at sign-in -----------------------
+  // -- LOGIN: Guest Bookings/Profile tab — OTP gate at sign-in -----------------------
   if (screen==='login') {
+    const loginTitle = loginIntent === 'profile' ? 'Sign in to Profile' : 'Sign in to Bookings';
+    const loginHint = loginIntent === 'profile'
+      ? 'Verify mobile to view and update your address. Name and mobile are OTP-verified and read-only.'
+      : 'Verify mobile to view your bookings and orders. OTP required each sign-in.';
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>{setScreen('services');resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Sign in</div>
+          <button onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
         </div>
         <div style={{padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Verify mobile to access bookings. OTP required each sign-in — skipped when already signed in.</div>
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
           <Field label="Mobile" req note="10-digit Indian mobile">
             <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
               <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
@@ -3206,7 +3271,7 @@ function QRScreen() {
    MAIN APP SCREENS (unchanged structure, updated URL ref)
 ================================================================ */
 function BottomNav() {
-  const {screen,setScreen,user,notifs}=useApp();
+  const {screen,setScreen,user,notifs,setActiveSvc}=useApp();
   const unread=notifs.filter(n=>!n.read).length;
   const tabs=[
     {id:'home',icon:'🏠',label:'Home'},
@@ -3215,10 +3280,14 @@ function BottomNav() {
     ...(['admin','partner'].includes(user?.role)?[{id:'crm',icon:'📊',label:'CRM'}]:[]),
     {id:'profile',icon:'👤',label:'Profile'},
   ];
+  const goTab=(id)=>{
+    if (id==='home'||id==='services') setActiveSvc(null);
+    setScreen(id);
+  };
   return (
     <div style={{display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'8px 0 4px',position:'sticky',bottom:0,zIndex:50}}>
       {tabs.map(t=>(
-        <button key={t.id} onClick={()=>setScreen(t.id)}
+        <button key={t.id} onClick={()=>goTab(t.id)}
           style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
           <span style={{fontSize:10,color:screen===t.id?C.acc:C.dim,fontFamily:"'DM Sans',sans-serif",fontWeight:screen===t.id?600:400}}>{t.label}</span>
@@ -4005,6 +4074,13 @@ function usePartnerLocationShare(user, bookings, addToast) {
   }, [user?.id, user?.role, bookings, addToast]);
 }
 
+const BOOKING_COMPLETED = new Set(['completed','closed']);
+function bookingStatusGroup(status) {
+  const s = (status || '').toLowerCase();
+  if (BOOKING_COMPLETED.has(s)) return { label: 'Completed', color: C.grn };
+  return { label: 'In-progress', color: C.gold };
+}
+
 function BookingsScreen() {
   const {user,addToast,setScreen,setTrackBookingId}=useApp();
   const [bookings,setBookings]=useState([]);
@@ -4067,8 +4143,35 @@ function BookingsScreen() {
     return ()=>{ if(channel) sb().removeChannel(channel); clearInterval(poll); };
   },[bookings]);
 
-  const sc=s=>s==='completed'?C.grn:s==='confirmed'?C.cyan:s==='cancelled'||s==='disputed'?C.red:C.gold;
   const showLive=(b)=>user.role==='customer'&&b.status==='confirmed'&&b.partner_id&&liveLocs[b.id]?.tracking_active;
+  const activeBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='In-progress');
+  const doneBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='Completed');
+
+  const renderBookingCard=(b)=>(
+    <div key={b.id} style={{...S.card(),marginBottom:10}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+        <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
+        <div style={{textAlign:'right'}}>
+          <div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div>
+          <Badge label={bookingStatusGroup(b.status).label} color={bookingStatusGroup(b.status).color}/>
+          <div style={{fontSize:10,color:C.dim,marginTop:4,textTransform:'capitalize'}}>{b.status?.replace(/_/g,' ')}</div>
+        </div>
+      </div>
+      {showLive(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]}/>}
+      {user.role==='customer'&&b.status==='confirmed'&&<WaitEngagementPanel compact />}
+      {user.role==='customer'&&bookingStatusGroup(b.status).label==='In-progress'&&b.partner_id&&(
+        <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
+      )}
+      {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={()=>markComplete(b)}>✓ Mark complete</Btn>}
+      {b.status==='completed'&&user.role==='customer'&&(
+        <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
+          {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>✅ Rated {stars[b.id]}⭐</div>}
+          <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:FF,marginTop:8,display:'block'}}>Raise a dispute</button>
+        </div>
+      )}
+      {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id).catch(()=>{});addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
+    </div>
+  );
 
   const markComplete=async(b)=>{
     await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);
@@ -4088,27 +4191,20 @@ function BookingsScreen() {
       )}
       <div style={{padding:16}}>
         {loading?<div style={{textAlign:'center',padding:40}}><Spin/></div>
-        :bookings.length?bookings.map(b=>(
-          <div key={b.id} style={{...S.card(),marginBottom:10}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-              <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
-              <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div><Badge label={b.status} color={sc(b.status)}/></div>
-            </div>
-            {showLive(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]}/>}
-            {user.role==='customer'&&b.status==='confirmed'&&<WaitEngagementPanel compact />}
-            {user.role==='customer'&&b.status==='confirmed'&&(
-              <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
-            )}
-            {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={()=>markComplete(b)}>✓ Mark complete</Btn>}
-            {b.status==='completed'&&user.role==='customer'&&(
-              <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
-                {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>✅ Rated {stars[b.id]}⭐</div>}
-                <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:FF,marginTop:8,display:'block'}}>Raise a dispute</button>
-              </div>
-            )}
-            {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id).catch(()=>{});addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
-          </div>
-        )):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>No bookings yet</div>}
+        :bookings.length?(<>
+          {activeBookings.length>0&&<>
+            <div style={{fontSize:13,fontWeight:700,color:C.txt,marginBottom:10}}>In-progress ({activeBookings.length})</div>
+            {activeBookings.map(renderBookingCard)}
+          </>}
+          {doneBookings.length>0&&<>
+            <div style={{fontSize:13,fontWeight:700,color:C.txt,marginBottom:10,marginTop:activeBookings.length?16:0}}>Completed ({doneBookings.length})</div>
+            {doneBookings.map(renderBookingCard)}
+          </>}
+        </>):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>
+          <div style={{fontSize:32,marginBottom:8}}>📅</div>
+          <div style={{fontWeight:600,marginBottom:4}}>No bookings yet</div>
+          <div style={{fontSize:12}}>Book a service to see your orders here</div>
+        </div>}
       </div>
     </div>
   );
@@ -4148,10 +4244,13 @@ function CRMScreen() {
 
 function ProfileScreen() {
   const {user,setUser,addToast,logout,setScreen}=useApp();
-  const [frm,setFrm]=useState({firstName:user?.first_name||'',lastName:user?.last_name||'',phone:user?.phone||'',age:user?.age||'',gender:user?.gender||'',upi_id:user?.upi_id||'',address:user?.address||'',village:user?.village||'',city:user?.city||'',pincode:user?.pincode||''});
+  const hasRealEmail=user?.email&&!user.email.endsWith('@scanv.app');
+  const [frm,setFrm]=useState({firstName:user?.first_name||'',lastName:user?.last_name||'',phone:user?.phone||'',email:hasRealEmail?user.email:'',age:user?.age||'',gender:user?.gender||'',upi_id:user?.upi_id||'',address:user?.address||'',village:user?.village||'',city:user?.city||'',pincode:user?.pincode||''});
   const [saving,setSaving]=useState(false);
   const f=(k,v)=>setFrm(p=>({...p,[k]:v}));
-  const save=async()=>{setSaving(true);try{const{data}=await sb().from('profiles').update({first_name:frm.firstName,last_name:frm.lastName,name:`${frm.firstName} ${frm.lastName}`,phone:frm.phone,age:parseInt(frm.age)||null,gender:frm.gender,upi_id:frm.upi_id,address:frm.address,village:frm.village,city:frm.city,pincode:frm.pincode}).eq('id',user.id).select().single();setUser(data);addToast('Profile saved ✅','success');}catch(e){addToast(e.message||'Save failed','error');}finally{setSaving(false);}};
+  const readOnlyInp={...S.inp(),background:C.deep,color:C.sub,cursor:'not-allowed'};
+  const verifiedNote=<div style={{fontSize:10,color:C.dim,marginTop:4}}>🔒 Verified — contact support to change</div>;
+  const save=async()=>{setSaving(true);try{const updates={address:frm.address,village:frm.village,city:frm.city,pincode:frm.pincode};if(hasRealEmail&&frm.email)updates.email=frm.email;if(user.role==='partner')updates.upi_id=frm.upi_id;const{data}=await sb().from('profiles').update(updates).eq('id',user.id).select().single();setUser(data);addToast('Address saved ✅','success');}catch(e){addToast(e.message||'Save failed','error');}finally{setSaving(false);}};
   const rc=user.role==='admin'?C.gold:user.role==='partner'?C.cyan:user.role==='candidate'?C.vio:C.acc;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
@@ -4169,14 +4268,14 @@ function ProfileScreen() {
         {user.role==='admin'&&<div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}><span style={{fontSize:22}}>📲</span><div style={{color:C.txt,fontSize:13,fontWeight:600}}>View QR Code & share</div><span style={{marginLeft:'auto',color:C.acc}}>→</span></div>}
         <div style={{...S.card(),marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:600,color:C.txt,marginBottom:14}}>Edit profile</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} onChange={e=>f('firstName',e.target.value)} style={S.inp()}/></Field><Field label="Last name"><input value={frm.lastName} onChange={e=>f('lastName',e.target.value)} style={S.inp()}/></Field></div>
-          {/* Age & Gender captured silently from device -- not shown in form */}
-          <Field label="Mobile"><input value={frm.phone} onChange={e=>f('phone',e.target.value)} style={S.inp()}/></Field>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} readOnly style={readOnlyInp}/>{verifiedNote}</Field><Field label="Last name"><input value={frm.lastName} readOnly style={readOnlyInp}/>{verifiedNote}</Field></div>
+          <Field label="Mobile"><input value={frm.phone} readOnly style={readOnlyInp}/>{verifiedNote}</Field>
+          {hasRealEmail&&<Field label="Email"><input value={frm.email} onChange={e=>f('email',e.target.value)} style={S.inp()}/></Field>}
           <Field label="Address"><input value={frm.address} onChange={e=>f('address',e.target.value)} style={S.inp()}/></Field>
           <Field label="Village / Area"><input value={frm.village} onChange={e=>f('village',e.target.value)} style={S.inp()}/></Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="City"><input value={frm.city} onChange={e=>f('city',e.target.value)} style={S.inp()}/></Field><Field label="PIN code"><input value={frm.pincode} onChange={e=>f('pincode',e.target.value)} style={S.inp()}/></Field></div>
           {user.role==='partner'&&<Field label="UPI ID"><input value={frm.upi_id} onChange={e=>f('upi_id',e.target.value)} placeholder="yourname@upi" style={S.inp()}/></Field>}
-          <Btn onClick={save} disabled={saving}>{saving?'Saving…':'Save changes'}</Btn>
+          <Btn onClick={save} disabled={saving}>{saving?'Saving…':'Save address'}</Btn>
         </div>
         <AssistBanner/>
         <Btn full v="outline" onClick={logout}>Sign out</Btn>
@@ -6514,7 +6613,7 @@ export default function App() {
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
     <BrowseFlow
       silentGeo={silentGeo}
-      onRegistered={(p, bookingId)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else setScreen('home');}}
+      onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else setScreen('home');}}
       addToast={addToast}
     />
     </Boundary>
