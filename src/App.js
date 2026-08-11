@@ -367,40 +367,40 @@ const HH_THEME = {
 
 /* --- HOUSEHOLD SUB-SERVICES (ScanV-branded; fulfillVia routes backend later) --- */
 const HOUSEHOLD_SVCS = [
-  { id:'hh-bathroom-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🚿', img:'/services/bathroom-deep.png', name:'Bathroom Deep Clean', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:true,
+  { id:'hh-bathroom-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🚿', img:'/services/bathroom-deep.png', name:'Bathroom Deep Clean', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV bathroom deep clean — tiles, WC, taps, mirrors & exhaust fan. Eco-friendly products, background-verified professionals, satisfaction guaranteed.',
     features:['WC & basin deep scrub','Tile & grout cleaning','Mirror & tap polish','Exhaust fan wipe','Re-clean if not satisfied'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'5,000+' },
-  { id:'hh-kitchen-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🍳', img:'/services/kitchen-deep.png', name:'Kitchen Deep Clean', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:true,
+  { id:'hh-kitchen-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🍳', img:'/services/kitchen-deep.png', name:'Kitchen Deep Clean', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:false,
     desc:'ScanV kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. All supplies included, verified professionals across Pune & PCMC.',
     features:['Counter & cabinet wipe','Chimney exterior clean','Sink & tap descale','Floor mop & degrease','Eco-friendly products'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'3,200+' },
-  { id:'hh-flat-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🏠', img:'/services/flat-clean.png', name:'Full Flat Cleaning', sub:'Complete home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:true,
+  { id:'hh-flat-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🏠', img:'/services/flat-clean.png', name:'Full Flat Cleaning', sub:'Complete home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:false,
     desc:'Complete flat cleaning through ScanV — every room, kitchen & bathroom. Ideal for move-in, festival prep or monthly deep clean.',
     features:['All rooms dust & mop','Kitchen + bathroom included','Balcony sweep','Furniture wipe-down','Team of 2 for 2BHK+'], turnaround:'24–48 hrs', rating:'4.9 ⭐', bookings:'2,100+' },
-  { id:'hh-care-plan', parent:'household', theme:'pink', fulfillVia:'x', icon:'📅', img:'/services/care-plan.png', name:'Bathroom Care Plan', sub:'Weekly / fortnightly · fixed slot', unit:'month', mrp:149900, price:discPaise(149900), cash:true,
+  { id:'hh-care-plan', parent:'household', theme:'pink', fulfillVia:'x', icon:'📅', img:'/services/care-plan.png', name:'Bathroom Care Plan', sub:'Weekly / fortnightly · fixed slot', unit:'month', mrp:149900, price:discPaise(149900), cash:false,
     desc:'ScanV recurring bathroom care — hassle-free scheduled cleaning without rebooking every time. Same trusted professional, fixed slot.',
     features:['4 visits per month','Fixed day & time slot','Same professional','Priority rescheduling','Save vs one-time booking'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'890+' },
-  { id:'hh-quick-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'✨', img:'/services/quick-clean.png', name:'Quick Clean', sub:'Single task · bathroom · fan · 30 min', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-quick-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'✨', img:'/services/quick-clean.png', name:'Quick Clean', sub:'Single task · bathroom · fan · 30 min', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV quick clean — affordable single-task service for one bathroom, fan or appliance. Perfect when you need just one thing done fast.',
     features:['Single bathroom refresh','Fan / exhaust wipe','Appliance exterior','30-min visit','Best-value quick booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,400+' },
-  { id:'hh-house-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🏡', img:'/services/house-help.png', name:'House Help', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:true,
+  { id:'hh-house-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🏡', img:'/services/house-help.png', name:'House Help', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:false,
     desc:'ScanV house help — trained, background-verified experts for sweeping, mopping, dusting, dishes & more. Book by the hour, instant or scheduled.',
     features:['Background verified experts','Professional training','Hourly — book 1–4 hrs','Instant or scheduled','Flexible tasks in one visit'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  { id:'hh-dishwashing', parent:'household', theme:'green', fulfillVia:'s', icon:'🍽️', img:'/services/dishwashing.png', name:'Dishwashing', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:true,
+  { id:'hh-dishwashing', parent:'household', theme:'green', fulfillVia:'s', icon:'🍽️', img:'/services/dishwashing.png', name:'Dishwashing', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:false,
     desc:'ScanV dishwashing help — sink, utensils & platform cleaned efficiently. Hourly booking, transparent pricing, verified professionals.',
     features:['All utensils washed','Sink & platform clean','Supplies included','Hourly booking','Trusted ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'8,000+' },
-  { id:'hh-kitchen-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🧽', img:'/services/kitchen-help.png', name:'Kitchen Tidy-Up', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-kitchen-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🧽', img:'/services/kitchen-help.png', name:'Kitchen Tidy-Up', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV kitchen tidy-up — platform, tiles, chimney exterior & sink within your booked hours. No contracts, cancel anytime before the slot.',
     features:['Platform & tile wipe','Chimney exterior','Sink clean','Cabinet exterior dust','Transparent hourly rate'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'4,500+' },
-  { id:'hh-fan-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🌀', img:'/services/fan-clean.png', name:'Fan Cleaning', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-fan-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🌀', img:'/services/fan-clean.png', name:'Fan Cleaning', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV fan cleaning — blade wipe & dust removal for reachable ceiling fans. Safe service — no ladder or height work.',
     features:['Blade dust & wipe','Cover clean','Safe reachable access','Add to hourly booking','No ladder tasks'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'2,200+' },
-  { id:'hh-window-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🪟', img:'/services/window-clean.png', name:'Window Cleaning', sub:'Glass · frames · inside only', unit:'visit', mrp:19900, price:discPaise(19900), cash:true,
+  { id:'hh-window-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🪟', img:'/services/window-clean.png', name:'Window Cleaning', sub:'Glass · frames · inside only', unit:'visit', mrp:19900, price:discPaise(19900), cash:false,
     desc:'ScanV window cleaning — glass & frame wipe for accessible windows inside your home. Streak-free finish by trained experts.',
     features:['Glass wipe inside','Frame & sill clean','Reachable windows only','Streak-free finish','Bundle with house help'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,800+' },
-  { id:'hh-laundry', parent:'household', theme:'green', fulfillVia:'s', icon:'👕', img:'/services/laundry.png', name:'Laundry Help', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-laundry', parent:'household', theme:'green', fulfillVia:'s', icon:'👕', img:'/services/laundry.png', name:'Laundry Help', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV laundry help — folding, sorting & organising clean clothes. Washing machine operation or ironing by separate agreement.',
     features:['Fold clean laundry','Sort by type/colour','Wardrobe organise','Bed linen change','Hourly booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'3,500+' },
-  { id:'hh-bathroom-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🛁', img:'/services/bathroom-help.png', name:'Bathroom Refresh', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:true,
+  { id:'hh-bathroom-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🛁', img:'/services/bathroom-help.png', name:'Bathroom Refresh', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:false,
     desc:'ScanV bathroom refresh — WC, floor, taps & mirror within booked hours. Ideal for quick upkeep — book 1–2 hours.',
     features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Verified ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'5,200+' },
 ];
@@ -414,7 +414,7 @@ const SVCS = [
   { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false, ...svcDisc(9999) },
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
-  { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 12 services', cat:'Household Services', cash:true,  ...svcDisc(149), household:true },
+  { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 12 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:true,  ...svcDisc(99) },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true,  ...svcDisc(199) },
 ];
@@ -508,6 +508,55 @@ function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
 }
 
+function isHouseholdService(s) {
+  return !!(s?.household || s?.parent === 'household' || s?.theme);
+}
+
+function UpiOnlyPill({ sm }) {
+  return (
+    <span style={{ background: '#eef2ff', color: '#4338ca', border: '1.5px solid #c7d2fe', borderRadius: 99, fontSize: sm ? 8 : 10, fontWeight: 800, padding: sm ? '2px 7px' : '3px 9px' }}>
+      📱 UPI only
+    </span>
+  );
+}
+
+function HouseholdFeaturedCard({ onClick, compact }) {
+  const hh = SVCS.find(s => s.id === 'household');
+  if (!hh) return null;
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        gridColumn: compact ? 'auto' : '1 / -1',
+        borderRadius: 16,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        border: '2px solid transparent',
+        background: 'linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, #FFD6E8, #86EFAC, #FFD6E8) border-box',
+        boxShadow: '0 8px 28px rgba(244,114,182,0.22), 0 4px 14px rgba(52,211,153,0.15)',
+        animation: 'fadeUp .4s ease both',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: compact ? 88 : 118, background: 'linear-gradient(135deg, #FFF1F5 0%, #ECFDF5 100%)' }}>
+        <div style={{ flex: 1, padding: compact ? '12px 14px' : '16px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: compact ? 4 : 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ background: C.acc, color: '#fff', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>✨ POPULAR</span>
+            <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>25% OFF</span>
+            <UpiOnlyPill sm />
+          </div>
+          <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 14 : 16, lineHeight: 1.2 }}>Household services</div>
+          <div style={{ color: C.sub, fontSize: compact ? 10 : 11, fontWeight: 600, lineHeight: 1.4 }}>Deep clean · home help · {HOUSEHOLD_SVCS.length} services · pay via GPay, PhonePe & UPI</div>
+          <div style={{ color: C.acc, fontSize: compact ? 11 : 12, fontWeight: 800 }}>From ₹{fmtRs(hh.price)} →</div>
+        </div>
+        <div style={{ width: compact ? 96 : 120, flexShrink: 0, position: 'relative' }}>
+          <img src="/services/house-help.png" alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #FFF1F5 0%, transparent 45%)' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HhCategoryPill({ theme, sm }) {
   const t = HH_THEME[theme];
   if (!t) return null;
@@ -594,7 +643,8 @@ function HouseholdSvcCard({ svc, onClick, compact }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
           <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
-          {svc.cash && <span style={{ color: C.grn, fontSize: 10, fontWeight: 700 }}>· 💵 Cash</span>}
+          {svc.cash && !isHouseholdService(svc) && <span style={{ color: C.grn, fontSize: 10, fontWeight: 700 }}>· 💵 Cash</span>}
+          {isHouseholdService(svc) && <UpiOnlyPill sm />}
         </div>
       </div>
     </div>
@@ -1259,7 +1309,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   };
 
   const openHouseholdSvc = (svc) => {
-    setActiveSvc({ ...svc, cat: 'Household Services', cash: true });
+    setActiveSvc({ ...svc, cat: 'Household Services', cash: false });
     setScreen('detail');
   };
 
@@ -1301,7 +1351,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'}</div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          {svcList.map((s,i)=>{
+          {!search && svcList.some(s=>s.household) && (
+            <HouseholdFeaturedCard onClick={()=>openBrowseSvc(SVCS.find(s=>s.id==='household'))} />
+          )}
+          {svcList.filter(s=>!s.household).map((s,i)=>{
             const d=SVC_DETAIL[s.id]||{};
             return (
               <div key={s.id} style={{...S.card(),padding:'14px 10px',textAlign:'center',cursor:'pointer',minHeight:118,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,animation:`fadeUp .35s ease ${i*0.03}s both`}}
@@ -1309,8 +1362,21 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                 <div style={{fontSize:28}}>{s.icon}</div>
                 <div style={{color:C.txt,fontWeight:800,fontSize:12,lineHeight:1.2}}>{SVC_SHORT[s.id]||s.name.split(' ')[0]}</div>
                 <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{fmtRs(s.price||discPaise(50000))}</div>
-                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {s.household ? `${HOUSEHOLD_SVCS.length} services` : (d.turnaround?.split(' ').slice(0,2).join(' ')||'Same day')}</div>
+                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {(d.turnaround?.split(' ').slice(0,2).join(' ')||'Same day')}</div>
                 {s.cash&&<span style={{color:C.grn,fontSize:8,fontWeight:800,background:'#e6f4ee',border:`1px solid rgba(0,122,77,0.35)`,padding:'2px 6px',borderRadius:4}}>💵 Cash</span>}
+              </div>
+            );
+          })}
+          {search && svcList.filter(s=>s.household).map((s,i)=>{
+            const d=SVC_DETAIL[s.id]||{};
+            return (
+              <div key={s.id} style={{...S.card(),padding:'14px 10px',textAlign:'center',cursor:'pointer',minHeight:118,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,animation:`fadeUp .35s ease ${i*0.03}s both`}}
+                onClick={()=>openBrowseSvc(s)}>
+                <div style={{fontSize:28}}>{s.icon}</div>
+                <div style={{color:C.txt,fontWeight:800,fontSize:12,lineHeight:1.2}}>{SVC_SHORT[s.id]||s.name.split(' ')[0]}</div>
+                <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{fmtRs(s.price||discPaise(50000))}</div>
+                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {HOUSEHOLD_SVCS.length} services</div>
+                <UpiOnlyPill sm />
               </div>
             );
           })}
@@ -1357,7 +1423,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               </div>
             ))}
           </div>
-          {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:12,fontSize:12,color:C.grn,fontWeight:700}}>💵 Cash on service · platform fee paid online</div>}
+          {isHouseholdService(activeSvc) && (
+            <div style={{ background: '#eef2ff', border: '1.5px solid #c7d2fe', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#4338ca', fontWeight: 700 }}>
+              📱 UPI only — pay via GPay, PhonePe, Paytm & all UPI apps
+            </div>
+          )}
+          {activeSvc.cash && !isHouseholdService(activeSvc) && <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:12,fontSize:12,color:C.grn,fontWeight:700}}>💵 Cash on service · platform fee paid online</div>}
         </div>
       </>,
       <StickyCta onClick={()=>setScreen('verify')}>Book now — verify & pay →</StickyCta>
@@ -1416,7 +1487,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               </div>
             ))}
           </div>
-          {activeSvc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
+          {isHouseholdService(activeSvc) && (
+            <div style={{ background: '#eef2ff', border: '1.5px solid #c7d2fe', borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: '#4338ca', fontWeight: 600 }}>
+              📱 Household bookings — UPI only (GPay, PhonePe, Paytm & all UPI apps)
+            </div>
+          )}
+          {activeSvc.cash && !isHouseholdService(activeSvc) && <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:600}}>💵 Service fee payable in cash to partner after job</div>}
           <UpiPaymentPanel
             pay={browsePay}
             addToast={addToast}
@@ -2153,9 +2229,12 @@ function HomeScreen() {
             <div style={{fontSize:14,fontWeight:600,color:C.txt}}>All services</div>
             <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.acc,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>View all</button>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-            {SVCS.map(s=>(
-              <div key={s.id} onClick={()=>{setActiveSvc(s);setScreen(s.household?'services':'book');}}
+          <div style={{marginBottom:10}}>
+            <HouseholdFeaturedCard compact onClick={()=>{setActiveSvc(SVCS.find(s=>s.id==='household'));setScreen('services');}} />
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:8}}>
+            {SVCS.filter(s=>!s.household).map(s=>(
+              <div key={s.id} onClick={()=>{setActiveSvc(s);setScreen('book');}}
                 style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'12px 6px',textAlign:'center',cursor:'pointer'}}>
                 <div style={{fontSize:24,marginBottom:5}}>{s.icon}</div>
                 <div style={{fontSize:10,color:C.sub,lineHeight:1.3}}>{s.name.split(' ').slice(0,2).join(' ')}</div>
@@ -2197,7 +2276,7 @@ const SVC_DETAIL = {
   vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
-  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off · cash accepted.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 12 services · 25% off · UPI payment only.', features:['Deep cleaning visits','Hourly home help','Background verified staff','25% discount on all','UPI — GPay, PhonePe & more'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
 };
@@ -2223,7 +2302,7 @@ function ServicesScreen() {
             <div style={{fontSize:11,color:C.dim}}>Deep cleaning & home help · ScanV verified partners</div>
           </div>
         </div>
-        <HouseholdListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:true}); setDetail(svc); setHhList(false); }} />
+        <HouseholdListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:false}); setDetail(svc); setHhList(false); }} />
       </div>
     );
   }
@@ -2262,9 +2341,15 @@ function ServicesScreen() {
               </div>
             ))}
           </div>
-          {detail.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
+          {isHouseholdService(detail) && (
+            <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span style={{ fontSize: 18 }}>📱</span>
+              <span style={{ color: '#4338ca', fontSize: 13, fontWeight: 600 }}>UPI only — GPay, PhonePe, Paytm & all UPI apps</span>
+            </div>
+          )}
+          {detail.cash && !isHouseholdService(detail) && <div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
           <AssistBanner/>
-          <Btn full onClick={()=>{setActiveSvc(isHh?{...detail,cat:'Household Services',cash:true}:detail);setScreen('book');}}>Book now →</Btn>
+          <Btn full onClick={()=>{setActiveSvc(isHh?{...detail,cat:'Household Services',cash:false}:detail);setScreen('book');}}>Book now →</Btn>
         </div>
       </div>
     );
@@ -2292,7 +2377,7 @@ function ServicesScreen() {
                     <span style={{color:C.gold,fontSize:11}}>{SVC_DETAIL[s.id]?.rating}</span>
                     <span style={{color:C.dim,fontSize:11}}>·</span>
                     <span style={{color:C.dim,fontSize:11}}>{s.household?`${HOUSEHOLD_SVCS.length} sub-services`:SVC_DETAIL[s.id]?.turnaround}</span>
-                    {s.cash&&<span style={{color:C.grn,fontSize:11}}>· 💵 Cash</span>}
+                    {s.household ? <UpiOnlyPill sm /> : s.cash ? <span style={{color:C.grn,fontSize:11}}>· 💵 Cash</span> : null}
                   </div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
@@ -2393,7 +2478,11 @@ function BookScreen() {
               <div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
               {[['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
-              {svc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>}
+              {isHouseholdService(svc) ? (
+                <div style={{background:'#eef2ff',border:'1.5px solid #c7d2fe',borderRadius:8,padding:'8px 12px',marginTop:12,color:'#4338ca',fontSize:12,fontWeight:600}}>📱 UPI only — GPay, PhonePe, Paytm & all UPI</div>
+              ) : svc.cash ? (
+                <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>
+              ) : null}
             </div>
           </div>
           {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
@@ -2733,10 +2822,10 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.cyan,fontSize:13}}>💳 All online payments processed by Razorpay (PCI-DSS Level 1). We never store card or bank details.</p>
           </div>
           {[
-            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks) · Cash on service (Household, Delivery, Food categories)'],
+            ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks) · Cash on service (Delivery, Food categories) · Household: UPI only'],
             ['How It Works','Platform fee (10%) paid online at booking. Service fee paid to Partner after completion (UPI or cash). GST added to total. Tax invoice auto-generated for every booking.'],
             ['UPI Payment','Pay to: dcoreglobal@upi · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
-            ['Cash on Service','Platform fee still paid online · Service fee paid in cash to Partner after service completion · Applies to: Household Services, Deliveries, Food & Tiffin'],
+            ['Cash on Service','Platform fee still paid online · Service fee paid in cash to Partner after service completion · Applies to: Deliveries, Food & Tiffin · Household services: UPI only'],
             ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
             ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner’s registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],
