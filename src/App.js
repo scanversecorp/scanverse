@@ -811,9 +811,9 @@ function HouseholdListBody({ onSelect }) {
   const list = HOUSEHOLD_SVCS.filter(s => filter === 'all' || s.theme === filter);
   return (
     <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
         {[['all', 'All', C.acc, C.surf], ['pink', 'Deep cleaning', HH_THEME.pink.color, HH_THEME.pink.bg], ['green', 'Home help', HH_THEME.green.color, HH_THEME.green.bg]].map(([k, l, col, bg]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
+          <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
             {l}
           </button>
         ))}
@@ -824,7 +824,7 @@ function HouseholdListBody({ onSelect }) {
         const t = HH_THEME[theme];
         return (
           <div key={theme} style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
               <HhCategoryPill theme={theme} />
               <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
             </div>
@@ -882,9 +882,9 @@ function CloudListBody({ onSelect }) {
   const list = CLOUD_SVCS.filter(s => filter === 'all' || s.theme === filter);
   return (
     <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
         {[['all', 'All', C.cyan, C.surf], ['host', 'Cloud hosting', CL_THEME.host.color, CL_THEME.host.bg], ['build', 'Infrastructure', CL_THEME.build.color, CL_THEME.build.bg], ['care', 'Managed & media', CL_THEME.care.color, CL_THEME.care.bg], ['pack', 'Turnkey packages', CL_THEME.pack.color, CL_THEME.pack.bg]].map(([k, l, col, bg]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
+          <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
             {l}
           </button>
         ))}
@@ -895,7 +895,7 @@ function CloudListBody({ onSelect }) {
         const t = CL_THEME[theme];
         return (
           <div key={theme} style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
               <CloudCategoryPill theme={theme} />
               <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
             </div>
