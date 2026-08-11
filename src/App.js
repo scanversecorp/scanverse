@@ -441,6 +441,19 @@ const HOME_CARD_META = {
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
 };
 
+/** Search categories + household sub-services (name, sub, desc, features) */
+function searchAllServices(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return { categories: SVCS, household: [] };
+  const inText = (parts) => parts.filter(Boolean).join(' ').toLowerCase().includes(q);
+  const categories = SVCS.filter(s => {
+    const d = SVC_DETAIL[s.id] || {};
+    return inText([s.name, s.sub, s.cat, SVC_SHORT[s.id], d.desc, ...(d.features || [])]);
+  });
+  const household = HOUSEHOLD_SVCS.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
+  return { categories, household };
+}
+
 /* --- SUPABASE ----------------------------------------------------- */
 let _sb = null;
 function sb() {
@@ -766,6 +779,45 @@ function HouseholdSvcCard({ svc, onClick, compact }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ServiceSearchResults({ query, categories, household, onCategory, onHousehold, renderCategory }) {
+  const q = query.trim();
+  if (!q) return null;
+  const total = categories.length + household.length;
+  if (!total) {
+    return (
+      <div style={{ ...S.card(), padding: 24, textAlign: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+        <div style={{ color: C.txt, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>No services found</div>
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;doctor&rdquo;, &ldquo;bathroom&rdquo;, or &ldquo;legal&rdquo;</div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ color: C.txt, fontSize: 16, fontWeight: 800, marginBottom: 3 }}>Search results</div>
+        <div style={{ color: C.dim, fontSize: 12, fontWeight: 500 }}>{total} found for &ldquo;{q}&rdquo;</div>
+      </div>
+      {household.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Household services · {household.length}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {household.map(svc => <HouseholdSvcCard key={svc.id} svc={svc} onClick={() => onHousehold(svc)} compact />)}
+          </div>
+        </div>
+      )}
+      {categories.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          {household.length > 0 && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {categories.map((s, i) => renderCategory(s, i))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1449,7 +1501,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     </div>
   );
 
-  const svcList = SVCS.filter(s=>!search||s.name.toLowerCase().includes(search.toLowerCase())||s.sub.toLowerCase().includes(search.toLowerCase())||(SVC_SHORT[s.id]||'').toLowerCase().includes(search.toLowerCase()));
+  const { categories: svcList, household: hhSearch } = searchAllServices(search);
+  const searching = !!search.trim();
 
   const openBrowseSvc = (s) => {
     if (s.household) { setActiveSvc(s); setScreen('household-list'); return; }
@@ -1492,7 +1545,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       </div>
       <div style={{margin:'12px 16px 0',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
         <span>🔍</span>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search legal, health, household…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search kitchen clean, legal, doctor…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+        {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
       </div>
       <div style={{display:'flex',gap:6,padding:'10px 16px 0',overflowX:'auto'}}>
         {['✓ DPDP 2023','✓ Verified partners','✓ 25% off','✓ Human-first'].map(p=>(
@@ -1500,18 +1554,29 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         ))}
       </div>
       <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
-        <div style={{marginBottom:14}}>
-          <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
-          <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
-        </div>
-        {!search && svcList.length > 0 && (
-          <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />
+        {searching ? (
+          <ServiceSearchResults
+            query={search}
+            categories={svcList}
+            household={hhSearch}
+            onCategory={openBrowseSvc}
+            onHousehold={openHouseholdSvc}
+            renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />}
+          />
+        ) : (
+          <>
+            <div style={{marginBottom:14}}>
+              <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
+              <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
+            </div>
+            {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              {svcList.map((s,i)=>(
+                <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />
+              ))}
+            </div>
+          </>
         )}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          {svcList.map((s,i)=>(
-            <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />
-          ))}
-        </div>
         <AssistBanner/>
         <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
           {[['privacy','Privacy'],['terms','Terms'],['refund','Refund'],['payment','Payment']].map(([k,l])=>(
@@ -2396,7 +2461,8 @@ function ServicesScreen() {
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [hhList,setHhList]=useState(false);
-  const list=SVCS.filter(s=>!search||s.name.toLowerCase().includes(search.toLowerCase())||s.sub.toLowerCase().includes(search.toLowerCase()));
+  const { categories: list, household: hhSearch } = searchAllServices(search);
+  const searching = !!search.trim();
 
   useEffect(()=>{
     if (activeSvc?.household && activeSvc?.id === 'household' && !detail) setHhList(true);
@@ -2464,11 +2530,22 @@ function ServicesScreen() {
       <div style={{padding:16}}>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:16}}>
           <span>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
-          {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18}}>×</button>}
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search kitchen clean, legal, doctor…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
+          {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
         </div>
+        {searching ? (
+          <ServiceSearchResults
+            query={search}
+            categories={list}
+            household={hhSearch}
+            onCategory={(s)=>s.household?setHhList(true):setDetail(s)}
+            onHousehold={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:false}); setDetail(svc); }}
+            renderCategory={(s,i)=><HomeModelCard key={s.id} svc={s} index={i} onClick={()=>s.household?setHhList(true):setDetail(s)} />}
+          />
+        ) : (
+        <>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          {!search && list.length > 0 && (
+          {list.length > 0 && (
             <div style={{ gridColumn:'1 / -1' }}>
               <HomeHeroCarousel services={list} onSelect={(s)=>s.household?setHhList(true):setDetail(s)} />
             </div>
@@ -2477,6 +2554,8 @@ function ServicesScreen() {
             <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>s.household?setHhList(true):setDetail(s)} />
           ))}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
