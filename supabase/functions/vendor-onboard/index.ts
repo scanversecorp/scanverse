@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       });
 
-      const sms = await sendSms(mobile, `ScanV Partner OTP: ${otp}. Valid 10 min.`);
+      const sms = await sendSms(mobile, `ScanV Partner OTP: ${otp}. Valid 10 min.`, otp);
       const devMode = !sms.ok && Deno.env.get("OTP_DEV_MODE") === "1";
       if (!sms.ok && !devMode) {
         return json({ success: false, error: sms.error }, 502);

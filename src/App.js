@@ -1560,9 +1560,12 @@ function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
 async function invokeSendOtp(mobile) {
   const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
   const r = await sb().functions.invoke('send-otp', { body: { mobile: norm } });
-  if (r.error) throw new Error(r.error.message || 'OTP service unavailable');
+  const bodyErr = r.data?.error || r.data?.message;
+  if (r.error) {
+    throw new Error(bodyErr || r.error.message || 'OTP service unavailable');
+  }
   if (r.data?.success || r.data?.provider) return { ...r.data, mobile: norm };
-  throw new Error(r.data?.error || r.data?.message || 'OTP send failed — check number and try again');
+  throw new Error(bodyErr || 'OTP send failed — check number and try again');
 }
 
 async function verifyOtpCode(mobile, code) {

@@ -34,6 +34,7 @@ export function msg91AuthKey(): string | undefined {
 export async function sendSms(
   mobile: string,
   message: string,
+  otpCode?: string,
 ): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
   const norm = normalizeMobile(mobile);
   if (!norm) return { ok: false, error: "Invalid mobile" };
@@ -109,12 +110,17 @@ export async function sendSms(
     };
   }
 
-  // 2Factor.in (India)
+  // 2Factor.in (India) — pass otpCode so SMS matches vendor_otp hash
   if (twoFactorKey) {
-    const res = await fetch(
-      `https://2factor.in/API/V1/${twoFactorKey}/SMS/${mobileDigitsE164(norm).slice(-10)}/AUTOGEN/ScanV%20OTP`,
-    );
+    const phone10 = mobileDigitsE164(norm).slice(-10);
+    const otp = otpCode || message.match(/\b(\d{6})\b/)?.[1];
+    const url = otp
+      ? `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`
+      : `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/AUTOGEN/ScanV%20OTP`;
+    const res = await fetch(url);
     if (res.ok) return { ok: true, provider: "2factor" };
+    const body = await res.text().catch(() => "");
+    return { ok: false, error: body || "2Factor SMS failed" };
   }
 
   return { ok: false, error: "No SMS provider configured (MSG91/Twilio/2Factor)" };

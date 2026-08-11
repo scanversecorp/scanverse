@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const message = `ScanV OTP: ${otp}. Valid 10 min. Do not share.`;
-    const sms = await sendSms(mobile, message);
+    const sms = await sendSms(mobile, message, otp);
 
     // Dev fallback: return OTP when no provider (never in production with providers set)
     const devMode = !sms.ok && Deno.env.get("OTP_DEV_MODE") === "1";
