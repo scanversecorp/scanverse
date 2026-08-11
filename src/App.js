@@ -354,16 +354,68 @@ const FF = "'Inter',system-ui,sans-serif";
 const BDR = `1.5px solid ${C.bdr}`;
 const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food' };
 
+const DISC_PCT = 0.25;
+const discPaise = (mrpPaise) => Math.round(mrpPaise * (1 - DISC_PCT));
+const fmtRs = (paise) => (paise / 100).toLocaleString('en-IN');
+const svcDisc = (mrpRupees) => ({ mrp: mrpRupees * 100, price: discPaise(mrpRupees * 100) });
+
+const PROVIDERS = {
+  x: { id:'x', name:'Xerodirt', badge:'X', color:'#0d9488', bg:'#ecfdf5', tagline:'Professional cleaning · Pune', rating:'4.9 ⭐' },
+  s: { id:'s', name:'Snabbit', badge:'S', color:'#7c3aed', bg:'#f5f3ff', tagline:'Trained house help · Mumbai', rating:'4.8 ⭐' },
+};
+
+/* --- HOUSEHOLD SUB-SERVICES (Xerodirt + Snabbit) ------------------ */
+const HOUSEHOLD_SVCS = [
+  { id:'hh-x-bathroom', parent:'household', provider:'x', icon:'🚿', img:'/services/x-bathroom.svg', name:'X· Bathroom Cleaning', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:true,
+    desc:'Professional bathroom deep clean by Xerodirt-trained staff in Pune. Tiles, WC, taps, mirrors & exhaust — eco-friendly products, satisfaction guaranteed.',
+    features:['WC & basin deep scrub','Tile & grout cleaning','Mirror & tap polish','Exhaust fan wipe','Re-clean if not satisfied'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'5,000+' },
+  { id:'hh-x-kitchen', parent:'household', provider:'x', icon:'🍳', img:'/services/x-kitchen.svg', name:'X· Kitchen Cleaning', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:true,
+    desc:'Xerodirt kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. Background-verified professionals, all supplies included.',
+    features:['Counter & cabinet wipe','Chimney exterior clean','Sink & tap descale','Floor mop & degrease','Eco-friendly products'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'3,200+' },
+  { id:'hh-x-flat', parent:'household', provider:'x', icon:'🏠', img:'/services/x-flat.svg', name:'X· Flat Cleaning', sub:'Full home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:true,
+    desc:'Complete flat cleaning by Xerodirt — every room, kitchen & bathroom. Ideal for move-in, festival or monthly deep clean across Pune/PCMC.',
+    features:['All rooms dust & mop','Kitchen + bathroom included','Balcony sweep','Furniture wipe-down','Team of 2 for 2BHK+'], turnaround:'24–48 hrs', rating:'4.9 ⭐', bookings:'2,100+' },
+  { id:'hh-x-subscription', parent:'household', provider:'x', icon:'📅', img:'/services/x-subscription.svg', name:'X· Bathroom Subscription', sub:'Weekly / fortnightly · no rebooking', unit:'month', mrp:149900, price:discPaise(149900), cash:true,
+    desc:'Xerodirt subscription — hassle-free recurring bathroom cleaning without rebooking every time. Fixed slot, same trusted professional.',
+    features:['4 visits per month','Fixed day & time slot','Same professional','Priority rescheduling','10% vs one-time rate'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'890+' },
+  { id:'hh-x-mini', parent:'household', provider:'x', icon:'✨', img:'/services/x-mini.svg', name:'X· Mini Services', sub:'Quick clean · single item · from ₹49', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'Xerodirt mini services — quick, affordable cleaning for a single bathroom, fan, or appliance. Perfect when you need just one thing done.',
+    features:['Single bathroom refresh','Fan / exhaust wipe','Appliance exterior','30-min quick visit','Lowest Xerodirt pricing'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,400+' },
+  { id:'hh-s-house-help', parent:'household', provider:'s', icon:'🏡', img:'/services/house-help-s.svg', name:'House Help S', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:true,
+    desc:'Snabbit house help in Mumbai — trained, Aadhaar-verified women experts at your door in ~10 min. Sweep, mop, dust, dishes & more in one booking.',
+    features:['Background verified experts','Aadhaar + 2-day training','Hourly — book 1–4 hrs','Instant or scheduled','35+ Mumbai localities'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'1,50,000+' },
+  { id:'hh-s-dishwashing', parent:'household', provider:'s', icon:'🍽️', img:'/services/dishwashing-s.svg', name:'Dishwashing S', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:true,
+    desc:'Snabbit dishwashing help — sink, utensils & platform cleaned efficiently. From ₹99/hr promotional rate, verified female workforce.',
+    features:['All utensils washed','Sink & platform clean','Soap & scrub included','Hourly booking','100% female experts'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'80,000+' },
+  { id:'hh-s-kitchen', parent:'household', provider:'s', icon:'🧽', img:'/services/kitchen-s.svg', name:'Kitchen Cleaning S', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'Snabbit kitchen tidy-up — platform, tiles, chimney exterior & sink. Hourly pricing, no contracts, cancel anytime before booking.',
+    features:['Platform & tile wipe','Chimney exterior','Sink clean','Cabinet exterior dust','Transparent hourly rate'], turnaround:'~10 min', rating:'4.7 ⭐', bookings:'45,000+' },
+  { id:'hh-s-fan', parent:'household', provider:'s', icon:'🌀', img:'/services/fan-s.svg', name:'Fan Cleaning S', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'Snabbit fan cleaning — blade wipe & dust removal for reachable ceiling fans. Safe, no ladder work — expert handles accessible fans only.',
+    features:['Blade dust & wipe','Cover clean','Safe reachable access','Add to hourly booking','No ladder tasks'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'22,000+' },
+  { id:'hh-s-window', parent:'household', provider:'s', icon:'🪟', img:'/services/window-s.svg', name:'Window Cleaning S', sub:'Glass · frames · reachable windows', unit:'visit', mrp:19900, price:discPaise(19900), cash:true,
+    desc:'Snabbit window cleaning — glass & frame wipe for accessible windows inside your Mumbai home. Streak-free finish by trained experts.',
+    features:['Glass wipe inside','Frame & sill clean','Reachable windows only','Streak-free finish','Bundle with house help'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'18,000+' },
+  { id:'hh-s-laundry', parent:'household', provider:'s', icon:'👕', img:'/services/laundry-s.svg', name:'Laundry Help S', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+    desc:'Snabbit laundry help — folding, sorting & organising clean clothes. Does not include washing machine operation or ironing unless agreed.',
+    features:['Fold clean laundry','Sort by type/colour','Wardrobe organise','Bed linen change','Hourly booking'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'35,000+' },
+  { id:'hh-s-bathroom', parent:'household', provider:'s', icon:'🛁', img:'/services/bathroom-s.svg', name:'Bathroom Cleaning S', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:true,
+    desc:'Snabbit bathroom cleaning — WC, floor, taps & mirror within booked hours. Ideal for Mumbai flats with one bathroom — book 1–2 hours.',
+    features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Female verified staff'], turnaround:'~10 min', rating:'4.8 ⭐', bookings:'52,000+' },
+];
+
+const HH_BY_ID = Object.fromEntries(HOUSEHOLD_SVCS.map(s => [s.id, s]));
+
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
-  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false },
-  { id:'cloud',    icon:'☁️', name:'Cloud training',     sub:'AWS · Azure · GCP · AI',           cat:'Cloud Training',     cash:false },
-  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false },
-  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false },
-  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false },
-  { id:'household',icon:'🔧', name:'Household services', sub:'Plumbing · electrical · cleaning', cat:'Household Services', cash:true  },
-  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:true  },
-  { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true  },
+  { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false, ...svcDisc(999) },
+  { id:'cloud',    icon:'☁️', name:'Cloud training',     sub:'AWS · Azure · GCP · AI',           cat:'Cloud Training',     cash:false, ...svcDisc(4999) },
+  { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Priority · concierge · executive', cat:'VIP Appointments',   cash:false, ...svcDisc(9999) },
+  { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy',       cat:'Health Care',        cash:false, ...svcDisc(499) },
+  { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · sell · PG · flat · plots',   cat:'Property & Rentals', cash:false, ...svcDisc(1999) },
+  { id:'household',icon:'🧹', name:'Household services', sub:'Xerodirt · Snabbit · cleaning',    cat:'Household Services', cash:true,  ...svcDisc(149), household:true },
+  { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · documents',    cat:'Deliveries',         cash:true,  ...svcDisc(99) },
+  { id:'food',     icon:'🍱', name:'Food',               sub:'Restaurants · tiffin · catering',  cat:'Food',               cash:true,  ...svcDisc(199) },
 ];
 
 /* --- SUPABASE ----------------------------------------------------- */
@@ -453,6 +505,93 @@ function Field({label,req,note,children}) {
 
 function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
+}
+
+function ProviderBadge({ provider, sm }) {
+  const p = PROVIDERS[provider];
+  if (!p) return null;
+  return (
+    <span style={{ background: p.bg, color: p.color, border: `1.5px solid ${p.color}44`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 7px' : '3px 9px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ background: p.color, color: '#fff', borderRadius: '50%', width: sm ? 14 : 16, height: sm ? 14 : 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: sm ? 8 : 9, fontWeight: 900 }}>{p.badge}</span>
+      {p.name}
+    </span>
+  );
+}
+
+function PriceTag({ svc, sm }) {
+  const mrp = svc.mrp || Math.round((svc.price || 0) / (1 - DISC_PCT));
+  const unit = svc.unit === 'hour' ? '/hr' : svc.unit === 'month' ? '/mo' : '';
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+      <span style={{ color: C.dim, fontSize: sm ? 10 : 11, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>
+      <span style={{ color: C.acc, fontSize: sm ? 13 : 15, fontWeight: 800 }}>₹{fmtRs(svc.price || 0)}{unit}</span>
+      <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>25% OFF</span>
+    </div>
+  );
+}
+
+function ServiceThumb({ svc, height = 100 }) {
+  if (svc.img) {
+    return <img src={svc.img} alt="" style={{ width: '100%', height, objectFit: 'cover', borderRadius: 10, display: 'block' }} />;
+  }
+  return (
+    <div style={{ width: '100%', height, borderRadius: 10, background: C.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: height * 0.4 }}>
+      {svc.icon}
+    </div>
+  );
+}
+
+function HouseholdListBody({ onSelect }) {
+  const [filter, setFilter] = useState('all');
+  const list = HOUSEHOLD_SVCS.filter(s => filter === 'all' || s.provider === filter);
+  return (
+    <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+        {[['all', 'All', ''], ['x', 'X· Xerodirt', PROVIDERS.x.color], ['s', 'Snabbit S', PROVIDERS.s.color]].map(([k, l, col]) => (
+          <button key={k} onClick={() => setFilter(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col || C.acc}` : BDR, background: filter === k ? (col ? `${col}18` : '#fff0f3') : C.surf, color: filter === k ? (col || C.acc) : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {['x', 's'].map(prov => {
+        const items = list.filter(s => s.provider === prov);
+        if (!items.length) return null;
+        const p = PROVIDERS[prov];
+        return (
+          <div key={prov} style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <ProviderBadge provider={prov} />
+              <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{p.tagline}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {items.map(svc => <HouseholdSvcCard key={svc.id} svc={svc} onClick={() => onSelect(svc)} compact />)}
+            </div>
+          </div>
+        );
+      })}
+      <AssistBanner />
+    </div>
+  );
+}
+
+function HouseholdSvcCard({ svc, onClick, compact }) {
+  const p = PROVIDERS[svc.provider];
+  return (
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer' }}>
+      <ServiceThumb svc={svc} height={compact ? 80 : 96} />
+      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px' }}>
+        <div style={{ marginBottom: 6 }}><ProviderBadge provider={svc.provider} sm={compact} /></div>
+        <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
+        <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
+        <PriceTag svc={svc} sm={compact} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
+          <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
+          {svc.cash && <span style={{ color: C.grn, fontSize: 10, fontWeight: 700 }}>· 💵 Cash</span>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Toast({toasts}) {
@@ -922,6 +1061,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const sendOTP = async (resend = false) => {
     if (!firstName.trim()) return setErr('Enter your first name');
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    if (!address.trim()) return setErr('Enter your address');
+    if (!city.trim()) return setErr('Enter your city');
+    if (!pincode.trim()||pincode.length<6) return setErr('Enter valid 6-digit PIN code');
     if (!localStorage.getItem('scanv_terms_accepted')) return setErr('Please accept Terms & Conditions to continue');
     setLoading(true); setErr('');
     try {
@@ -1103,6 +1245,33 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
   const svcList = SVCS.filter(s=>!search||s.name.toLowerCase().includes(search.toLowerCase())||s.sub.toLowerCase().includes(search.toLowerCase())||(SVC_SHORT[s.id]||'').toLowerCase().includes(search.toLowerCase()));
 
+  const openBrowseSvc = (s) => {
+    if (s.household) { setActiveSvc(s); setScreen('household-list'); return; }
+    setActiveSvc(s);
+    setScreen('detail');
+  };
+
+  const openHouseholdSvc = (svc) => {
+    setActiveSvc({ ...svc, cat: 'Household Services', cash: true });
+    setScreen('detail');
+  };
+
+  // -- HOUSEHOLD SUB-SERVICES LIST ----------------------------------------
+  if (screen==='household-list') {
+    return browseWrap(
+      <>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Household services</div>
+            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>Xerodirt · Pune · X &nbsp;|&nbsp; Snabbit · Mumbai · S</div>
+          </div>
+        </div>
+        <HouseholdListBody onSelect={openHouseholdSvc} />
+      </>
+    );
+  }
+
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
@@ -1129,11 +1298,11 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
             const d=SVC_DETAIL[s.id]||{};
             return (
               <div key={s.id} style={{...S.card(),padding:'14px 10px',textAlign:'center',cursor:'pointer',minHeight:118,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,animation:`fadeUp .35s ease ${i*0.03}s both`}}
-                onClick={()=>{setActiveSvc(s);setScreen('detail');}}>
+                onClick={()=>openBrowseSvc(s)}>
                 <div style={{fontSize:28}}>{s.icon}</div>
                 <div style={{color:C.txt,fontWeight:800,fontSize:12,lineHeight:1.2}}>{SVC_SHORT[s.id]||s.name.split(' ')[0]}</div>
-                <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{((s.price||50000)/100).toLocaleString('en-IN')}</div>
-                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {d.turnaround?.split(' ').slice(0,2).join(' ')||'Same day'}</div>
+                <div style={{color:C.acc,fontSize:11,fontWeight:800}}>From ₹{fmtRs(s.price||discPaise(50000))}</div>
+                <div style={{color:C.dim,fontSize:9,fontWeight:600}}>{d.rating||'4.8 ⭐'} · {s.household ? `${HOUSEHOLD_SVCS.length} services` : (d.turnaround?.split(' ').slice(0,2).join(' ')||'Same day')}</div>
                 {s.cash&&<span style={{color:C.grn,fontSize:8,fontWeight:800,background:'#e6f4ee',border:`1px solid rgba(0,122,77,0.35)`,padding:'2px 6px',borderRadius:4}}>💵 Cash</span>}
               </div>
             );
@@ -1151,27 +1320,31 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
   // -- SERVICE DETAIL -------------------------------------------------------
   if (screen==='detail'&&activeSvc) {
-    const d = SVC_DETAIL[activeSvc.id]||{};
+    const d = activeSvc.desc ? activeSvc : (SVC_DETAIL[activeSvc.id]||{});
+    const isHh = !!activeSvc.provider;
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
+          <button onClick={()=>setScreen(isHh?'household-list':'services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{activeSvc.name}</div>
         </div>
         <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
+          {isHh && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} height={140} /></div>}
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
-            <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>
+            {isHh && <div style={{ marginBottom: 10 }}><ProviderBadge provider={activeSvc.provider} /></div>}
+            {!isHh && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
             <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
+            {isHh && <div style={{ marginBottom: 12 }}><PriceTag svc={activeSvc} /></div>}
             <div style={{display:'flex',justifyContent:'center',gap:22}}>
-              <div><div style={{color:C.acc,fontSize:14,fontWeight:800}}>{d.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Rating</div></div>
-              <div><div style={{color:C.grn,fontSize:14,fontWeight:800}}>{d.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Bookings</div></div>
-              <div><div style={{color:C.cyan,fontSize:14,fontWeight:800}}>{d.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Response</div></div>
+              <div><div style={{color:C.acc,fontSize:14,fontWeight:800}}>{d.rating||activeSvc.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Rating</div></div>
+              <div><div style={{color:C.grn,fontSize:14,fontWeight:800}}>{d.bookings||activeSvc.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Bookings</div></div>
+              <div><div style={{color:C.cyan,fontSize:14,fontWeight:800}}>{d.turnaround||activeSvc.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Response</div></div>
             </div>
           </div>
           <div style={S.card({marginBottom:12,padding:'12px 14px'})}>
             <div style={{color:C.txt,fontSize:13,fontWeight:700,marginBottom:8}}>What&#39;s included</div>
-            {(d.features||[activeSvc.sub]).slice(0,4).map(f=>(
+            {(d.features||[activeSvc.sub]).slice(0,6).map(f=>(
               <div key={f} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:12,color:C.sub}}>
                 <span style={{color:C.grn,fontWeight:700}}>✓</span>{f}
               </div>
@@ -1256,6 +1429,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     const sendWA = async () => {
       if (!firstName.trim()) return setErr('Enter your first name');
       if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+      if (!address.trim()) return setErr('Enter your address');
+      if (!city.trim()) return setErr('Enter your city');
+      if (!pincode.trim()||pincode.length<6) return setErr('Enter valid 6-digit PIN code');
       if (!termsAccepted) return setErr('Please accept Terms & Conditions to continue');
       setLoading(true); setErr('');
       const ok = await startWAVerify(`+91${mobile}`, () => verifyProfile(true), {
@@ -1283,7 +1459,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         </div>
         <div style={{padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Verify identity before payment</div>
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP before payment</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
             <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -1294,6 +1470,13 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
+          <Field label="Address" req note="House no, street, area">
+            <input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Flat 302, Rose Society, Wakad" style={S.inp()}/>
+          </Field>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
+            <Field label="City" req><input value={city} onChange={e=>setCity(e.target.value)} placeholder="Pune" style={S.inp()}/></Field>
+            <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} onChange={e=>setPincode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="411018" style={S.inp()}/></Field>
+          </div>
           {!termsAccepted&&(
             <div style={{background:C.deep,border:BDR,borderRadius:10,padding:14,marginBottom:14}}>
               <label style={{display:'flex',gap:10,alignItems:'flex-start',cursor:'pointer'}}>
@@ -1965,7 +2148,7 @@ function HomeScreen() {
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
             {SVCS.map(s=>(
-              <div key={s.id} onClick={()=>{setActiveSvc(s);setScreen('book');}}
+              <div key={s.id} onClick={()=>{setActiveSvc(s);setScreen(s.household?'services':'book');}}
                 style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'12px 6px',textAlign:'center',cursor:'pointer'}}>
                 <div style={{fontSize:24,marginBottom:5}}>{s.icon}</div>
                 <div style={{fontSize:10,color:C.sub,lineHeight:1.3}}>{s.name.split(' ').slice(0,2).join(' ')}</div>
@@ -2007,19 +2190,40 @@ const SVC_DETAIL = {
   vip:      { desc:'Priority access to premium concierge services — executive meetings, airport transfers, event management, personal assistance.', features:['24/7 concierge','Airport transfers','Event planning','Personal assistant','Priority support'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Book doctors, diagnostics, pharmacy delivery and specialist consultations at home or clinic near Pune/PCMC.', features:['Doctor at home','Lab tests','Pharmacy delivery','Specialist referrals','Health records'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent or find PG accommodation in PCMC/Pune. Verified listings, legal checks, loan assistance.', features:['Verified listings','Site visits','Legal verification','Loan assistance','Rental agreements'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
-  household:{ desc:'Trusted professionals for plumbing, electrical, carpentry, AC repair, painting and deep cleaning across PCMC/Pune.', features:['Background verified','Same day visits','Warranty on work','Transparent pricing','Cash accepted'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'8,900+' },
+  household:{ desc:'Professional home cleaning via Xerodirt (Pune) and trained house help via Snabbit (Mumbai). 12 services · 25% off · cash accepted.', features:['X· Xerodirt deep cleaning','Snabbit hourly house help','Background verified staff','25% discount on all','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Fast and reliable courier, parcel and document delivery within PCMC/Pune and inter-city across Maharashtra.', features:['Same day pickup','Real-time tracking','Insurance coverage','Document delivery','Cash on delivery'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Order from local restaurants, tiffin services and caterers near you in PCMC/Pune. Fresh, hygienic, timely.', features:['Local restaurants','Home-cooked tiffins','Catering for events','Real-time tracking','Cash accepted'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
 };
 
 function ServicesScreen() {
-  const {setActiveSvc,setScreen}=useApp();
+  const {setActiveSvc,setScreen,activeSvc}=useApp();
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
+  const [hhList,setHhList]=useState(false);
   const list=SVCS.filter(s=>!search||s.name.toLowerCase().includes(search.toLowerCase())||s.sub.toLowerCase().includes(search.toLowerCase()));
 
+  useEffect(()=>{
+    if (activeSvc?.household && activeSvc?.id === 'household' && !detail) setHhList(true);
+  }, [activeSvc, detail]);
+
+  if (hhList) {
+    return (
+      <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={()=>setHhList(false)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>Household services</div>
+            <div style={{fontSize:11,color:C.dim}}>X· Xerodirt · Pune &nbsp;|&nbsp; Snabbit S · Mumbai</div>
+          </div>
+        </div>
+        <HouseholdListBody onSelect={(svc)=>{ setActiveSvc({...svc,cat:'Household Services',cash:true}); setDetail(svc); setHhList(false); }} />
+      </div>
+    );
+  }
+
   if(detail) {
-    const d = SVC_DETAIL[detail.id]||{};
+    const d = detail.desc ? detail : (SVC_DETAIL[detail.id]||{});
+    const isHh = !!detail.provider;
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
@@ -2027,18 +2231,21 @@ function ServicesScreen() {
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
         </div>
         <div style={{padding:16}}>
-          {/* Hero */}
+          {isHh && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} height={160} /></div>}
           <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
-            <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>
+            {isHh && <div style={{ marginBottom: 10 }}><ProviderBadge provider={detail.provider} /></div>}
+            {!isHh && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
-            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc}</div>
+            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
+            {isHh ? <div style={{ marginBottom: 12 }}><PriceTag svc={detail} /></div> : (
+              <div style={{ marginBottom: 12 }}><PriceTag svc={detail} sm /></div>
+            )}
             <div style={{display:'flex',justifyContent:'center',gap:20,flexWrap:'wrap'}}>
-              <div style={{textAlign:'center'}}><div style={{color:C.gold,fontSize:14,fontWeight:700}}>{d.rating}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
-              <div style={{textAlign:'center'}}><div style={{color:C.grn,fontSize:14,fontWeight:700}}>{d.bookings}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
-              <div style={{textAlign:'center'}}><div style={{color:C.cyan,fontSize:14,fontWeight:700}}>{d.turnaround}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.gold,fontSize:14,fontWeight:700}}>{d.rating||detail.rating}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.grn,fontSize:14,fontWeight:700}}>{d.bookings||detail.bookings}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.cyan,fontSize:14,fontWeight:700}}>{d.turnaround||detail.turnaround}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
             </div>
           </div>
-          {/* Features */}
           <div style={S.card({marginBottom:16})}>
             <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
             {(d.features||[]).map(f=>(
@@ -2048,19 +2255,9 @@ function ServicesScreen() {
               </div>
             ))}
           </div>
-          {/* How it works */}
-          <div style={S.card({marginBottom:16})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>How it works</div>
-            {[['1','Book','Select date & time, add your requirements'],['2','Verify','OTP verification — confirm your mobile'],['3','Match','We assign the best professional near you'],['4','Complete','Service delivered, pay securely']].map(([n,t,d])=>(
-              <div key={n} style={{display:'flex',gap:12,padding:'8px 0',borderBottom:`1px solid ${C.bdr}`}}>
-                <div style={{width:24,height:24,borderRadius:'50%',background:C.acc,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',flexShrink:0}}>{n}</div>
-                <div><div style={{color:C.txt,fontSize:13,fontWeight:500}}>{t}</div><div style={{color:C.dim,fontSize:11,marginTop:2}}>{d}</div></div>
-              </div>
-            ))}
-          </div>
           {detail.cash&&<div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'center'}}><span style={{fontSize:18}}>💵</span><span style={{color:C.grn,fontSize:13}}>Cash on service available</span></div>}
           <AssistBanner/>
-          <Btn full onClick={()=>{setActiveSvc(detail);setScreen('book');}}>Book now →</Btn>
+          <Btn full onClick={()=>{setActiveSvc(isHh?{...detail,cat:'Household Services',cash:true}:detail);setScreen('book');}}>Book now →</Btn>
         </div>
       </div>
     );
@@ -2077,16 +2274,17 @@ function ServicesScreen() {
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {list.map(s=>(
-            <div key={s.id} style={{...S.card(),cursor:'pointer',overflow:'hidden'}} onClick={()=>setDetail(s)}>
+            <div key={s.id} style={{...S.card(),cursor:'pointer',overflow:'hidden'}} onClick={()=>s.household?setHhList(true):setDetail(s)}>
               <div style={{display:'flex',gap:14,alignItems:'center'}}>
                 <div style={{width:56,height:56,borderRadius:12,background:C.deep,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,flexShrink:0}}>{s.icon}</div>
                 <div style={{flex:1}}>
                   <div style={{color:C.txt,fontWeight:700,fontSize:15}}>{s.name}</div>
                   <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
+                  <div style={{marginTop:6}}><PriceTag svc={s} sm /></div>
                   <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>
                     <span style={{color:C.gold,fontSize:11}}>{SVC_DETAIL[s.id]?.rating}</span>
                     <span style={{color:C.dim,fontSize:11}}>·</span>
-                    <span style={{color:C.dim,fontSize:11}}>{SVC_DETAIL[s.id]?.turnaround}</span>
+                    <span style={{color:C.dim,fontSize:11}}>{s.household?`${HOUSEHOLD_SVCS.length} sub-services`:SVC_DETAIL[s.id]?.turnaround}</span>
                     {s.cash&&<span style={{color:C.grn,fontSize:11}}>· 💵 Cash</span>}
                   </div>
                 </div>
@@ -2127,12 +2325,18 @@ function BookScreen() {
   const [bookPhone,setBookPhone]=useState(user?.phone?.replace(/^\+91/,'')||'');
   const [bookFirstName,setBookFirstName]=useState(user?.first_name||'');
   const [bookLastName,setBookLastName]=useState(user?.last_name||'');
+  const [bookAddress,setBookAddress]=useState(user?.address||'');
+  const [bookCity,setBookCity]=useState(user?.city||'');
+  const [bookPincode,setBookPincode]=useState(user?.pincode||'');
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
   const sendBookOTP=async(resend=false)=>{
     if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
     if(!bookFirstName.trim()) return addToast('Enter first name','error');
+    if(!bookAddress.trim()) return addToast('Enter your address','error');
+    if(!bookCity.trim()) return addToast('Enter your city','error');
+    if(!bookPincode.trim()||bookPincode.length<6) return addToast('Enter valid PIN code','error');
     setLoading(true);
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
@@ -2152,7 +2356,7 @@ function BookScreen() {
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
       const ok=await verifyOtpCode(mob,code);
-      if(ok){ setBookOtpVerified(true); setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); addToast('Mobile verified — proceed to payment ✓','success'); }
+      if(ok){ setBookOtpVerified(true); setLoc([bookAddress,bookCity,bookPincode].filter(Boolean).join(', ')); setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); addToast('Mobile verified — proceed to payment ✓','success'); }
       else throw new Error('Invalid OTP');
     }catch(e){addToast(e.message||'Verification failed','error');}
     finally{setLoading(false);}
@@ -2172,10 +2376,25 @@ function BookScreen() {
       <TopBar title={svc.name} back="services"/>
       <div style={{display:'flex',padding:'12px 16px',gap:4}}>{Array.from({length:progressTotal},(_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:progressIdx>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
       <div style={{padding:'8px 16px 40px'}}>
-        {step===1&&<><div style={{...S.card(),marginBottom:20}}><div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div><div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div><div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:20}}>{svc.sub}</div>{[['Service fee',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span></div>)}{svc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>}</div>{skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}<Btn full onClick={goFromService}>{skipVerify?'Continue to payment →':'Continue →'}</Btn></>}
+        {step===1&&<>
+          <div style={{...S.card(),marginBottom:20,padding:0,overflow:'hidden'}}>
+            {svc.img && <ServiceThumb svc={svc} height={120} />}
+            <div style={{padding:16}}>
+              {svc.provider && <div style={{marginBottom:8}}><ProviderBadge provider={svc.provider} /></div>}
+              {!svc.img && <div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div>}
+              <div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div>
+              <div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
+              <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
+              {[['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+              {svc.cash&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:8,padding:'8px 12px',marginTop:12,color:C.grn,fontSize:12,fontWeight:600}}>💵 Cash on service available</div>}
+            </div>
+          </div>
+          {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
+          <Btn full onClick={goFromService}>{skipVerify?'Continue to payment →':'Continue →'}</Btn>
+        </>}
 
         {step===2&&!skipVerify&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 2 · Verify identity</div>
+          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 2 · Name, address & OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
             <Field label="First name" req><input value={bookFirstName} onChange={e=>setBookFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={bookLastName} onChange={e=>setBookLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -2186,6 +2405,13 @@ function BookScreen() {
               <input type="tel" maxLength={10} value={bookPhone} onChange={e=>{ if(bookOtpSent) resetBookOtp(); setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
+          <Field label="Address" req note="Where should the expert visit?">
+            <input value={bookAddress} onChange={e=>setBookAddress(e.target.value)} placeholder="Flat 302, Rose Society, Wakad" style={S.inp()}/>
+          </Field>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+            <Field label="City" req><input value={bookCity} onChange={e=>setBookCity(e.target.value)} placeholder="Pune" style={S.inp()}/></Field>
+            <Field label="PIN code" req><input type="tel" maxLength={6} value={bookPincode} onChange={e=>setBookPincode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="411018" style={S.inp()}/></Field>
+          </div>
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
               <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} />
