@@ -605,6 +605,27 @@ const TWOFACTOR_KEY = '2e5ec291-9406-11f1-908b-0200cd936042';
 // Fast2SMS (blocked until website verified + ₹100 recharge -- keep for later)
 const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75xFYRpgsdcH6qL3fyvr8Pm1z';
 
+function emptyOtpDigits() { return ['','','','','','']; }
+
+function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ color: C.grn, fontSize: 12, marginBottom: 10, fontWeight: 700, textAlign: 'center' }}>✅ OTP sent to +91 {mobile}</div>
+      <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+        <button type="button" onClick={onChangeNumber} style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Change number</button>
+        <button type="button" onClick={onResend} disabled={loading} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 12, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: FF, opacity: loading ? 0.5 : 1 }}>{loading ? 'Sending…' : 'Resend OTP'}</button>
+      </div>
+    </div>
+  );
+}
+
+async function invokeSendOtp(mobile) {
+  const r = await sb().functions.invoke('send-otp', { body: { mobile } });
+  if (r.error) throw new Error(r.error.message || 'OTP service unavailable');
+  if (r.data?.success || r.data?.provider) return r.data;
+  throw new Error(r.data?.error || r.data?.message || 'OTP send failed — check number and try again');
+}
+
 async function sendSMSViaSB(mobile, otp) {
   // Store OTP in DB first
   await sb().from('custom_otp').insert({
@@ -848,6 +869,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const [pincode, setPincode]     = useState(silentGeo?.pincode||'');
   const [otpSent, setOtpSent]     = useState(false);
   const [otpCode, setOtpCode]     = useState(['','','','','','']);
+  const [otpTargetMobile, setOtpTargetMobile] = useState('');
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState('');
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
@@ -879,16 +901,27 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     }
   },[silentGeo]);
 
-  const sendOTP = async () => {
+  const resetOtpFlow = () => {
+    setOtpSent(false);
+    setOtpCode(emptyOtpDigits());
+    setOtpTargetMobile('');
+    setWaToken('');
+    setWaChecking(false);
+  };
+
+  const sendOTP = async (resend = false) => {
     if (!firstName.trim()) return setErr('Enter your first name');
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
     if (!localStorage.getItem('scanv_terms_accepted')) return setErr('Please accept Terms & Conditions to continue');
     setLoading(true); setErr('');
     try {
-      const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
-      if (r.data?.success||r.data?.provider) { setOtpSent(true); }
-      else throw new Error('OTP send failed');
-    } catch(e) { setErr(e.message||'Could not send OTP'); }
+      await invokeSendOtp(`+91${mobile}`);
+      setOtpSent(true);
+      setOtpTargetMobile(mobile);
+      setOtpCode(emptyOtpDigits());
+      if (resend) setErr('');
+      addToast?.(resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`, 'success');
+    } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
     finally { setLoading(false); }
   };
 
@@ -970,14 +1003,17 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     finally { setLoading(false); }
   };
 
-  const sendLoginOTP = async () => {
+  const sendLoginOTP = async (resend = false) => {
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
     setLoading(true); setErr('');
     try {
-      const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
-      if (r.data?.success||r.data?.provider) { setOtpSent(true); }
-      else throw new Error('OTP send failed');
-    } catch(e) { setErr(e.message||'Could not send OTP'); }
+      await invokeSendOtp(`+91${mobile}`);
+      setOtpSent(true);
+      setOtpTargetMobile(mobile);
+      setOtpCode(emptyOtpDigits());
+      if (resend) setErr('');
+      addToast?.(resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`, 'success');
+    } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
     finally { setLoading(false); }
   };
 
@@ -992,8 +1028,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         setWaToken('');
         setErr(`${msg} — use SMS OTP below`);
         try {
-          const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
-          if (r.data?.success||r.data?.provider) setOtpSent(true);
+          await invokeSendOtp(`+91${mobile}`);
+          setOtpSent(true);
+          setOtpTargetMobile(mobile);
         } catch (_) {}
       },
     });
@@ -1219,8 +1256,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           setWaToken('');
           setErr(`${msg} — use SMS OTP below`);
           try {
-            const r = await sb().functions.invoke('send-otp',{body:{mobile:`+91${mobile}`}});
-            if (r.data?.success||r.data?.provider) setOtpSent(true);
+            await invokeSendOtp(`+91${mobile}`);
+            setOtpSent(true);
+            setOtpTargetMobile(mobile);
           } catch (_) {}
         },
       });
@@ -1243,7 +1281,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <Field label="Mobile" req note="10-digit Indian mobile">
             <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
               <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
-              <input type="tel" maxLength={10} value={mobile} onChange={e=>setMobile(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+              <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
           {!termsAccepted&&(
@@ -1267,7 +1305,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <div style={{color:C.grn,fontSize:12,marginBottom:12,fontWeight:700}}>✅ OTP sent to +91 {mobile}</div>
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendOTP(true)} loading={loading} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
@@ -1284,7 +1322,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           )}
           {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
-              onUseSms={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendOTP();}}/>
+              onUseSms={()=>{setVerifyMethod('sms');resetOtpFlow();sendOTP();}}/>
           )}
         </div>
       </>
@@ -1296,7 +1334,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>{setScreen('services');setOtpSent(false);setOtpCode(['','','','','','']);setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>{setScreen('services');resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Sign in</div>
         </div>
         <div style={{padding:'16px 16px 24px'}}>
@@ -1305,7 +1343,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <Field label="Mobile" req note="10-digit Indian mobile">
             <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
               <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
-              <input type="tel" maxLength={10} value={mobile} onChange={e=>setMobile(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+              <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
           {!otpSent&&(
@@ -1320,7 +1358,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <div style={{color:C.grn,fontSize:12,marginBottom:12,fontWeight:700}}>✅ OTP sent to +91 {mobile}</div>
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
@@ -2094,21 +2132,26 @@ function BookScreen() {
   const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');});};
   const [bookOtpSent,setBookOtpSent]=useState(false);
   const [bookOtpCode,setBookOtpCode]=useState(['','','','','','']);
+  const [bookOtpTarget,setBookOtpTarget]=useState('');
   const [bookOtpVerified,setBookOtpVerified]=useState(false);
   const [bookPhone,setBookPhone]=useState(user?.phone?.replace(/^\+91/,'')||'');
   const [bookFirstName,setBookFirstName]=useState(user?.first_name||'');
   const [bookLastName,setBookLastName]=useState(user?.last_name||'');
 
-  const sendBookOTP=async()=>{
+  const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
+
+  const sendBookOTP=async(resend=false)=>{
     if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
     if(!bookFirstName.trim()) return addToast('Enter first name','error');
     setLoading(true);
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
-      const r=await sb().functions.invoke('send-otp',{body:{mobile:mob}});
-      if(r.data?.success||r.data?.provider) { setBookOtpSent(true); addToast('OTP sent to '+mob,'success'); }
-      else throw new Error('OTP send failed');
-    }catch(e){addToast(e.message||'Could not send OTP','error');}
+      await invokeSendOtp(mob);
+      setBookOtpSent(true);
+      setBookOtpTarget(bookPhone.replace(/\D/g,''));
+      setBookOtpCode(emptyOtpDigits());
+      addToast(resend?'OTP resent to '+mob:'OTP sent to '+mob,'success');
+    }catch(e){addToast(e.message||'Could not send OTP','error'); if(!resend) resetBookOtp();}
     finally{setLoading(false);}
   };
 
@@ -2150,12 +2193,12 @@ function BookScreen() {
           <Field label="Mobile number" req note="OTP will be sent to verify">
             <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
               <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
-              <input type="tel" maxLength={10} value={bookPhone} onChange={e=>setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+              <input type="tel" maxLength={10} value={bookPhone} onChange={e=>{ if(bookOtpSent) resetBookOtp(); setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
-              <div style={{color:C.grn,fontSize:12,marginBottom:10}}>✅ OTP sent to +91 {bookPhone}</div>
+              <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
                 {bookOtpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
@@ -2165,7 +2208,6 @@ function BookScreen() {
                 ))}
               </div>
               <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pay →'}</Btn>
-              <button onClick={sendBookOTP} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',display:'block',margin:'8px auto 0',fontFamily:"'DM Sans',sans-serif"}}>Resend OTP</button>
             </>
           )}
         </>}
