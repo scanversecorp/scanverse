@@ -420,14 +420,25 @@ const SVCS = [
 ];
 
 const SVC_CARD_THEME = {
-  legal:    { bgFrom:'#EEF2FF', bgTo:'#E0E7FF', b1:'#818CF8', b2:'#6366F1', glow:'rgba(99,102,241,0.18)' },
-  cloud:    { bgFrom:'#DBEAFE', bgTo:'#BFDBFE', b1:'#60A5FA', b2:'#2563EB', glow:'rgba(37,99,235,0.18)' },
-  vip:      { bgFrom:'#FEF3C7', bgTo:'#FDE68A', b1:'#FBBF24', b2:'#D97706', glow:'rgba(217,119,6,0.2)',  tag:'👑 Premium' },
-  health:   { bgFrom:'#FEE2E2', bgTo:'#FECACA', b1:'#F87171', b2:'#DC2626', glow:'rgba(220,38,38,0.16)' },
-  property: { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)' },
-  household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/services/house-help.png' },
-  delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)' },
-  food:     { bgFrom:'#FCE7F3', bgTo:'#FBCFE8', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.18)' },
+  legal:    { bgFrom:'#EEF2FF', bgTo:'#E0E7FF', b1:'#818CF8', b2:'#6366F1', glow:'rgba(99,102,241,0.18)', img:'/home-models/legal.png' },
+  cloud:    { bgFrom:'#DBEAFE', bgTo:'#BFDBFE', b1:'#60A5FA', b2:'#2563EB', glow:'rgba(37,99,235,0.18)', img:'/home-models/cloud.png' },
+  vip:      { bgFrom:'#FEF3C7', bgTo:'#FDE68A', b1:'#FBBF24', b2:'#D97706', glow:'rgba(217,119,6,0.2)',  tag:'👑 Premium', img:'/home-models/vip.png' },
+  health:   { bgFrom:'#FEE2E2', bgTo:'#FECACA', b1:'#F87171', b2:'#DC2626', glow:'rgba(220,38,38,0.16)', img:'/home-models/health.png' },
+  property: { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)', img:'/home-models/property.png' },
+  household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/home-models/household.png' },
+  delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)', img:'/home-models/delivery.png' },
+  food:     { bgFrom:'#FCE7F3', bgTo:'#FBCFE8', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.18)', img:'/home-models/food.png' },
+};
+
+const HOME_CARD_META = {
+  legal:    { commitment:'Justice with a human touch.',     face:'Adv. Priya · verified lawyer' },
+  cloud:    { commitment:'Skills that lift your tomorrow.', face:'Rahul · certified trainer' },
+  vip:      { commitment:'You first. Every single time.',   face:'Meera · concierge lead' },
+  health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
+  property: { commitment:'Find home. Find peace.',          face:'Verified listings · PCMC' },
+  household:{ commitment:'A lighter home. A lighter heart.',face:'Deep clean & home help · 12 services' },
+  delivery: { commitment:'On time. With a smile.',          face:'Vikram · local delivery' },
+  food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
 };
 
 /* --- SUPABASE ----------------------------------------------------- */
@@ -519,56 +530,80 @@ function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
 }
 
-function ServiceFeaturedCard({ svc, onClick, compact, index = 0, fullWidth }) {
+function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   const theme = SVC_CARD_THEME[svc.id] || SVC_CARD_THEME.legal;
+  const meta = HOME_CARD_META[svc.id] || {};
   const d = SVC_DETAIL[svc.id] || {};
   const title = SVC_SHORT[svc.id] ? `${SVC_SHORT[svc.id]} services` : svc.name;
-  const sub = svc.household ? `Deep clean · home help · ${HOUSEHOLD_SVCS.length} services` : svc.sub;
-  const meta = svc.household
-    ? `${d.rating || '4.8 ⭐'} · ${HOUSEHOLD_SVCS.length} options`
-    : `${d.rating || '4.8 ⭐'} · ${d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day'}`;
-  const wide = fullWidth || svc.household;
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        gridColumn: wide && !compact ? '1 / -1' : 'auto',
-        borderRadius: 16,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        border: '2px solid transparent',
-        background: `linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`,
-        boxShadow: `0 8px 24px ${theme.glow}`,
-        animation: `fadeUp .35s ease ${index * 0.04}s both`,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: compact ? 84 : 112, background: `linear-gradient(135deg, ${theme.bgFrom} 0%, ${theme.bgTo} 100%)` }}>
-        <div style={{ flex: 1, padding: compact ? '11px 13px' : '15px 17px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: compact ? 3 : 5 }}>
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-            {theme.tag && <span style={{ background: svc.household ? C.acc : theme.b2, color: '#fff', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>{theme.tag}</span>}
-            <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99 }}>25% OFF</span>
+  const imgH = compact ? 72 : hero ? 168 : 132;
+
+  if (hero && !compact) {
+    return (
+      <div onClick={onClick} style={{ gridColumn:'1 / -1', borderRadius:20, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 12px 32px ${theme.glow}`, animation:`fadeUp .4s ease ${index * 0.04}s both` }}>
+        <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:`linear-gradient(135deg, ${theme.bgFrom} 0%, ${theme.bgTo} 100%)` }}>
+          <div style={{ flex:1, padding:'18px 18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:7 }}>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>
+              <span style={{ background:'#fef3c7', color:'#b45309', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>25% OFF</span>
+            </div>
+            <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
+            <div style={{ color:C.txt, fontWeight:800, fontSize:18, lineHeight:1.2 }}>{title}</div>
+            <div style={{ color:C.sub, fontSize:11, fontWeight:600 }}>{meta.face}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:2 }}>
+              <span style={{ color:C.acc, fontSize:14, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
+              <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{d.rating||'4.8 ⭐'} · {HOUSEHOLD_SVCS.length} options</span>
+            </div>
           </div>
-          <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 13 : 15, lineHeight: 1.2 }}>{title}</div>
-          <div style={{ color: C.sub, fontSize: compact ? 10 : 11, fontWeight: 600, lineHeight: 1.35 }}>{sub}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: C.acc, fontSize: compact ? 11 : 12, fontWeight: 800 }}>From ₹{fmtRs(svc.price)} →</span>
-            <span style={{ color: C.dim, fontSize: compact ? 9 : 10, fontWeight: 600 }}>{meta}</span>
+          <div style={{ width:148, flexShrink:0, position:'relative' }}>
+            <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%' }} />
+            <div style={{ position:'absolute', inset:0, background:`linear-gradient(90deg, ${theme.bgFrom} 0%, transparent 42%)` }} />
           </div>
         </div>
-        <div style={{ width: compact ? 72 : 108, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {theme.img ? (
-            <>
-              <img src={theme.img} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
-              <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${theme.bgFrom} 0%, transparent 50%)` }} />
-            </>
-          ) : (
-            <div style={{ fontSize: compact ? 36 : 44, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.08))' }}>{svc.icon}</div>
-          )}
+      </div>
+    );
+  }
+
+  if (compact) {
+    return (
+      <div onClick={onClick} style={{ borderRadius:14, overflow:'hidden', cursor:'pointer', border:BDR, background:C.card, boxShadow:'0 4px 16px rgba(18,18,18,0.06)', animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
+        <div style={{ width:72, flexShrink:0, position:'relative' }}>
+          <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%' }} />
+        </div>
+        <div style={{ flex:1, padding:'10px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:3 }}>
+          <div style={{ color:theme.b2, fontSize:10, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
+          <div style={{ color:C.txt, fontWeight:800, fontSize:13 }}>{title}</div>
+          <span style={{ color:C.acc, fontSize:11, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div onClick={onClick} style={{ borderRadius:16, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 8px 22px ${theme.glow}`, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column' }}>
+      <div style={{ position:'relative', height:imgH, flexShrink:0, background:theme.bgFrom }}>
+        <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 35%, rgba(18,18,18,0.55) 100%)' }} />
+        <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4, flexWrap:'wrap' }}>
+          {theme.tag && <span style={{ background:theme.b2, color:'#fff', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99 }}>{theme.tag}</span>}
+          <span style={{ background:'rgba(255,255,255,0.92)', color:'#b45309', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99 }}>25% OFF</span>
+        </div>
+        <div style={{ position:'absolute', bottom:8, left:10, right:10, color:'#fff', fontSize:10, fontWeight:600, textShadow:'0 1px 4px rgba(0,0,0,0.4)' }}>{meta.face}</div>
+      </div>
+      <div style={{ padding:'11px 12px 13px', background:`linear-gradient(180deg, ${theme.bgFrom} 0%, #fff 100%)`, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
+        <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
+        <div style={{ color:C.txt, fontWeight:800, fontSize:14, lineHeight:1.2 }}>{title}</div>
+        <div style={{ color:C.sub, fontSize:10, fontWeight:600, lineHeight:1.3 }}>{svc.sub}</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginTop:'auto' }}>
+          <span style={{ color:C.acc, fontSize:12, fontWeight:800 }}>₹{fmtRs(svc.price)} →</span>
+          <span style={{ color:C.dim, fontSize:9, fontWeight:600 }}>{d.rating||'4.8 ⭐'}</span>
         </div>
       </div>
     </div>
   );
 }
+
+/** @deprecated use HomeModelCard — v1 backup in src/backup/homecards_v1.js */
+function ServiceFeaturedCard(props) { return <HomeModelCard {...props} hero={props.fullWidth && props.svc?.household} />; }
 
 function HhCategoryPill({ theme, sm }) {
   const t = HH_THEME[theme];
@@ -1378,23 +1413,28 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||'PCMC'} {silentGeo?.pincode||''}</div>
       </div>
-      <div style={{margin:'10px 16px 0',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-        <span>🔍</span>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search legal, health, plumber…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+      <div style={{margin:'12px 16px 0',borderRadius:18,overflow:'hidden',background:`linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,padding:'18px 20px',color:'#fff',boxShadow:'0 10px 28px rgba(214,58,86,0.28)'}}>
+        <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase',opacity:0.92,marginBottom:6}}>Real people · Real care</div>
+        <div style={{fontSize:20,fontWeight:800,lineHeight:1.28,marginBottom:6,fontFamily:FF}}>Book services with a smile</div>
+        <div style={{fontSize:12,fontWeight:500,opacity:0.94,lineHeight:1.45}}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
       </div>
-      <div style={{display:'flex',gap:6,padding:'8px 16px 0',overflowX:'auto'}}>
-        {['✓ DPDP 2023','✓ Verified partners','✓ 25% off'].map(p=>(
+      <div style={{margin:'12px 16px 0',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+        <span>🔍</span>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search legal, health, household…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+      </div>
+      <div style={{display:'flex',gap:6,padding:'10px 16px 0',overflowX:'auto'}}>
+        {['✓ DPDP 2023','✓ Verified partners','✓ 25% off','✓ Human-first'].map(p=>(
           <span key={p} style={{flexShrink:0,fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99}}>{p}</span>
         ))}
       </div>
       <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
-        <div style={{marginBottom:12}}>
-          <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Book a service</div>
-          <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'}</div>
+        <div style={{marginBottom:14}}>
+          <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
+          <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           {[...svcList].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
-            <ServiceFeaturedCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} fullWidth={s.household && !search} />
+            <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} hero={s.household && !search} />
           ))}
         </div>
         <AssistBanner/>
@@ -2229,12 +2269,12 @@ function HomeScreen() {
         <AssistBanner/>
         <div style={{marginBottom:24}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div style={{fontSize:14,fontWeight:600,color:C.txt}}>All services</div>
+            <div style={{fontSize:14,fontWeight:600,color:C.txt}}>Our commitments</div>
             <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.acc,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>View all</button>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {[...SVCS].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
-              <ServiceFeaturedCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen(s.household?'services':'book');}} />
+              <HomeModelCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen(s.household?'services':'book');}} />
             ))}
           </div>
         </div>
@@ -2352,26 +2392,9 @@ function ServicesScreen() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search services…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
           {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18}}>×</button>}
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {list.map(s=>(
-            <div key={s.id} style={{...S.card(),cursor:'pointer',overflow:'hidden'}} onClick={()=>s.household?setHhList(true):setDetail(s)}>
-              <div style={{display:'flex',gap:14,alignItems:'center'}}>
-                <div style={{width:56,height:56,borderRadius:12,background:C.deep,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,flexShrink:0}}>{s.icon}</div>
-                <div style={{flex:1}}>
-                  <div style={{color:C.txt,fontWeight:700,fontSize:15}}>{s.name}</div>
-                  <div style={{color:C.sub,fontSize:12,marginTop:2}}>{s.sub}</div>
-                  <div style={{marginTop:6}}><PriceTag svc={s} sm /></div>
-                  <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>
-                    <span style={{color:C.gold,fontSize:11}}>{SVC_DETAIL[s.id]?.rating}</span>
-                    <span style={{color:C.dim,fontSize:11}}>·</span>
-                    <span style={{color:C.dim,fontSize:11}}>{s.household?`${HOUSEHOLD_SVCS.length} sub-services`:SVC_DETAIL[s.id]?.turnaround}</span>
-                  </div>
-                </div>
-                <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
-                  <div style={{background:C.acc,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 12px',borderRadius:6}}>View →</div>
-                </div>
-              </div>
-            </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          {list.map((s,i)=>(
+            <HomeModelCard key={s.id} svc={s} index={i} hero={s.household && !search} onClick={()=>s.household?setHhList(true):setDetail(s)} />
           ))}
         </div>
       </div>
