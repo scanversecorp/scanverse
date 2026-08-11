@@ -4784,13 +4784,14 @@ function VendorAdminPage() {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#vendor-admin</code>
           </div>
+          <CopyrightLine style={{ marginTop: 12 }} />
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
@@ -4835,6 +4836,7 @@ function VendorAdminPage() {
         ))}
         {!shown.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>}
       </div>
+      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>
   );
 }
