@@ -754,8 +754,11 @@ const TRACK_BOOKING_KEY = 'scanv_track_booking';
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const VENDOR_PIN_KEY = 'scanv_vendor_pin';
+const SUPPORT_PIN_KEY = 'scanv_support_pin';
+const SUPPORT_AUTH_KEY = 'scanv_support_auth';
 const PRICING_FN = `${SB_URL}/functions/v1/pricing-admin`;
 const VENDOR_FN = `${SB_URL}/functions/v1/vendor-onboard`;
+const SUPPORT_FN = `${SB_URL}/functions/v1/customer-support`;
 const DISPATCH_FN = `${SB_URL}/functions/v1/booking-dispatch`;
 
 function findSvcById(id) {
@@ -892,6 +895,48 @@ function isVendorOnboardRoute() {
 
 function isVendorAdminRoute() {
   return window.location.hash.replace(/^#/, '') === VENDOR_ADMIN_HASH;
+}
+
+const CUSTOMER_SUPPORT_HASH = 'customer-support';
+
+function isCustomerSupportRoute() {
+  return window.location.hash.replace(/^#/, '') === CUSTOMER_SUPPORT_HASH;
+}
+
+function supportAuthOk() {
+  try {
+    const raw = sessionStorage.getItem(SUPPORT_AUTH_KEY);
+    if (!raw) return false;
+    const { pin, exp } = JSON.parse(raw);
+    return !!pin && Date.now() < exp;
+  } catch { return false; }
+}
+
+function setSupportAuth(pin, role) {
+  sessionStorage.setItem(SUPPORT_AUTH_KEY, JSON.stringify({ pin, role, exp: Date.now() + 86400000 }));
+}
+
+function getSupportAuth() {
+  try {
+    const raw = sessionStorage.getItem(SUPPORT_AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.pin || Date.now() >= parsed.exp) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+async function customerSupportFetch(action, payload = {}, pin) {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+  if (pin) headers['x-support-pin'] = pin;
+  const res = await fetch(SUPPORT_FN, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
 }
 
 function isTrackRoute() {
@@ -4659,6 +4704,313 @@ function VendorAdminPage() {
 }
 
 /* ================================================================
+   CUSTOMER SUPPORT — #customer-support (read-only agents, admin update)
+================================================================ */
+function fmtRs(paise) {
+  return `₹${((Number(paise) || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`;
+}
+
+function fmtDt(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); }
+  catch { return iso; }
+}
+
+function CustomerSupportPage() {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(SUPPORT_PIN_KEY) || '');
+  const [auth, setAuth] = useState(() => getSupportAuth());
+  const [authed, setAuthed] = useState(supportAuthOk());
+  const [role, setRole] = useState(auth?.role || 'support_agent');
+  const bookingStatusColor = { confirmed: C.acc, in_progress: C.gold, completed: C.grn, cancelled: C.red, pending: C.dim };
+  const [q, setQ] = useState('');
+  const [field, setField] = useState('all');
+  const [results, setResults] = useState([]);
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [editProfile, setEditProfile] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const isAdmin = role === 'support_admin';
+
+  const login = async () => {
+    if (!pin) { setErr('Enter your PIN'); return; }
+    setLoading(true); setErr('');
+    try {
+      const { role: r } = await customerSupportFetch('whoami', {}, pin);
+      sessionStorage.setItem(SUPPORT_PIN_KEY, pin);
+      setSupportAuth(pin, r);
+      setRole(r);
+      setAuthed(true);
+      setMsg(r === 'support_admin' ? 'Signed in as Support Admin' : 'Signed in as Support Agent (read-only)');
+    } catch {
+      setErr('Incorrect PIN — set SUPPORT_AGENT_PIN or SUPPORT_ADMIN_PIN in Supabase secrets');
+      setAuthed(false);
+      sessionStorage.removeItem(SUPPORT_AUTH_KEY);
+    } finally { setLoading(false); }
+  };
+
+  const search = async () => {
+    if (!q.trim()) { setErr('Enter a search term'); return; }
+    setLoading(true); setErr(''); setDetail(null); setMsg('');
+    try {
+      const usePin = pin || getSupportAuth()?.pin;
+      const { results: data, count } = await customerSupportFetch('search', { q: q.trim(), field: field === 'all' ? undefined : field }, usePin);
+      setResults(data || []);
+      setMsg(`Found ${count || 0} customer(s)`);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const loadDetail = async (profileId) => {
+    setLoading(true); setErr(''); setMsg('');
+    try {
+      const usePin = pin || getSupportAuth()?.pin;
+      const data = await customerSupportFetch('detail', { profile_id: profileId }, usePin);
+      setDetail(data);
+      setEditProfile({
+        first_name: data.profile?.first_name || '',
+        last_name: data.profile?.last_name || '',
+        phone: data.profile?.phone || '',
+        email: data.profile?.email || '',
+        address: data.profile?.address || '',
+        village: data.profile?.village || '',
+        city: data.profile?.city || '',
+        pincode: data.profile?.pincode || '',
+        status: data.profile?.status || 'active',
+      });
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const saveProfile = async () => {
+    if (!isAdmin || !detail?.profile?.id) return;
+    setSaving(true); setErr('');
+    try {
+      const usePin = pin || getSupportAuth()?.pin;
+      await customerSupportFetch('update', {
+        profile_id: detail.profile.id,
+        profile: editProfile,
+      }, usePin);
+      setMsg('Profile updated');
+      await loadDetail(detail.profile.id);
+    } catch (e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const updateBookingStatus = async (bookingId, status) => {
+    if (!isAdmin || !detail?.profile?.id) return;
+    setSaving(true); setErr('');
+    try {
+      const usePin = pin || getSupportAuth()?.pin;
+      await customerSupportFetch('update', {
+        profile_id: detail.profile.id,
+        booking: { id: bookingId, status },
+      }, usePin);
+      setMsg(`Booking → ${status}`);
+      await loadDetail(detail.profile.id);
+    } catch (e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const lbl = { padding: '6px 10px', fontSize: 10, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5 };
+  const val = { fontSize: 12, color: C.txt, lineHeight: 1.5 };
+  const section = { ...S.card(), marginBottom: 12, padding: 14 };
+  const row = (k, v) => (
+    <div key={k} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, marginBottom: 6 }}>
+      <div style={lbl}>{k}</div>
+      <div style={val}>{v ?? '—'}</div>
+    </div>
+  );
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 380, width: '100%', padding: 24 }}>
+          <div style={{ fontSize: 11, color: C.cyan, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>INTERNAL</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Customer Support</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+            Search customers, bookings, and payments. Support agents have read-only access. Admins can update records.
+          </div>
+          <Field label="Support PIN">
+            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+          </Field>
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock support desk'}</Btn>
+          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#customer-support</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1100, margin: '0 auto' }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.cyan, fontWeight: 700 }}>CUSTOMER SUPPORT · {isAdmin ? 'ADMIN' : 'READ-ONLY'}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.txt }}>ScanV Support Desk</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {detail && <Btn v="outline" sm onClick={() => { setDetail(null); setEditProfile(null); }}>← Search</Btn>}
+            <Btn v="ghost" sm onClick={() => { sessionStorage.removeItem(SUPPORT_AUTH_KEY); sessionStorage.removeItem(SUPPORT_PIN_KEY); setAuthed(false); setDetail(null); }}>Lock</Btn>
+          </div>
+        </div>
+        {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8, maxWidth: 1100, margin: '8px auto 0' }}>{msg}</div>}
+        {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8, maxWidth: 1100, margin: '8px auto 0' }}>{err}</div>}
+      </div>
+
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
+        {!detail ? (
+          <>
+            <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                {[['all', 'All fields'], ['mobile', 'Mobile'], ['name', 'Name'], ['address', 'Address'], ['city', 'City'], ['email', 'Email'], ['pincode', 'PIN code']].map(([k, label]) => (
+                  <button key={k} onClick={() => setField(k)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${field === k ? C.acc : C.bdr}`, background: field === k ? `${C.acc}18` : C.surf, color: field === k ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Mobile, name, address, city, email…" style={{ ...S.inp(), flex: 1 }} />
+                <Btn onClick={search} disabled={loading}>{loading ? 'Searching…' : 'Search'}</Btn>
+              </div>
+            </div>
+            {results.map(r => (
+              <div key={r.id} onClick={() => loadDetail(r.id)} style={{ ...S.card(), marginBottom: 8, padding: 14, cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{r.name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Unknown'}</div>
+                    <div style={{ fontSize: 12, color: C.sub }}>{r.phone}{r.mobile_verified ? ' · ✓ verified' : ''}</div>
+                    <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{[r.address, r.village, r.city, r.pincode].filter(Boolean).join(', ') || 'No address'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 10, color: C.dim }}>
+                    <div>{r.device_type} · {r.os_name}</div>
+                    <div>Joined {fmtDt(r.created_at)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!results.length && !loading && q && <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No customers found</div>}
+          </>
+        ) : (
+          <>
+            <div style={section}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: C.txt, marginBottom: 10 }}>Profile · {detail.profile?.id}</div>
+              {!isAdmin ? (
+                <>
+                  {row('Name', detail.profile?.name)}
+                  {row('Phone', `${detail.profile?.phone}${detail.profile?.mobile_verified ? ' (verified)' : ''}`)}
+                  {row('Email', detail.profile?.email)}
+                  {row('Address', [detail.profile?.address, detail.profile?.village, detail.profile?.city, detail.profile?.pincode].filter(Boolean).join(', '))}
+                  {row('Status', detail.profile?.status)}
+                  {row('Created', fmtDt(detail.profile?.created_at))}
+                  {row('GPS', detail.profile?.last_lat ? `${detail.profile.last_lat}, ${detail.profile.last_lng}` : '—')}
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <Field label="First name"><input value={editProfile?.first_name || ''} onChange={e => setEditProfile(p => ({ ...p, first_name: e.target.value }))} style={S.inp()} /></Field>
+                    <Field label="Last name"><input value={editProfile?.last_name || ''} onChange={e => setEditProfile(p => ({ ...p, last_name: e.target.value }))} style={S.inp()} /></Field>
+                  </div>
+                  <Field label="Phone"><input value={editProfile?.phone || ''} onChange={e => setEditProfile(p => ({ ...p, phone: e.target.value }))} style={S.inp()} /></Field>
+                  <Field label="Email"><input value={editProfile?.email || ''} onChange={e => setEditProfile(p => ({ ...p, email: e.target.value }))} style={S.inp()} /></Field>
+                  <Field label="Address"><input value={editProfile?.address || ''} onChange={e => setEditProfile(p => ({ ...p, address: e.target.value }))} style={S.inp()} /></Field>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <Field label="Village"><input value={editProfile?.village || ''} onChange={e => setEditProfile(p => ({ ...p, village: e.target.value }))} style={S.inp()} /></Field>
+                    <Field label="City"><input value={editProfile?.city || ''} onChange={e => setEditProfile(p => ({ ...p, city: e.target.value }))} style={S.inp()} /></Field>
+                    <Field label="PIN"><input value={editProfile?.pincode || ''} onChange={e => setEditProfile(p => ({ ...p, pincode: e.target.value }))} style={S.inp()} /></Field>
+                  </div>
+                  <Field label="Status">
+                    <select value={editProfile?.status || 'active'} onChange={e => setEditProfile(p => ({ ...p, status: e.target.value }))} style={S.inp()}>
+                      {['active', 'inactive', 'suspended'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                  <Btn onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Update profile'}</Btn>
+                </>
+              )}
+            </div>
+
+            <div style={section}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Device & location</div>
+              {row('Device', `${detail.device?.device_type || '—'} · ${detail.device?.os_name || '—'} · ${detail.device?.browser || '—'}`)}
+              {row('Timezone', detail.device?.timezone)}
+              {row('Language', detail.device?.language)}
+              {row('IP', detail.device?.ip_address)}
+              {row('Last GPS', detail.device?.last_lat ? `${detail.device.last_lat}, ${detail.device.last_lng}` : '—')}
+            </div>
+
+            <div style={section}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Bookings ({detail.bookings?.length || 0})</div>
+              {(detail.bookings || []).length ? (detail.bookings || []).map(b => (
+                <div key={b.id} style={{ borderBottom: `1px solid ${C.bdr}`, padding: '10px 0' }}>
+                  <div style={{ fontWeight: 700, color: C.txt, fontSize: 13 }}>{b.service_name}</div>
+                  <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text}</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                    Status: <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} /> · {fmtRs(b.total)} · TXN {b.txn_id}
+                    {b.paid_at ? ` · Paid ${fmtDt(b.paid_at)}` : ''}
+                  </div>
+                  {isAdmin && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      {['confirmed', 'in_progress', 'completed', 'cancelled'].filter(s => s !== b.status).map(s => (
+                        <button key={s} onClick={() => updateBookingStatus(b.id, s)} disabled={saving} style={{ background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 6, padding: '4px 8px', color: C.sub, fontSize: 10, cursor: 'pointer', fontFamily: FF }}>→ {s}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )) : <div style={{ color: C.dim, fontSize: 12 }}>No bookings</div>}
+            </div>
+
+            <div style={section}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Payments ({detail.payments?.length || 0})</div>
+              {(detail.payments || []).length ? (detail.payments || []).map(p => (
+                <div key={p.id} style={{ borderBottom: `1px solid ${C.bdr}`, padding: '8px 0', fontSize: 11 }}>
+                  <span style={{ fontWeight: 700, color: C.txt }}>{fmtRs(p.amount)}</span>
+                  <span style={{ color: C.sub }}> · {p.method} · </span>
+                  <Badge label={p.status} color={p.status === 'success' ? C.grn : C.gold} />
+                  <span style={{ color: C.dim }}> · {p.gateway} · TXN {p.txn_id}</span>
+                </div>
+              )) : <div style={{ color: C.dim, fontSize: 12 }}>No payments</div>}
+            </div>
+
+            <div style={section}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Payment intents ({detail.payment_intents?.length || 0})</div>
+              {(detail.payment_intents || []).length ? (detail.payment_intents || []).map(pi => (
+                <div key={pi.id} style={{ borderBottom: `1px solid ${C.bdr}`, padding: '8px 0', fontSize: 11 }}>
+                  <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
+                  <span style={{ color: C.sub }}> · {fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
+                  {pi.verified_via && <span style={{ color: C.dim }}> · via {pi.verified_via}</span>}
+                  {pi.paid_at && <span style={{ color: C.dim }}> · {fmtDt(pi.paid_at)}</span>}
+                </div>
+              )) : <div style={{ color: C.dim, fontSize: 12 }}>No payment intents</div>}
+            </div>
+
+            {(detail.qr_scans?.length > 0 || detail.visitor_sessions?.length > 0) && (
+              <div style={section}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Captured scan / session data</div>
+                {(detail.qr_scans || []).slice(0, 5).map(s => (
+                  <div key={s.id} style={{ fontSize: 10, color: C.dim, marginBottom: 6 }}>
+                    QR · {s.device_type} · {s.os_name} · {s.browser} · {s.city || s.village || '—'} · {fmtDt(s.scanned_at)}
+                  </div>
+                ))}
+                {(detail.visitor_sessions || []).slice(0, 5).map(s => (
+                  <div key={s.id} style={{ fontSize: 10, color: C.dim, marginBottom: 6 }}>
+                    Session · {s.device_type} · {s.city || '—'} · {fmtDt(s.created_at)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
    ROOT APP
 ================================================================ */
 /* ================================================================
@@ -4948,6 +5300,15 @@ export default function App() {
       <Boundary>
         <style>{APP_CSS}</style>
         <VendorAdminPage/>
+      </Boundary>
+    );
+  }
+
+  if (isCustomerSupportRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <CustomerSupportPage/>
       </Boundary>
     );
   }
