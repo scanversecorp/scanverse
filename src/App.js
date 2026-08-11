@@ -352,7 +352,7 @@ const C = {
 };
 const FF = "'Inter',system-ui,sans-serif";
 const BDR = `1.5px solid ${C.bdr}`;
-const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food' };
+const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food', 'two-wheeler':'2-Wheeler', 'four-wheeler':'4-Wheeler' };
 
 const DISC_PCT = 0.25;
 const discPaise = (mrpPaise) => Math.round(mrpPaise * (1 - DISC_PCT));
@@ -639,6 +639,56 @@ const FOOD_SVCS = [
     features:['Seasonal menus','Advance booking','Bulk sweet boxes','Doorstep delivery','Corporate gifting'], turnaround:'2–5 days', rating:'4.9 ⭐', bookings:'1,200+' },
 ];
 
+const TW_THEME = {
+  roadside: { id:'roadside', label:'Roadside help', color:'#EA580C', bg:'#FFEDD5', border:'#FDBA74', gradFrom:'#FED7AA', gradTo:'#FB923C', tagline:'Mechanic · fixing · battery & tyre' },
+  care:     { id:'care',     label:'Care & pickup', color:'#2563EB', bg:'#DBEAFE', border:'#93C5FD', gradFrom:'#BFDBFE', gradTo:'#60A5FA', tagline:'Pick-up · wash · deep clean' },
+};
+const TWO_WHEELER_SVCS = [
+  { id:'tw-mechanic', parent:'two-wheeler', theme:'roadside', icon:'🔧', img:'/services/two-wheeler/mechanic.png', name:'Mechanic Support', sub:'Breakdown · tune-up · at home or roadside', unit:'visit', mrp:29900, price:discPaise(29900), cash:false,
+    desc:'ScanV two-wheeler mechanic — verified bike technicians for breakdowns, tune-ups, and general repairs at your location or roadside across Pune & PCMC.',
+    features:['Roadside or home visit','Verified bike mechanics','Parts guidance','Same-day slots','Live partner tracking'], turnaround:'60–90 min', rating:'4.8 ⭐', bookings:'3,400+' },
+  { id:'tw-pickup', parent:'two-wheeler', theme:'care', icon:'🛵', img:'/services/two-wheeler/pickup.png', name:'Pick-up & Drop Servicing', sub:'Garage run · service · return to doorstep', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV pick-up & drop — we collect your two-wheeler, take it to a trusted garage for servicing, and return it washed and ready. Live GPS tracking throughout.',
+    features:['Doorstep pick-up','Partner garage network','Status updates','Drop-back same/next day','Live location map'], turnaround:'Same/next day', rating:'4.9 ⭐', bookings:'2,800+' },
+  { id:'tw-fix', parent:'two-wheeler', theme:'roadside', icon:'⚡', img:'/services/two-wheeler/fixing.png', name:'On-Road Fixing', sub:'Flat tyre · chain · fuse · minor electrical', unit:'visit', mrp:19900, price:discPaise(19900), cash:false,
+    desc:'ScanV on-road fixing — quick roadside assistance for flat tyres, chain issues, fuse replacement, and minor electrical faults on scooters and bikes.',
+    features:['30-min response target','Tyre puncture repair','Chain & cable fix','Battery jump-start','Track mechanic live'], turnaround:'30–60 min', rating:'4.7 ⭐', bookings:'5,100+' },
+  { id:'tw-wash', parent:'two-wheeler', theme:'care', icon:'💦', img:'/services/two-wheeler/washing.png', name:'Bike Washing', sub:'Exterior wash · chain lube · 30 min', unit:'visit', mrp:9900, price:discPaise(9900), cash:false,
+    desc:'ScanV bike wash — eco-friendly exterior wash, chain wipe, and tyre shine at your parking spot or society gate. Book solo or add to a service visit.',
+    features:['Water-efficient wash','Chain lube option','Tyre & rim clean','Society gate friendly','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'6,200+' },
+  { id:'tw-deep', parent:'two-wheeler', theme:'care', icon:'✨', img:'/services/two-wheeler/deep-clean.png', name:'Deep Cleaning', sub:'Engine bay wipe · degrease · polish · 1–2 hrs', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
+    desc:'ScanV two-wheeler deep clean — thorough degrease, engine bay wipe, plastic polish, and under-seat vacuum for a showroom-fresh bike.',
+    features:['Engine bay degrease','Full body polish','Seat & storage clean','Rust spot treatment','Premium products'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,400+' },
+  { id:'tw-battery', parent:'two-wheeler', theme:'roadside', icon:'🔋', img:'/services/two-wheeler/battery.png', name:'Battery & Tyre Check', sub:'Health test · air · replacement guidance', unit:'visit', mrp:12900, price:discPaise(12900), cash:false,
+    desc:'ScanV battery & tyre check — doorstep health diagnostics, air top-up, and honest replacement guidance from verified partners. No upsell pressure.',
+    features:['Battery load test','Tyre pressure check','Tread inspection','Replacement quote','Monsoon prep add-on'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,900+' },
+];
+
+const FW_THEME = {
+  service: { id:'service', label:'Service & repair', color:'#7C3AED', bg:'#EDE9FE', border:'#C4B5FD', gradFrom:'#DDD6FE', gradTo:'#A78BFA', tagline:'Mechanic · pick-up · on-site fix' },
+  care:    { id:'care',    label:'Cleaning & care', color:'#0891B2', bg:'#CFFAFE', border:'#67E8F9', gradFrom:'#A5F3FC', gradTo:'#22D3EE', tagline:'Wash · deep clean · detailing' },
+};
+const FOUR_WHEELER_SVCS = [
+  { id:'fw-mechanic', parent:'four-wheeler', theme:'service', icon:'🔧', img:'/services/four-wheeler/mechanic.png', name:'Mechanic Support', sub:'Breakdown · diagnostics · home or roadside', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV four-wheeler mechanic — certified car technicians for breakdowns, diagnostics, and repairs at your location. Live GPS tracking like delivery apps.',
+    features:['Home or roadside visit','OBD diagnostics','Verified car mechanics','Same-day slots','Live partner map'], turnaround:'60–120 min', rating:'4.8 ⭐', bookings:'2,200+' },
+  { id:'fw-pickup', parent:'four-wheeler', theme:'service', icon:'🚗', img:'/services/four-wheeler/pickup.png', name:'Pick-up & Drop Servicing', sub:'Collect · service centre · return washed', unit:'visit', mrp:79900, price:discPaise(79900), cash:false,
+    desc:'ScanV car pick-up & drop — we collect your car, complete scheduled servicing at a partner garage, and return it to your doorstep with live tracking end-to-end.',
+    features:['Doorstep pick-up','Authorised partner garages','Digital job card','Washed return delivery','Live GPS until closed'], turnaround:'1–2 days', rating:'4.9 ⭐', bookings:'1,600+' },
+  { id:'fw-fix', parent:'four-wheeler', theme:'service', icon:'⚡', img:'/services/four-wheeler/fixing.png', name:'On-Site Fixing', sub:'Battery · tyre · minor electrical · fluid top-up', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV on-site car fixing — battery jump-start, tyre change, fuse replacement, and fluid top-ups at your parking spot or roadside location.',
+    features:['45-min response target','Battery & tyre assist','Minor electrical fix','Fluid top-up','Track technician live'], turnaround:'45–90 min', rating:'4.7 ⭐', bookings:'3,800+' },
+  { id:'fw-wash', parent:'four-wheeler', theme:'care', icon:'💦', img:'/services/four-wheeler/washing.png', name:'Car Washing', sub:'Exterior wash · vacuum · 45–60 min', unit:'visit', mrp:19900, price:discPaise(19900), cash:false,
+    desc:'ScanV car wash — doorstep exterior wash and interior vacuum at your home or office parking. Eco-friendly products, verified partners.',
+    features:['Doorstep wash','Interior vacuum','Tyre & glass clean','Water-saving method','Monthly plans'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,500+' },
+  { id:'fw-deep', parent:'four-wheeler', theme:'care', icon:'✨', img:'/services/four-wheeler/deep-clean.png', name:'Deep Cleaning', sub:'Interior shampoo · AC vent · engine bay', unit:'visit', mrp:29900, price:discPaise(29900), cash:false,
+    desc:'ScanV car deep clean — interior shampoo, AC vent sanitisation, engine bay degrease, and odour treatment for a fresh cabin and engine bay.',
+    features:['Seat shampoo','AC vent sanitise','Engine bay degrease','Odour treatment','3–4 hr visit'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,800+' },
+  { id:'fw-detail', parent:'four-wheeler', theme:'care', icon:'💎', img:'/services/four-wheeler/detailing.png', name:'Detailing & Interior', sub:'Polish · ceramic prep · leather care · premium', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV car detailing — premium polish, leather conditioning, ceramic prep, and full interior restoration from specialist partners.',
+    features:['Machine polish','Leather conditioning','Ceramic prep','Dashboard restore','Premium finish'], turnaround:'1–2 days', rating:'4.9 ⭐', bookings:'920+' },
+];
+
 const SUB_CATEGORIES = {
   household: { title:'Household services', subtitle:'Deep cleaning & home help · 25% off · verified partners', cat:'Household Services', themes:HH_THEME, svcs:HOUSEHOLD_SVCS, themeOrder:['pink','green'] },
   cloud:     { title:'Cloud services', subtitle:'Hosting · infrastructure · packages · 25% off', cat:'Cloud Services', themes:CL_THEME, svcs:CLOUD_SVCS, themeOrder:['host','build','care','pack'] },
@@ -648,6 +698,8 @@ const SUB_CATEGORIES = {
   property:  { title:'Property & rentals', subtitle:'Buy · rent · verify · 25% off', cat:'Property & Rentals', themes:PR_THEME, svcs:PROPERTY_SVCS, themeOrder:['find','verify'] },
   delivery:  { title:'Deliveries', subtitle:'Courier · parcels · express · 25% off', cat:'Deliveries', themes:DL_THEME, svcs:DELIVERY_SVCS, themeOrder:['local','express'] },
   food:      { title:'Food', subtitle:'Tiffin · restaurant · catering · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
+  'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · deep clean · 6 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
+  'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · detailing · 6 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
 };
 
 const ALL_SUB_SVCS = Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
@@ -667,9 +719,14 @@ function subSvcCount(svc) {
 
 /* --- LIVE PRICING (Supabase overrides) ----------------------------- */
 const PRICING_ADMIN_HASH = 'pricing-admin';
+const VENDOR_ONBOARD_HASH = 'vendor-onboard';
+const VENDOR_ADMIN_HASH = 'vendor-admin';
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
+const VENDOR_PIN_KEY = 'scanv_vendor_pin';
 const PRICING_FN = `${SB_URL}/functions/v1/pricing-admin`;
+const VENDOR_FN = `${SB_URL}/functions/v1/vendor-onboard`;
+const DISPATCH_FN = `${SB_URL}/functions/v1/booking-dispatch`;
 
 function findSvcById(id) {
   return SVCS.find(s => s.id === id) || SUB_BY_ID[id] || null;
@@ -764,6 +821,82 @@ function isPricingAdminRoute() {
   return window.location.hash.replace(/^#/, '') === PRICING_ADMIN_HASH;
 }
 
+function isVendorOnboardRoute() {
+  return window.location.hash.replace(/^#/, '') === VENDOR_ONBOARD_HASH;
+}
+
+function isVendorAdminRoute() {
+  return window.location.hash.replace(/^#/, '') === VENDOR_ADMIN_HASH;
+}
+
+/** All bookable services for vendor onboarding selection */
+function allVendorSelectableServices() {
+  const list = [];
+  for (const [catId, cfg] of Object.entries(SUB_CATEGORIES)) {
+    for (const s of cfg.svcs) {
+      list.push({ service_id: s.id, category_id: catId, name: s.name, cat: cfg.title });
+    }
+  }
+  for (const s of SVCS) {
+    if (!SUB_CATEGORIES[s.id]) {
+      list.push({ service_id: s.id, category_id: s.id, name: s.name, cat: s.cat });
+    }
+  }
+  return list;
+}
+
+async function vendorOnboardFetch(action, payload = {}, pin) {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+  if (pin) headers['x-vendor-admin-pin'] = pin;
+  const res = await fetch(VENDOR_FN, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function invokeBookingDispatch({ bookingId, serviceId, serviceName, lat, lng, location, date, time }) {
+  try {
+    const r = await sb().functions.invoke('booking-dispatch', {
+      body: {
+        action: 'start',
+        booking_id: bookingId,
+        service_id: serviceId || '',
+        service_name: serviceName,
+        lat: lat ?? null,
+        lng: lng ?? null,
+        location: location || '',
+        date: date || null,
+        time: time || null,
+      },
+    });
+    if (r.error) console.warn('[Dispatch]', r.error.message);
+    return r.data;
+  } catch (e) {
+    console.warn('[Dispatch]', e.message);
+    return null;
+  }
+}
+
+const INDIAN_STATES = [
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
+  'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
+  'Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab',
+  'Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh',
+  'Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Puducherry',
+];
+
+const COUNTRY_OPTIONS = [
+  { code: 'IN', name: 'India' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SG', name: 'Singapore' },
+];
+
 const paiseInp = (p) => Math.round((Number(p) || 0) / 100);
 const paiseFromInp = (r) => Math.round((Number(r) || 0) * 100);
 
@@ -777,6 +910,8 @@ const SVCS = [
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurant · catering · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
+  { id:'two-wheeler', icon:'🛵', name:'Two Wheeler Support', sub:'Mechanic · pick-up · wash · 6 services', cat:'Two Wheeler Support', cash:false, ...svcDisc(299), twowheeler:true },
+  { id:'four-wheeler', icon:'🚗', name:'Four Wheeler Support', sub:'Car service · pick-up · detailing · 6 services', cat:'Four Wheeler Support', cash:false, ...svcDisc(499), fourwheeler:true },
 ];
 
 const SVC_CARD_THEME = {
@@ -788,6 +923,8 @@ const SVC_CARD_THEME = {
   household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/home-models/household.png' },
   delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)', img:'/home-models/delivery.png' },
   food:     { bgFrom:'#FCE7F3', bgTo:'#FBCFE8', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.18)', img:'/home-models/food.png' },
+  'two-wheeler': { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.2)', tag:'🛵 Bike', img:'/home-models/two-wheeler.png' },
+  'four-wheeler': { bgFrom:'#EDE9FE', bgTo:'#DDD6FE', b1:'#A78BFA', b2:'#7C3AED', glow:'rgba(124,58,237,0.2)', tag:'🚗 Car', img:'/home-models/four-wheeler.png' },
 };
 
 const HOME_CARD_META = {
@@ -799,6 +936,8 @@ const HOME_CARD_META = {
   household:{ commitment:'A lighter home. A lighter heart.',face:'Deep clean & home help · 12 services' },
   delivery: { commitment:'On time. With a smile.',          face:'Vikram · local delivery' },
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
+  'two-wheeler': { commitment:'Back on the road. Fast.',    face:'Ravi · bike mechanic · live GPS' },
+  'four-wheeler': { commitment:'Your car. Our care.',       face:'Suresh · car service · live tracking' },
 };
 
 /** Search categories + all sub-services */
@@ -1867,6 +2006,16 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         booking_id:bk.id, user_id:userId, amount:total,
         method:paymentMethod||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
       }).catch(()=>{});
+      invokeBookingDispatch({
+        bookingId: bk.id,
+        serviceId: svc.id || svc.parent || activeSvc?.id || '',
+        serviceName: svc.name,
+        lat: silentGeo?.lat || bookingDetail.lat || null,
+        lng: silentGeo?.lng || bookingDetail.lng || null,
+        location: loc,
+        date: bookingDetail.date,
+        time: bookingDetail.time || '10:00',
+      });
       onRegistered(pendingProfile);
     } catch(e) { setErr(e.message||'Booking failed.'); }
     finally { setLoading(false); }
@@ -1949,7 +2098,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <>
             <div style={{marginBottom:14}}>
               <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
-              <div style={{color:C.dim,fontSize:12,fontWeight:500}}>8 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
+              <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
             </div>
             {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
@@ -2838,6 +2987,8 @@ const SVC_DETAIL = {
   household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 14 services · 25% off.', features:['Deep cleaning visits','Sofa & upholstery clean','Hourly home help','Ironing & pressing','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Same-day courier, documents, parcels, groceries, and inter-city express — 6 delivery services · 25% off.', features:['Same-day pickup','Document handover','Grocery & essentials run','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Home tiffin, breakfast plans, restaurant orders, office lunch, and catering — 6 food services · 25% off.', features:['Monthly tiffin plans','Breakfast & snacks plan','Restaurant delivery','Office lunch boxes','Party catering'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+  'two-wheeler': { desc:'Mechanic support, pick-up & drop servicing, roadside fixing, washing, and deep cleaning — 6 bike services · 25% off · live GPS.', features:['Roadside mechanic','Pick-up & drop servicing','On-road fixing','Bike wash & deep clean','Live partner tracking'], turnaround:'30–90 min', rating:'4.8 ⭐', bookings:'6,400+' },
+  'four-wheeler': { desc:'Car mechanic, pick-up & drop servicing, on-site fixing, washing, deep cleaning, and detailing — 6 car services · 25% off · live GPS.', features:['Home/roadside mechanic','Pick-up & drop servicing','On-site fixing','Wash & deep clean','Live partner map'], turnaround:'45 min–2 days', rating:'4.8 ⭐', bookings:'4,200+' },
 };
 
 function ServicesScreen() {
@@ -3027,7 +3178,7 @@ function BookScreen() {
     finally{setLoading(false);}
   };
 
-  const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');if(!payMethod)return addToast('Complete UPI payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});setBooking(data);addToast('Booking confirmed! 🎉','success');setScreen('bookings');}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
+  const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');if(!payMethod)return addToast('Complete UPI payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});invokeBookingDispatch({bookingId:data.id,serviceId:svc.id||svc.parent||'',serviceName:svc.name,lat:user.last_lat||null,lng:user.last_lng||null,location:loc,date,time});setBooking(data);addToast('Booking confirmed! Partner notified 🎉','success');setScreen('bookings');}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
   const confirmPaid=method=>{if(!bookPay.upiOpened&&!bookPay.paymentVerified){addToast('Pay via UPI first','error');return;}setPayMethod(method);setStep(4);addToast('Payment confirmed — pick date & time','success');};
   const goFromService=()=>{
     if(skipVerify){ setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); }
@@ -3122,6 +3273,86 @@ function BookScreen() {
   );
 }
 
+function osmEmbedUrl(vLat, vLng, cLat, cLng) {
+  const lat = vLat || cLat || 18.6298;
+  const lng = vLng || cLng || 73.7997;
+  const pad = 0.012;
+  const minLng = Math.min(lng, cLng ?? lng) - pad;
+  const maxLng = Math.max(lng, cLng ?? lng) + pad;
+  const minLat = Math.min(lat, cLat ?? lat) - pad;
+  const maxLat = Math.max(lat, cLat ?? lat) + pad;
+  let url = `https://www.openstreetmap.org/export/embed.html?bbox=${minLng}%2C${minLat}%2C${maxLng}%2C${maxLat}&layer=mapnik`;
+  if (vLat && vLng) url += `&marker=${vLat}%2C${vLng}`;
+  return url;
+}
+
+function LiveVendorMap({ live, booking, partnerName }) {
+  if (!live?.tracking_active || !live.lat || !live.lng) return null;
+  const updated = live.updated_at ? new Date(live.updated_at) : null;
+  const minsAgo = updated ? Math.max(0, Math.round((Date.now() - updated.getTime()) / 60000)) : null;
+  const mapsLink = `https://www.google.com/maps/dir/?api=1&destination=${live.lat},${live.lng}`;
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${C.bdr}`, paddingTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.grn, boxShadow: `0 0 0 3px ${C.grn}44`, animation: 'heroPulse 1.5s ease infinite' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.grn }}>Live partner location</span>
+        </div>
+        <span style={{ fontSize: 10, color: C.dim }}>{minsAgo === 0 ? 'Just now' : minsAgo != null ? `${minsAgo}m ago` : ''}</span>
+      </div>
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>
+        {partnerName || 'Your partner'} is en route · tracking until service is closed
+      </div>
+      <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: 180, background: C.deep }}>
+        <iframe
+          title="Live partner map"
+          src={osmEmbedUrl(live.lat, live.lng, booking?.customer_lat, booking?.customer_lng)}
+          style={{ width: '100%', height: '100%', border: 0 }}
+          loading="lazy"
+        />
+      </div>
+      <a href={mapsLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 11, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>
+        Open in Google Maps ↗
+      </a>
+    </div>
+  );
+}
+
+function usePartnerLocationShare(user, bookings, addToast) {
+  const watchRef = useRef(null);
+  useEffect(() => {
+    if (user?.role !== 'partner') return undefined;
+    const active = bookings.filter(b => b.status === 'confirmed' && b.partner_id);
+    if (!active.length) {
+      if (watchRef.current != null) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; }
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: vendor } = await sb().from('vendor_partners').select('id').eq('profile_id', user.id).eq('status', 'active').maybeSingle();
+      if (cancelled || !vendor?.id) return;
+      if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = navigator.geolocation.watchPosition(async (pos) => {
+        for (const b of active) {
+          await sb().from('vendor_live_locations').upsert({
+            booking_id: b.id,
+            vendor_id: vendor.id,
+            partner_id: user.id,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            heading: pos.coords.heading,
+            speed_kmh: pos.coords.speed != null ? Math.round(pos.coords.speed * 3.6 * 10) / 10 : null,
+            tracking_active: true,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'booking_id' }).catch(() => {});
+        }
+      }, () => addToast?.('Enable GPS to share live location with customer', 'error'),
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
+    })();
+    return () => { cancelled = true; if (watchRef.current != null) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; } };
+  }, [user?.id, user?.role, bookings, addToast]);
+}
+
 function BookingsScreen() {
   const {user,addToast}=useApp();
   const [bookings,setBookings]=useState([]);
@@ -3129,28 +3360,97 @@ function BookingsScreen() {
   const [stars,setStars]=useState({});
   const [disputing,setDisputing]=useState(null);
   const [reason,setReason]=useState('');
-  const load=useCallback(async()=>{const col=user.role==='partner'?'partner_id':'customer_id';const{data}=await sb().from('bookings').select('*').eq(col,user.id).order('created_at',{ascending:false});setBookings(data||[]);setLoading(false);},[user.id,user.role]);
+  const [liveLocs,setLiveLocs]=useState({});
+  const [partners,setPartners]=useState({});
+
+  const load=useCallback(async()=>{
+    const col=user.role==='partner'?'partner_id':'customer_id';
+    const{data}=await sb().from('bookings').select('*').eq(col,user.id).order('created_at',{ascending:false});
+    setBookings(data||[]);
+    const ids=(data||[]).map(b=>b.id);
+    if(ids.length){
+      const{data:lives}=await sb().from('vendor_live_locations').select('*').in('booking_id',ids);
+      const map={}; (lives||[]).forEach(l=>{ map[l.booking_id]=l; });
+      setLiveLocs(map);
+      const pids=[...new Set((data||[]).filter(b=>b.partner_id).map(b=>b.partner_id))];
+      if(pids.length){
+        const{data:vendors}=await sb().from('vendor_partners').select('id,profile_id,business_name,contact_name').in('profile_id',pids);
+        const{data:profiles}=await sb().from('profiles').select('id,first_name,last_name').in('id',pids);
+        const pmap={};
+        (vendors||[]).forEach(v=>{ if(v.profile_id) pmap[v.profile_id]=v.business_name; });
+        (profiles||[]).forEach(p=>{ if(!pmap[p.id]) pmap[p.id]=`${p.first_name||''} ${p.last_name||''}`.trim(); });
+        setPartners(pmap);
+      }
+    }
+    setLoading(false);
+  },[user.id,user.role]);
+
+  usePartnerLocationShare(user, bookings, addToast);
+
   useEffect(()=>{load();},[load]);
+
+  useEffect(()=>{
+    const openIds=bookings.filter(b=>b.status==='confirmed'&&b.partner_id).map(b=>b.id);
+    if(!openIds.length) return undefined;
+    let channel;
+    try{
+      channel=sb().channel('live-vendor-locs')
+        .on('postgres_changes',{event:'*',schema:'public',table:'vendor_live_locations'},(payload)=>{
+          const row=payload.new||payload.old;
+          if(row?.booking_id&&openIds.includes(row.booking_id)){
+            if(payload.eventType==='DELETE'||(row.tracking_active===false)){
+              setLiveLocs(prev=>{ const n={...prev}; delete n[row.booking_id]; return n; });
+            } else {
+              setLiveLocs(prev=>({...prev,[row.booking_id]:row}));
+            }
+          }
+        })
+        .subscribe();
+    }catch{}
+    const poll=setInterval(async()=>{
+      const{data}=await sb().from('vendor_live_locations').select('*').in('booking_id',openIds).eq('tracking_active',true);
+      const map={}; (data||[]).forEach(l=>{ map[l.booking_id]=l; });
+      setLiveLocs(prev=>({...prev,...map}));
+    },20000);
+    return ()=>{ if(channel) sb().removeChannel(channel); clearInterval(poll); };
+  },[bookings]);
+
   const sc=s=>s==='completed'?C.grn:s==='confirmed'?C.cyan:s==='cancelled'||s==='disputed'?C.red:C.gold;
+  const showLive=(b)=>user.role==='customer'&&b.status==='confirmed'&&b.partner_id&&liveLocs[b.id]?.tracking_active;
+
+  const markComplete=async(b)=>{
+    await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);
+    await sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id).catch(()=>{});
+    await sb().from('service_requests').update({status:'completed'}).eq('txn_id',b.txn_id).catch(()=>{});
+    addToast('Complete ✅ — live tracking stopped','success');
+    load();
+  };
+
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title="Bookings"/>
+      {user.role==='partner'&&bookings.some(b=>b.status==='confirmed')&&(
+        <div style={{margin:'0 16px 8px',background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',fontSize:11,color:C.grn,fontWeight:700}}>
+          📍 Sharing live GPS with customers on active bookings
+        </div>
+      )}
       <div style={{padding:16}}>
         {loading?<div style={{textAlign:'center',padding:40}}><Spin/></div>
         :bookings.length?bookings.map(b=>(
           <div key={b.id} style={{...S.card(),marginBottom:10}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-              <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}</div>
+              <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
               <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div><Badge label={b.status} color={sc(b.status)}/></div>
             </div>
-            {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={async()=>{await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);addToast('Complete ✅','success');load();}}>✓ Mark complete</Btn>}
+            {showLive(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]}/>}
+            {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={()=>markComplete(b)}>✓ Mark complete</Btn>}
             {b.status==='completed'&&user.role==='customer'&&(
               <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
                 {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>✅ Rated {stars[b.id]}⭐</div>}
-                <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",marginTop:8,display:'block'}}>Raise a dispute</button>
+                <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:FF,marginTop:8,display:'block'}}>Raise a dispute</button>
               </div>
             )}
-            {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});addToast('Dispute raised','success');setDisputing(null);setReason('');}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
+            {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id).catch(()=>{});addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
           </div>
         )):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>No bookings yet</div>}
       </div>
@@ -3472,6 +3772,411 @@ function PricingAdminPage({ onPricesUpdated }) {
 }
 
 /* ================================================================
+   VENDOR ONBOARDING — #vendor-onboard (Partner self-registration)
+================================================================ */
+function VendorOnboardPage() {
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState(emptyOtpDigits());
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [businessName, setBusinessName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [shopOrFlat, setShopOrFlat] = useState('');
+  const [buildingName, setBuildingName] = useState('');
+  const [streetName, setStreetName] = useState('');
+  const [village, setVillage] = useState('');
+  const [city, setCity] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [stateName, setStateName] = useState('Maharashtra');
+  const [countryCode, setCountryCode] = useState('IN');
+  const [gps, setGps] = useState(null);
+  const [gpsCheck, setGpsCheck] = useState(null);
+  const [aadhaar, setAadhaar] = useState('');
+  const [aadhaarOk, setAadhaarOk] = useState(false);
+  const [pan, setPan] = useState('');
+  const [panOk, setPanOk] = useState(null);
+  const [selectedSvcs, setSelectedSvcs] = useState({});
+  const allSvcs = allVendorSelectableServices();
+
+  const captureGps = () => {
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
+      setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, ...geo });
+      setCity(geo.city || city);
+      setPincode(geo.pincode || pincode);
+      setVillage(geo.village || village);
+      try {
+        const ip = await getIP();
+        const check = await vendorOnboardFetch('check-gps', {
+          lat: pos.coords.latitude, lng: pos.coords.longitude, ip,
+          requested_country_code: countryCode,
+        });
+        setGpsCheck(check);
+        if (!check.country_allowed && countryCode !== 'IN') {
+          setErr(check.message || 'Country not allowed for your GPS location');
+          setCountryCode('IN');
+        }
+      } catch (e) { setErr(e.message); }
+      setLoading(false);
+    }, () => { setErr('GPS required for partner onboarding'); setLoading(false); },
+    { enableHighAccuracy: true, maximumAge: 0 });
+  };
+
+  const sendOtp = async () => {
+    if (phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
+    setLoading(true); setErr('');
+    try {
+      await vendorOnboardFetch('send-otp', { mobile: '+91' + phone.replace(/\D/g, '') });
+      setOtpSent(true);
+      setMsg('OTP sent to +91' + phone);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const verifyOtp = async () => {
+    const code = otp.join('');
+    if (code.length < 6) return setErr('Enter 6-digit OTP');
+    setLoading(true); setErr('');
+    try {
+      await vendorOnboardFetch('verify-otp', { mobile: '+91' + phone.replace(/\D/g, ''), otp: code });
+      setPhoneVerified(true);
+      setStep(2);
+      setMsg('Phone verified ✓');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const verifyAadhaar = async () => {
+    if (aadhaar.replace(/\s/g, '').length !== 12) return setErr('Enter 12-digit Aadhaar');
+    setLoading(true); setErr('');
+    try {
+      const r = await vendorOnboardFetch('ekyc-aadhaar', { aadhaar, name: contactName });
+      if (!r.verified) throw new Error(r.error || 'Aadhaar eKYC failed');
+      setAadhaarOk(true);
+      setMsg('Aadhaar verified ✓ (last 4: ' + (r.last4 || '****') + ')');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const verifyPan = async () => {
+    if (!pan.trim()) { setPanOk(true); return; }
+    setLoading(true); setErr('');
+    try {
+      const r = await vendorOnboardFetch('validate-pan', { pan, name: contactName });
+      setPanOk(r.valid);
+      if (!r.valid) setErr(r.error || 'Invalid PAN');
+      else setMsg('PAN validated ✓');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const toggleSvc = (id) => setSelectedSvcs(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const submit = async () => {
+    const services = allSvcs.filter(s => selectedSvcs[s.service_id]).map(s => ({
+      service_id: s.service_id, category_id: s.category_id,
+    }));
+    if (!services.length) return setErr('Select at least one service');
+    if (!gps) return setErr('Capture GPS location first');
+    if (!aadhaarOk) return setErr('Complete Aadhaar eKYC first');
+    setLoading(true); setErr('');
+    try {
+      const ip = await getIP();
+      const r = await vendorOnboardFetch('register', {
+        phone: '+91' + phone.replace(/\D/g, ''),
+        business_name: businessName,
+        contact_name: contactName,
+        email,
+        shop_or_flat: shopOrFlat,
+        building_name: buildingName,
+        street_name: streetName,
+        village,
+        city,
+        pincode,
+        state: stateName,
+        country: COUNTRY_OPTIONS.find(c => c.code === countryCode)?.name || 'India',
+        country_code: countryCode,
+        gps_lat: gps.lat,
+        gps_lng: gps.lng,
+        address_lat: gps.lat,
+        address_lng: gps.lng,
+        ip,
+        aadhaar_number: aadhaar,
+        pan_number: pan || null,
+        pan_verified: !!pan && panOk,
+        services,
+      });
+      setMsg(r.message || 'Registration submitted!');
+      setStep(6);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const stepLabels = ['Phone OTP', 'Business & address', 'Aadhaar eKYC', 'PAN (optional)', 'Services', 'Done'];
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ fontSize: 10, color: C.cyan, fontWeight: 700, letterSpacing: 1 }}>PARTNER ONBOARDING</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>Become a ScanV Partner</div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
+          {stepLabels.map((l, i) => (
+            <div key={l} style={{ flex: 1, height: 3, borderRadius: 2, background: step > i ? C.acc : C.deep }} title={l} />
+          ))}
+        </div>
+      </div>
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+        {err && <div style={S.err}>{err}</div>}
+        {msg && <div style={{ background: '#e6f4ee', border: `1.5px solid rgba(0,122,77,0.35)`, borderRadius: 8, padding: '10px 14px', color: C.grn, fontSize: 13, marginBottom: 14 }}>{msg}</div>}
+
+        {step === 1 && <>
+          <Field label="Mobile number" req note="OTP verified — required for booking alerts">
+            <div style={{ display: 'flex', alignItems: 'center', background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '11px 12px', background: C.card, borderRight: `1px solid ${C.bdr}`, color: C.sub, fontSize: 14, fontWeight: 600 }}>+91</div>
+              <input type="tel" maxLength={10} value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={phoneVerified} />
+            </div>
+          </Field>
+          {!otpSent ? <Btn full onClick={sendOtp} disabled={loading}>{loading ? <><Spin size={16} /> Sending…</> : 'Send OTP →'}</Btn> : <>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
+              {otp.map((d, i) => (
+                <input key={i} maxLength={1} value={d} inputMode="numeric"
+                  onChange={e => { const nd = [...otp]; nd[i] = e.target.value.replace(/\D/, '').slice(-1); setOtp(nd); }}
+                  style={{ width: 40, height: 48, textAlign: 'center', background: d ? `${C.acc}20` : C.deep, border: `1.5px solid ${d ? C.acc : C.bdr}`, borderRadius: 8, color: C.acc, fontFamily: 'monospace', fontSize: 22, outline: 'none' }} />
+              ))}
+            </div>
+            <Btn full onClick={verifyOtp} disabled={loading || phoneVerified}>{loading ? <><Spin size={16} /> Verifying…</> : 'Verify OTP →'}</Btn>
+          </>}
+        </>}
+
+        {step === 2 && <>
+          <Field label="Business / shop name" req><input value={businessName} onChange={e => setBusinessName(e.target.value)} style={S.inp()} placeholder="Sharma Home Services" /></Field>
+          <Field label="Contact person name" req><input value={contactName} onChange={e => setContactName(e.target.value)} style={S.inp()} placeholder="Rahul Sharma" /></Field>
+          <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={S.inp()} placeholder="partner@example.com" /></Field>
+          <Field label="Shop # / Flat #" req><input value={shopOrFlat} onChange={e => setShopOrFlat(e.target.value)} style={S.inp()} placeholder="Shop 12 / Flat 302" /></Field>
+          <Field label="Building name"><input value={buildingName} onChange={e => setBuildingName(e.target.value)} style={S.inp()} placeholder="Rose Plaza" /></Field>
+          <Field label="Street name" req><input value={streetName} onChange={e => setStreetName(e.target.value)} style={S.inp()} placeholder="Wakad Main Road" /></Field>
+          <Field label="Village / locality"><input value={village} onChange={e => setVillage(e.target.value)} style={S.inp()} placeholder="Wakad" /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Field label="City" req><input value={city} onChange={e => setCity(e.target.value)} style={S.inp()} placeholder="Pune" /></Field>
+            <Field label="PIN code" req><input maxLength={6} value={pincode} onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={S.inp()} placeholder="411057" /></Field>
+          </div>
+          <Field label="State" req>
+            <select value={stateName} onChange={e => setStateName(e.target.value)} style={S.inp()}>
+              {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Country" note="India default. Other countries only if real GPS shows you outside India (no VPN).">
+            <select value={countryCode} onChange={async e => {
+              const code = e.target.value;
+              setCountryCode(code);
+              if (code !== 'IN' && gps) {
+                try {
+                  const ip = await getIP();
+                  const check = await vendorOnboardFetch('check-gps', { lat: gps.lat, lng: gps.lng, ip, requested_country_code: code });
+                  setGpsCheck(check);
+                  if (!check.country_allowed) { setErr(check.message); setCountryCode('IN'); }
+                } catch (ex) { setErr(ex.message); }
+              }
+            }} style={S.inp()}>
+              {COUNTRY_OPTIONS.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="GPS location" req note="Required — used to match you with nearby bookings">
+            <Btn v="outline" full onClick={captureGps} disabled={loading}>{gps ? `✓ GPS: ${gps.lat?.toFixed(4)}, ${gps.lng?.toFixed(4)}` : loading ? 'Getting GPS…' : '📍 Capture GPS location'}</Btn>
+            {gpsCheck?.vpn_suspected && <div style={{ color: C.red, fontSize: 11, marginTop: 6 }}>⚠ VPN/proxy detected — disable VPN for accurate location</div>}
+          </Field>
+          <Btn full onClick={() => { if (!businessName || !contactName || !shopOrFlat || !streetName || !city || !pincode || !gps) return setErr('Complete all required fields + GPS'); setStep(3); setErr(''); }}>Continue →</Btn>
+        </>}
+
+        {step === 3 && <>
+          <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
+            Aadhaar eKYC is mandatory. Your full Aadhaar is never stored — only last 4 digits after verification via UIDAI-approved provider.
+          </div>
+          <Field label="Aadhaar number" req note="12 digits — OTP sent to Aadhaar-linked mobile">
+            <input type="tel" maxLength={14} value={aadhaar} onChange={e => setAadhaar(e.target.value.replace(/\D/g, '').slice(0, 12))} style={S.inp()} placeholder="XXXX XXXX XXXX" disabled={aadhaarOk} />
+          </Field>
+          {!aadhaarOk ? <Btn full onClick={verifyAadhaar} disabled={loading}>{loading ? <><Spin size={16} /> Verifying…</> : 'Verify Aadhaar (eKYC) →'}</Btn>
+            : <Btn full onClick={() => setStep(4)}>Continue →</Btn>}
+        </>}
+
+        {step === 4 && <>
+          <Field label="PAN card (optional)" note="Format: AAAAA9999A — validated if provided">
+            <input value={pan} onChange={e => setPan(e.target.value.toUpperCase().slice(0, 10))} style={S.inp()} placeholder="ABCDE1234F" />
+          </Field>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {pan && <Btn v="outline" onClick={verifyPan} disabled={loading}>Validate PAN</Btn>}
+            <Btn full onClick={() => { if (pan && panOk === false) return setErr('Fix PAN or leave blank'); setStep(5); setErr(''); }}>{pan ? 'Continue →' : 'Skip PAN →'}</Btn>
+          </div>
+        </>}
+
+        {step === 5 && <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Select services you can provide</div>
+          <div style={{ maxHeight: 360, overflowY: 'auto', marginBottom: 16 }}>
+            {Object.entries(
+              allSvcs.reduce((acc, s) => { (acc[s.cat] = acc[s.cat] || []).push(s); return acc; }, {})
+            ).map(([cat, svcs]) => (
+              <div key={cat} style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.acc, marginBottom: 6 }}>{cat}</div>
+                {svcs.map(s => (
+                  <label key={s.service_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.bdr}`, cursor: 'pointer', fontSize: 13 }}>
+                    <input type="checkbox" checked={!!selectedSvcs[s.service_id]} onChange={() => toggleSvc(s.service_id)} />
+                    <span>{s.name}</span>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+          <Btn full onClick={submit} disabled={loading}>{loading ? <><Spin size={16} /> Submitting…</> : 'Submit partner application →'}</Btn>
+        </>}
+
+        {step === 6 && (
+          <div style={{ ...S.card(), textAlign: 'center', padding: 32 }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Application submitted!</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>ScanV will review and activate your partner account. Once active, you'll receive booking alerts via SMS, call & WhatsApp.</div>
+          </div>
+        )}
+
+        {step > 1 && step < 6 && (
+          <button type="button" onClick={() => setStep(s => s - 1)} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 12, marginTop: 16, cursor: 'pointer', fontFamily: FF }}>← Back</button>
+        )}
+        <div style={{ marginTop: 24, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+          Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#vendor-onboard</code>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
+   VENDOR ADMIN — #vendor-admin (Activate / offboard partners)
+================================================================ */
+function VendorAdminPage() {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(VENDOR_PIN_KEY) || '');
+  const [authed, setAuthed] = useState(false);
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const load = useCallback(async (usePin) => {
+    setLoading(true); setErr('');
+    try {
+      const { vendors: data } = await vendorOnboardFetch('list', {}, usePin);
+      setVendors(data || []);
+      setAuthed(true);
+      sessionStorage.setItem(VENDOR_PIN_KEY, usePin);
+      setMsg(`Loaded ${data?.length || 0} partners`);
+    } catch (e) {
+      setErr(e.message);
+      setAuthed(false);
+    } finally { setLoading(false); }
+  }, []);
+
+  const login = () => load(pin);
+
+  const activate = async (id) => {
+    setLoading(true);
+    try {
+      await vendorOnboardFetch('activate', { vendor_id: id }, pin);
+      await load(pin);
+      setMsg('Partner activated');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const offboard = async (id) => {
+    if (!window.confirm('Offboard this partner? They will stop receiving bookings.')) return;
+    setLoading(true);
+    try {
+      await vendorOnboardFetch('offboard', { vendor_id: id }, pin);
+      await load(pin);
+      setMsg('Partner offboarded');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const shown = filter === 'all' ? vendors : vendors.filter(v => v.status === filter);
+  const statusColor = { pending: C.cyan, active: C.grn, suspended: C.red, offboarded: C.dim };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 360, width: '100%', padding: 24 }}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER ONLY</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Partner Admin</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20 }}>Activate or offboard ScanV partners. Not linked in public nav.</div>
+          <Field label="Admin PIN">
+            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" />
+          </Field>
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Loading…' : 'Unlock partner admin'}</Btn>
+          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#vendor-admin</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.red, fontWeight: 700 }}>PARTNER ADMIN</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.txt }}>ScanV Partners ({vendors.length})</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn v="outline" sm onClick={() => load(pin)} disabled={loading}>Reload</Btn>
+            <Btn v="ghost" sm onClick={() => { setAuthed(false); sessionStorage.removeItem(VENDOR_PIN_KEY); }}>Lock</Btn>
+          </div>
+        </div>
+        {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8 }}>{msg}</div>}
+        {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8 }}>{err}</div>}
+      </div>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          {['all', 'pending', 'active', 'offboarded'].map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${filter === f ? C.acc : C.bdr}`, background: filter === f ? `${C.acc}18` : C.surf, color: filter === f ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
+              {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+        {shown.map(v => (
+          <div key={v.id} style={{ ...S.card(), marginBottom: 10, padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{v.business_name}</div>
+                <div style={{ fontSize: 12, color: C.sub }}>{v.contact_name} · {v.phone}</div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{v.shop_or_flat}, {v.street_name}, {v.city} {v.pincode}, {v.state}</div>
+                <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
+                  {v.aadhaar_verified && '✓ Aadhaar '}{v.pan_verified && '✓ PAN '}{v.phone_verified && '✓ Phone '}
+                  · {(v.vendor_partner_services || []).filter(s => s.is_active).length} services
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                <Badge label={v.status} color={statusColor[v.status] || C.sub} />
+                {v.status === 'pending' && <Btn sm onClick={() => activate(v.id)} disabled={loading}>Activate</Btn>}
+                {v.status === 'active' && <Btn v="danger" sm onClick={() => offboard(v.id)} disabled={loading}>Offboard</Btn>}
+              </div>
+            </div>
+          </div>
+        ))}
+        {!shown.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
    ROOT APP
 ================================================================ */
 /* ================================================================
@@ -3708,6 +4413,24 @@ export default function App() {
       <Boundary>
         <style>{APP_CSS}</style>
         <PricingAdminPage onPricesUpdated={refreshPricing}/>
+      </Boundary>
+    );
+  }
+
+  if (isVendorOnboardRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <VendorOnboardPage/>
+      </Boundary>
+    );
+  }
+
+  if (isVendorAdminRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <VendorAdminPage/>
       </Boundary>
     );
   }

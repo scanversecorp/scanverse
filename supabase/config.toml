@@ -9,3 +9,12 @@ verify_jwt = false
 
 [functions.pricing-admin]
 verify_jwt = false
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.vendor-onboard]
+verify_jwt = false
+
+[functions.booking-dispatch]
+verify_jwt = false
