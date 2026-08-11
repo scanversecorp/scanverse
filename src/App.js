@@ -19,9 +19,8 @@ const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-const UPI_PA   = 'dcoreglobalcorp406807.rzp@rxairtel';
-const UPI_PN   = 'DCORE Global Corporation';
-const UPI_MC   = '5817';
+const UPI_PA   = 'vyapar.172928067841@hdfcbank';
+const UPI_PN   = 'Vyapar';
 const ASSIST   = '+91-9270194842';
 
 const UPI_PACKAGES = {
@@ -47,8 +46,6 @@ function buildUpiParams(amountPaise, txnRef, note) {
   sp.set('pn', UPI_PN);
   if (amountPaise) sp.set('am', (amountPaise / 100).toFixed(2));
   sp.set('cu', 'INR');
-  sp.set('mc', UPI_MC);
-  sp.set('mode', '19');
   if (note) sp.set('tn', note);
   return sp.toString();
 }
@@ -151,9 +148,6 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
       <UpiVpaCopy addToast={addToast} />
-      <div style={{ background: '#e6f4ee', border: `1.5px solid rgba(0,122,77,0.25)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 11, color: C.grn, lineHeight: 1.5 }}>
-        Using Razorpay UPI (verified on your QR). If an app still rejects payment, use <strong>Card / Net Banking via Razorpay</strong> below.
-      </div>
       <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
         {android ? '💳 Choose UPI app →' : '💳 Pay via UPI →'}
       </Btn>
