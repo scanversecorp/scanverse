@@ -178,10 +178,34 @@ function RazorpayPayButton({ onInteract }) {
     </div>
   );
 }
+async function requirePaymentVerified(txnId, onStale) {
+  const ok = await checkPaymentVerified(txnId);
+  if (!ok) onStale?.();
+  return ok;
+}
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
-  const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, amountPaise, txnId } = pay;
+  const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, setPaymentVerified, amountPaise, txnId } = pay;
+  const [confirming, setConfirming] = useState(false);
   const inApp = isInAppBrowser();
   const amountRu = amountPaise ? (amountPaise / 100).toFixed(0) : '0';
+  const handleContinue = async () => {
+    if (loading || disabled || confirming) return;
+    if (!paymentVerified) {
+      addToast?.('Payment not confirmed yet — complete payment in your UPI app', 'error');
+      return;
+    }
+    setConfirming(true);
+    try {
+      const ok = await requirePaymentVerified(txnId, () => setPaymentVerified(false));
+      if (!ok) {
+        addToast?.('Payment not found yet. Finish paying — we check automatically every few seconds.', 'error');
+        return;
+      }
+      onConfirm();
+    } finally {
+      setConfirming(false);
+    }
+  };
   return (
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
@@ -208,7 +232,7 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
       <RazorpayPayButton onInteract={() => setUpiOpened(true)} />
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
-          {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app, then tap I\'ve paid — continue'}
+          {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app — we confirm automatically (no manual “I\'ve paid” needed)'}
         </div>
       )}
       {paymentVerified && (
@@ -216,8 +240,8 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
           ✅ Payment confirmed — you can continue
         </div>
       )}
-      <Btn full onClick={onConfirm} disabled={loading || disabled || (!upiOpened && !paymentVerified)}>
-        {paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'I\'ve paid — continue →' : 'Pay via UPI or Razorpay first'}
+      <Btn full onClick={handleContinue} disabled={loading || disabled || confirming || !paymentVerified}>
+        {confirming ? <><Spin size={16} /> Verifying payment…</> : paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'Waiting for payment confirmation…' : 'Pay via UPI or Razorpay first'}
       </Btn>
       {showUpiPicker && (
         <UpiPickerModal onPick={launchUpiDirect} onClose={() => setShowUpiPicker(false)} />
@@ -1991,19 +2015,34 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setLoading(false);
   };
 
-  const confirmPayment = (method) => {
-    if (!browsePay.upiOpened && !browsePay.paymentVerified) { addToast?.('Pay via UPI first','error'); return; }
+  const confirmPayment = async (method) => {
+    if (!browsePay.paymentVerified) {
+      addToast?.('Payment not confirmed yet — complete payment first', 'error');
+      return;
+    }
+    const ok = await requirePaymentVerified(txnId, () => browsePay.setPaymentVerified(false));
+    if (!ok) {
+      addToast?.('Payment not verified. Finish paying — we check automatically.', 'error');
+      return;
+    }
     setPaymentMethod(method);
     setScreen('schedule');
-    addToast?.('Payment confirmed — pick date & time','success');
+    addToast?.('Payment confirmed — pick date & time', 'success');
   };
 
   const createBooking = async () => {
     if (!bookingDetail?.date) return setErr('Select a date');
     if (!userId||!activeSvc||!txnId) return setErr('Session expired — start again');
-    if (!paymentMethod) return setErr('Complete payment first');
+    if (!paymentMethod || !browsePay.paymentVerified) return setErr('Complete payment first');
     setLoading(true); setErr('');
     try {
+      const paid = await checkPaymentVerified(txnId);
+      if (!paid) {
+        browsePay.setPaymentVerified(false);
+        setPaymentMethod(null);
+        setScreen('payment');
+        return setErr('Payment not verified. Complete payment before booking.');
+      }
       const svc = activeSvc;
       const price = svc.price||50000;
       const fee   = Math.round(price*FEE_PCT);
@@ -2196,7 +2235,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pick date & time</div>
         </div>
         <div style={{padding:'14px 16px 120px'}}>
-          <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
+          {browsePay.paymentVerified && (
+            <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
+          )}
           <Field label="Date" req><input type="date" defaultValue={bookingDetail?.date||''} onChange={e=>setBookingDetail(b=>({...b,date:e.target.value}))} style={S.inp()}/></Field>
           <Field label="Time"><input type="time" defaultValue={bookingDetail?.time||'10:00'} onChange={e=>setBookingDetail(b=>({...b,time:e.target.value}))} style={S.inp()}/></Field>
           <Field label="Service location" note="Auto-filled from your GPS">
@@ -3205,8 +3246,63 @@ function BookScreen() {
     finally{setLoading(false);}
   };
 
-  const create=async()=>{if(!date)return addToast('Select a date','error');if(!txnId)return addToast('Complete payment first','error');if(!payMethod)return addToast('Complete UPI payment first','error');setLoading(true);try{const mob='+91'+bookPhone.replace(/\D/g,'');const fullName=bookFirstName+' '+bookLastName;const{data,error}=await sb().from('bookings').insert({customer_id:user.id,service_name:svc.name,customer_name:fullName.trim()||user.name,customer_email:user.email||'',date,time,notes,location_text:loc,price,platform_fee:fee,gst_amt:gst,total,status:'confirmed',txn_id:txnId,paid_at:new Date().toISOString()}).select().single();if(error)throw error;await sb().from('service_requests').insert({customer_id:user.id,service_name:svc.name,service_type:svc.cat,preferred_date:date,preferred_time:time,notes,location_text:loc,price,platform_fee:fee,gst_amount:gst,total,status:'new',txn_id:txnId,added_by:user.id});await sb().from('payments').insert({booking_id:data.id,user_id:user.id,amount:total,method:payMethod||'UPI',status:'success',txn_id:txnId,gateway:'Razorpay'}).catch(()=>{});invokeBookingDispatch({bookingId:data.id,serviceId:svc.id||svc.parent||'',serviceName:svc.name,lat:user.last_lat||null,lng:user.last_lng||null,location:loc,date,time});setBooking(data);addToast('Booking confirmed! Track your partner live 📍','success');goToTrack(setTrackBookingId,setScreen,data.id);}catch(e){addToast(e.message||'Booking failed','error');}finally{setLoading(false);}};
-  const confirmPaid=method=>{if(!bookPay.upiOpened&&!bookPay.paymentVerified){addToast('Pay via UPI first','error');return;}setPayMethod(method);setStep(4);addToast('Payment confirmed — pick date & time','success');};
+  const create = async () => {
+    if (!date) return addToast('Select a date', 'error');
+    if (!txnId) return addToast('Complete payment first', 'error');
+    if (!payMethod || !bookPay.paymentVerified) return addToast('Complete UPI payment first', 'error');
+    setLoading(true);
+    try {
+      const paid = await checkPaymentVerified(txnId);
+      if (!paid) {
+        bookPay.setPaymentVerified(false);
+        setPayMethod(null);
+        setStep(3);
+        return addToast('Payment not verified. Complete payment before booking.', 'error');
+      }
+      const mob = '+91' + bookPhone.replace(/\D/g, '');
+      const fullName = bookFirstName + ' ' + bookLastName;
+      const { data, error } = await sb().from('bookings').insert({
+        customer_id: user.id, service_name: svc.name,
+        customer_name: fullName.trim() || user.name, customer_email: user.email || '',
+        date, time, notes, location_text: loc,
+        price, platform_fee: fee, gst_amt: gst, total,
+        status: 'confirmed', txn_id: txnId, paid_at: new Date().toISOString(),
+      }).select().single();
+      if (error) throw error;
+      await sb().from('service_requests').insert({
+        customer_id: user.id, service_name: svc.name, service_type: svc.cat,
+        preferred_date: date, preferred_time: time, notes, location_text: loc,
+        price, platform_fee: fee, gst_amount: gst, total,
+        status: 'new', txn_id: txnId, added_by: user.id,
+      });
+      await sb().from('payments').insert({
+        booking_id: data.id, user_id: user.id, amount: total,
+        method: payMethod || 'UPI', status: 'success', txn_id: txnId, gateway: 'Razorpay',
+      }).catch(() => {});
+      invokeBookingDispatch({
+        bookingId: data.id, serviceId: svc.id || svc.parent || '', serviceName: svc.name,
+        lat: user.last_lat || null, lng: user.last_lng || null, location: loc, date, time,
+      });
+      setBooking(data);
+      addToast('Booking confirmed! Track your partner live 📍', 'success');
+      goToTrack(setTrackBookingId, setScreen, data.id);
+    } catch (e) { addToast(e.message || 'Booking failed', 'error'); }
+    finally { setLoading(false); }
+  };
+  const confirmPaid = async (method) => {
+    if (!bookPay.paymentVerified) {
+      addToast('Payment not confirmed yet — complete payment first', 'error');
+      return;
+    }
+    const ok = await requirePaymentVerified(txnId, () => bookPay.setPaymentVerified(false));
+    if (!ok) {
+      addToast('Payment not verified. Finish paying — we check automatically.', 'error');
+      return;
+    }
+    setPayMethod(method);
+    setStep(4);
+    addToast('Payment confirmed — pick date & time', 'success');
+  };
   const goFromService=()=>{
     if(skipVerify){ setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); }
     else setStep(2);
@@ -3288,7 +3384,9 @@ function BookScreen() {
 
         {step===4&&<>
           <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 4 · Pick date & time</div>
-          <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
+          {bookPay.paymentVerified && (
+            <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
+          )}
           <Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field>
           <Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field>
           <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
