@@ -933,6 +933,12 @@ const REPORT_HASH = 'report';
 const TRACK_TICKET_HASH = 'track-ticket';
 const ADMIN_HUB_HASH = 'admin';
 const ADMIN_HUB_ALIASES = new Set(['admin', 'admin-hub']);
+const EXEC_DASHBOARD_HASH = 'exec';
+const EXEC_DASHBOARD_ALIASES = new Set(['exec', 'exec-dashboard']);
+
+function isExecDashboardRoute() {
+  return EXEC_DASHBOARD_ALIASES.has(hashBase());
+}
 
 function isCustomerSupportRoute() {
   return window.location.hash.replace(/^#/, '') === CUSTOMER_SUPPORT_HASH;
@@ -5827,6 +5833,381 @@ function CustomerSupportPage() {
 }
 
 /* ================================================================
+   EXECUTIVE DASHBOARD — #exec / #exec-dashboard (owner PIN only)
+================================================================ */
+function ExecSection({ title, sub, children, action }) {
+  return (
+    <div style={{ ...S.card(), padding: 16, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>{title}</div>
+          {sub && <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{sub}</div>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ExecBarChart({ items, height = 160 }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height, paddingTop: 8 }}>
+      {items.map((item) => (
+        <div key={item.label} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>{item.value}</div>
+          <div style={{ width: '100%', maxWidth: 48, background: C.deep, borderRadius: 6, height: '100%', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: `${Math.max(4, (item.value / max) * 100)}%`, background: item.color || C.acc, borderRadius: 6, transition: 'height .3s' }} />
+          </div>
+          <div style={{ fontSize: 9, color: C.dim, textAlign: 'center', lineHeight: 1.2, wordBreak: 'break-word' }}>{item.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExecLineChart({ points, height = 140, color = C.acc }) {
+  if (!points?.length) return <div style={{ color: C.dim, fontSize: 12, padding: 20, textAlign: 'center' }}>No trend data</div>;
+  const w = 320;
+  const h = height;
+  const pad = { t: 8, r: 8, b: 24, l: 8 };
+  const maxY = Math.max(1, ...points.map((p) => p.value));
+  const stepX = (w - pad.l - pad.r) / Math.max(1, points.length - 1);
+  const coords = points.map((p, i) => {
+    const x = pad.l + i * stepX;
+    const y = pad.t + (h - pad.t - pad.b) * (1 - p.value / maxY);
+    return { x, y, ...p };
+  });
+  const line = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const area = `${line} L${coords[coords.length - 1].x},${h - pad.b} L${coords[0].x},${h - pad.b} Z`;
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', maxWidth: w, height: 'auto', display: 'block' }}>
+        <defs>
+          <linearGradient id="execLineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#execLineGrad)" />
+        <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {coords.map((c) => (
+          <circle key={c.date} cx={c.x} cy={c.y} r="3.5" fill={color} />
+        ))}
+        {coords.filter((_, i) => i % 2 === 0 || i === coords.length - 1).map((c) => (
+          <text key={`lbl-${c.date}`} x={c.x} y={h - 4} textAnchor="middle" fontSize="8" fill={C.dim}>
+            {c.date.slice(5)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function ExecDonutChart({ segments, size = 120 }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
+  let angle = -90;
+  const r = 40;
+  const cx = 50;
+  const cy = 50;
+  const colors = [C.acc, C.cyan, C.grn, C.gold, C.vio, C.red];
+  const arcs = segments.filter((s) => s.value > 0).map((seg, i) => {
+    const sweep = (seg.value / total) * 360;
+    const start = angle;
+    angle += sweep;
+    const end = angle;
+    const large = sweep > 180 ? 1 : 0;
+    const rad = (deg) => (deg * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(rad(start));
+    const y1 = cy + r * Math.sin(rad(start));
+    const x2 = cx + r * Math.cos(rad(end));
+    const y2 = cy + r * Math.sin(rad(end));
+    const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+    return { d, color: seg.color || colors[i % colors.length], label: seg.label, value: seg.value };
+  });
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <svg viewBox="0 0 100 100" style={{ width: size, height: size, flexShrink: 0 }}>
+        {arcs.map((a) => <path key={a.label} d={a.d} fill={a.color} opacity={0.92} />)}
+        <circle cx={cx} cy={cy} r={22} fill={C.card} />
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill={C.txt}>{total}</text>
+      </svg>
+      <div style={{ flex: 1, minWidth: 120 }}>
+        {arcs.map((a) => (
+          <div key={a.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: a.color, flexShrink: 0 }} />
+            <span style={{ color: C.sub, flex: 1 }}>{a.label}</span>
+            <span style={{ color: C.txt, fontWeight: 700 }}>{a.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExecDashboardPage() {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
+  const [authed, setAuthed] = useState(adminAuthOk());
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [data, setData] = useState(null);
+
+  const usePin = pin || getAdminAuth()?.pin;
+
+  const login = async () => {
+    if (!pin) { setErr('Enter owner PIN'); return; }
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('exec_stats', {}, pin);
+      sessionStorage.setItem(ADMIN_PIN_KEY, pin);
+      setAdminAuth(pin);
+      setAuthed(true);
+    } catch (e) {
+      setErr(e.message?.includes('Executive') || e.message?.includes('403')
+        ? 'Executive dashboard requires ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN'
+        : 'Incorrect PIN — set ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN in Supabase secrets');
+      setAuthed(false);
+      sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    } finally { setLoading(false); }
+  };
+
+  const load = useCallback(async () => {
+    if (!usePin) return;
+    setLoading(true); setErr('');
+    try {
+      const stats = await adminHubFetch('exec_stats', {}, usePin);
+      setData(stats);
+    } catch (e) {
+      setErr(e.message || 'Failed to load dashboard');
+    } finally { setLoading(false); }
+  }, [usePin]);
+
+  useEffect(() => {
+    if (authed) load();
+  }, [authed, load]);
+
+  const lock = () => {
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    sessionStorage.removeItem(ADMIN_PIN_KEY);
+    setAuthed(false);
+    setData(null);
+  };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 24 }}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>BUSINESS OWNER · CONFIDENTIAL</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Executive Dashboard</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+            Read-only metrics for revenue, payments, users, bookings, support, and platform health. Requires owner PIN.
+          </div>
+          <Field label="Owner PIN (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN)">
+            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+          </Field>
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock dashboard'}</Btn>
+          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#exec</code>
+          </div>
+          <CopyrightLine style={{ marginTop: 12 }} />
+        </div>
+      </div>
+    );
+  }
+
+  const k = data?.kpis || {};
+  const payTrend = (data?.payments?.daily_trend || []).map((d) => ({ date: d.date, value: d.success }));
+  const signupTrend = (data?.users?.signup_trend || []).map((d) => ({ date: d.date, value: d.count }));
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 2px 12px rgba(18,18,18,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1200, margin: '0 auto' }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 1 }}>EXECUTIVE DASHBOARD</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>ScanV Business Owner</div>
+            {data?.generated_at && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>Updated {fmtDt(data.generated_at)}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Btn v="outline" sm onClick={load} disabled={loading}>{loading ? 'Refreshing…' : '↻ Refresh'}</Btn>
+            <AdminDeepLinkBtn hash="admin" label="Admin hub →" />
+            <Btn v="ghost" sm onClick={lock}>Lock</Btn>
+          </div>
+        </div>
+        {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8, maxWidth: 1200, margin: '8px auto 0' }}>{err}</div>}
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 16, width: '100%' }}>
+        {!data && loading ? (
+          <div style={{ textAlign: 'center', padding: 48 }}><Spin size={36} /></div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+              <AdminStatCard label="Revenue (30d)" value={data ? `₹${fmtRs(k.revenue_30d_paise)}` : '—'} color={C.grn} sub={data ? `Today ₹${fmtRs(k.revenue_today_paise)} · 7d ₹${fmtRs(k.revenue_7d_paise)}` : ''} />
+              <AdminStatCard label="Payments success" value={k.payments_success ?? '—'} color={C.grn} sub={data ? `Failed ${k.payments_failed} · Pending ${k.payments_pending}` : ''} />
+              <AdminStatCard label="Active users (30d)" value={k.active_users_30d ?? '—'} color={C.cyan} sub={data ? `${k.profiles_total} profiles · ${k.mobile_verified} verified` : ''} />
+              <AdminStatCard label="Open tickets" value={k.open_tickets ?? '—'} color={C.gold} sub={data?.support?.open_queue != null ? `Unassigned queue ${data.support.open_queue}` : ''} />
+              <AdminStatCard label="Pending dispatch" value={k.pending_dispatch ?? '—'} color={C.gold} sub={data ? `Bookings today ${k.bookings_today}` : ''} />
+              <AdminStatCard label="Avg transaction" value={data ? `₹${fmtRs(k.avg_txn_paise)}` : '—'} />
+              <AdminStatCard label="Signups (7d)" value={k.signups_7d ?? '—'} sub={data ? `Today ${k.signups_today}` : ''} />
+              <AdminStatCard label="Load index (24h)" value={k.activity_index_24h ?? '—'} color={C.vio} sub="Bookings + tickets + payments" />
+            </div>
+
+            <ExecSection title="Payments & Transactions" sub="Success vs failed · 14-day trend · method mix">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Payment outcomes</div>
+                  <ExecBarChart items={[
+                    { label: 'Success', value: data?.payments?.success || 0, color: C.grn },
+                    { label: 'Failed', value: data?.payments?.failed || 0, color: C.red },
+                    { label: 'Pending', value: data?.payments?.pending || 0, color: C.gold },
+                  ]} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Method breakdown</div>
+                  <ExecBarChart items={[
+                    { label: 'UPI', value: data?.payments?.methods?.upi || 0, color: C.cyan },
+                    { label: 'Razorpay', value: data?.payments?.methods?.razorpay || 0, color: C.acc },
+                    { label: 'Other', value: data?.payments?.methods?.other || 0, color: C.dim },
+                  ]} height={120} />
+                </div>
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Daily successful payments (14 days)</div>
+                <ExecLineChart points={payTrend} color={C.grn} />
+              </div>
+            </ExecSection>
+
+            <ExecSection title="Bookings & Dispatch" sub="Status distribution · dispatch pipeline">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8 }}>Bookings by status</div>
+                  <ExecDonutChart segments={Object.entries(data?.bookings?.by_status || {}).map(([label, value], i) => ({
+                    label, value, color: [C.acc, C.cyan, C.grn, C.gold, C.red][i % 5],
+                  }))} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8 }}>Dispatch pipeline</div>
+                  <ExecBarChart items={[
+                    { label: 'Pending', value: data?.dispatch?.pending || 0, color: C.gold },
+                    { label: 'Dispatching', value: data?.dispatch?.by_status?.dispatching || 0, color: C.cyan },
+                    { label: 'Assigned', value: data?.dispatch?.assigned || 0, color: C.grn },
+                    { label: 'Exhausted', value: data?.dispatch?.exhausted || 0, color: C.red },
+                  ]} height={120} />
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 10 }}>
+                    Bookings this week: <strong style={{ color: C.txt }}>{data?.bookings?.week ?? '—'}</strong> · Total: {data?.bookings?.total ?? '—'}
+                  </div>
+                </div>
+              </div>
+            </ExecSection>
+
+            <ExecSection title="Support & Customer Agents" sub="Tickets by category · agent workload · resolution time">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8 }}>Tickets by category</div>
+                  <ExecBarChart items={Object.entries(data?.support?.by_category || {}).map(([label, value]) => ({
+                    label, value, color: label === 'payment' ? C.acc : label === 'booking' ? C.cyan : label === 'service' ? C.grn : C.dim,
+                  }))} height={130} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8 }}>Tickets by status</div>
+                  <ExecBarChart items={Object.entries(data?.support?.by_status || {}).slice(0, 6).map(([label, value]) => ({
+                    label: label.replace('_', ' '), value, color: label === 'resolved' || label === 'closed' ? C.grn : C.gold,
+                  }))} height={130} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>
+                Created: today {data?.support?.created_today ?? 0} · 7d {data?.support?.created_7d ?? 0} · 30d {data?.support?.created_30d ?? 0}
+                {data?.support?.avg_resolution_hours != null && ` · Avg resolution ${data.support.avg_resolution_hours}h`}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: BDR, textAlign: 'left' }}>
+                      {['Agent', 'Role', 'Open', 'Total', 'Status'].map(h => (
+                        <th key={h} style={{ padding: '8px 6px', color: C.sub, fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data?.support?.agent_workload || []).length ? data.support.agent_workload.map(a => (
+                      <tr key={a.agent_id} style={{ borderBottom: `1px solid ${C.bdr}` }}>
+                        <td style={{ padding: '8px 6px', color: C.txt, fontWeight: 600 }}>{a.name}</td>
+                        <td style={{ padding: '8px 6px', color: C.dim }}>{a.role}</td>
+                        <td style={{ padding: '8px 6px', color: C.gold, fontWeight: 700 }}>{a.open}</td>
+                        <td style={{ padding: '8px 6px', color: C.sub }}>{a.total}</td>
+                        <td style={{ padding: '8px 6px' }}><Badge label={a.active ? 'Active' : 'Inactive'} color={a.active ? C.grn : C.dim} /></td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5} style={{ padding: 16, color: C.dim, textAlign: 'center' }}>No assigned tickets yet</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </ExecSection>
+
+            <ExecSection title="Users & Growth" sub="Profile signups · verification">
+              <ExecLineChart points={signupTrend} color={C.cyan} />
+              <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap', fontSize: 12, color: C.sub }}>
+                <span>Total profiles: <strong style={{ color: C.txt }}>{data?.users?.total ?? '—'}</strong></span>
+                <span>Mobile verified: <strong style={{ color: C.grn }}>{data?.users?.mobile_verified ?? '—'}</strong></span>
+                <span>Active (booked 30d): <strong style={{ color: C.cyan }}>{data?.users?.active_30d ?? '—'}</strong></span>
+              </div>
+            </ExecSection>
+
+            <ExecSection title="Admin Access & Restrictions" sub="PIN-protected modules · agent roles">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+                <AdminStatCard label="Agents active" value={data?.admin?.agents_active ?? '—'} color={C.grn} />
+                <AdminStatCard label="Agents inactive" value={data?.admin?.agents_inactive ?? '—'} />
+                <AdminStatCard label="Support admins" value={data?.admin?.agents_by_role?.support_admin ?? '—'} color={C.acc} />
+                <AdminStatCard label="Ticket updates (7d)" value={data?.admin?.activity_updates_7d ?? '—'} sub="Admin activity proxy" />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8 }}>PIN-protected modules</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(data?.admin?.pin_modules || []).map(m => (
+                  <Badge key={m} label={m} color={C.acc} />
+                ))}
+              </div>
+            </ExecSection>
+
+            <ExecSection title="Infra, DB & App Load" sub="Table counts · platform links · system health">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 16 }}>
+                {Object.entries(data?.infra?.table_counts || {}).map(([table, count]) => (
+                  <div key={table} style={{ background: C.deep, borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: 9, color: C.dim, textTransform: 'uppercase', fontWeight: 700 }}>{table}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginTop: 4 }}>{count}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
+                <AdminStatCard label="App version" value={data?.infra?.app_version ?? '—'} sub="ScanV production" />
+                <AdminStatCard label="Edge functions" value={data?.infra?.edge_functions ?? '—'} />
+                <AdminStatCard label="Migrations" value={data?.infra?.migrations ?? '—'} sub={data?.infra?.latest_migration} />
+                <AdminStatCard label="24h activity index" value={data?.infra?.load_index_24h ?? '—'} color={C.vio} />
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {[
+                  ['Supabase Dashboard', data?.infra?.links?.supabase],
+                  ['Edge Functions', data?.infra?.links?.edge_functions],
+                  ['Vercel Deployments', data?.infra?.links?.vercel],
+                ].filter(([, url]) => url).map(([title, url]) => (
+                  <a key={title} href={url} target="_blank" rel="noreferrer" style={{ ...S.card(), padding: 12, textDecoration: 'none', display: 'block' }}>
+                    <div style={{ fontWeight: 700, color: C.acc, fontSize: 13 }}>{title} ↗</div>
+                  </a>
+                ))}
+              </div>
+            </ExecSection>
+          </>
+        )}
+      </div>
+      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
+    </div>
+  );
+}
+
+/* ================================================================
    ADMIN CONTROL CENTER — #admin / #admin-hub
 ================================================================ */
 const ADMIN_TABS = [
@@ -6171,9 +6552,10 @@ function AdminControlCenter({ onPricesUpdated }) {
               <AdminStatCard label="Open tickets" value={stats?.open_tickets ?? '—'} color={C.gold} sub={stats?.avg_ticket_resolution_hours != null ? `Avg resolve ${stats.avg_ticket_resolution_hours}h` : ''} />
               <AdminStatCard label="Profiles" value={stats?.profiles_count ?? '—'} />
             </div>
-            <div style={{ ...S.card(), padding: 16 }}>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Quick links</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <AdminDeepLinkBtn hash="exec" label="Executive Dashboard →" />
                 <AdminDeepLinkBtn hash="pricing-admin" label="Pricing admin →" />
                 <AdminDeepLinkBtn hash="customer-support" label="Support desk →" />
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
@@ -6579,6 +6961,15 @@ export default function App() {
       <Boundary>
         <style>{APP_CSS}</style>
         <AdminControlCenter onPricesUpdated={refreshPricing}/>
+      </Boundary>
+    );
+  }
+
+  if (isExecDashboardRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <ExecDashboardPage/>
       </Boundary>
     );
   }
