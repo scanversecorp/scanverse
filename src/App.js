@@ -953,6 +953,14 @@ function FooterLegalLinks({ current, small }) {
   );
 }
 
+function CopyrightLine({ style }) {
+  return (
+    <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.4, ...style }}>
+      © All rights reserved. DCore Global Corporation
+    </div>
+  );
+}
+
 const ADMIN_PIN_KEY = 'scanv_admin_pin';
 const ADMIN_AUTH_KEY = 'scanv_admin_auth';
 const ADMIN_FN = `${SB_URL}/functions/v1/admin-hub`;
@@ -2076,7 +2084,7 @@ function QRLandingPage({ onContinue }) {
   },[]);
 
   return (
-    <div style={S.center}>
+    <div style={{...S.center, flexDirection: 'column', minHeight: '100vh', position: 'relative', padding: '16px 16px 48px'}}>
       <div style={{fontSize:34,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif"}}>
         <span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span>
       </div>
@@ -2088,6 +2096,7 @@ function QRLandingPage({ onContinue }) {
       <div style={{color:C.dim,fontSize:11,maxWidth:260,textAlign:'center'}}>
         Collecting your device & location details to show nearby services
       </div>
+      <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
     </div>
   );
 }
@@ -2352,6 +2361,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:72}}>
       {content}
       {sticky}
+      <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
       <GuestBottomNav screen={screen} setScreen={setScreen} addToast={addToast}/>
     </div>
   );
@@ -2987,9 +2997,7 @@ function RegistrationFlow({ onComplete, prefill }) {
           {err&&<div style={S.err}>{err}</div>}
           {content}
         </div>
-        <div style={{textAlign:'center',marginTop:12,fontSize:10,color:C.dim}}>
-          © 2026 ScanV · DCORE Global Corporation · DPDP Act 2023
-        </div>
+        <CopyrightLine style={{ marginTop: 12 }} />
       </div>
     </div>
   );
@@ -4345,6 +4353,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           <div style={{ marginTop:16, fontSize:11, color:C.dim, textAlign:'center' }}>
             Bookmark: <code style={{ color:C.acc }}>{APP_URL}/#pricing-admin</code>
           </div>
+          <CopyrightLine style={{ marginTop: 12 }} />
         </div>
       </div>
     );
@@ -4353,7 +4362,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const shown = filter === 'all' ? rows : rows.filter(r => r.card === filter);
 
   return (
-    <div style={{ minHeight: embedded ? 'auto' : '100vh', background:C.bg, fontFamily:FF }}>
+    <div style={{ minHeight: embedded ? 'auto' : '100vh', background:C.bg, fontFamily:FF, display: embedded ? undefined : 'flex', flexDirection: embedded ? undefined : 'column' }}>
       {!embedded && (
       <div style={{ background:C.surf, borderBottom:BDR, padding:'12px 16px', position:'sticky', top:0, zIndex:10, boxShadow:'0 2px 12px rgba(18,18,18,0.06)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, maxWidth:1400, margin:'0 auto' }}>
@@ -4419,6 +4428,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           <strong>#</strong> is the fixed row number (1–{rows.length}) — use it when asking to change a specific row. Change <strong>New ₹</strong> to update card prices on the live app. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
         </div>
       </div>
+      {!embedded && <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />}
     </div>
   );
 }
@@ -4701,6 +4711,7 @@ function VendorOnboardPage() {
         <div style={{ marginTop: 24, fontSize: 11, color: C.dim, textAlign: 'center' }}>
           Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#vendor-onboard</code>
         </div>
+        <CopyrightLine style={{ marginTop: 12 }} />
       </div>
     </div>
   );
@@ -4887,13 +4898,13 @@ function FaqPage() {
     ['How do refunds work?', 'Refunds apply to the platform fee only, per our Refund Policy. Cancel 24+ hours before for full platform fee refund. See /refund for details.'],
     ['My payment failed but money was deducted — what now?', 'Failed payments are auto-refunded in 5–7 business days. Email payments@dcoreglobal.com with your TXN ID if not resolved.'],
     ['How do I report an issue or complaint?', 'Use Report in the footer (#report) to submit a support ticket. You receive a ticket number (TKT-…) for reference.'],
-    ['How do I check my support ticket status?', 'Go to #track-ticket, enter your ticket number and mobile. You see only status, subject, and last update — not the full agent workflow.'],
+    ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). View status pipeline, agent updates, and resolution note.'],
     ['Can I change or cancel a booking?', 'Contact support before the service time. Admins can update booking status. Cancellation refunds follow the schedule in our Refund Policy.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
     ['Who operates ScanV?', 'DCORE Global Corporation, Pune. Marketplace connecting customers with independent service partners. Call +91-9270194842 for help.'],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
     ['How are partners assigned?', 'After payment, our dispatch system notifies nearby verified partners. First to accept is assigned to your booking.'],
-    ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Check basic status at #track-ticket.'],
+    ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Track progress at #track-ticket.'],
   ];
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
@@ -4923,6 +4934,7 @@ function FaqPage() {
         <div style={{ borderTop: `1px solid ${C.bdr}`, paddingTop: 20, marginTop: 20, display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           <FooterLegalLinks current="faq" />
         </div>
+        <CopyrightLine style={{ marginTop: 16 }} />
       </div>
     </div>
   );
@@ -4972,6 +4984,7 @@ function ReportPage() {
           <div style={{ marginTop: 14 }}>
             <a href="#" onClick={e => { e.preventDefault(); window.location.hash = ''; window.history.back(); }} style={{ color: C.dim, fontSize: 12 }}>← Back to home</a>
           </div>
+          <CopyrightLine style={{ marginTop: 16 }} />
         </div>
       </div>
     );
@@ -5003,6 +5016,7 @@ function ReportPage() {
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <a href="#track-ticket" style={{ color: C.dim, fontSize: 11 }}>Already have a ticket? Check status →</a>
         </div>
+        <CopyrightLine style={{ marginTop: 16 }} />
       </div>
     </div>
   );
@@ -5013,81 +5027,85 @@ function TrackTicketPage() {
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
-  const [ticket, setTicket] = useState(null);
+  const [data, setData] = useState(null);
 
   const track = async () => {
     if (!ticketNum.trim() || !mobile.trim()) { setErr('Enter ticket number and mobile'); return; }
-    setLoading(true); setErr(''); setTicket(null);
+    setLoading(true); setErr(''); setData(null);
     try {
       const res = await supportTicketsFetch('track', {
         ticket_number: ticketNum.trim().toUpperCase(),
         mobile: mobile.trim(),
       });
-      setTicket(res.ticket);
+      setData(res);
       window.location.hash = `track-ticket?id=${encodeURIComponent(ticketNum.trim().toUpperCase())}`;
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
+  const t = data?.ticket;
+
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
-        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Ticket status</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Track support ticket</div>
       </div>
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
-        {!ticket ? (
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '20px 16px 40px' }}>
+        {!t ? (
           <>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>
-              Enter your ticket number and mobile to see a basic status update. Full case details are handled by our support team.
+              Enter your ticket number and mobile (full number or last 4 digits) to view status, pipeline, and updates.
             </div>
             <Field label="Ticket number" req><input value={ticketNum} onChange={e => setTicketNum(e.target.value)} style={S.inp()} placeholder="TKT-1786479760941" /></Field>
             <Field label="Mobile" req><input value={mobile} onChange={e => setMobile(e.target.value)} style={S.inp()} placeholder="10-digit or last 4 digits" inputMode="tel" /></Field>
             {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-            <Btn full onClick={track} disabled={loading}>{loading ? 'Looking up…' : 'Check status'}</Btn>
+            <Btn full onClick={track} disabled={loading}>{loading ? 'Looking up…' : 'View ticket'}</Btn>
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <a href="#report" style={{ color: C.dim, fontSize: 11 }}>Need to report a new issue? →</a>
             </div>
           </>
         ) : (
           <>
-            <div style={{ ...S.card(), padding: 20, marginBottom: 14, textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>YOUR TICKET</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.acc, fontFamily: 'monospace', marginBottom: 14 }}>{ticket.ticket_number}</div>
-              <Badge label={TICKET_STATUS_LABEL[ticket.status] || ticket.status} color={TICKET_STATUS_COLOR[ticket.status] || C.sub} />
+            <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, letterSpacing: 1 }}>TICKET</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: C.acc, fontFamily: 'monospace' }}>{t.ticket_number}</div>
+                </div>
+                <Badge label={TICKET_STATUS_LABEL[t.status] || t.status} color={TICKET_STATUS_COLOR[t.status] || C.sub} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, marginBottom: 6 }}>{t.subject}</div>
+              {t.description && <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>{t.description}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11, color: C.dim }}>
+                <div>Category: <span style={{ color: C.sub }}>{t.category}</span></div>
+                <div>Priority: <span style={{ color: C.sub }}>{t.priority}</span></div>
+                <div>Created: <span style={{ color: C.sub }}>{fmtDt(t.created_at)}</span></div>
+                <div>Updated: <span style={{ color: C.sub }}>{fmtDt(t.updated_at)}</span></div>
+                {t.assigned_agent_name && <div>Agent: <span style={{ color: C.sub }}>{t.assigned_agent_name}</span></div>}
+                {t.resolved_at && <div>Resolved: <span style={{ color: C.grn }}>{fmtDt(t.resolved_at)}</span></div>}
+              </div>
             </div>
             <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>Subject</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, marginBottom: 14 }}>{ticket.subject}</div>
-              <div style={{ display: 'grid', gap: 8, fontSize: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ color: C.dim }}>Status</span>
-                  <span style={{ color: C.txt, fontWeight: 600 }}>{TICKET_STATUS_LABEL[ticket.status] || ticket.status}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ color: C.dim }}>Last update</span>
-                  <span style={{ color: C.txt, fontWeight: 600 }}>{fmtDt(ticket.updated_at)}</span>
-                </div>
-                {ticket.created_at && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ color: C.dim }}>Submitted</span>
-                    <span style={{ color: C.sub }}>{fmtDt(ticket.created_at)}</span>
-                  </div>
-                )}
-              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 12 }}>Status pipeline</div>
+              <TicketStatusPipeline status={t.status} />
             </div>
-            {ticket.closure_note && (
+            {t.closure_note && (
               <div style={{ ...S.card(), padding: 16, marginBottom: 14, borderLeft: `4px solid ${C.grn}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Resolution</div>
-                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{ticket.closure_note}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Resolution note</div>
+                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{t.closure_note}</div>
               </div>
             )}
-            <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.6, marginBottom: 14, textAlign: 'center' }}>
-              For urgent help, call {ASSIST}. Our team manages the full case workflow internally.
+            <div style={{ ...S.card(), padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 12 }}>Activity timeline</div>
+              <TicketActivityFeed comments={data.comments} />
             </div>
-            <Btn v="outline" sm full onClick={() => { setTicket(null); setErr(''); }}>← Check another ticket</Btn>
+            <div style={{ marginTop: 14 }}>
+              <Btn v="outline" sm onClick={() => { setData(null); setErr(''); }}>← Look up another ticket</Btn>
+            </div>
           </>
         )}
+        <CopyrightLine style={{ marginTop: 20 }} />
       </div>
     </div>
   );
@@ -5513,13 +5531,14 @@ function CustomerSupportPage() {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#customer-support</code>
           </div>
+          <CopyrightLine style={{ marginTop: 12 }} />
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1100, margin: '0 auto' }}>
           <div>
@@ -5685,6 +5704,7 @@ function CustomerSupportPage() {
           </>
         )}
       </div>
+      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>
   );
 }
@@ -5990,13 +6010,14 @@ function AdminControlCenter({ onPricesUpdated }) {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#admin</code>
           </div>
+          <CopyrightLine style={{ marginTop: 12 }} />
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 2px 12px rgba(18,18,18,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1200, margin: '0 auto' }}>
           <div>
@@ -6155,6 +6176,7 @@ npx supabase db push`}</pre>
           </div>
         )}
       </div>
+      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>
   );
 }
@@ -6285,9 +6307,7 @@ function LegalPage({page}) {
           <FooterLegalLinks current={page}/>
           <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global ↗</a>
         </div>
-        <div style={{textAlign:'center',marginTop:16,color:C.dim,fontSize:11}}>
-          © 2026 DCORE Global Corporation · ScanV · Pune, India · DPDP Act 2023 Compliant
-        </div>
+        <CopyrightLine style={{ marginTop: 16 }} />
       </div>
     </div>
   );
@@ -6483,7 +6503,11 @@ export default function App() {
 
   if (state==='boot') return (
     <><style>{APP_CSS}</style>
-    <div style={S.center}><div style={{fontSize:32,fontWeight:800,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div><Spin size={32}/></div></>
+    <div style={{...S.center, flexDirection: 'column', minHeight: '100vh', position: 'relative', padding: '16px 16px 48px'}}>
+      <div style={{fontSize:32,fontWeight:800,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
+      <Spin size={32}/>
+      <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
+    </div></>
   );
 
   // QR landing page -- capture data then proceed to register
@@ -6534,6 +6558,7 @@ export default function App() {
         <Toast toasts={toasts}/>
         <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.bg}}>
           <Boundary>{renderScreen()}</Boundary>
+          <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>
       </Ctx.Provider>

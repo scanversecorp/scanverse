@@ -169,17 +169,30 @@ async function trackTicket(sb: ReturnType<typeof adminSb>, body: Record<string, 
     return json({ error: "Mobile number does not match this ticket" }, 403);
   }
 
-  // Customer-facing lookup: status, subject, last update only — no agent timeline
-  const closed = ticket.status === "resolved" || ticket.status === "closed";
+  const { data: comments } = await sb
+    .from("support_ticket_comments")
+    .select("*")
+    .eq("ticket_id", ticket.id)
+    .eq("is_internal", false)
+    .order("created_at", { ascending: true });
+
+  const agentName = (ticket as { support_agents?: { name?: string } }).support_agents?.name || null;
+
   return json({
     ticket: {
       ticket_number: ticket.ticket_number,
       status: ticket.status,
       subject: ticket.subject,
+      description: ticket.description,
+      category: ticket.category,
+      priority: ticket.priority,
       updated_at: ticket.updated_at,
       created_at: ticket.created_at,
-      closure_note: closed && ticket.closure_note ? ticket.closure_note : null,
+      resolved_at: ticket.resolved_at,
+      assigned_agent_name: agentName,
+      closure_note: ticket.closure_note,
     },
+    comments: comments || [],
   });
 }
 
