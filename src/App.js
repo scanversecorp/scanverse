@@ -18,7 +18,7 @@ import {
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
-const UPI_PA   = 'dcoreglobalcorp406807.rzp@rxairtel';
+const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const ASSIST   = '+91-9270194842';
 
@@ -6392,7 +6392,7 @@ function LegalPage({page}) {
           {[
             ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks)'],
             ['How It Works','Platform fee (10%) paid online at booking via UPI. GST added to total. Tax invoice auto-generated for every booking.'],
-            ['UPI Payment','Pay to: dcoreglobalcorp406807.rzp@rxairtel · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
+            ['UPI Payment','Pay to: Vyapar.172928067841@hdfcbank · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
             ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
             ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner’s registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],
