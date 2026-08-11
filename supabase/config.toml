@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.razorpay-payment]
 verify_jwt = false
+
+[functions.pricing-admin]
+verify_jwt = false

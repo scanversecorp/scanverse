@@ -474,6 +474,109 @@ const CLOUD_SVCS = [
 
 const CL_BY_ID = Object.fromEntries(CLOUD_SVCS.map(s => [s.id, s]));
 
+/* --- LIVE PRICING (Supabase overrides) ----------------------------- */
+const PRICING_ADMIN_HASH = 'pricing-admin';
+const PRICING_PIN_KEY = 'scanv_pricing_pin';
+const PRICING_AUTH_KEY = 'scanv_pricing_auth';
+const PRICING_FN = `${SB_URL}/functions/v1/pricing-admin`;
+const PRICING_PIN = process.env.REACT_APP_PRICING_PIN || '';
+
+function findSvcById(id) {
+  return SVCS.find(s => s.id === id) || HH_BY_ID[id] || CL_BY_ID[id] || null;
+}
+
+function applyLivePricingRows(rows) {
+  if (!rows?.length) return;
+  for (const row of rows) {
+    const svc = findSvcById(row.service_id);
+    if (!svc) continue;
+    if (row.price_paise != null) svc.price = row.price_paise;
+    if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
+  }
+}
+
+async function fetchLivePricing() {
+  try {
+    const { data, error } = await sb().from('service_prices_public').select('service_id,price_paise,mrp_paise');
+    if (error || !data?.length) return [];
+    applyLivePricingRows(data);
+    return data;
+  } catch { return []; }
+}
+
+function pricingAuthOk() {
+  try {
+    const raw = sessionStorage.getItem(PRICING_AUTH_KEY);
+    if (!raw) return false;
+    const { pin, exp } = JSON.parse(raw);
+    return pin === PRICING_PIN && Date.now() < exp;
+  } catch { return false; }
+}
+
+function setPricingAuth(pin) {
+  sessionStorage.setItem(PRICING_AUTH_KEY, JSON.stringify({ pin, exp: Date.now() + 86400000 }));
+}
+
+async function pricingAdminFetch(pin) {
+  const res = await fetch(PRICING_FN, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'x-pricing-pin': pin },
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Fetch failed');
+  return res.json();
+}
+
+async function pricingAdminSave(pin, rows) {
+  const res = await fetch(PRICING_FN, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'x-pricing-pin': pin },
+    body: JSON.stringify({ rows }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
+  return res.json();
+}
+
+function splitPricingRow(row, field, value) {
+  const next = { ...row };
+  const num = (v) => Math.max(0, Math.round(Number(v) || 0));
+  if (field === 'new_amount_paise') {
+    next.new_amount_paise = num(value);
+    const pPct = Number(next.partner_pct) || 70;
+    next.partner_amount_paise = Math.round(next.new_amount_paise * pPct / 100);
+    next.scanv_amount_paise = next.new_amount_paise - next.partner_amount_paise;
+    next.scanv_pct = Math.round((100 - pPct) * 100) / 100;
+  } else if (field === 'partner_pct') {
+    next.partner_pct = Math.min(100, Math.max(0, Number(value) || 0));
+    next.partner_amount_paise = Math.round(next.new_amount_paise * next.partner_pct / 100);
+    next.scanv_amount_paise = next.new_amount_paise - next.partner_amount_paise;
+    next.scanv_pct = Math.round((100 - next.partner_pct) * 100) / 100;
+  } else if (field === 'scanv_pct') {
+    next.scanv_pct = Math.min(100, Math.max(0, Number(value) || 0));
+    next.partner_pct = Math.round((100 - next.scanv_pct) * 100) / 100;
+    next.partner_amount_paise = Math.round(next.new_amount_paise * next.partner_pct / 100);
+    next.scanv_amount_paise = next.new_amount_paise - next.partner_amount_paise;
+  } else if (field === 'partner_amount_paise') {
+    next.partner_amount_paise = num(value);
+    next.partner_pct = next.new_amount_paise ? Math.round(next.partner_amount_paise / next.new_amount_paise * 10000) / 100 : 0;
+    next.scanv_amount_paise = next.new_amount_paise - next.partner_amount_paise;
+    next.scanv_pct = Math.round((100 - next.partner_pct) * 100) / 100;
+  } else if (field === 'scanv_amount_paise') {
+    next.scanv_amount_paise = num(value);
+    next.scanv_pct = next.new_amount_paise ? Math.round(next.scanv_amount_paise / next.new_amount_paise * 10000) / 100 : 0;
+    next.partner_pct = Math.round((100 - next.scanv_pct) * 100) / 100;
+    next.partner_amount_paise = next.new_amount_paise - next.scanv_amount_paise;
+  } else if (field === 'current_amount_paise') {
+    next.current_amount_paise = num(value);
+  }
+  return next;
+}
+
+function isPricingAdminRoute() {
+  return window.location.hash.replace(/^#/, '') === PRICING_ADMIN_HASH;
+}
+
+const paiseInp = (p) => Math.round((Number(p) || 0) / 100);
+const paiseFromInp = (r) => Math.round((Number(r) || 0) * 100);
+
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
   { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · filings',        cat:'Legal',              cash:false, ...svcDisc(999) },
@@ -3091,6 +3194,168 @@ function LeaderHome() {
 }
 
 /* ================================================================
+   CONFIDENTIAL PRICING ADMIN — #pricing-admin (PIN only, not in nav)
+================================================================ */
+function PricingAdminPage({ onPricesUpdated }) {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(PRICING_PIN_KEY) || '');
+  const [authed, setAuthed] = useState(pricingAuthOk());
+  const [rows, setRows] = useState([]);
+  const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const cards = ['all', ...Array.from(new Set(rows.map(r => r.card)))];
+
+  const load = useCallback(async (usePin) => {
+    setLoading(true); setErr('');
+    try {
+      const { rows: data } = await pricingAdminFetch(usePin);
+      setRows(data || []);
+      setMsg(`Loaded ${data?.length || 0} services`);
+    } catch (e) {
+      setErr(e.message || 'Could not load pricing');
+      setAuthed(false);
+      sessionStorage.removeItem(PRICING_AUTH_KEY);
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (authed && pin) load(pin);
+  }, [authed, pin, load]);
+
+  const login = async () => {
+    if (!PRICING_PIN) { setErr('REACT_APP_PRICING_PIN not set on server'); return; }
+    if (pin !== PRICING_PIN) { setErr('Incorrect PIN'); return; }
+    sessionStorage.setItem(PRICING_PIN_KEY, pin);
+    setPricingAuth(pin);
+    setAuthed(true);
+    setErr('');
+  };
+
+  const updateRow = (idx, field, rawVal) => {
+    setRows(prev => prev.map((r, i) => i === idx ? splitPricingRow(r, field, field.includes('pct') ? rawVal : paiseFromInp(rawVal)) : r));
+  };
+
+  const saveAll = async () => {
+    setSaving(true); setErr(''); setMsg('');
+    try {
+      await pricingAdminSave(pin, rows);
+      await fetchLivePricing();
+      onPricesUpdated?.();
+      setMsg(`Saved ${rows.length} rows — live on site now`);
+    } catch (e) {
+      setErr(e.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const saveOne = async (idx) => {
+    setSaving(true); setErr('');
+    try {
+      await pricingAdminSave(pin, [rows[idx]]);
+      await fetchLivePricing();
+      onPricesUpdated?.();
+      setMsg(`Saved ${rows[idx].service_name}`);
+    } catch (e) {
+      setErr(e.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const th = { padding:'8px 10px', textAlign:'left', fontSize:10, fontWeight:700, color:C.sub, borderBottom:BDR, whiteSpace:'nowrap', background:C.surf, position:'sticky', top:0, zIndex:2 };
+  const td = { padding:'6px 8px', borderBottom:`1px solid ${C.bdr}`, fontSize:11, verticalAlign:'middle' };
+  const inp = { width:72, padding:'4px 6px', borderRadius:6, border:BDR, background:C.bg, color:C.txt, fontSize:11, fontFamily:FF };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight:'100vh', background:C.bg, fontFamily:FF, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+        <div style={{ ...S.card(), maxWidth:360, width:'100%', padding:24 }}>
+          <div style={{ fontSize:11, color:C.red, fontWeight:700, letterSpacing:1, marginBottom:8 }}>CONFIDENTIAL</div>
+          <div style={{ fontSize:20, fontWeight:800, color:C.txt, marginBottom:6 }}>ScanV Pricing Input</div>
+          <div style={{ fontSize:12, color:C.sub, marginBottom:20, lineHeight:1.5 }}>Leader-only. Not linked in the app. Enter your private PIN to edit service amounts and partner splits.</div>
+          <Field label="Private PIN">
+            <input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()} style={S.inp()} placeholder="••••••••" autoComplete="off"/>
+          </Field>
+          {err && <div style={{ color:C.red, fontSize:12, marginBottom:12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin}>Unlock pricing table</Btn>
+          <div style={{ marginTop:16, fontSize:11, color:C.dim, textAlign:'center' }}>
+            Bookmark: <code style={{ color:C.acc }}>{APP_URL}/#pricing-admin</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const shown = filter === 'all' ? rows : rows.filter(r => r.card === filter);
+
+  return (
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:FF }}>
+      <div style={{ background:C.surf, borderBottom:BDR, padding:'12px 16px', position:'sticky', top:0, zIndex:10, boxShadow:'0 2px 12px rgba(18,18,18,0.06)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, maxWidth:1400, margin:'0 auto' }}>
+          <div>
+            <div style={{ fontSize:10, color:C.red, fontWeight:700, letterSpacing:1 }}>CONFIDENTIAL · PRICING</div>
+            <div style={{ fontSize:18, fontWeight:800, color:C.txt }}>ScanV Pricing Input</div>
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <Btn v="outline" sm onClick={()=>load(pin)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
+            <Btn sm onClick={saveAll} disabled={saving||!rows.length}>{saving?'Saving…':'Save all & go live'}</Btn>
+            <Btn v="ghost" sm onClick={()=>{ sessionStorage.removeItem(PRICING_AUTH_KEY); setAuthed(false); }}>Lock</Btn>
+          </div>
+        </div>
+        {msg && <div style={{ color:C.grn, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{msg}</div>}
+        {err && <div style={{ color:C.red, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{err}</div>}
+      </div>
+
+      <div style={{ maxWidth:1400, margin:'0 auto', padding:'16px' }}>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
+          {cards.map(c => (
+            <button key={c} onClick={()=>setFilter(c)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${filter===c?C.acc:C.bdr}`, background:filter===c?`${C.acc}18`:C.surf, color:filter===c?C.acc:C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF }}>
+              {c === 'all' ? 'All cards' : c}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ ...S.card(), padding:0, overflow:'auto', maxHeight:'calc(100vh - 180px)' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1100 }}>
+            <thead>
+              <tr>
+                {[['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['','save']].map(([label])=>(
+                  <th key={label||'save'} style={th}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((r) => {
+                const idx = rows.indexOf(r);
+                return (
+                  <tr key={r.service_id}>
+                    <td style={{ ...td, color:C.sub, maxWidth:100 }}>{r.card}</td>
+                    <td style={{ ...td, color:C.dim, fontSize:10 }}>{r.sub_card}</td>
+                    <td style={{ ...td, fontWeight:600, color:C.txt }}>{r.service_name}</td>
+                    <td style={{ ...td, color:C.dim, fontSize:10, maxWidth:140 }}>{r.sub_service_name}</td>
+                    <td style={td}><input type="number" value={paiseInp(r.current_amount_paise)} onChange={e=>updateRow(idx,'current_amount_paise',e.target.value)} style={inp}/></td>
+                    <td style={td}><input type="number" value={paiseInp(r.new_amount_paise)} onChange={e=>updateRow(idx,'new_amount_paise',e.target.value)} style={{ ...inp, borderColor:C.acc, fontWeight:700 }}/></td>
+                    <td style={td}><input type="number" value={paiseInp(r.partner_amount_paise)} onChange={e=>updateRow(idx,'partner_amount_paise',e.target.value)} style={inp}/></td>
+                    <td style={td}><input type="number" step="0.01" value={r.partner_pct} onChange={e=>updateRow(idx,'partner_pct',e.target.value)} style={{ ...inp, width:56 }}/></td>
+                    <td style={td}><input type="number" value={paiseInp(r.scanv_amount_paise)} onChange={e=>updateRow(idx,'scanv_amount_paise',e.target.value)} style={inp}/></td>
+                    <td style={td}><input type="number" step="0.01" value={r.scanv_pct} onChange={e=>updateRow(idx,'scanv_pct',e.target.value)} style={{ ...inp, width:56 }}/></td>
+                    <td style={td}><Btn v="ghost" sm onClick={()=>saveOne(idx)} disabled={saving}>Save</Btn></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!shown.length && !loading && <div style={{ padding:40, textAlign:'center', color:C.dim }}>No rows — deploy migration & edge function first</div>}
+        </div>
+        <div style={{ marginTop:14, fontSize:11, color:C.dim, lineHeight:1.6 }}>
+          Change <strong>New ₹</strong> to update card prices on the live app. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
    ROOT APP
 ================================================================ */
 /* ================================================================
@@ -3236,6 +3501,7 @@ export default function App() {
   const [qrPrefill,setQrPrefill] = useState(null);
   const [,forceUpdate]         = useReducer(x=>x+1,0);
   const [silentGeo, setSilentGeo] = useState(null); // GPS captured silently
+  const refreshPricing = useCallback(() => { forceUpdate(); }, []);
 
   const addToast=useCallback((msg,type='info')=>{
     const id=Date.now(); setToasts(t=>[...t,{id,msg,type}]);
@@ -3254,6 +3520,9 @@ export default function App() {
 
   useEffect(()=>{
     (async()=>{
+      // Load live pricing overrides before showing services
+      await fetchLivePricing();
+
       // Silently capture device + IP + location in background
       try {
         const device = detectDevice();
@@ -3293,6 +3562,20 @@ export default function App() {
     })();
   },[]);
 
+  // Realtime price sync — card amounts update without reload
+  useEffect(()=>{
+    let channel;
+    try {
+      channel = sb().channel('live-pricing')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'service_prices_public' }, async () => {
+          await fetchLivePricing();
+          refreshPricing();
+        })
+        .subscribe();
+    } catch { /* supabase not ready */ }
+    return () => { if (channel) sb().removeChannel(channel); };
+  }, [refreshPricing]);
+
   useEffect(()=>{
     if (!user) return;
     sb().from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(20)
@@ -3302,6 +3585,15 @@ export default function App() {
   const legalPath = legalSegment();
   if (isLegalRoute()) {
     return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath}/></Boundary>;
+  }
+
+  if (isPricingAdminRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <PricingAdminPage onPricesUpdated={refreshPricing}/>
+      </Boundary>
+    );
   }
 
   if (state==='boot') return (
@@ -3336,7 +3628,7 @@ export default function App() {
     </Boundary>
   );
 
-  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,setUser};
+  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,setUser,refreshPricing};
 
   const renderScreen=()=>{
     if (screen==='book')     return <BookScreen/>;
