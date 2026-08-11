@@ -98,6 +98,70 @@ function extractPaidAmountPaise(payload: Record<string, unknown>): number {
   return 0;
 }
 
+function extractPayerVpa(payload: Record<string, unknown>): string | null {
+  const pl = payload.payload as Record<string, unknown> | undefined;
+  const payment =
+    (pl?.payment as { entity?: Record<string, unknown> })?.entity;
+  if (!payment) return null;
+  const method = String(payment.method || "").toLowerCase();
+  const vpa = payment.vpa;
+  if (method === "upi" && typeof vpa === "string" && vpa.includes("@")) {
+    return vpa.trim().toLowerCase();
+  }
+  if (typeof vpa === "string" && vpa.includes("@")) {
+    return vpa.trim().toLowerCase();
+  }
+  return null;
+}
+
+async function fetchPaymentVpa(
+  auth: string,
+  paymentId: string,
+): Promise<string | null> {
+  if (!paymentId) return null;
+  try {
+    const res = await fetch(
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`,
+      { headers: { Authorization: auth } },
+    );
+    if (!res.ok) return null;
+    const p = await res.json();
+    const vpa = p.vpa;
+    if (typeof vpa === "string" && vpa.includes("@")) {
+      return vpa.trim().toLowerCase();
+    }
+  } catch (e) {
+    console.error("fetchPaymentVpa failed:", paymentId, e);
+  }
+  return null;
+}
+
+async function fetchVpaFromPaymentLink(
+  auth: string,
+  linkId: string,
+): Promise<string | null> {
+  if (!linkId) return null;
+  try {
+    const res = await fetch(
+      `https://api.razorpay.com/v1/payment_links/${encodeURIComponent(linkId)}/payments`,
+      { headers: { Authorization: auth } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const items = data.items || data.payments || [];
+    for (const p of items) {
+      if (p.status !== "captured" && p.status !== "authorized") continue;
+      const vpa = p.vpa;
+      if (typeof vpa === "string" && vpa.includes("@")) {
+        return vpa.trim().toLowerCase();
+      }
+    }
+  } catch (e) {
+    console.error("fetchVpaFromPaymentLink failed:", linkId, e);
+  }
+  return null;
+}
+
 async function markPaid(
   supabase: ReturnType<typeof createClient>,
   txnId: string,
@@ -106,6 +170,7 @@ async function markPaid(
     razorpay_payment_id?: string;
     razorpay_payment_link_id?: string;
     verified_via: string;
+    payer_vpa?: string | null;
   },
 ): Promise<boolean> {
   const { data: row, error: fetchErr } = await supabase
@@ -141,6 +206,7 @@ async function markPaid(
       verified_via: opts.verified_via,
       razorpay_payment_id: opts.razorpay_payment_id || null,
       razorpay_payment_link_id: opts.razorpay_payment_link_id || null,
+      ...(opts.payer_vpa ? { payer_vpa: opts.payer_vpa } : {}),
     })
     .eq("txn_id", txnId)
     .eq("status", "pending")
@@ -159,6 +225,7 @@ type RazorpayCheckResult = {
   paidAmountPaise?: number;
   paymentId?: string;
   linkId?: string;
+  payerVpa?: string | null;
 };
 
 async function checkRazorpayApi(
@@ -186,10 +253,24 @@ async function checkRazorpayApi(
           amountSufficient(expectedPaise, paidPaise) &&
           linkAmount >= expectedPaise
         ) {
+          const linkId = String(link.id || "");
+          let payerVpa: string | null = null;
+          if (link.payments?.length) {
+            for (const p of link.payments) {
+              if (typeof p.vpa === "string" && p.vpa.includes("@")) {
+                payerVpa = p.vpa.trim().toLowerCase();
+                break;
+              }
+            }
+          }
+          if (!payerVpa && linkId) {
+            payerVpa = await fetchVpaFromPaymentLink(auth, linkId);
+          }
           return {
             paid: true,
             paidAmountPaise: paidPaise,
-            linkId: String(link.id || ""),
+            linkId,
+            payerVpa,
           };
         }
       }
@@ -213,10 +294,18 @@ async function checkRazorpayApi(
         if (!matches) continue;
         const paidPaise = Number(p.amount ?? 0);
         if (amountSufficient(expectedPaise, paidPaise)) {
+          const paymentId = String(p.id || "");
+          let payerVpa: string | null = null;
+          if (typeof p.vpa === "string" && p.vpa.includes("@")) {
+            payerVpa = p.vpa.trim().toLowerCase();
+          } else if (paymentId) {
+            payerVpa = await fetchPaymentVpa(auth, paymentId);
+          }
           return {
             paid: true,
             paidAmountPaise: paidPaise,
-            paymentId: String(p.id || ""),
+            paymentId,
+            payerVpa,
           };
         }
       }
@@ -403,6 +492,7 @@ async function handleCheck(
       amount_paise: expectedPaise,
       paid_at: row.paid_at,
       mode: row.verified_via || "webhook",
+      payer_vpa: row.payer_vpa || null,
     });
   }
 
@@ -426,6 +516,7 @@ async function handleCheck(
       verified_via: "api",
       razorpay_payment_id: apiResult.paymentId,
       razorpay_payment_link_id: apiResult.linkId,
+      payer_vpa: apiResult.payerVpa,
     });
     if (marked) {
       return json({
@@ -435,6 +526,7 @@ async function handleCheck(
         amount_paise: expectedPaise,
         paid_amount_paise: apiResult.paidAmountPaise,
         mode: "api",
+        payer_vpa: apiResult.payerVpa || null,
       });
     }
     return json({
@@ -496,10 +588,21 @@ async function handleWebhook(
   const paymentLink =
     (pl?.payment_link as { entity?: Record<string, unknown> })?.entity || {};
 
+  let payerVpa = extractPayerVpa(body);
+  if (!payerVpa && payment.id) {
+    const auth = razorpayAuth();
+    if (auth) payerVpa = await fetchPaymentVpa(auth, String(payment.id));
+  }
+  if (!payerVpa && paymentLink.id) {
+    const auth = razorpayAuth();
+    if (auth) payerVpa = await fetchVpaFromPaymentLink(auth, String(paymentLink.id));
+  }
+
   const marked = await markPaid(supabase, txnId, paidAmountPaise, {
     verified_via: "webhook",
     razorpay_payment_id: String(payment.id || ""),
     razorpay_payment_link_id: String(paymentLink.id || ""),
+    payer_vpa: payerVpa,
   });
 
   return json({

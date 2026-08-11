@@ -9,6 +9,9 @@ Verifies ScanV UPI / Razorpay payments before the PWA allows booking to continue
 3. User pays via UPI deep link or opens the Razorpay payment link.
 4. PWA polls `check` every 3s after payment starts; continue unlocks only when `verified: true` **and** `amount_ok: true`.
 5. Razorpay webhook (`payment.captured` / `payment_link.paid`) marks intent paid server-side only if captured amount ≥ `payment_intents.amount_paise`.
+6. Payer UPI VPA (`payment.vpa` when `method=upi`) is stored on `payment_intents.payer_vpa` and returned by `check` for refund processing.
+
+**Limitation:** Manual UPI deep-link payments (GPay/PhonePe to static VPA without Razorpay) are verified only if Razorpay can match the TXN — payer VPA is not auto-captured on that path.
 
 ## Security
 
@@ -68,7 +71,7 @@ Response:
 Response when paid:
 
 ```json
-{ "verified": true, "status": "paid", "amount_ok": true, "mode": "api" }
+{ "verified": true, "status": "paid", "amount_ok": true, "mode": "api", "payer_vpa": "user@okaxis" }
 ```
 
 Response when underpaid (e.g. ₹1 test payment):

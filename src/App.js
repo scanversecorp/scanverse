@@ -18,7 +18,7 @@ import {
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
-const UPI_PA   = 'vyapar.172928067841@hdfcbank';
+const UPI_PA   = 'dcoreglobalcorp406807.rzp@rxairtel';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const ASSIST   = '+91-9270194842';
 
@@ -279,8 +279,8 @@ async function registerPaymentIntent(txnId, amountPaise, userId) {
     return null;
   }
 }
-async function checkPaymentVerified(txnId, expectedAmountPaise) {
-  if (!txnId) return false;
+async function fetchPaymentVerification(txnId, expectedAmountPaise) {
+  if (!txnId) return { verified: false, payer_vpa: null };
   try {
     const r = await sb().functions.invoke('razorpay-payment', {
       body: {
@@ -289,15 +289,23 @@ async function checkPaymentVerified(txnId, expectedAmountPaise) {
         amount_paise: expectedAmountPaise || undefined,
       },
     });
-    if (r.data?.verified && r.data?.amount_ok !== false) return true;
-    if (r.data?.verified === false && r.data?.amount_ok === false) return false;
+    if (r.data?.verified && r.data?.amount_ok !== false) {
+      return { verified: true, payer_vpa: r.data.payer_vpa || null };
+    }
+    if (r.data?.verified === false && r.data?.amount_ok === false) {
+      return { verified: false, payer_vpa: null };
+    }
   } catch (_) {}
   try {
-    const { data } = await sb().from('payment_intents').select('status, amount_paise').eq('txn_id', txnId).maybeSingle();
-    if (data?.status !== 'paid') return false;
-    if (expectedAmountPaise && data.amount_paise !== expectedAmountPaise) return false;
-    return true;
-  } catch (_) { return false; }
+    const { data } = await sb().from('payment_intents').select('status, amount_paise, payer_vpa').eq('txn_id', txnId).maybeSingle();
+    if (data?.status !== 'paid') return { verified: false, payer_vpa: null };
+    if (expectedAmountPaise && data.amount_paise !== expectedAmountPaise) return { verified: false, payer_vpa: null };
+    return { verified: true, payer_vpa: data.payer_vpa || null };
+  } catch (_) { return { verified: false, payer_vpa: null }; }
+}
+async function checkPaymentVerified(txnId, expectedAmountPaise) {
+  const r = await fetchPaymentVerification(txnId, expectedAmountPaise);
+  return r.verified;
 }
 function usePaymentVerification(txnId, amountPaise, userId, addToast) {
   const [paymentVerified, setPaymentVerified] = useState(false);
@@ -2326,6 +2334,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         setScreen('payment');
         return setErr('Payment not verified. Complete payment before booking.');
       }
+      const payCheck = await fetchPaymentVerification(txnId, browseTotal);
       const svc = activeSvc;
       const price = svc.price||50000;
       const fee   = Math.round(price*FEE_PCT);
@@ -2353,6 +2362,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       await sb().from('payments').insert({
         booking_id:bk.id, user_id:userId, amount:total,
         method:paymentMethod||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
+        payer_vpa: payCheck.payer_vpa || null,
       }).catch(()=>{});
       invokeBookingDispatch({
         bookingId: bk.id,
@@ -3628,6 +3638,7 @@ function BookScreen() {
         setStep(3);
         return addToast('Payment not verified. Complete payment before booking.', 'error');
       }
+      const payCheck = await fetchPaymentVerification(txnId, total);
       const mob = normalizeMobileE164(bookPhone || user?.phone || '');
       const custId = user?.id || await resolveCustomerProfileId(mob);
       const profile = await upsertCustomerProfile({
@@ -3659,6 +3670,7 @@ function BookScreen() {
       await sb().from('payments').insert({
         booking_id: data.id, user_id: profile.id, amount: total,
         method: payMethod || 'UPI', status: 'success', txn_id: txnId, gateway: 'Razorpay',
+        payer_vpa: payCheck.payer_vpa || null,
       }).catch(() => {});
       invokeBookingDispatch({
         bookingId: data.id, serviceId: svc.id || svc.parent || '', serviceName: svc.name,
@@ -5773,6 +5785,7 @@ function CustomerSupportPage() {
                   <span style={{ color: C.sub }}> · {p.method} · </span>
                   <Badge label={p.status} color={p.status === 'success' ? C.grn : C.gold} />
                   <span style={{ color: C.dim }}> · {p.gateway} · TXN {p.txn_id}</span>
+                  {p.payer_vpa && <span style={{ color: C.cyan }}> · Payer UPI: {p.payer_vpa}</span>}
                 </div>
               )) : <div style={{ color: C.dim, fontSize: 12 }}>No payments</div>}
             </div>
@@ -5784,6 +5797,7 @@ function CustomerSupportPage() {
                   <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
                   <span style={{ color: C.sub }}> · ₹{fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
                   {pi.verified_via && <span style={{ color: C.dim }}> · via {pi.verified_via}</span>}
+                  {pi.payer_vpa && <span style={{ color: C.cyan }}> · Payer UPI: {pi.payer_vpa}</span>}
                   {pi.paid_at && <span style={{ color: C.dim }}> · {fmtDt(pi.paid_at)}</span>}
                 </div>
               )) : <div style={{ color: C.dim, fontSize: 12 }}>No payment intents</div>}
@@ -6038,6 +6052,7 @@ function AdminBookingsTab({ pin }) {
           <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
           <span style={{ fontSize: 11, color: C.sub }}> · ₹{fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
           {pi.paid_at && <span style={{ fontSize: 10, color: C.dim }}> · {fmtDt(pi.paid_at)}</span>}
+          {pi.payer_vpa && <span style={{ fontSize: 10, color: C.cyan }}> · {pi.payer_vpa}</span>}
         </div>
       ))}
     </div>
@@ -6244,7 +6259,7 @@ function AdminControlCenter({ onPricesUpdated }) {
             <div style={{ ...S.card(), padding: 16, marginTop: 14 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Migrations applied</div>
               <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.8 }}>
-                20260811000000_wa_verifications · 20260811000001_wa_verifications_outbound · 20260811000002_payment_intents · 20260811000003_service_pricing · 20260812000004_sub_services_pricing · 20260812000005_fill_grid_pricing · 20260812000006_vendors_and_dispatch · 20260812000007_live_tracking_and_vehicle_pricing · 20260812000008_dispatch_cron · 20260812000009_vendor_live_locations_rls · 20260812000010_pricing_realtime_vehicle_cards · 20260812000011_customer_support_roles · 20260812000012_support_tickets · 20260812000013_support_ticket_comment_internal
+                20260811000000_wa_verifications · 20260811000001_wa_verifications_outbound · 20260811000002_payment_intents · 20260811000003_service_pricing · 20260812000004_sub_services_pricing · 20260812000005_fill_grid_pricing · 20260812000006_vendors_and_dispatch · 20260812000007_live_tracking_and_vehicle_pricing · 20260812000008_dispatch_cron · 20260812000009_vendor_live_locations_rls · 20260812000010_pricing_realtime_vehicle_cards · 20260812000011_customer_support_roles · 20260812000012_support_tickets · 20260812000013_support_ticket_comment_internal · 20260812000014_payer_vpa
               </div>
             </div>
           </div>
@@ -6377,7 +6392,7 @@ function LegalPage({page}) {
           {[
             ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks)'],
             ['How It Works','Platform fee (10%) paid online at booking via UPI. GST added to total. Tax invoice auto-generated for every booking.'],
-            ['UPI Payment','Pay to: dcoreglobal@upi · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
+            ['UPI Payment','Pay to: dcoreglobalcorp406807.rzp@rxairtel · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
             ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
             ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner’s registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],

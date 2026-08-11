@@ -213,7 +213,7 @@ async function listPayments(sb: ReturnType<typeof adminSb>, body: Record<string,
 
   let query = sb
     .from("payment_intents")
-    .select("id,txn_id,amount_paise,status,verified_via,paid_at,created_at")
+    .select("id,txn_id,amount_paise,status,verified_via,paid_at,created_at,payer_vpa")
     .order("created_at", { ascending: false })
     .limit(limit);
 
