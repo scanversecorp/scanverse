@@ -3393,6 +3393,65 @@ function useLiveBookingTrack(bookingId) {
   return { booking, live, dispatch, partnerName, loading, refresh };
 }
 
+const WAIT_HEALTH_TIPS = [
+  { tip: 'Drink a glass of water while you wait — mild dehydration can cause fatigue and headaches.', source: 'WHO hydration guidance' },
+  { tip: 'Take 6 slow deep breaths: inhale 4 sec, hold 2, exhale 6. It lowers stress in under a minute.', source: 'NIH / stress research' },
+  { tip: 'Stand up and stretch your neck and shoulders for 30 seconds if you have been sitting a while.', source: 'WHO physical activity' },
+  { tip: 'Wash hands with soap for 20 seconds before meals — the simplest infection guard.', source: 'WHO hand hygiene' },
+  { tip: 'Aim for 7–8 hours of sleep tonight. Good rest speeds recovery and focus.', source: 'ICMR sleep hygiene' },
+  { tip: 'Add one extra fruit or vegetable to your next meal — fibre supports gut health.', source: 'ICMR balanced diet' },
+  { tip: 'If you work at a screen, look 20 feet away for 20 seconds every 20 minutes (20-20-20 rule).', source: 'American Optometric Association' },
+  { tip: 'Short walks after meals help blood sugar control — even 5 minutes around home helps.', source: 'ADA / physical activity' },
+];
+
+const WAIT_JOKES = [
+  'Why did the delivery partner bring a ladder? The customer ordered high-speed internet.',
+  'My Wi‑Fi and my motivation have something in common — both disappear when I need them most.',
+  'Partner: “I’m 5 minutes away.” Also partner: still finishing their chai. Classic Pune timing.',
+  'I told my smart speaker to book a cleaner. It replied: “Playing ‘Clean Bandit’ on Spotify.”',
+  'Why don’t secrets stay at the gym? Because they always get leaked at the water cooler.',
+  'Customer: “Is the expert verified?” ScanV: “Yes — OTP, GPS, and a very serious profile photo.”',
+  'What did one plate say to the other? “Lunch is on me.”',
+  'Why did the scooter go to therapy? Too many unresolved pickup & drop issues.',
+  'I asked the cloud service for a joke. It said: “404 — humour not found. Try again in 503 seconds.”',
+  'Doctor: “Take two jokes and call me in the morning.” Patient: “Finally, affordable healthcare.”',
+];
+
+function WaitEngagementPanel({ compact }) {
+  const [slot, setSlot] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSlot(s => s + 1), 7000);
+    return () => clearInterval(t);
+  }, []);
+  const showJoke = slot % 2 === 1;
+  const tipIdx = Math.floor(slot / 2) % WAIT_HEALTH_TIPS.length;
+  const jokeIdx = Math.floor(slot / 2) % WAIT_JOKES.length;
+  const tip = WAIT_HEALTH_TIPS[tipIdx];
+  const pad = compact ? '12px 14px' : '16px 18px';
+
+  return (
+    <div style={{ ...S.card(), marginBottom: compact ? 10 : 12, padding: pad, background: showJoke ? '#fffbeb' : '#ecfdf5', border: showJoke ? '1.5px solid #fde68a' : '1.5px solid rgba(0,122,77,0.25)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: showJoke ? '#b45309' : C.grn }}>
+          {showJoke ? '😄 While you wait' : '💚 Verified health tip'}
+        </span>
+        <span style={{ fontSize: 9, color: C.dim, fontWeight: 600 }}>Rotates every 7s</span>
+      </div>
+      {showJoke ? (
+        <div style={{ fontSize: compact ? 13 : 14, color: C.txt, lineHeight: 1.55, fontWeight: 500 }}>{WAIT_JOKES[jokeIdx]}</div>
+      ) : (
+        <>
+          <div style={{ fontSize: compact ? 13 : 14, color: C.txt, lineHeight: 1.55, marginBottom: 8 }}>{tip.tip}</div>
+          <div style={{ fontSize: 10, color: C.grn, fontWeight: 700 }}>✓ {tip.source}</div>
+        </>
+      )}
+      <div style={{ fontSize: 9, color: C.dim, marginTop: 10, lineHeight: 1.4 }}>
+        General wellness only — not medical advice. Consult a doctor for symptoms.
+      </div>
+    </div>
+  );
+}
+
 function trackStatusLabel(booking, dispatch, live) {
   if (!booking) return { label: 'Loading…', color: C.dim, step: 0 };
   if (booking.status === 'completed') return { label: 'Service completed', color: C.grn, step: 4 };
@@ -3481,6 +3540,8 @@ function TrackServiceScreen() {
               Dispatch code {dispatch.accept_code} · attempt {dispatch.attempt_num || 1} of 2 per partner
             </div>
           )}
+
+          {booking?.status === 'confirmed' && <WaitEngagementPanel />}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Btn full onClick={() => { setScreen('bookings'); window.location.hash = ''; }}>All bookings</Btn>
@@ -3620,6 +3681,7 @@ function BookingsScreen() {
               <div style={{textAlign:'right'}}><div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div><Badge label={b.status} color={sc(b.status)}/></div>
             </div>
             {showLive(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]}/>}
+            {user.role==='customer'&&b.status==='confirmed'&&<WaitEngagementPanel compact />}
             {user.role==='customer'&&b.status==='confirmed'&&(
               <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
             )}
