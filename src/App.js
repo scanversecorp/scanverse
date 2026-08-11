@@ -607,23 +607,69 @@ const FAST2SMS_KEY  = 'qT5XNR8YLirx6unhwDIcyAVm9WajkMldotCHGzgKvpe2Q03sP7JetNE75
 
 function emptyOtpDigits() { return ['','','','','','']; }
 
-function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
+function OtpSentFooter({ mobile, onChangeNumber, onResend, onScreenFallback, loading, screenMode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ color: C.grn, fontSize: 12, marginBottom: 10, fontWeight: 700, textAlign: 'center' }}>✅ OTP sent to +91 {mobile}</div>
-      <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-        <button type="button" onClick={onChangeNumber} style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Change number</button>
-        <button type="button" onClick={onResend} disabled={loading} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 12, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: FF, opacity: loading ? 0.5 : 1 }}>{loading ? 'Sending…' : 'Resend OTP'}</button>
-      </div>
+      {!screenMode ? (
+        <>
+          <div style={{ color: C.grn, fontSize: 12, marginBottom: 10, fontWeight: 700, textAlign: 'center' }}>✅ OTP sent to +91 {mobile}</div>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+            <button type="button" onClick={onChangeNumber} style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Change number</button>
+            <button type="button" onClick={onResend} disabled={loading} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 12, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: FF, opacity: loading ? 0.5 : 1 }}>{loading ? 'Sending…' : 'Resend OTP'}</button>
+          </div>
+          {onScreenFallback && (
+            <button type="button" onClick={onScreenFallback} disabled={loading} style={{ display: 'block', margin: '0 auto', background: 'none', border: 'none', color: C.acc, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FF, textDecoration: 'underline' }}>
+              Didn&apos;t receive SMS? Show code on screen
+            </button>
+          )}
+        </>
+      ) : (
+        <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: 'center' }}>Using on-screen code for +91 {mobile}</div>
+      )}
     </div>
   );
 }
 
 async function invokeSendOtp(mobile) {
-  const r = await sb().functions.invoke('send-otp', { body: { mobile } });
+  const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
+  const r = await sb().functions.invoke('send-otp', { body: { mobile: norm } });
   if (r.error) throw new Error(r.error.message || 'OTP service unavailable');
-  if (r.data?.success || r.data?.provider) return r.data;
+  if (r.data?.success || r.data?.provider) return { ...r.data, mobile: norm };
   throw new Error(r.data?.error || r.data?.message || 'OTP send failed — check number and try again');
+}
+
+async function storeClientOtp(mobile) {
+  const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  await sb().from('custom_otp').update({ used: true }).eq('mobile', norm).eq('used', false);
+  await sb().from('custom_otp').insert({
+    mobile: norm, otp,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+  });
+  return otp;
+}
+
+async function verifyOtpCode(mobile, code) {
+  const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
+  try {
+    const r = await sb().functions.invoke('send-otp', { body: { mobile: norm, otp: code, action: 'verify' } });
+    if (r.data?.success) return true;
+  } catch (_) {}
+  return verifyCustomOTP(norm, code);
+}
+
+function ScreenOtpBanner({ otp, onFill }) {
+  if (!otp) return null;
+  return (
+    <div
+      onClick={() => onFill?.(otp)}
+      style={{ background: C.acc, borderRadius: 12, padding: 16, marginBottom: 14, textAlign: 'center', cursor: 'pointer' }}
+    >
+      <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🔐 Your OTP — tap to auto-fill</div>
+      <div style={{ color: '#fff', fontSize: 40, fontFamily: 'monospace', fontWeight: 800, letterSpacing: 8 }}>{otp}</div>
+      <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 6 }}>SMS may be delayed — use this code to continue</div>
+    </div>
+  );
 }
 
 async function sendSMSViaSB(mobile, otp) {
@@ -870,6 +916,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const [otpSent, setOtpSent]     = useState(false);
   const [otpCode, setOtpCode]     = useState(['','','','','','']);
   const [otpTargetMobile, setOtpTargetMobile] = useState('');
+  const [screenOtp, setScreenOtp] = useState('');
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState('');
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
@@ -905,8 +952,29 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setOtpSent(false);
     setOtpCode(emptyOtpDigits());
     setOtpTargetMobile('');
+    setScreenOtp('');
     setWaToken('');
     setWaChecking(false);
+  };
+
+  const fillOtpFromScreen = (otp) => {
+    const d = otp.split('');
+    setOtpCode([d[0]||'', d[1]||'', d[2]||'', d[3]||'', d[4]||'', d[5]||'']);
+  };
+
+  const showScreenOtpFallback = async () => {
+    if (!mobile || mobile.length !== 10) return setErr('Enter valid 10-digit mobile');
+    setLoading(true); setErr('');
+    try {
+      const otp = await storeClientOtp(`+91${mobile}`);
+      setScreenOtp(otp);
+      setOtpSent(true);
+      setOtpTargetMobile(mobile);
+      setOtpCode(emptyOtpDigits());
+      addToast?.('Code shown below — tap it to auto-fill', 'info');
+      invokeSendOtp(`+91${mobile}`).catch(() => {});
+    } catch (e) { setErr(e.message || 'Could not generate code'); }
+    finally { setLoading(false); }
   };
 
   const sendOTP = async (resend = false) => {
@@ -919,6 +987,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       setOtpSent(true);
       setOtpTargetMobile(mobile);
       setOtpCode(emptyOtpDigits());
+      setScreenOtp('');
       if (resend) setErr('');
       addToast?.(resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`, 'success');
     } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
@@ -935,8 +1004,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const mob = `+91${mobile}`;
       if (!waVerified) {
         const code = otpCode.join('');
-        const r = await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
-        if (!r.data?.success) throw new Error('Invalid OTP. Try again.');
+        const ok = await verifyOtpCode(mob, code);
+        if (!ok) throw new Error('Invalid OTP. Try again.');
       }
 
       const fakeEmail = `${mobile}@scanv.app`;
@@ -989,8 +1058,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const mob = `+91${mobile}`;
       if (!waVerified) {
         const code = otpCode.join('');
-        const r = await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
-        if (!r.data?.success) throw new Error('Invalid OTP. Try again.');
+        const ok = await verifyOtpCode(mob, code);
+        if (!ok) throw new Error('Invalid OTP. Try again.');
       }
       const {data:existing} = await sb().from('profiles').select('*').eq('phone',mob).maybeSingle();
       if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
@@ -1011,6 +1080,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       setOtpSent(true);
       setOtpTargetMobile(mobile);
       setOtpCode(emptyOtpDigits());
+      setScreenOtp('');
       if (resend) setErr('');
       addToast?.(resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`, 'success');
     } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
@@ -1305,7 +1375,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendOTP(true)} loading={loading} />
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendOTP(true)} onScreenFallback={showScreenOtpFallback} loading={loading} screenMode={!!screenOtp} />
+              <ScreenOtpBanner otp={screenOtp} onFill={fillOtpFromScreen} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
@@ -1358,7 +1429,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} />
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} onScreenFallback={showScreenOtpFallback} loading={loading} screenMode={!!screenOtp} />
+              <ScreenOtpBanner otp={screenOtp} onFill={fillOtpFromScreen} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
@@ -2133,12 +2205,31 @@ function BookScreen() {
   const [bookOtpSent,setBookOtpSent]=useState(false);
   const [bookOtpCode,setBookOtpCode]=useState(['','','','','','']);
   const [bookOtpTarget,setBookOtpTarget]=useState('');
+  const [bookScreenOtp,setBookScreenOtp]=useState('');
   const [bookOtpVerified,setBookOtpVerified]=useState(false);
   const [bookPhone,setBookPhone]=useState(user?.phone?.replace(/^\+91/,'')||'');
   const [bookFirstName,setBookFirstName]=useState(user?.first_name||'');
   const [bookLastName,setBookLastName]=useState(user?.last_name||'');
 
-  const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
+  const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');setBookScreenOtp('');};
+
+  const fillBookOtpFromScreen=(otp)=>{const d=otp.split('');setBookOtpCode([d[0]||'',d[1]||'',d[2]||'',d[3]||'',d[4]||'',d[5]||'']);};
+
+  const showBookScreenOtp=async()=>{
+    if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
+    setLoading(true);
+    try{
+      const mob='+91'+bookPhone.replace(/\D/g,'');
+      const otp=await storeClientOtp(mob);
+      setBookScreenOtp(otp);
+      setBookOtpSent(true);
+      setBookOtpTarget(bookPhone.replace(/\D/g,''));
+      setBookOtpCode(emptyOtpDigits());
+      addToast('Code shown below — tap to auto-fill','info');
+      invokeSendOtp(mob).catch(()=>{});
+    }catch(e){addToast(e.message||'Could not generate code','error');}
+    finally{setLoading(false);}
+  };
 
   const sendBookOTP=async(resend=false)=>{
     if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
@@ -2161,8 +2252,8 @@ function BookScreen() {
     setLoading(true);
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
-      const r=await sb().functions.invoke('send-otp',{body:{mobile:mob,otp:code,action:'verify'}});
-      if(r.data?.success){ setBookOtpVerified(true); setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); addToast('Mobile verified — proceed to payment ✓','success'); }
+      const ok=await verifyOtpCode(mob,code);
+      if(ok){ setBookOtpVerified(true); setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); addToast('Mobile verified — proceed to payment ✓','success'); }
       else throw new Error('Invalid OTP');
     }catch(e){addToast(e.message||'Verification failed','error');}
     finally{setLoading(false);}
@@ -2198,7 +2289,8 @@ function BookScreen() {
           </Field>
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
-              <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} />
+              <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} onScreenFallback={showBookScreenOtp} loading={loading} screenMode={!!bookScreenOtp} />
+              <ScreenOtpBanner otp={bookScreenOtp} onFill={fillBookOtpFromScreen} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
                 {bookOtpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
