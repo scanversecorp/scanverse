@@ -898,9 +898,59 @@ function isVendorAdminRoute() {
 }
 
 const CUSTOMER_SUPPORT_HASH = 'customer-support';
+const ADMIN_HUB_HASH = 'admin';
+const ADMIN_HUB_ALIASES = new Set(['admin', 'admin-hub']);
 
 function isCustomerSupportRoute() {
   return window.location.hash.replace(/^#/, '') === CUSTOMER_SUPPORT_HASH;
+}
+
+const ADMIN_PIN_KEY = 'scanv_admin_pin';
+const ADMIN_AUTH_KEY = 'scanv_admin_auth';
+const ADMIN_FN = `${SB_URL}/functions/v1/admin-hub`;
+
+function isAdminHubRoute() {
+  return ADMIN_HUB_ALIASES.has(window.location.hash.replace(/^#/, ''));
+}
+
+function adminAuthOk() {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_AUTH_KEY);
+    if (!raw) return false;
+    const { pin, exp } = JSON.parse(raw);
+    return !!pin && Date.now() < exp;
+  } catch { return false; }
+}
+
+function setAdminAuth(pin) {
+  sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify({ pin, exp: Date.now() + 86400000 }));
+}
+
+function getAdminAuth() {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.pin || Date.now() >= parsed.exp) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+async function adminHubFetch(action, payload = {}, pin) {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+  if (pin) headers['x-admin-pin'] = pin;
+  const res = await fetch(ADMIN_FN, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function adminDeepLink(hash) {
+  return `${APP_URL}/#${hash}`;
 }
 
 function supportAuthOk() {
@@ -4131,9 +4181,9 @@ function LeaderHome() {
 /* ================================================================
    CONFIDENTIAL PRICING ADMIN — #pricing-admin (PIN only, not in nav)
 ================================================================ */
-function PricingAdminPage({ onPricesUpdated }) {
-  const [pin, setPin] = useState(() => sessionStorage.getItem(PRICING_PIN_KEY) || '');
-  const [authed, setAuthed] = useState(pricingAuthOk());
+function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
+  const [pin, setPin] = useState(() => hubPin || sessionStorage.getItem(PRICING_PIN_KEY) || '');
+  const [authed, setAuthed] = useState(!!hubPin || pricingAuthOk());
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -4155,6 +4205,10 @@ function PricingAdminPage({ onPricesUpdated }) {
       sessionStorage.removeItem(PRICING_AUTH_KEY);
     } finally { setLoading(false); }
   }, []);
+
+  useEffect(() => {
+    if (hubPin) { setPin(hubPin); setAuthed(true); }
+  }, [hubPin]);
 
   useEffect(() => {
     if (authed && pin) load(pin);
@@ -4207,7 +4261,7 @@ function PricingAdminPage({ onPricesUpdated }) {
   const td = { padding:'6px 8px', borderBottom:`1px solid ${C.bdr}`, fontSize:11, verticalAlign:'middle' };
   const inp = { width:72, padding:'4px 6px', borderRadius:6, border:BDR, background:C.bg, color:C.txt, fontSize:11, fontFamily:FF };
 
-  if (!authed) {
+  if (!authed && !embedded) {
     return (
       <div style={{ minHeight:'100vh', background:C.bg, fontFamily:FF, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
         <div style={{ ...S.card(), maxWidth:360, width:'100%', padding:24 }}>
@@ -4230,7 +4284,8 @@ function PricingAdminPage({ onPricesUpdated }) {
   const shown = filter === 'all' ? rows : rows.filter(r => r.card === filter);
 
   return (
-    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:FF }}>
+    <div style={{ minHeight: embedded ? 'auto' : '100vh', background:C.bg, fontFamily:FF }}>
+      {!embedded && (
       <div style={{ background:C.surf, borderBottom:BDR, padding:'12px 16px', position:'sticky', top:0, zIndex:10, boxShadow:'0 2px 12px rgba(18,18,18,0.06)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, maxWidth:1400, margin:'0 auto' }}>
           <div>
@@ -4246,8 +4301,9 @@ function PricingAdminPage({ onPricesUpdated }) {
         {msg && <div style={{ color:C.grn, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{msg}</div>}
         {err && <div style={{ color:C.red, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{err}</div>}
       </div>
+      )}
 
-      <div style={{ maxWidth:1400, margin:'0 auto', padding:'16px' }}>
+      <div style={{ maxWidth:1400, margin:'0 auto', padding: embedded ? '0' : '16px' }}>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
           {cards.map(c => (
             <button key={c} onClick={()=>setFilter(c)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${filter===c?C.acc:C.bdr}`, background:filter===c?`${C.acc}18`:C.surf, color:filter===c?C.acc:C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF }}>
@@ -5011,6 +5067,462 @@ function CustomerSupportPage() {
 }
 
 /* ================================================================
+   ADMIN CONTROL CENTER — #admin / #admin-hub
+================================================================ */
+const ADMIN_TABS = [
+  { id: 'overview', label: 'Overview', icon: '📊' },
+  { id: 'pricing', label: 'Pricing', icon: '💰' },
+  { id: 'support', label: 'Customer Support', icon: '🎧' },
+  { id: 'agents', label: 'Support Agents', icon: '👥' },
+  { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
+  { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
+  { id: 'database', label: 'Database / App', icon: '🗄️' },
+  { id: 'settings', label: 'Settings', icon: '⚙️' },
+];
+
+function AdminDeepLinkBtn({ hash, label }) {
+  return (
+    <a href={adminDeepLink(hash)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+      <Btn v="outline" sm>{label || `Open #${hash} →`}</Btn>
+    </a>
+  );
+}
+
+function AdminStatCard({ label, value, sub, color }) {
+  return (
+    <div style={{ ...S.card(), padding: 16, flex: '1 1 140px', minWidth: 140 }}>
+      <div style={{ fontSize: 10, color: C.sub, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: color || C.acc, marginTop: 6 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function AdminSupportQuickSearch({ pin }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const search = async () => {
+    if (!q.trim()) return;
+    setLoading(true); setErr('');
+    try {
+      const { results: data } = await customerSupportFetch('search', { q: q.trim() }, pin);
+      setResults(data || []);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Mobile, name, email…" style={{ ...S.inp(), flex: 1 }} />
+        <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+      </div>
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {results.slice(0, 8).map(r => (
+        <div key={r.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
+          <div style={{ fontWeight: 700, color: C.txt }}>{r.name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Unknown'}</div>
+          <div style={{ fontSize: 12, color: C.sub }}>{r.phone} · {r.city || '—'}</div>
+        </div>
+      ))}
+      {!results.length && q && !loading && <div style={{ color: C.dim, fontSize: 12 }}>No results — open full desk for details</div>}
+    </div>
+  );
+}
+
+function AdminAgentsTab({ pin }) {
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'support_agent', notes: '' });
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr('');
+    try {
+      const { agents: data } = await adminHubFetch('list_agents', {}, pin);
+      setAgents(data || []);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [pin]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    if (!form.name.trim()) return setErr('Name required');
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('create_agent', form, pin);
+      setMsg('Agent added');
+      setShowForm(false);
+      setForm({ name: '', email: '', phone: '', role: 'support_agent', notes: '' });
+      await load();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const toggleActive = async (agent) => {
+    setLoading(true); setErr('');
+    try {
+      if (agent.active) {
+        await adminHubFetch('deactivate_agent', { id: agent.id }, pin);
+        setMsg(`${agent.name} offboarded`);
+      } else {
+        await adminHubFetch('update_agent', { id: agent.id, active: true }, pin);
+        setMsg(`${agent.name} reactivated`);
+      }
+      await load();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const roleColor = { support_agent: C.cyan, support_admin: C.acc };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontSize: 13, color: C.sub }}>Registry of support staff. PIN auth is via Supabase secrets — this table is for audit only.</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn v="outline" sm onClick={load} disabled={loading}>Reload</Btn>
+          <Btn sm onClick={() => setShowForm(s => !s)}>{showForm ? 'Cancel' : '+ Add agent'}</Btn>
+        </div>
+      </div>
+      {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {showForm && (
+        <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+          <Field label="Name" req><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={S.inp()} /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Field label="Email"><input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={S.inp()} /></Field>
+            <Field label="Phone"><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} style={S.inp()} /></Field>
+          </div>
+          <Field label="Role">
+            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={S.inp()}>
+              <option value="support_agent">Support Agent (read-only)</option>
+              <option value="support_admin">Support Admin (full access)</option>
+            </select>
+          </Field>
+          <Field label="Notes"><input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={S.inp()} placeholder="Tier-1, shift info…" /></Field>
+          <Btn onClick={create} disabled={loading}>Create agent</Btn>
+        </div>
+      )}
+      {agents.map(a => (
+        <div key={a.id} style={{ ...S.card(), marginBottom: 8, padding: 14, opacity: a.active ? 1 : 0.65 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{a.name}</div>
+              <div style={{ fontSize: 12, color: C.sub }}>{a.email || '—'} · {a.phone || '—'}</div>
+              {a.notes && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{a.notes}</div>}
+              <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>Added {fmtDt(a.created_at)}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <Badge label={a.role} color={roleColor[a.role] || C.sub} />
+              <Badge label={a.active ? 'Active' : 'Offboarded'} color={a.active ? C.grn : C.dim} />
+              <Btn v={a.active ? 'danger' : 'outline'} sm onClick={() => toggleActive(a)} disabled={loading}>
+                {a.active ? 'Offboard' : 'Reactivate'}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      ))}
+      {!agents.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 32 }}>No agents registered yet</div>}
+    </div>
+  );
+}
+
+function AdminBookingsTab({ pin }) {
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('all');
+  const [bookings, setBookings] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [subTab, setSubTab] = useState('bookings');
+
+  const search = async () => {
+    setLoading(true); setErr('');
+    try {
+      if (subTab === 'bookings') {
+        const { bookings: data } = await adminHubFetch('search_bookings', { q: q.trim() || undefined, status }, pin);
+        setBookings(data || []);
+      } else {
+        const { payment_intents: data } = await adminHubFetch('list_payments', { q: q.trim() || undefined }, pin);
+        setPayments(data || []);
+      }
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { search(); }, [subTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {[['bookings', 'Bookings'], ['payments', 'Payment intents']].map(([k, l]) => (
+          <button key={k} onClick={() => setSubTab(k)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${subTab === k ? C.acc : C.bdr}`, background: subTab === k ? `${C.acc}18` : C.surf, color: subTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
+        ))}
+      </div>
+      {subTab === 'bookings' && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          {['all', 'confirmed', 'in_progress', 'completed', 'cancelled', 'pending'].map(s => (
+            <button key={s} onClick={() => setStatus(s)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${status === s ? C.acc : C.bdr}`, background: status === s ? `${C.acc}18` : C.surf, color: status === s ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{s}</button>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder={subTab === 'bookings' ? 'TXN, service, customer ID…' : 'TXN ID…'} style={{ ...S.inp(), flex: 1 }} />
+        <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+      </div>
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {subTab === 'bookings' && bookings.map(b => (
+        <div key={b.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
+          <div style={{ fontWeight: 700, color: C.txt }}>{b.service_name}</div>
+          <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text || '—'}</div>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+            <Badge label={b.status} color={C.acc} /> · {fmtRs(b.total)} · TXN {b.txn_id || '—'}
+          </div>
+        </div>
+      ))}
+      {subTab === 'payments' && payments.map(pi => (
+        <div key={pi.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
+          <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
+          <span style={{ fontSize: 11, color: C.sub }}> · {fmtRs(pi.amount_paise)} · TXN {pi.txn_id}</span>
+          {pi.paid_at && <span style={{ fontSize: 10, color: C.dim }}> · {fmtDt(pi.paid_at)}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminControlCenter({ onPricesUpdated }) {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
+  const [authed, setAuthed] = useState(adminAuthOk());
+  const [tab, setTab] = useState('overview');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [stats, setStats] = useState(null);
+
+  const usePin = pin || getAdminAuth()?.pin;
+
+  const login = async () => {
+    if (!pin) { setErr('Enter admin PIN'); return; }
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('whoami', {}, pin);
+      sessionStorage.setItem(ADMIN_PIN_KEY, pin);
+      setAdminAuth(pin);
+      setAuthed(true);
+      setMsg('Admin hub unlocked');
+    } catch {
+      setErr('Incorrect PIN — set ADMIN_HUB_PIN, SUPPORT_ADMIN_PIN, PRICING_ADMIN_PIN, or VENDOR_ADMIN_PIN in Supabase secrets');
+      setAuthed(false);
+      sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    } finally { setLoading(false); }
+  };
+
+  const loadStats = useCallback(async () => {
+    if (!usePin) return;
+    try {
+      const data = await adminHubFetch('stats', {}, usePin);
+      setStats(data);
+    } catch (e) { setErr(e.message); }
+  }, [usePin]);
+
+  useEffect(() => {
+    if (authed && (tab === 'overview' || tab === 'vendors')) loadStats();
+  }, [authed, tab, loadStats]);
+
+  const lock = () => {
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    sessionStorage.removeItem(ADMIN_PIN_KEY);
+    setAuthed(false);
+    setStats(null);
+  };
+
+  const tabBtn = (t) => ({
+    padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${tab === t.id ? C.acc : C.bdr}`,
+    background: tab === t.id ? `${C.acc}18` : C.surf, color: tab === t.id ? C.acc : C.sub,
+    fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF, whiteSpace: 'nowrap',
+  });
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 400, width: '100%', padding: 24 }}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER ONLY · CONFIDENTIAL</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Admin Control Center</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+            Unified hub for pricing, support, agents, vendors, bookings, and platform settings. Not linked in public navigation.
+          </div>
+          <Field label="Admin PIN">
+            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+          </Field>
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock admin hub'}</Btn>
+          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#admin</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 2px 12px rgba(18,18,18,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1200, margin: '0 auto' }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 1 }}>ADMIN CONTROL CENTER</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>ScanV Admin Hub</div>
+          </div>
+          <Btn v="ghost" sm onClick={lock}>Lock</Btn>
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto', maxWidth: 1200, margin: '12px auto 0', paddingBottom: 4 }}>
+          {ADMIN_TABS.map(t => (
+            <button key={t.id} type="button" onClick={() => { setTab(t.id); setMsg(''); setErr(''); }} style={tabBtn(t)}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+        {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8, maxWidth: 1200, margin: '8px auto 0' }}>{msg}</div>}
+        {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8, maxWidth: 1200, margin: '8px auto 0' }}>{err}</div>}
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
+        {tab === 'overview' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, color: C.sub }}>Live platform snapshot</div>
+              <Btn v="outline" sm onClick={loadStats}>Refresh</Btn>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+              <AdminStatCard label="Bookings" value={stats?.bookings_count ?? '—'} sub={stats?.bookings_by_status ? Object.entries(stats.bookings_by_status).map(([k,v]) => `${k}: ${v}`).join(' · ') : ''} />
+              <AdminStatCard label="Revenue (payments)" value={stats ? fmtRs(stats.revenue_paise) : '—'} color={C.grn} />
+              <AdminStatCard label="Active vendors" value={stats?.active_vendors ?? '—'} color={C.cyan} />
+              <AdminStatCard label="Pending dispatches" value={stats?.pending_dispatches ?? '—'} color={C.gold} />
+              <AdminStatCard label="Support agents" value={stats?.active_support_agents ?? '—'} />
+              <AdminStatCard label="Profiles" value={stats?.profiles_count ?? '—'} />
+            </div>
+            <div style={{ ...S.card(), padding: 16 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Quick links</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <AdminDeepLinkBtn hash="pricing-admin" label="Pricing admin →" />
+                <AdminDeepLinkBtn hash="customer-support" label="Support desk →" />
+                <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
+                <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'pricing' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 13, color: C.sub }}>Edit service prices and partner splits. Same PIN works if set as PRICING_ADMIN_PIN.</div>
+              <AdminDeepLinkBtn hash="pricing-admin" label="Open full page →" />
+            </div>
+            <PricingAdminPage hubPin={usePin} embedded onPricesUpdated={onPricesUpdated} />
+          </div>
+        )}
+
+        {tab === 'support' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 13, color: C.sub }}>Quick customer lookup. Full desk supports profile edits (admin PIN).</div>
+              <AdminDeepLinkBtn hash="customer-support" label="Open support desk →" />
+            </div>
+            <div style={{ ...S.card(), padding: 16 }}>
+              <AdminSupportQuickSearch pin={usePin} />
+            </div>
+          </div>
+        )}
+
+        {tab === 'agents' && <AdminAgentsTab pin={usePin} />}
+
+        {tab === 'vendors' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 13, color: C.sub }}>Activate/offboard partners. Pending dispatches: {stats?.pending_dispatches ?? '—'}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
+                <AdminDeepLinkBtn hash="vendor-onboard" label="Onboarding →" />
+              </div>
+            </div>
+            <div style={{ ...S.card(), padding: 16, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
+              <p style={{ margin: '0 0 8px' }}><strong>Active vendors:</strong> {stats?.active_vendors ?? '—'}</p>
+              <p style={{ margin: 0 }}><strong>Pending dispatches:</strong> {stats?.pending_dispatches ?? '—'} — booking-dispatch cron runs every minute via pg_cron.</p>
+            </div>
+          </div>
+        )}
+
+        {tab === 'bookings' && <AdminBookingsTab pin={usePin} />}
+
+        {tab === 'database' && (
+          <div>
+            <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>External dashboards and key tables (read-only links).</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {[
+                ['Supabase Dashboard', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut', 'DB, auth, edge functions, secrets'],
+                ['Vercel (ScanV app)', 'https://vercel.com/dashboard', 'Deployments & env vars'],
+                ['Table: profiles', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor/17350', 'Customer profiles (id is TEXT)'],
+                ['Table: bookings', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'All bookings'],
+                ['Table: support_agents', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Support staff registry'],
+                ['Table: vendor_partners', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Partner onboarding'],
+                ['Table: booking_dispatch', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Dispatch state machine'],
+                ['Edge functions', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/functions', 'admin-hub, customer-support, pricing-admin…'],
+              ].map(([title, url, desc]) => (
+                <a key={title} href={url} target="_blank" rel="noreferrer" style={{ ...S.card(), padding: 14, textDecoration: 'none', display: 'block' }}>
+                  <div style={{ fontWeight: 700, color: C.acc, fontSize: 14 }}>{title} ↗</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{desc}</div>
+                </a>
+              ))}
+            </div>
+            <div style={{ ...S.card(), padding: 16, marginTop: 14 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Migrations applied</div>
+              <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.8 }}>
+                20260811000000_wa_verifications · 20260811000001_wa_verifications_outbound · 20260811000002_payment_intents · 20260811000003_service_pricing · 20260812000004_sub_services_pricing · 20260812000005_fill_grid_pricing · 20260812000006_vendors_and_dispatch · 20260812000007_live_tracking_and_vehicle_pricing · 20260812000008_dispatch_cron · 20260812000009_vendor_live_locations_rls · 20260812000010_pricing_realtime_vehicle_cards · 20260812000011_customer_support_roles
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'settings' && (
+          <div>
+            <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>PIN and secrets checklist (values not shown — set in Supabase secrets only).</div>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Admin PIN secrets</div>
+              {[
+                ['ADMIN_HUB_PIN', 'Dedicated hub PIN (optional — falls back to other admin PINs)'],
+                ['SUPPORT_ADMIN_PIN', 'Support desk admin + agent management'],
+                ['SUPPORT_AGENT_PIN', 'Read-only support desk (not hub access)'],
+                ['PRICING_ADMIN_PIN', 'Pricing admin + hub access'],
+                ['VENDOR_ADMIN_PIN', 'Vendor admin + hub access'],
+              ].map(([key, desc]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.bdr}`, fontSize: 12 }}>
+                  <code style={{ color: C.acc }}>{key}</code>
+                  <span style={{ color: C.dim, textAlign: 'right', maxWidth: '60%' }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ ...S.card(), padding: 16 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Deploy checklist</div>
+              <pre style={{ fontSize: 11, color: C.sub, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.6 }}>{`npx supabase secrets set ADMIN_HUB_PIN=YourHubPin123
+npx supabase functions deploy admin-hub --no-verify-jwt
+npx supabase functions deploy customer-support --no-verify-jwt
+npx supabase db push`}</pre>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
    ROOT APP
 ================================================================ */
 /* ================================================================
@@ -5275,6 +5787,15 @@ export default function App() {
   const legalPath = legalSegment();
   if (isLegalRoute()) {
     return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath}/></Boundary>;
+  }
+
+  if (isAdminHubRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <AdminControlCenter onPricesUpdated={refreshPricing}/>
+      </Boundary>
+    );
   }
 
   if (isPricingAdminRoute()) {

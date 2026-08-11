@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.customer-support]
 verify_jwt = false
+
+[functions.admin-hub]
+verify_jwt = false

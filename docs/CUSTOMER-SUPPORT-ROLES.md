@@ -8,6 +8,8 @@ Internal support desk for searching customers, bookings, and payments. Not linke
 https://scanv-tau.vercel.app/#customer-support
 ```
 
+**Admin hub (all tools):** `https://scanv-tau.vercel.app/#admin` — see [ADMIN-HUB.md](./ADMIN-HUB.md)
+
 ## Roles
 
 | Role | PIN secret | Permissions |
@@ -39,7 +41,9 @@ PINs must be at least 6 characters. Share agent PIN only with read-only staff; k
 
 The `support_agents` table is an optional audit registry. Auth is PIN-based (env secrets), not per-row PINs.
 
-Add an agent in Supabase SQL editor or Table Editor:
+**Preferred:** use the Admin Control Center → **Support Agents** tab at `#admin` (see [ADMIN-HUB.md](./ADMIN-HUB.md)).
+
+Or add manually in Supabase SQL editor or Table Editor:
 
 ```sql
 insert into public.support_agents (name, email, phone, role, notes)
