@@ -337,3 +337,54 @@ export function callFailedStatuses(): Set<string> {
     "failed", "busy", "no-answer", "no_answer", "canceled", "cancelled",
   ]);
 }
+
+/** Optional email — set RESEND_API_KEY + SUPPORT_EMAIL_FROM in Supabase secrets */
+export async function sendEmail(
+  to: string,
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; provider?: string; error?: string }> {
+  const email = (to || "").trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Invalid email address" };
+  }
+
+  const resendKey = Deno.env.get("RESEND_API_KEY");
+  const from = Deno.env.get("SUPPORT_EMAIL_FROM") || "support@dcoreglobal.com";
+
+  if (resendKey) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [email], subject, text: body }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return { ok: true, provider: "resend" };
+    return {
+      ok: false,
+      error: typeof data === "object" && data !== null && "message" in data
+        ? String((data as { message: string }).message)
+        : res.statusText,
+    };
+  }
+
+  console.log(`[ScanV email] To: ${email} | ${subject}\n${body.slice(0, 500)}`);
+  return { ok: false, error: "Email not configured — set RESEND_API_KEY and SUPPORT_EMAIL_FROM" };
+}
+
+export function ticketClosureMessage(
+  ticketNumber: string,
+  subject: string,
+  closureNote: string,
+): string {
+  return (
+    `ScanV Support — Ticket ${ticketNumber} resolved\n` +
+    `Subject: ${subject}\n` +
+    `Resolution: ${closureNote}\n` +
+    `Track: https://scanv-tau.vercel.app/#track-ticket?id=${ticketNumber}\n` +
+    `Questions? Call +91-9270194842`
+  );
+}

@@ -32,6 +32,7 @@ Session stored in `sessionStorage` for 24 hours (same pattern as other admin pag
 | **Overview** | Bookings count, revenue, active vendors, pending dispatches, support agents, profiles |
 | **Pricing** | Inline pricing table + link to `#pricing-admin` |
 | **Customer Support** | Quick customer search + link to `#customer-support` |
+| **Tickets** | ServiceNow-style ticket desk (agents/admins only): queue, timeline, status workflow, assignment, internal comments, resolve with SMS/email closure. Stats sub-tab on admin hub. |
 | **Support Agents** | CRUD for `support_agents` — add, offboard, reactivate |
 | **Vendors & Dispatch** | Dispatch stats + links to `#vendor-admin`, `#vendor-onboard` |
 | **Bookings & Payments** | Search bookings by status/TXN; list payment intents |
@@ -72,8 +73,9 @@ npx supabase secrets set ADMIN_HUB_PIN=YourHubPin123
 
 npx supabase functions deploy admin-hub --no-verify-jwt
 npx supabase functions deploy customer-support --no-verify-jwt
+npx supabase functions deploy support-tickets --no-verify-jwt
 
-# Migrations (support_agents.active already exists — no new migration required)
+# Migrations (support_tickets — 20260812000012_support_tickets.sql)
 npx supabase db push
 ```
 

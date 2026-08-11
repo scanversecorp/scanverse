@@ -62,6 +62,7 @@ async function hubStats(sb: ReturnType<typeof adminSb>) {
     dispatchRes,
     agentsRes,
     profilesRes,
+    ticketsRes,
   ] = await Promise.all([
     sb.from("bookings").select("id,total,status", { count: "exact", head: false }).limit(5000),
     sb.from("payments").select("amount,status").eq("status", "success"),
@@ -69,6 +70,7 @@ async function hubStats(sb: ReturnType<typeof adminSb>) {
     sb.from("booking_dispatch").select("id", { count: "exact", head: true }).in("status", ["pending", "dispatching"]),
     sb.from("support_agents").select("id", { count: "exact", head: true }).eq("active", true),
     sb.from("profiles").select("id", { count: "exact", head: true }),
+    sb.from("support_tickets").select("id,status,created_at,resolved_at"),
   ]);
 
   const bookings = bookingsRes.data || [];
@@ -87,6 +89,23 @@ async function hubStats(sb: ReturnType<typeof adminSb>) {
     byStatus[s] = (byStatus[s] || 0) + 1;
   }
 
+  const tickets = ticketsRes.data || [];
+  const openTicketStatuses = new Set(["new", "in_progress", "pending_customer"]);
+  const openTickets = tickets.filter((t: { status?: string }) => openTicketStatuses.has(t.status || "")).length;
+  const ticketsByStatus: Record<string, number> = {};
+  for (const t of tickets) {
+    const s = (t as { status?: string }).status || "unknown";
+    ticketsByStatus[s] = (ticketsByStatus[s] || 0) + 1;
+  }
+  const resolvedTickets = tickets.filter((t: { resolved_at?: string }) => t.resolved_at);
+  let avgTicketResolutionHours: number | null = null;
+  if (resolvedTickets.length) {
+    const totalMs = resolvedTickets.reduce((sum: number, t: { resolved_at?: string; created_at?: string }) => {
+      return sum + (new Date(t.resolved_at!).getTime() - new Date(t.created_at!).getTime());
+    }, 0);
+    avgTicketResolutionHours = Math.round((totalMs / resolvedTickets.length / 3600000) * 10) / 10;
+  }
+
   return json({
     bookings_count: bookingsRes.count ?? bookings.length,
     bookings_by_status: byStatus,
@@ -96,6 +115,10 @@ async function hubStats(sb: ReturnType<typeof adminSb>) {
     pending_dispatches: dispatchRes.count ?? 0,
     active_support_agents: agentsRes.count ?? 0,
     profiles_count: profilesRes.count ?? 0,
+    tickets_count: tickets.length,
+    open_tickets: openTickets,
+    tickets_by_status: ticketsByStatus,
+    avg_ticket_resolution_hours: avgTicketResolutionHours,
   });
 }
 

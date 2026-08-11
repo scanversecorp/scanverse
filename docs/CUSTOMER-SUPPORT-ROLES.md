@@ -14,7 +14,7 @@ https://scanv-tau.vercel.app/#customer-support
 
 | Role | PIN secret | Permissions |
 |------|------------|-------------|
-| **Support Agent** (`support_agent`) | `SUPPORT_AGENT_PIN` | Read-only: search customers, view profile, bookings, payments, payment intents, device/location data |
+| **Support Agent** (`support_agent`) | `SUPPORT_AGENT_PIN` | Read-only customer search; full ticket desk (queue, timeline, comments, resolve) |
 | **Support Admin** (`support_admin`) | `SUPPORT_ADMIN_PIN` | Everything agents can do, plus update profile fields and booking status |
 
 Leaders who already use `PRICING_ADMIN_PIN` or `VENDOR_ADMIN_PIN` are treated as **Support Admin** (full update access).
@@ -98,7 +98,36 @@ All updates go through the `customer-support` edge function (service role). Clie
     → POST /functions/v1/customer-support
         Header: x-support-pin
         Actions: search | detail | update (admin) | whoami
-    → Supabase service role (profiles, bookings, payments, payment_intents, …)
+    → POST /functions/v1/support-tickets
+        Header: x-support-pin (agent actions)
+        Actions: search | detail | update_status | add_comment | resolve | stats
+    → Supabase service role (profiles, bookings, payments, support_tickets, …)
+```
+
+## Support tickets
+
+Public routes (footer links) — **minimal customer experience only**:
+
+| Route | Purpose |
+|-------|---------|
+| `#faq` | FAQ page (bookings, payments, OTP, tracking) |
+| `#report` | Submit issue → ticket number `TKT-{timestamp}` |
+| `#track-ticket?id=TKT-…` | Basic status lookup by ticket # + mobile (status, subject, last update — **not** the agent timeline) |
+
+**ServiceNow-style tracking is for agents/admins only:**
+
+| Audience | URL | Experience |
+|----------|-----|------------|
+| **Support agents** | `#customer-support` → Tickets tab | Full desk: queue, filters, timeline, internal vs customer-visible comments, assignment, resolve with SMS/email |
+| **Admins** | `#admin` → Tickets tab | Same full desk + Stats sub-tab |
+
+On resolve, agents can optionally send closure note via SMS (2Factor/MSG91/Twilio) and/or email (requires `RESEND_API_KEY` + `SUPPORT_EMAIL_FROM`).
+
+Deploy:
+
+```bash
+npx supabase functions deploy support-tickets --no-verify-jwt
+npx supabase db push
 ```
 
 ## Security notes

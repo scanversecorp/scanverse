@@ -759,6 +759,7 @@ const SUPPORT_AUTH_KEY = 'scanv_support_auth';
 const PRICING_FN = `${SB_URL}/functions/v1/pricing-admin`;
 const VENDOR_FN = `${SB_URL}/functions/v1/vendor-onboard`;
 const SUPPORT_FN = `${SB_URL}/functions/v1/customer-support`;
+const SUPPORT_TICKETS_FN = `${SB_URL}/functions/v1/support-tickets`;
 const DISPATCH_FN = `${SB_URL}/functions/v1/booking-dispatch`;
 
 function findSvcById(id) {
@@ -898,11 +899,58 @@ function isVendorAdminRoute() {
 }
 
 const CUSTOMER_SUPPORT_HASH = 'customer-support';
+const FAQ_HASH = 'faq';
+const REPORT_HASH = 'report';
+const TRACK_TICKET_HASH = 'track-ticket';
 const ADMIN_HUB_HASH = 'admin';
 const ADMIN_HUB_ALIASES = new Set(['admin', 'admin-hub']);
 
 function isCustomerSupportRoute() {
   return window.location.hash.replace(/^#/, '') === CUSTOMER_SUPPORT_HASH;
+}
+
+function hashBase() {
+  const h = window.location.hash.replace(/^#/, '');
+  return h.includes('?') ? h.split('?')[0] : h;
+}
+
+function isFaqRoute() { return hashBase() === FAQ_HASH; }
+function isReportRoute() { return hashBase() === REPORT_HASH; }
+function isTrackTicketRoute() {
+  const h = window.location.hash.replace(/^#/, '');
+  return h === TRACK_TICKET_HASH || h.startsWith(`${TRACK_TICKET_HASH}?`);
+}
+function trackTicketIdFromHash() {
+  const raw = window.location.hash.replace(/^#/, '');
+  if (!raw.startsWith(TRACK_TICKET_HASH)) return null;
+  const q = raw.includes('?') ? raw.split('?')[1] : '';
+  return new URLSearchParams(q).get('id') || null;
+}
+
+const FOOTER_LINKS = [
+  ['privacy', 'Privacy', 'path'],
+  ['terms', 'Terms', 'path'],
+  ['refund', 'Refund', 'path'],
+  ['payment', 'Payment', 'path'],
+  ['faq', 'FAQ', 'hash'],
+  ['report', 'Report', 'hash'],
+];
+
+function FooterLegalLinks({ current, small }) {
+  const fs = small ? 10 : 12;
+  return (
+    <>
+      {FOOTER_LINKS.map(([k, l, kind]) => (
+        <a
+          key={k}
+          href={kind === 'hash' ? `#${k}` : `/${k}`}
+          style={{ color: current === k ? C.acc : C.dim, fontSize: fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600 }}
+        >
+          {l}{!small && kind === 'path' ? ' Policy' : ''}
+        </a>
+      ))}
+    </>
+  );
 }
 
 const ADMIN_PIN_KEY = 'scanv_admin_pin';
@@ -988,6 +1036,29 @@ async function customerSupportFetch(action, payload = {}, pin) {
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
+
+async function supportTicketsFetch(action, payload = {}, pin, useAdminPin = false) {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+  if (pin) headers[useAdminPin ? 'x-admin-pin' : 'x-support-pin'] = pin;
+  const res = await fetch(SUPPORT_TICKETS_FN, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+const TICKET_STATUS_COLOR = {
+  new: C.cyan, in_progress: C.gold, pending_customer: C.acc,
+  resolved: C.grn, closed: C.dim, cancelled: C.red,
+};
+const TICKET_STATUS_STEPS = ['new', 'in_progress', 'pending_customer', 'resolved', 'closed'];
+const TICKET_STATUS_LABEL = {
+  new: 'New', in_progress: 'In Progress', pending_customer: 'Pending Customer',
+  resolved: 'Resolved', closed: 'Closed', cancelled: 'Cancelled',
+};
 
 function isTrackRoute() {
   const h = window.location.hash.replace(/^#/, '');
@@ -2366,9 +2437,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         )}
         <AssistBanner/>
         <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
-          {[['privacy','Privacy'],['terms','Terms'],['refund','Refund'],['payment','Payment']].map(([k,l])=>(
-            <a key={k} href={'/'+k} style={{color:C.dim,fontSize:10,textDecoration:'none',margin:'0 6px',fontWeight:600}}>{l}</a>
-          ))}
+          <FooterLegalLinks small current={null}/>
         </div>
       </div>
     </>
@@ -4760,6 +4829,552 @@ function VendorAdminPage() {
 }
 
 /* ================================================================
+   SUPPORT TICKETS — #faq #report #track-ticket
+================================================================ */
+function TicketStatusPipeline({ status }) {
+  const idx = TICKET_STATUS_STEPS.indexOf(status);
+  const cancelled = status === 'cancelled';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 16 }}>
+      {TICKET_STATUS_STEPS.map((s, i) => {
+        const done = !cancelled && idx >= i;
+        const active = status === s;
+        return (
+          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%', fontSize: 10, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: done ? C.grn : active ? C.acc : C.deep,
+              color: done || active ? '#fff' : C.dim,
+              border: `2px solid ${active ? C.acc : done ? C.grn : C.bdr}`,
+            }}>{i + 1}</div>
+            <span style={{ fontSize: 10, fontWeight: active ? 800 : 600, color: active ? C.acc : done ? C.grn : C.dim }}>{TICKET_STATUS_LABEL[s]}</span>
+            {i < TICKET_STATUS_STEPS.length - 1 && <span style={{ color: C.bdr, margin: '0 2px' }}>→</span>}
+          </div>
+        );
+      })}
+      {cancelled && <Badge label="Cancelled" color={C.red} />}
+    </div>
+  );
+}
+
+function TicketActivityFeed({ comments, agentMode = false }) {
+  if (!comments?.length) return <div style={{ color: C.dim, fontSize: 12 }}>No activity yet</div>;
+  return (
+    <div style={{ borderLeft: `2px solid ${C.bdr}`, marginLeft: 8, paddingLeft: 16 }}>
+      {comments.map(c => (
+        <div key={c.id} style={{ marginBottom: 14, position: 'relative', opacity: c.is_internal ? 0.92 : 1 }}>
+          <div style={{ position: 'absolute', left: -21, top: 4, width: 10, height: 10, borderRadius: '50%', background: c.is_internal ? C.gold : c.author_type === 'agent' ? C.acc : c.author_type === 'customer' ? C.cyan : C.dim, border: `2px solid ${C.surf}` }} />
+          <div style={{ fontSize: 10, color: C.dim, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>{c.author_name || c.author_type} · {fmtDt(c.created_at)}</span>
+            {agentMode && c.is_internal && <Badge label="Internal" color={C.gold} />}
+            {agentMode && !c.is_internal && c.author_type === 'agent' && <Badge label="Customer-visible" color={C.cyan} />}
+          </div>
+          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{c.body.replace(/\*\*(.*?)\*\*/g, '$1')}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FaqPage() {
+  const faqs = [
+    ['How do I book a service on ScanV?', 'Browse services on the home page, verify your mobile via OTP, pay the platform fee, and schedule date/time/location. You receive a TXN ID for tracking.'],
+    ['What areas does ScanV cover?', 'ScanV operates across PCMC, Pune, and wider Maharashtra. GPS is used to match you with nearby service partners.'],
+    ['How does OTP verification work?', 'We send a 6-digit OTP to your mobile via SMS/WhatsApp. Enter it to verify before booking. This protects your account under DPDP Act 2023.'],
+    ['How can I track my booking?', 'After payment, use the tracking link or go to #track with your booking ID. You can also view bookings in your profile after login.'],
+    ['What payment methods are accepted?', 'UPI (GPay, PhonePe, Paytm), debit/credit cards, and net banking via Razorpay. Platform fee (10%) is paid online at booking.'],
+    ['How do refunds work?', 'Refunds apply to the platform fee only, per our Refund Policy. Cancel 24+ hours before for full platform fee refund. See /refund for details.'],
+    ['My payment failed but money was deducted — what now?', 'Failed payments are auto-refunded in 5–7 business days. Email payments@dcoreglobal.com with your TXN ID if not resolved.'],
+    ['How do I report an issue or complaint?', 'Use Report in the footer (#report) to submit a support ticket. You receive a ticket number (TKT-…) for reference.'],
+    ['How do I check my support ticket status?', 'Go to #track-ticket, enter your ticket number and mobile. You see only status, subject, and last update — not the full agent workflow.'],
+    ['Can I change or cancel a booking?', 'Contact support before the service time. Admins can update booking status. Cancellation refunds follow the schedule in our Refund Policy.'],
+    ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
+    ['Who operates ScanV?', 'DCORE Global Corporation, Pune. Marketplace connecting customers with independent service partners. Call +91-9270194842 for help.'],
+    ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
+    ['How are partners assigned?', 'After payment, our dispatch system notifies nearby verified partners. First to accept is assigned to your booking.'],
+    ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Check basic status at #track-ticket.'],
+  ];
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)' }}>
+        <div style={{ fontWeight: 800, fontSize: 20, fontFamily: FF }}><span style={{ color: C.txt }}>Scan</span><span style={{ color: C.acc }}>V</span></div>
+        <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 13, textDecoration: 'none' }}>← Back</a>
+      </div>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px 80px' }}>
+        <div style={{ background: `linear-gradient(135deg,${C.surf},${C.card})`, border: `1px solid ${C.bdr}`, borderRadius: 16, padding: '28px 24px', marginBottom: 28 }}>
+          <div style={{ display: 'inline-block', background: C.cyan, color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: 1, marginBottom: 10 }}>FAQ</div>
+          <div style={{ color: C.txt, fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Frequently Asked Questions</div>
+          <div style={{ color: C.sub, fontSize: 12 }}>ScanV · Bookings, payments, OTP, tracking & support</div>
+        </div>
+        {faqs.map(([q, a]) => (
+          <div key={q} style={{ marginBottom: 20 }}>
+            <div style={{ color: C.txt, fontWeight: 600, fontSize: 14, marginBottom: 6, paddingBottom: 6, borderBottom: `1px solid ${C.bdr}` }}>{q}</div>
+            <p style={{ color: C.sub, fontSize: 13, lineHeight: 1.7, margin: 0 }}>{a}</p>
+          </div>
+        ))}
+        <div style={{ background: `${C.acc}12`, border: `1px solid ${C.acc}33`, borderRadius: 12, padding: 16, marginTop: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 6 }}>Still need help?</div>
+          <p style={{ fontSize: 12, color: C.sub, margin: '0 0 10px', lineHeight: 1.6 }}>Submit a report and receive a ticket number for reference.</p>
+          <a href="#report" style={{ color: C.acc, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Report an issue →</a>
+          {' · '}
+          <a href={`tel:${ASSIST.replace(/-/g, '')}`} style={{ color: C.acc, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Call {ASSIST}</a>
+        </div>
+        <div style={{ borderTop: `1px solid ${C.bdr}`, paddingTop: 20, marginTop: 20, display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <FooterLegalLinks current="faq" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportPage() {
+  const [form, setForm] = useState({ reporter_name: '', reporter_mobile: '', reporter_email: '', category: 'other', subject: '', description: '', txn_id: '' });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [result, setResult] = useState(null);
+
+  const submit = async () => {
+    if (!form.reporter_name.trim() || !form.reporter_mobile.trim() || !form.subject.trim() || !form.description.trim()) {
+      setErr('Name, mobile, subject, and description are required');
+      return;
+    }
+    setLoading(true); setErr('');
+    try {
+      const data = await supportTicketsFetch('create', {
+        reporter_name: form.reporter_name.trim(),
+        reporter_mobile: form.reporter_mobile.trim(),
+        reporter_email: form.reporter_email.trim() || undefined,
+        category: form.category,
+        subject: form.subject.trim(),
+        description: form.description.trim(),
+        txn_id: form.txn_id.trim() || undefined,
+      });
+      setResult(data);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  if (result?.ticket_number) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 28, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Ticket submitted</div>
+          <div style={{ fontSize: 13, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>We received your report. Save your ticket number — our support team will follow up.</div>
+          <div style={{ background: C.deep, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, letterSpacing: 1 }}>TICKET NUMBER</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.acc, fontFamily: 'monospace' }}>{result.ticket_number}</div>
+          </div>
+          <a href={`#track-ticket?id=${encodeURIComponent(result.ticket_number)}`} style={{ textDecoration: 'none' }}>
+            <Btn full>Check status →</Btn>
+          </a>
+          <div style={{ marginTop: 14 }}>
+            <a href="#" onClick={e => { e.preventDefault(); window.location.hash = ''; window.history.back(); }} style={{ color: C.dim, fontSize: 12 }}>← Back to home</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Report an issue</div>
+      </div>
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
+        <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>
+          Describe your booking, payment, or service issue. You receive a ticket number for reference.
+        </div>
+        <Field label="Your name" req><input value={form.reporter_name} onChange={e => setForm(f => ({ ...f, reporter_name: e.target.value }))} style={S.inp()} placeholder="Full name" /></Field>
+        <Field label="Mobile" req note="Used to verify when tracking"><input value={form.reporter_mobile} onChange={e => setForm(f => ({ ...f, reporter_mobile: e.target.value }))} style={S.inp()} placeholder="10-digit mobile" inputMode="tel" /></Field>
+        <Field label="Email" note="Optional — for closure notification"><input value={form.reporter_email} onChange={e => setForm(f => ({ ...f, reporter_email: e.target.value }))} style={S.inp()} placeholder="you@email.com" inputMode="email" /></Field>
+        <Field label="Category" req>
+          <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={S.inp()}>
+            {[['booking', 'Booking'], ['payment', 'Payment'], ['service', 'Service quality'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        <Field label="Subject" req><input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} style={S.inp()} placeholder="Brief summary" /></Field>
+        <Field label="Description" req><textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ ...S.inp(), minHeight: 100, resize: 'vertical' }} placeholder="What happened? Include TXN ID, date, service name…" /></Field>
+        <Field label="Booking / TXN reference" note="Optional"><input value={form.txn_id} onChange={e => setForm(f => ({ ...f, txn_id: e.target.value }))} style={S.inp()} placeholder="TXN-XXXXXXXX" /></Field>
+        {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+        <Btn full onClick={submit} disabled={loading}>{loading ? 'Submitting…' : 'Submit report'}</Btn>
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <a href="#track-ticket" style={{ color: C.dim, fontSize: 11 }}>Already have a ticket? Check status →</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrackTicketPage() {
+  const [ticketNum, setTicketNum] = useState(() => trackTicketIdFromHash() || '');
+  const [mobile, setMobile] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [ticket, setTicket] = useState(null);
+
+  const track = async () => {
+    if (!ticketNum.trim() || !mobile.trim()) { setErr('Enter ticket number and mobile'); return; }
+    setLoading(true); setErr(''); setTicket(null);
+    try {
+      const res = await supportTicketsFetch('track', {
+        ticket_number: ticketNum.trim().toUpperCase(),
+        mobile: mobile.trim(),
+      });
+      setTicket(res.ticket);
+      window.location.hash = `track-ticket?id=${encodeURIComponent(ticketNum.trim().toUpperCase())}`;
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Ticket status</div>
+      </div>
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
+        {!ticket ? (
+          <>
+            <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>
+              Enter your ticket number and mobile to see a basic status update. Full case details are handled by our support team.
+            </div>
+            <Field label="Ticket number" req><input value={ticketNum} onChange={e => setTicketNum(e.target.value)} style={S.inp()} placeholder="TKT-1786479760941" /></Field>
+            <Field label="Mobile" req><input value={mobile} onChange={e => setMobile(e.target.value)} style={S.inp()} placeholder="10-digit or last 4 digits" inputMode="tel" /></Field>
+            {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+            <Btn full onClick={track} disabled={loading}>{loading ? 'Looking up…' : 'Check status'}</Btn>
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <a href="#report" style={{ color: C.dim, fontSize: 11 }}>Need to report a new issue? →</a>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ ...S.card(), padding: 20, marginBottom: 14, textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>YOUR TICKET</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.acc, fontFamily: 'monospace', marginBottom: 14 }}>{ticket.ticket_number}</div>
+              <Badge label={TICKET_STATUS_LABEL[ticket.status] || ticket.status} color={TICKET_STATUS_COLOR[ticket.status] || C.sub} />
+            </div>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.dim, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>Subject</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, marginBottom: 14 }}>{ticket.subject}</div>
+              <div style={{ display: 'grid', gap: 8, fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ color: C.dim }}>Status</span>
+                  <span style={{ color: C.txt, fontWeight: 600 }}>{TICKET_STATUS_LABEL[ticket.status] || ticket.status}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ color: C.dim }}>Last update</span>
+                  <span style={{ color: C.txt, fontWeight: 600 }}>{fmtDt(ticket.updated_at)}</span>
+                </div>
+                {ticket.created_at && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ color: C.dim }}>Submitted</span>
+                    <span style={{ color: C.sub }}>{fmtDt(ticket.created_at)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {ticket.closure_note && (
+              <div style={{ ...S.card(), padding: 16, marginBottom: 14, borderLeft: `4px solid ${C.grn}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Resolution</div>
+                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{ticket.closure_note}</div>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.6, marginBottom: 14, textAlign: 'center' }}>
+              For urgent help, call {ASSIST}. Our team manages the full case workflow internally.
+            </div>
+            <Btn v="outline" sm full onClick={() => { setTicket(null); setErr(''); }}>← Check another ticket</Btn>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TicketDeskPanel({ pin, useAdminPin = false, readOnly = false }) {
+  const [deskView, setDeskView] = useState('queue');
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('all');
+  const [tickets, setTickets] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [detail, setDetail] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [comment, setComment] = useState('');
+  const [commentInternal, setCommentInternal] = useState(true);
+  const [closureNote, setClosureNote] = useState('');
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyEmail, setNotifyEmail] = useState(false);
+  const [stats, setStats] = useState(null);
+
+  const fetchStats = useCallback(async () => {
+    if (!pin) return;
+    try {
+      const s = await supportTicketsFetch('stats', {}, pin, useAdminPin);
+      setStats(s);
+    } catch { /* ignore */ }
+  }, [pin, useAdminPin]);
+
+  const fetchAgents = useCallback(async () => {
+    if (!pin) return;
+    try {
+      const { agents: data } = await supportTicketsFetch('list_agents', {}, pin, useAdminPin);
+      setAgents(data || []);
+    } catch { /* ignore */ }
+  }, [pin, useAdminPin]);
+
+  const search = async () => {
+    setLoading(true); setErr(''); setDetail(null);
+    try {
+      const { tickets: data } = await supportTicketsFetch('search', { q: q.trim() || undefined, status }, pin, useAdminPin);
+      setTickets(data || []);
+      setMsg(`Found ${data?.length || 0} ticket(s)`);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const loadDetail = async (id) => {
+    setLoading(true); setErr('');
+    try {
+      const res = await supportTicketsFetch('detail', { id }, pin, useAdminPin);
+      setDetail(res.ticket);
+      setComments(res.comments || []);
+      setClosureNote(res.ticket?.closure_note || '');
+      setNotifyEmail(!!res.ticket?.reporter_email);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchStats(); fetchAgents(); search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateStatus = async (newStatus) => {
+    if (!detail?.id || readOnly) return;
+    setLoading(true); setErr('');
+    try {
+      await supportTicketsFetch('update_status', { id: detail.id, status: newStatus }, pin, useAdminPin);
+      setMsg(`Status → ${TICKET_STATUS_LABEL[newStatus]}`);
+      await loadDetail(detail.id);
+      await search();
+      await fetchStats();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const updateMeta = async (patch) => {
+    if (!detail?.id || readOnly) return;
+    setLoading(true); setErr('');
+    try {
+      await supportTicketsFetch('update_status', { id: detail.id, status: detail.status, ...patch }, pin, useAdminPin);
+      setMsg('Ticket updated');
+      await loadDetail(detail.id);
+      await search();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const postComment = async () => {
+    if (!detail?.id || !comment.trim() || readOnly) return;
+    setLoading(true); setErr('');
+    try {
+      await supportTicketsFetch('add_comment', { id: detail.id, body: comment.trim(), is_internal: commentInternal }, pin, useAdminPin);
+      setComment('');
+      await loadDetail(detail.id);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const resolve = async () => {
+    if (!detail?.id || !closureNote.trim() || readOnly) return;
+    setLoading(true); setErr('');
+    try {
+      const res = await supportTicketsFetch('resolve', {
+        id: detail.id,
+        closure_note: closureNote.trim(),
+        notify_sms: notifySms,
+        notify_email: notifyEmail,
+      }, pin, useAdminPin);
+      const notes = [];
+      if (res.notifications?.sms?.ok) notes.push('SMS sent');
+      else if (notifySms && res.notifications?.sms) notes.push(`SMS: ${res.notifications.sms.error || 'failed'}`);
+      if (res.notifications?.email?.ok) notes.push('Email sent');
+      else if (notifyEmail && res.notifications?.email) notes.push(`Email: ${res.notifications.email.error || 'not configured'}`);
+      setMsg(`Ticket resolved${notes.length ? ' · ' + notes.join(' · ') : ''}`);
+      await loadDetail(detail.id);
+      await search();
+      await fetchStats();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const priorityColor = { low: C.dim, medium: C.cyan, high: C.gold, urgent: C.red };
+
+  if (!detail) {
+    return (
+      <div>
+        {useAdminPin && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            {[['queue', 'Ticket queue'], ['stats', 'Stats']].map(([k, l]) => (
+              <button key={k} onClick={() => setDeskView(k)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${deskView === k ? C.acc : C.bdr}`, background: deskView === k ? `${C.acc}18` : C.surf, color: deskView === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
+            ))}
+          </div>
+        )}
+        {deskView === 'stats' && stats ? (
+          <div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              <AdminStatCard label="Total tickets" value={stats.total ?? '—'} />
+              <AdminStatCard label="Open" value={stats.open ?? '—'} color={C.gold} />
+              <AdminStatCard label="Resolved / closed" value={stats.resolved ?? '—'} color={C.grn} sub={stats.avg_resolution_hours != null ? `Avg ${stats.avg_resolution_hours}h to resolve` : ''} />
+            </div>
+            {stats.by_status && (
+              <div style={{ ...S.card(), padding: 16 }}>
+                <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>By status</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {Object.entries(stats.by_status).map(([s, n]) => (
+                    <div key={s} style={{ padding: '8px 12px', borderRadius: 10, background: C.deep, border: `1px solid ${C.bdr}` }}>
+                      <div style={{ fontSize: 10, color: C.dim }}>{TICKET_STATUS_LABEL[s] || s}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: TICKET_STATUS_COLOR[s] || C.txt }}>{n}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {stats && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                <AdminStatCard label="Open tickets" value={stats.open ?? '—'} color={C.gold} sub={`Total: ${stats.total}`} />
+                <AdminStatCard label="Resolved" value={stats.resolved ?? '—'} color={C.grn} sub={stats.avg_resolution_hours != null ? `Avg ${stats.avg_resolution_hours}h` : ''} />
+              </div>
+            )}
+            <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                {['all', 'new', 'in_progress', 'pending_customer', 'resolved', 'closed', 'cancelled'].map(s => (
+                  <button key={s} onClick={() => setStatus(s)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${status === s ? C.acc : C.bdr}`, background: status === s ? `${C.acc}18` : C.surf, color: status === s ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
+                    {s === 'all' ? 'All' : TICKET_STATUS_LABEL[s]}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Ticket #, mobile, subject, TXN…" style={{ ...S.inp(), flex: 1 }} />
+                <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+              </div>
+            </div>
+            {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+            {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+            {tickets.map(t => (
+              <div key={t.id} onClick={() => loadDetail(t.id)} style={{ ...S.card(), marginBottom: 8, padding: 14, cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: C.acc, fontSize: 13, fontFamily: 'monospace' }}>{t.ticket_number}</div>
+                    <div style={{ fontWeight: 700, color: C.txt, fontSize: 14, marginTop: 2 }}>{t.subject}</div>
+                    <div style={{ fontSize: 11, color: C.sub }}>{t.reporter_name} · {t.reporter_mobile}</div>
+                    {t.assigned_agent_name && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>Assigned: {t.assigned_agent_name}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <Badge label={TICKET_STATUS_LABEL[t.status]} color={TICKET_STATUS_COLOR[t.status]} />
+                    {t.priority && <div style={{ marginTop: 4 }}><Badge label={t.priority} color={priorityColor[t.priority] || C.sub} /></div>}
+                    <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>{fmtDt(t.created_at)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!tickets.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 32 }}>No tickets found</div>}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Btn v="outline" sm onClick={() => { setDetail(null); setComments([]); }} style={{ marginBottom: 12 }}>← All tickets</Btn>
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+      <div style={{ ...S.card(), padding: 16, marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontFamily: 'monospace', fontWeight: 800, color: C.acc, fontSize: 16 }}>{detail.ticket_number}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, marginTop: 4 }}>{detail.subject}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Badge label={TICKET_STATUS_LABEL[detail.status]} color={TICKET_STATUS_COLOR[detail.status]} />
+            {detail.priority && <Badge label={detail.priority} color={priorityColor[detail.priority] || C.sub} />}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>{detail.description}</div>
+        <div style={{ fontSize: 11, color: C.dim, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <div>{detail.reporter_name} · {detail.reporter_mobile}</div>
+          <div>{detail.reporter_email || 'No email'}</div>
+          <div>Category: {detail.category}</div>
+          <div>TXN: {detail.txn_id || '—'}</div>
+          <div>Created: {fmtDt(detail.created_at)}</div>
+          {detail.assigned_agent_name && <div>Agent: {detail.assigned_agent_name}</div>}
+        </div>
+        {!readOnly && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+            <Field label="Priority">
+              <select value={detail.priority || 'medium'} onChange={e => updateMeta({ priority: e.target.value })} style={S.inp()} disabled={loading}>
+                {['low', 'medium', 'high', 'urgent'].map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+            <Field label="Assign to">
+              <select value={detail.assigned_agent_id || ''} onChange={e => updateMeta({ assigned_agent_id: e.target.value || null })} style={S.inp()} disabled={loading}>
+                <option value="">Unassigned</option>
+                {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </Field>
+          </div>
+        )}
+      </div>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Status pipeline</div>
+        <TicketStatusPipeline status={detail.status} />
+        {!readOnly && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+            {['new', 'in_progress', 'pending_customer', 'resolved', 'closed', 'cancelled'].filter(s => s !== detail.status).map(s => (
+              <button key={s} onClick={() => updateStatus(s)} disabled={loading} style={{ background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 6, padding: '4px 8px', color: C.sub, fontSize: 10, cursor: 'pointer', fontFamily: FF }}>→ {TICKET_STATUS_LABEL[s]}</button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Activity timeline</div>
+        <TicketActivityFeed comments={comments} agentMode />
+        {!readOnly && (
+          <div style={{ marginTop: 14 }}>
+            <Field label="Add comment">
+              <textarea value={comment} onChange={e => setComment(e.target.value)} style={{ ...S.inp(), minHeight: 70 }} placeholder={commentInternal ? 'Internal note (agents only)…' : 'Customer-visible update…'} />
+            </Field>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.sub, marginBottom: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={commentInternal} onChange={e => setCommentInternal(e.target.checked)} /> Internal note (not shown to customer)
+            </label>
+            <Btn sm onClick={postComment} disabled={loading || !comment.trim()}>Post comment</Btn>
+          </div>
+        )}
+      </div>
+      {!readOnly && detail.status !== 'resolved' && detail.status !== 'closed' && (
+        <div style={{ ...S.card(), padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Resolve ticket</div>
+          <Field label="Closure note" req note="Sent to customer if notify is checked"><textarea value={closureNote} onChange={e => setClosureNote(e.target.value)} style={{ ...S.inp(), minHeight: 80 }} placeholder="Explain resolution to the customer…" /></Field>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.sub, marginBottom: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={notifySms} onChange={e => setNotifySms(e.target.checked)} /> Send closure SMS to {detail.reporter_mobile}
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.sub, marginBottom: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={notifyEmail} onChange={e => setNotifyEmail(e.target.checked)} disabled={!detail.reporter_email} /> Send closure email{detail.reporter_email ? ` to ${detail.reporter_email}` : ' (no email on file)'}
+          </label>
+          <Btn onClick={resolve} disabled={loading || !closureNote.trim()}>Resolve & notify</Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
    CUSTOMER SUPPORT — #customer-support (read-only agents, admin update)
 ================================================================ */
 function fmtRs(paise) {
@@ -4777,6 +5392,7 @@ function CustomerSupportPage() {
   const [auth, setAuth] = useState(() => getSupportAuth());
   const [authed, setAuthed] = useState(supportAuthOk());
   const [role, setRole] = useState(auth?.role || 'support_agent');
+  const [deskTab, setDeskTab] = useState('customers');
   const bookingStatusColor = { confirmed: C.acc, in_progress: C.gold, completed: C.grn, cancelled: C.red, pending: C.dim };
   const [q, setQ] = useState('');
   const [field, setField] = useState('all');
@@ -4911,16 +5527,23 @@ function CustomerSupportPage() {
             <div style={{ fontSize: 18, fontWeight: 800, color: C.txt }}>ScanV Support Desk</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {detail && <Btn v="outline" sm onClick={() => { setDetail(null); setEditProfile(null); }}>← Search</Btn>}
+            {detail && deskTab === 'customers' && <Btn v="outline" sm onClick={() => { setDetail(null); setEditProfile(null); }}>← Search</Btn>}
             <Btn v="ghost" sm onClick={() => { sessionStorage.removeItem(SUPPORT_AUTH_KEY); sessionStorage.removeItem(SUPPORT_PIN_KEY); setAuthed(false); setDetail(null); }}>Lock</Btn>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, maxWidth: 1100, margin: '10px auto 0' }}>
+          {[['customers', 'Customers'], ['tickets', 'Tickets']].map(([k, l]) => (
+            <button key={k} onClick={() => { setDeskTab(k); setDetail(null); setResults([]); setMsg(''); setErr(''); }} style={{ padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${deskTab === k ? C.acc : C.bdr}`, background: deskTab === k ? `${C.acc}18` : C.surf, color: deskTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
+          ))}
         </div>
         {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8, maxWidth: 1100, margin: '8px auto 0' }}>{msg}</div>}
         {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8, maxWidth: 1100, margin: '8px auto 0' }}>{err}</div>}
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
-        {!detail ? (
+        {deskTab === 'tickets' ? (
+          <TicketDeskPanel pin={pin || getSupportAuth()?.pin} readOnly={false} />
+        ) : !detail ? (
           <>
             <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -5073,6 +5696,7 @@ const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'pricing', label: 'Pricing', icon: '💰' },
   { id: 'support', label: 'Customer Support', icon: '🎧' },
+  { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'agents', label: 'Support Agents', icon: '👥' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
@@ -5405,6 +6029,7 @@ function AdminControlCenter({ onPricesUpdated }) {
               <AdminStatCard label="Active vendors" value={stats?.active_vendors ?? '—'} color={C.cyan} />
               <AdminStatCard label="Pending dispatches" value={stats?.pending_dispatches ?? '—'} color={C.gold} />
               <AdminStatCard label="Support agents" value={stats?.active_support_agents ?? '—'} />
+              <AdminStatCard label="Open tickets" value={stats?.open_tickets ?? '—'} color={C.gold} sub={stats?.avg_ticket_resolution_hours != null ? `Avg resolve ${stats.avg_ticket_resolution_hours}h` : ''} />
               <AdminStatCard label="Profiles" value={stats?.profiles_count ?? '—'} />
             </div>
             <div style={{ ...S.card(), padding: 16 }}>
@@ -5441,6 +6066,16 @@ function AdminControlCenter({ onPricesUpdated }) {
           </div>
         )}
 
+        {tab === 'tickets' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 13, color: C.sub }}>ServiceNow-style ticket desk for agents/admins. Resolve with optional SMS/email closure note.</div>
+              <AdminDeepLinkBtn hash="customer-support" label="Support desk →" />
+            </div>
+            <TicketDeskPanel pin={usePin} useAdminPin />
+          </div>
+        )}
+
         {tab === 'agents' && <AdminAgentsTab pin={usePin} />}
 
         {tab === 'vendors' && (
@@ -5471,6 +6106,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 ['Table: profiles', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor/17350', 'Customer profiles (id is TEXT)'],
                 ['Table: bookings', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'All bookings'],
                 ['Table: support_agents', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Support staff registry'],
+                ['Table: support_tickets', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Customer support tickets'],
                 ['Table: vendor_partners', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Partner onboarding'],
                 ['Table: booking_dispatch', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor', 'Dispatch state machine'],
                 ['Edge functions', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/functions', 'admin-hub, customer-support, pricing-admin…'],
@@ -5484,7 +6120,7 @@ function AdminControlCenter({ onPricesUpdated }) {
             <div style={{ ...S.card(), padding: 16, marginTop: 14 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Migrations applied</div>
               <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.8 }}>
-                20260811000000_wa_verifications · 20260811000001_wa_verifications_outbound · 20260811000002_payment_intents · 20260811000003_service_pricing · 20260812000004_sub_services_pricing · 20260812000005_fill_grid_pricing · 20260812000006_vendors_and_dispatch · 20260812000007_live_tracking_and_vehicle_pricing · 20260812000008_dispatch_cron · 20260812000009_vendor_live_locations_rls · 20260812000010_pricing_realtime_vehicle_cards · 20260812000011_customer_support_roles
+                20260811000000_wa_verifications · 20260811000001_wa_verifications_outbound · 20260811000002_payment_intents · 20260811000003_service_pricing · 20260812000004_sub_services_pricing · 20260812000005_fill_grid_pricing · 20260812000006_vendors_and_dispatch · 20260812000007_live_tracking_and_vehicle_pricing · 20260812000008_dispatch_cron · 20260812000009_vendor_live_locations_rls · 20260812000010_pricing_realtime_vehicle_cards · 20260812000011_customer_support_roles · 20260812000012_support_tickets · 20260812000013_support_ticket_comment_internal
               </div>
             </div>
           </div>
@@ -5513,6 +6149,7 @@ function AdminControlCenter({ onPricesUpdated }) {
               <pre style={{ fontSize: 11, color: C.sub, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.6 }}>{`npx supabase secrets set ADMIN_HUB_PIN=YourHubPin123
 npx supabase functions deploy admin-hub --no-verify-jwt
 npx supabase functions deploy customer-support --no-verify-jwt
+npx supabase functions deploy support-tickets --no-verify-jwt
 npx supabase db push`}</pre>
             </div>
           </div>
@@ -5645,9 +6282,7 @@ function LegalPage({page}) {
         {pg.content}
         {/* Footer links */}
         <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:20,marginTop:20,display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center'}}>
-          {[['privacy','Privacy'],['terms','Terms'],['refund','Refund'],['payment','Payment']].map(([k,l])=>(
-            <a key={k} href={`/${k}`} style={{color:page===k?C.acc:C.dim,fontSize:12,textDecoration:'none'}}>{l} Policy</a>
-          ))}
+          <FooterLegalLinks current={page}/>
           <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global ↗</a>
         </div>
         <div style={{textAlign:'center',marginTop:16,color:C.dim,fontSize:11}}>
@@ -5787,6 +6422,18 @@ export default function App() {
   const legalPath = legalSegment();
   if (isLegalRoute()) {
     return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath}/></Boundary>;
+  }
+
+  if (isFaqRoute()) {
+    return <Boundary><style>{APP_CSS}</style><FaqPage/></Boundary>;
+  }
+
+  if (isReportRoute()) {
+    return <Boundary><style>{APP_CSS}</style><ReportPage/></Boundary>;
+  }
+
+  if (isTrackTicketRoute()) {
+    return <Boundary><style>{APP_CSS}</style><TrackTicketPage/></Boundary>;
   }
 
   if (isAdminHubRoute()) {
