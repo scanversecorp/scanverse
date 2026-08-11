@@ -770,15 +770,50 @@ function applyLivePricingRows(rows) {
     if (row.price_paise != null) svc.price = row.price_paise;
     if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
   }
+  syncParentFromPrices(rows);
 }
 
-async function fetchLivePricing() {
+/** Parent cards without DB rows show min sub-service price after live sync. */
+function syncParentFromPrices(rows) {
+  const dbIds = new Set((rows || []).map(r => r.service_id));
+  for (const parent of SVCS) {
+    const cfg = SUB_CATEGORIES[parent.id];
+    if (!cfg?.svcs?.length || dbIds.has(parent.id)) continue;
+    const prices = cfg.svcs.map(s => s.price).filter(p => p > 0);
+    const mrps = cfg.svcs.map(s => s.mrp).filter(p => p > 0);
+    if (prices.length) parent.price = Math.min(...prices);
+    if (mrps.length) parent.mrp = Math.min(...mrps);
+  }
+}
+
+async function waitForSupabase(maxMs = 8000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    if (window.supabase?.createClient) return true;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  return false;
+}
+
+async function fetchLivePricing(onApplied) {
   try {
+    if (!(await waitForSupabase())) {
+      console.warn('[ScanV] Supabase not ready — using catalog prices');
+      return [];
+    }
     const { data, error } = await sb().from('service_prices_public').select('service_id,price_paise,mrp_paise');
-    if (error || !data?.length) return [];
+    if (error) {
+      console.warn('[ScanV] Live pricing fetch failed:', error.message);
+      return [];
+    }
+    if (!data?.length) return [];
     applyLivePricingRows(data);
+    onApplied?.();
     return data;
-  } catch { return []; }
+  } catch (e) {
+    console.warn('[ScanV] Live pricing fetch error:', e?.message || e);
+    return [];
+  }
 }
 
 function pricingAuthOk() {
@@ -4006,8 +4041,7 @@ function PricingAdminPage({ onPricesUpdated }) {
     setSaving(true); setErr(''); setMsg('');
     try {
       await pricingAdminSave(pin, rows);
-      await fetchLivePricing();
-      onPricesUpdated?.();
+      await fetchLivePricing(onPricesUpdated);
       setMsg(`Saved ${rows.length} rows — live on site now`);
     } catch (e) {
       setErr(e.message || 'Save failed');
@@ -4018,8 +4052,7 @@ function PricingAdminPage({ onPricesUpdated }) {
     setSaving(true); setErr('');
     try {
       await pricingAdminSave(pin, [rows[idx]]);
-      await fetchLivePricing();
-      onPricesUpdated?.();
+      await fetchLivePricing(onPricesUpdated);
       setMsg(`Saved ${rows[idx].service_name}`);
     } catch (e) {
       setErr(e.message || 'Save failed');
@@ -4693,7 +4726,7 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       // Load live pricing overrides before showing services
-      await fetchLivePricing();
+      await fetchLivePricing(refreshPricing);
 
       // Silently capture device + IP + location in background
       try {
@@ -4744,18 +4777,32 @@ export default function App() {
     })();
   },[]);
 
-  // Realtime price sync — card amounts update without reload
+  // Realtime + refetch when returning from admin or switching tabs
   useEffect(()=>{
     let channel;
-    try {
-      channel = sb().channel('live-pricing')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'service_prices_public' }, async () => {
-          await fetchLivePricing();
-          refreshPricing();
-        })
-        .subscribe();
-    } catch { /* supabase not ready */ }
-    return () => { if (channel) sb().removeChannel(channel); };
+    let cancelled = false;
+    const refetch = async () => {
+      if (cancelled) return;
+      await fetchLivePricing(refreshPricing);
+    };
+    const onHash = () => { if (!isPricingAdminRoute()) refetch(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') refetch(); };
+    window.addEventListener('hashchange', onHash);
+    document.addEventListener('visibilitychange', onVisible);
+    (async () => {
+      if (!(await waitForSupabase())) return;
+      try {
+        channel = sb().channel('live-pricing')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'service_prices_public' }, refetch)
+          .subscribe();
+      } catch { /* supabase not ready */ }
+    })();
+    return () => {
+      cancelled = true;
+      window.removeEventListener('hashchange', onHash);
+      document.removeEventListener('visibilitychange', onVisible);
+      if (channel) sb().removeChannel(channel);
+    };
   }, [refreshPricing]);
 
   useEffect(()=>{
