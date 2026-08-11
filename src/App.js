@@ -19,7 +19,7 @@ const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const RZP_URL  = 'https://rzp.io/rzp/QEuXj4E';
-const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
+const UPI_PA   = '8484850288.1@hdfc';
 const UPI_PN   = 'DCORE Global Corporation';
 const ASSIST   = '+91-9270194842';
 
