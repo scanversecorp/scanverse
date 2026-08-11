@@ -32,6 +32,15 @@ function dispatchSecretOk(req: Request): boolean {
   return req.headers.get("x-dispatch-secret") === secret;
 }
 
+/** pg_cron may call tick with service role bearer (stored in Vault) */
+function tickAuthOk(req: Request): boolean {
+  if (dispatchSecretOk(req)) return true;
+  const auth = req.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return !!(serviceKey && token === serviceKey);
+}
+
 function baseUrl(): string {
   return Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "") +
     "/functions/v1/booking-dispatch";
@@ -491,7 +500,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "tick") {
-      if (!dispatchSecretOk(req)) return json({ error: "Unauthorized" }, 401);
+      if (!tickAuthOk(req)) return json({ error: "Unauthorized" }, 401);
 
       const { data: due } = await supabase
         .from("booking_dispatch")

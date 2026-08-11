@@ -48,7 +48,45 @@ npx supabase functions deploy booking-dispatch --no-verify-jwt
 
 ## Cron for retry ticks (every 1 min)
 
-Call `POST /functions/v1/booking-dispatch` with body `{"action":"tick"}` and header `x-dispatch-secret`.
+Migration `20260812000008_dispatch_cron.sql` schedules `scanv-dispatch-tick` via **pg_cron** — runs every minute and processes due dispatches (2-minute retry gaps).
+
+### Setup (one time, after `db push`)
+
+1. Apply migration:
+   ```bash
+   npx supabase db push
+   npx supabase functions deploy booking-dispatch --no-verify-jwt
+   ```
+
+2. Store your dispatch secret in Vault — **Supabase Dashboard → SQL Editor**, run (use your real `DISPATCH_SECRET`):
+   ```sql
+   SELECT vault.create_secret(
+     'ScanV2026',
+     'scanv_dispatch_secret',
+     'ScanV booking-dispatch cron auth'
+   );
+   ```
+
+3. Test manually:
+   ```sql
+   SELECT public.scanv_dispatch_tick_cron();
+   ```
+
+4. Confirm job is scheduled:
+   ```sql
+   SELECT jobid, jobname, schedule FROM cron.job WHERE jobname = 'scanv-dispatch-tick';
+   ```
+
+See also: `scripts/setup-dispatch-cron.sql`
+
+### Manual curl (debug)
+
+```bash
+curl -X POST 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/booking-dispatch' \
+  -H 'Content-Type: application/json' \
+  -H 'x-dispatch-secret: ScanV2026' \
+  -d '{"action":"tick"}'
+```
 
 ## Twilio webhooks
 
