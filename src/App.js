@@ -367,40 +367,40 @@ const HH_THEME = {
 
 /* --- HOUSEHOLD SUB-SERVICES (ScanV-branded; fulfillVia routes backend later) --- */
 const HOUSEHOLD_SVCS = [
-  { id:'hh-bathroom-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🚿', img:'/services/bathroom-deep.svg', name:'Bathroom Deep Clean', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:true,
+  { id:'hh-bathroom-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🚿', img:'/services/bathroom-deep.png', name:'Bathroom Deep Clean', sub:'Deep scrub · sanitise · 45–60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:true,
     desc:'ScanV bathroom deep clean — tiles, WC, taps, mirrors & exhaust fan. Eco-friendly products, background-verified professionals, satisfaction guaranteed.',
     features:['WC & basin deep scrub','Tile & grout cleaning','Mirror & tap polish','Exhaust fan wipe','Re-clean if not satisfied'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'5,000+' },
-  { id:'hh-kitchen-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🍳', img:'/services/kitchen-deep.svg', name:'Kitchen Deep Clean', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:true,
+  { id:'hh-kitchen-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🍳', img:'/services/kitchen-deep.png', name:'Kitchen Deep Clean', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:true,
     desc:'ScanV kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. All supplies included, verified professionals across Pune & PCMC.',
     features:['Counter & cabinet wipe','Chimney exterior clean','Sink & tap descale','Floor mop & degrease','Eco-friendly products'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'3,200+' },
-  { id:'hh-flat-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🏠', img:'/services/flat-clean.svg', name:'Full Flat Cleaning', sub:'Complete home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:true,
+  { id:'hh-flat-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🏠', img:'/services/flat-clean.png', name:'Full Flat Cleaning', sub:'Complete home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:true,
     desc:'Complete flat cleaning through ScanV — every room, kitchen & bathroom. Ideal for move-in, festival prep or monthly deep clean.',
     features:['All rooms dust & mop','Kitchen + bathroom included','Balcony sweep','Furniture wipe-down','Team of 2 for 2BHK+'], turnaround:'24–48 hrs', rating:'4.9 ⭐', bookings:'2,100+' },
-  { id:'hh-care-plan', parent:'household', theme:'pink', fulfillVia:'x', icon:'📅', img:'/services/care-plan.svg', name:'Bathroom Care Plan', sub:'Weekly / fortnightly · fixed slot', unit:'month', mrp:149900, price:discPaise(149900), cash:true,
+  { id:'hh-care-plan', parent:'household', theme:'pink', fulfillVia:'x', icon:'📅', img:'/services/care-plan.png', name:'Bathroom Care Plan', sub:'Weekly / fortnightly · fixed slot', unit:'month', mrp:149900, price:discPaise(149900), cash:true,
     desc:'ScanV recurring bathroom care — hassle-free scheduled cleaning without rebooking every time. Same trusted professional, fixed slot.',
     features:['4 visits per month','Fixed day & time slot','Same professional','Priority rescheduling','Save vs one-time booking'], turnaround:'Starts in 48 hrs', rating:'4.8 ⭐', bookings:'890+' },
-  { id:'hh-quick-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'✨', img:'/services/quick-clean.svg', name:'Quick Clean', sub:'Single task · bathroom · fan · 30 min', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-quick-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'✨', img:'/services/quick-clean.png', name:'Quick Clean', sub:'Single task · bathroom · fan · 30 min', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
     desc:'ScanV quick clean — affordable single-task service for one bathroom, fan or appliance. Perfect when you need just one thing done fast.',
     features:['Single bathroom refresh','Fan / exhaust wipe','Appliance exterior','30-min visit','Best-value quick booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,400+' },
-  { id:'hh-house-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🏡', img:'/services/house-help.svg', name:'House Help', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:true,
+  { id:'hh-house-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🏡', img:'/services/house-help.png', name:'House Help', sub:'Sweep · mop · dust · multi-task · hourly', unit:'hour', mrp:18200, price:discPaise(18200), cash:true,
     desc:'ScanV house help — trained, background-verified experts for sweeping, mopping, dusting, dishes & more. Book by the hour, instant or scheduled.',
     features:['Background verified experts','Professional training','Hourly — book 1–4 hrs','Instant or scheduled','Flexible tasks in one visit'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  { id:'hh-dishwashing', parent:'household', theme:'green', fulfillVia:'s', icon:'🍽️', img:'/services/dishwashing.svg', name:'Dishwashing', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:true,
+  { id:'hh-dishwashing', parent:'household', theme:'green', fulfillVia:'s', icon:'🍽️', img:'/services/dishwashing.png', name:'Dishwashing', sub:'Utensils · sink · platform wipe', unit:'hour', mrp:9900, price:discPaise(9900), cash:true,
     desc:'ScanV dishwashing help — sink, utensils & platform cleaned efficiently. Hourly booking, transparent pricing, verified professionals.',
     features:['All utensils washed','Sink & platform clean','Supplies included','Hourly booking','Trusted ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'8,000+' },
-  { id:'hh-kitchen-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🧽', img:'/services/kitchen-help.svg', name:'Kitchen Tidy-Up', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-kitchen-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🧽', img:'/services/kitchen-help.png', name:'Kitchen Tidy-Up', sub:'Platform · tiles · chimney wipe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
     desc:'ScanV kitchen tidy-up — platform, tiles, chimney exterior & sink within your booked hours. No contracts, cancel anytime before the slot.',
     features:['Platform & tile wipe','Chimney exterior','Sink clean','Cabinet exterior dust','Transparent hourly rate'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'4,500+' },
-  { id:'hh-fan-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🌀', img:'/services/fan-clean.svg', name:'Fan Cleaning', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-fan-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🌀', img:'/services/fan-clean.png', name:'Fan Cleaning', sub:'Ceiling fan · blades · reachable only', unit:'visit', mrp:14900, price:discPaise(14900), cash:true,
     desc:'ScanV fan cleaning — blade wipe & dust removal for reachable ceiling fans. Safe service — no ladder or height work.',
     features:['Blade dust & wipe','Cover clean','Safe reachable access','Add to hourly booking','No ladder tasks'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'2,200+' },
-  { id:'hh-window-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🪟', img:'/services/window-clean.svg', name:'Window Cleaning', sub:'Glass · frames · inside only', unit:'visit', mrp:19900, price:discPaise(19900), cash:true,
+  { id:'hh-window-clean', parent:'household', theme:'green', fulfillVia:'s', icon:'🪟', img:'/services/window-clean.png', name:'Window Cleaning', sub:'Glass · frames · inside only', unit:'visit', mrp:19900, price:discPaise(19900), cash:true,
     desc:'ScanV window cleaning — glass & frame wipe for accessible windows inside your home. Streak-free finish by trained experts.',
     features:['Glass wipe inside','Frame & sill clean','Reachable windows only','Streak-free finish','Bundle with house help'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,800+' },
-  { id:'hh-laundry', parent:'household', theme:'green', fulfillVia:'s', icon:'👕', img:'/services/laundry.svg', name:'Laundry Help', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
+  { id:'hh-laundry', parent:'household', theme:'green', fulfillVia:'s', icon:'👕', img:'/services/laundry.png', name:'Laundry Help', sub:'Fold · sort · organise wardrobe', unit:'hour', mrp:14900, price:discPaise(14900), cash:true,
     desc:'ScanV laundry help — folding, sorting & organising clean clothes. Washing machine operation or ironing by separate agreement.',
     features:['Fold clean laundry','Sort by type/colour','Wardrobe organise','Bed linen change','Hourly booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'3,500+' },
-  { id:'hh-bathroom-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🛁', img:'/services/bathroom-help.svg', name:'Bathroom Refresh', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:true,
+  { id:'hh-bathroom-help', parent:'household', theme:'green', fulfillVia:'s', icon:'🛁', img:'/services/bathroom-help.png', name:'Bathroom Refresh', sub:'WC · floor · taps · hourly', unit:'hour', mrp:19900, price:discPaise(19900), cash:true,
     desc:'ScanV bathroom refresh — WC, floor, taps & mirror within booked hours. Ideal for quick upkeep — book 1–2 hours.',
     features:['WC & floor clean','Tap & mirror wipe','Bucket & mug rinse','Hourly scope','Verified ScanV partners'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'5,200+' },
 ];
@@ -532,7 +532,14 @@ function PriceTag({ svc, sm }) {
 
 function ServiceThumb({ svc, height = 100 }) {
   if (svc.img) {
-    return <img src={svc.img} alt="" style={{ width: '100%', height, objectFit: 'cover', borderRadius: 10, display: 'block' }} />;
+    return (
+      <img
+        src={svc.img}
+        alt=""
+        loading="lazy"
+        style={{ width: '100%', height, objectFit: 'cover', objectPosition: 'center 15%', borderRadius: 10, display: 'block' }}
+      />
+    );
   }
   return (
     <div style={{ width: '100%', height, borderRadius: 10, background: C.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: height * 0.4 }}>
@@ -578,7 +585,7 @@ function HouseholdSvcCard({ svc, onClick, compact }) {
   const t = HH_THEME[svc.theme] || HH_THEME.pink;
   return (
     <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2px solid ${t.border}` }}>
-      <ServiceThumb svc={svc} height={compact ? 80 : 96} />
+      <ServiceThumb svc={svc} height={compact ? 96 : 112} />
       <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: t.bg }}>
         <div style={{ marginBottom: 6 }}><HhCategoryPill theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
