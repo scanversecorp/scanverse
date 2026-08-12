@@ -24,6 +24,10 @@ import {
   searchBookingsAdmin,
   updateBookingAdmin,
 } from "../_shared/bookings-admin.ts";
+import {
+  listInvestmentRequests,
+  respondInvestmentRequest,
+} from "../_shared/investments-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -461,6 +465,27 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Cancel failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "list_investments") {
+    try {
+      const requests = await listInvestmentRequests(sb, body);
+      return json({ requests, count: requests.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "List failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "respond_investment") {
+    try {
+      const actor = role === "support_admin" ? "support_admin" : "support_agent";
+      const request = await respondInvestmentRequest(sb, body, actor);
+      return json({ success: true, request });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Respond failed";
       return json({ error: msg }, 400);
     }
   }
