@@ -1549,6 +1549,14 @@ async function invokeBookingDispatch(opts, addToast) {
     const n = r.data?.nearest_count ?? r.data?.vendors_notified?.length ?? 0;
     if (n > 0) {
       addToast?.(`Alerting ${n} nearest partner${n > 1 ? 's' : ''} via SMS, call & WhatsApp 📲`, 'success');
+    } else if (r.data?.empty_queue) {
+      const eq = r.data.empty_queue;
+      const hint = eq.reason === 'vendors_missing_gps'
+        ? 'Partners need GPS on file — ask them to open Vendor portal'
+        : eq.reason === 'all_candidates_busy_or_blocked'
+          ? 'Nearest partners are busy on other jobs'
+          : 'No partners matched — check service & location';
+      addToast?.(`No partners alerted (${eq.reason}). ${hint}`, 'error');
     } else if (r.data?.success) {
       addToast?.('Searching for partners — alerts will retry shortly', 'success');
     }

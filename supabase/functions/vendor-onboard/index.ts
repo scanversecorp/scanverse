@@ -607,13 +607,14 @@ Deno.serve(async (req: Request) => {
       }
 
       const now = new Date().toISOString();
+      // Keep address_* in sync with live GPS so find_nearest_vendors dispatch matches portal map
       const { error } = await supabase
         .from("vendor_partners")
         .update({
-          address_lat: lat,
-          address_lng: lng,
           gps_lat: lat,
           gps_lng: lng,
+          address_lat: lat,
+          address_lng: lng,
           updated_at: now,
         })
         .eq("id", vendor.id);

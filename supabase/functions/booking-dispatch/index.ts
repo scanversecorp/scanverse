@@ -155,6 +155,99 @@ function serviceMatchOr(serviceId: string, categoryId: string): string {
   return uniq.map((id) => `service_id.eq.${id},category_id.eq.${id}`).join(",");
 }
 
+type VendorQueueRow = {
+  vendor_id: string;
+  business_name: string;
+  phone: string;
+  distance_km: number;
+};
+
+type VendorQueueResult = {
+  queue: VendorQueueRow[];
+  rpc_error?: string;
+  rpc_total?: number;
+  blocked_count?: number;
+};
+
+type EmptyQueueDiagnostics = {
+  reason: string;
+  customer_has_gps: boolean;
+  active_service_vendors: number;
+  with_dispatch_coords: number;
+  gps_only_vendors: number;
+  unavailable_busy: number;
+  blocked_in_queue: number;
+  rpc_error?: string;
+};
+
+async function diagnoseEmptyVendorQueue(
+  supabase: ReturnType<typeof createClient>,
+  serviceId: string,
+  lat: number | null,
+  lng: number | null,
+  categoryId = "",
+  rpcError?: string,
+  blockedCount = 0,
+): Promise<EmptyQueueDiagnostics> {
+  const matchOr = serviceMatchOr(serviceId, categoryId);
+  const { data: rows } = await supabase
+    .from("vendor_partner_services")
+    .select("vendor_id, vendor_partners!inner(id, status, address_lat, address_lng, gps_lat, gps_lng)")
+    .eq("is_active", true)
+    .or(matchOr)
+    .limit(200);
+
+  const active = (rows || []).filter(
+    (r: { vendor_partners: { status: string } }) => r.vendor_partners?.status === "active",
+  );
+  const withCoords = active.filter((r: {
+    vendor_partners: {
+      address_lat: number | null;
+      address_lng: number | null;
+      gps_lat: number | null;
+      gps_lng: number | null;
+    };
+  }) => {
+    const vp = r.vendor_partners;
+    const vLat = vp.address_lat ?? vp.gps_lat;
+    const vLng = vp.address_lng ?? vp.gps_lng;
+    return vLat != null && vLng != null;
+  });
+  const gpsOnly = active.filter((r: {
+    vendor_partners: {
+      address_lat: number | null;
+      address_lng: number | null;
+      gps_lat: number | null;
+      gps_lng: number | null;
+    };
+  }) => {
+    const vp = r.vendor_partners;
+    return (vp.address_lat == null || vp.address_lng == null) && vp.gps_lat != null && vp.gps_lng != null;
+  });
+
+  const unavailable = await getUnavailableVendorIds(supabase);
+
+  let reason = "no_active_vendors_for_service";
+  if (!serviceId && !categoryId) reason = "missing_service_id";
+  else if (!lat || !lng) reason = "missing_customer_gps";
+  else if (rpcError) reason = "rpc_error";
+  else if (!active.length) reason = "no_active_vendors_for_service";
+  else if (!withCoords.length) reason = "vendors_missing_gps";
+  else if (blockedCount >= withCoords.length) reason = "all_candidates_busy_or_blocked";
+  else reason = "no_vendors_within_range";
+
+  return {
+    reason,
+    customer_has_gps: !!(lat && lng),
+    active_service_vendors: active.length,
+    with_dispatch_coords: withCoords.length,
+    gps_only_vendors: gpsOnly.length,
+    unavailable_busy: unavailable.size,
+    blocked_in_queue: blockedCount,
+    ...(rpcError ? { rpc_error: rpcError } : {}),
+  };
+}
+
 async function getVendorQueue(
   supabase: ReturnType<typeof createClient>,
   serviceId: string,
@@ -162,21 +255,23 @@ async function getVendorQueue(
   lng: number | null,
   excludeIds: string[] = [],
   categoryId = "",
-): Promise<Array<{ vendor_id: string; business_name: string; phone: string; distance_km: number }>> {
+): Promise<VendorQueueResult> {
   const unavailable = await getUnavailableVendorIds(supabase);
   const blocked = new Set([...excludeIds, ...unavailable]);
   const matchOr = serviceMatchOr(serviceId, categoryId);
   if (!lat || !lng) {
     const { data } = await supabase
       .from("vendor_partner_services")
-      .select("vendor_id, vendor_partners!inner(id, business_name, phone, status, address_lat, address_lng)")
+      .select("vendor_id, vendor_partners!inner(id, business_name, phone, status, address_lat, address_lng, gps_lat, gps_lng)")
       .eq("is_active", true)
       .or(matchOr)
       .limit(MAX_VENDORS * 4);
-    return (data || [])
-      .filter((r: { vendor_partners: { status: string; id: string } }) =>
-        r.vendor_partners?.status === "active" && !blocked.has(String(r.vendor_partners.id))
-      )
+    const queue = (data || [])
+      .filter((r: { vendor_partners: { status: string; id: string; address_lat: number | null; address_lng: number | null; gps_lat: number | null; gps_lng: number | null } }) => {
+        const vp = r.vendor_partners;
+        const hasCoords = (vp.address_lat ?? vp.gps_lat) != null && (vp.address_lng ?? vp.gps_lng) != null;
+        return vp?.status === "active" && hasCoords && !blocked.has(String(vp.id));
+      })
       .slice(0, MAX_VENDORS)
       .map((r: { vendor_id: string; vendor_partners: { business_name: string; phone: string } }) => ({
         vendor_id: r.vendor_id,
@@ -184,6 +279,7 @@ async function getVendorQueue(
         phone: r.vendor_partners.phone,
         distance_km: 999,
       }));
+    return { queue };
   }
 
   const { data, error } = await supabase.rpc("find_nearest_vendors", {
@@ -194,10 +290,13 @@ async function getVendorQueue(
     p_limit: MAX_VENDORS * 4,
     p_max_km: 100,
   });
-  if (error || !data?.length) return [];
-  return (data as Array<{ vendor_id: string; business_name: string; phone: string; distance_km: number }>)
+  if (error) return { queue: [], rpc_error: error.message };
+  const all = (data as VendorQueueRow[]) || [];
+  const queue = all
     .filter((v) => !blocked.has(String(v.vendor_id)))
     .slice(0, MAX_VENDORS);
+  const blockedCount = all.filter((v) => blocked.has(String(v.vendor_id))).length;
+  return { queue, rpc_total: all.length, blocked_count: blockedCount };
 }
 
 async function notifyVendor(
@@ -338,17 +437,19 @@ async function assignVendor(
   // Seed live tracking from vendor base location until partner GPS updates
   const { data: vp } = await supabase
     .from("vendor_partners")
-    .select("address_lat, address_lng")
+    .select("address_lat, address_lng, gps_lat, gps_lng")
     .eq("id", vendorId)
     .maybeSingle();
-  if (vp?.address_lat && vp?.address_lng) {
+  const seedLat = vp?.address_lat ?? vp?.gps_lat;
+  const seedLng = vp?.address_lng ?? vp?.gps_lng;
+  if (seedLat != null && seedLng != null) {
     await dispatchIgnore(
       supabase.from("vendor_live_locations").upsert({
         booking_id: bookingId,
         vendor_id: vendorId,
         partner_id: partnerId,
-        lat: vp.address_lat,
-        lng: vp.address_lng,
+        lat: seedLat,
+        lng: seedLng,
         tracking_active: false,
         updated_at: now,
       }, { onConflict: "booking_id" }),
@@ -356,11 +457,18 @@ async function assignVendor(
   }
 }
 
+type DispatchTickResult = {
+  vendors: Array<{ vendor_id: string; business_name: string; distance_km: number }>;
+  empty_diagnostics?: EmptyQueueDiagnostics;
+};
+
 async function processDispatchTick(
   supabase: ReturnType<typeof createClient>,
   dispatch: Record<string, unknown>,
-): Promise<Array<{ vendor_id: string; business_name: string; distance_km: number }>> {
-  if (dispatch.status === "assigned" || dispatch.status === "exhausted") return [];
+): Promise<DispatchTickResult> {
+  if (dispatch.status === "assigned" || dispatch.status === "exhausted") {
+    return { vendors: [] };
+  }
 
   const lat = dispatch.customer_lat as number | null;
   const lng = dispatch.customer_lng as number | null;
@@ -368,16 +476,26 @@ async function processDispatchTick(
   const categoryId = String(dispatch.category_id || "");
   const attemptNum = Number(dispatch.attempt_num || 1);
 
-  const queue = await getVendorQueue(supabase, serviceId, lat, lng, [], categoryId);
+  const { queue, rpc_error: rpcError, blocked_count: blockedCount = 0 } = await getVendorQueue(
+    supabase, serviceId, lat, lng, [], categoryId,
+  );
   const top3 = queue.slice(0, MAX_VENDORS);
 
   if (!top3.length) {
+    const emptyDiagnostics = await diagnoseEmptyVendorQueue(
+      supabase, serviceId, lat, lng, categoryId, rpcError, blockedCount,
+    );
     await supabase.from("booking_dispatch").update({
       status: "exhausted",
       exhausted_at: new Date().toISOString(),
       next_action_at: null,
     }).eq("id", dispatch.id);
-    return [];
+    console.warn("[dispatch] empty vendor queue", {
+      dispatch_id: dispatch.id,
+      booking_id: dispatch.booking_id,
+      ...emptyDiagnostics,
+    });
+    return { vendors: [], empty_diagnostics: emptyDiagnostics };
   }
 
   await supabase.from("booking_dispatch").update({ status: "dispatching" }).eq("id", dispatch.id);
@@ -401,11 +519,13 @@ async function processDispatchTick(
     }).eq("id", dispatch.id);
   }
 
-  return top3.map((v) => ({
-    vendor_id: v.vendor_id,
-    business_name: v.business_name,
-    distance_km: v.distance_km,
-  }));
+  return {
+    vendors: top3.map((v) => ({
+      vendor_id: v.vendor_id,
+      business_name: v.business_name,
+      distance_km: v.distance_km,
+    })),
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -628,16 +748,20 @@ Deno.serve(async (req: Request) => {
 
       // Alert nearest 3 GPS-matched partners immediately
       const dispatchRow = { ...dispatch, customer_lat: custLat, customer_lng: custLng };
-      const vendorsNotified = await processDispatchTick(supabase, dispatchRow);
+      const tickResult = await processDispatchTick(supabase, dispatchRow);
+      const vendorsNotified = tickResult.vendors;
 
       return json({
         success: true,
         dispatch_id: dispatch.id,
         accept_code: acceptCode,
-        status: "dispatching",
+        status: vendorsNotified.length ? "dispatching" : "exhausted",
         customer_gps: custLat && custLng ? { lat: custLat, lng: custLng } : null,
         vendors_notified: vendorsNotified,
         nearest_count: vendorsNotified.length,
+        ...(tickResult.empty_diagnostics
+          ? { empty_queue: tickResult.empty_diagnostics }
+          : {}),
       });
     }
 

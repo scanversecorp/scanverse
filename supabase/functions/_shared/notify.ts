@@ -102,12 +102,13 @@ export async function sendSms(
           : undefined,
       };
     }
-    return {
-      ok: false,
-      error: typeof data === "object" && data !== null && "message" in data
+    // Fall through to 2Factor — Twilio often fails for unverified IN numbers
+    console.warn(
+      "[SMS] Twilio failed:",
+      typeof data === "object" && data !== null && "message" in data
         ? String((data as { message: string }).message)
         : res.statusText,
-    };
+    );
   }
 
   // 2Factor.in (India) — OTP route when otpCode set; transactional SMS for dispatch alerts
