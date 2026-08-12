@@ -577,13 +577,19 @@ function CancelBookingModal({ booking, onClose, onConfirm, busy }) {
   );
 }
 
-/* --- DESIGN TOKENS · Daylight Trust -------------------------------- */
+/* --- DESIGN TOKENS · IG-style daylight (bright tiles, clear photos) --- */
 const C = {
-  bg:'#f5f3ef', surf:'#ffffff', card:'#ffffff', deep:'#f0ebe3',
+  bg:'#fafafa', surf:'#ffffff', card:'#ffffff', deep:'#f5f5f5',
   acc:'#d63a56', cyan:'#0d47a1', gold:'#b8860b',
   grn:'#007a4d', red:'#c62828', vio:'#7c3aed',
-  txt:'#121212', sub:'#3d4f5f', dim:'#5c6b7a',
-  bdr:'rgba(18,18,18,0.2)', gls:'rgba(18,18,18,0.05)',
+  txt:'#121212', sub:'#262626', dim:'#737373',
+  bdr:'rgba(0,0,0,0.08)', gls:'rgba(0,0,0,0.04)',
+};
+const IG_TILE = {
+  shadow:'0 1px 2px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08)',
+  border:'1px solid rgba(0,0,0,0.06)',
+  radius:12,
+  imgFilter:'brightness(1.04) contrast(1.06) saturate(1.05)',
 };
 const FF = "'Inter',system-ui,sans-serif";
 const BDR = `1.5px solid ${C.bdr}`;
@@ -1957,7 +1963,7 @@ const S = {
   center: {height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:16,fontFamily:FF,padding:20},
   inp: (x={}) => ({width:'100%',background:C.surf,border:BDR,borderRadius:10,padding:'12px 14px',color:C.txt,fontSize:15,outline:'none',fontFamily:FF,boxSizing:'border-box',...x}),
   lbl: {fontSize:11,fontWeight:700,color:C.sub,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:5,display:'block'},
-  card: (x={}) => ({background:C.card,border:BDR,borderRadius:14,padding:16,boxShadow:'0 4px 18px rgba(18,18,18,0.12)',...x}),
+  card: (x={}) => ({background:C.card,border:IG_TILE.border,borderRadius:IG_TILE.radius,padding:16,boxShadow:IG_TILE.shadow,...x}),
   err: {background:`${C.red}12`,border:`1.5px solid ${C.red}55`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
 };
 
@@ -2022,8 +2028,8 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
 
   if (hero && !compact) {
     return (
-      <div onClick={onClick} style={{ gridColumn:'1 / -1', borderRadius:20, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 14px 36px ${theme.glow}, 0 2px 8px rgba(18,18,18,0.08)`, animation:`fadeUp .4s ease ${index * 0.04}s both` }}>
-        <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:`linear-gradient(135deg, ${theme.bgFrom} 0%, #fff 55%, ${theme.bgTo} 100%)` }}>
+      <div onClick={onClick} style={{ gridColumn:'1 / -1', borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .4s ease ${index * 0.04}s both` }}>
+        <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:C.card }}>
           <div style={{ flex:1, padding:'18px 18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:7 }}>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {svc.household && <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>}
@@ -2041,9 +2047,8 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
               </span>
             </div>
           </div>
-          <div style={{ width:148, flexShrink:0, position:'relative' }}>
-            <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%' }} />
-            <div style={{ position:'absolute', inset:0, background:`linear-gradient(90deg, rgba(255,255,255,0.55) 0%, transparent 48%)` }} />
+          <div style={{ width:148, flexShrink:0, position:'relative', background:C.deep }}>
+            <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
           </div>
         </div>
       </div>
@@ -2052,9 +2057,9 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
 
   if (compact) {
     return (
-      <div onClick={onClick} style={{ borderRadius:14, overflow:'hidden', cursor:'pointer', border:`2px solid ${C.bdr}`, background:C.card, boxShadow:'0 6px 20px rgba(18,18,18,0.1)', animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
-        <div style={{ width:72, flexShrink:0, position:'relative' }}>
-          <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%' }} />
+      <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
+        <div style={{ width:72, flexShrink:0, position:'relative', background:C.deep }}>
+          <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%', filter:IG_TILE.imgFilter }} />
         </div>
         <div style={{ flex:1, padding:'10px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:3 }}>
           <div style={{ color:theme.b2, fontSize:10, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
@@ -2066,17 +2071,16 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   }
 
   return (
-    <div onClick={onClick} style={{ borderRadius:16, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 10px 28px ${theme.glow}, 0 2px 8px rgba(18,18,18,0.08)`, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column' }}>
-      <div style={{ position:'relative', height:imgH, flexShrink:0, background:theme.bgFrom }}>
-        <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%' }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 45%, rgba(18,18,18,0.32) 100%)' }} />
+    <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column' }}>
+      <div style={{ position:'relative', height:imgH, flexShrink:0, background:C.deep }}>
+        <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
         <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4, flexWrap:'wrap' }}>
-          {theme.tag && <span style={{ background:theme.b2, color:'#fff', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99 }}>{theme.tag}</span>}
-          <span style={{ background:'rgba(255,255,255,0.92)', color:'#b45309', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99 }}>25% OFF</span>
+          {theme.tag && <span style={{ background:'rgba(255,255,255,0.95)', color:theme.b2, fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>{theme.tag}</span>}
+          <span style={{ background:'rgba(255,255,255,0.95)', color:'#b45309', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>25% OFF</span>
         </div>
-        <div style={{ position:'absolute', bottom:8, left:10, right:10, color:'#fff', fontSize:10, fontWeight:600, textShadow:'0 1px 4px rgba(0,0,0,0.4)' }}>{meta.face}</div>
       </div>
-      <div style={{ padding:'11px 12px 13px', background:`linear-gradient(180deg, #fff 0%, ${theme.bgFrom} 100%)`, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
+      <div style={{ padding:'11px 12px 13px', background:C.card, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
+        {meta.face && <div style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{meta.face}</div>}
         <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
         <div style={{ color:C.txt, fontWeight:800, fontSize:14, lineHeight:1.2 }}>{title}</div>
         <div style={{ color:C.sub, fontSize:10, fontWeight:600, lineHeight:1.3 }}>{svc.sub}</div>
@@ -2184,19 +2188,19 @@ function PriceTag({ svc, sm }) {
   );
 }
 
-function ServiceThumb({ svc, height = 100 }) {
+function ServiceThumb({ svc, height = 100, fullBleed = false }) {
   if (svc.img) {
     return (
       <img
         src={svc.img}
         alt=""
         loading="lazy"
-        style={{ width: '100%', height, objectFit: 'cover', objectPosition: 'center 15%', borderRadius: 10, display: 'block' }}
+        style={{ width: '100%', height, objectFit: 'cover', objectPosition: 'center 15%', borderRadius: fullBleed ? 0 : 10, display: 'block', filter: IG_TILE.imgFilter }}
       />
     );
   }
   return (
-    <div style={{ width: '100%', height, borderRadius: 10, background: C.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: height * 0.4 }}>
+    <div style={{ width: '100%', height, borderRadius: fullBleed ? 0 : 10, background: C.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: height * 0.4 }}>
       {svc.icon}
     </div>
   );
@@ -2206,8 +2210,8 @@ function CategorySvcCard({ categoryId, svc, onClick, compact }) {
   const cfg = SUB_CATEGORIES[categoryId];
   const t = cfg?.themes?.[svc.theme] || Object.values(cfg?.themes || {})[0] || { bg: C.surf, border: C.bdr };
   return (
-    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2.5px solid ${t.border}`, boxShadow: '0 6px 20px rgba(18,18,18,0.1)' }}>
-      <ServiceThumb svc={svc} height={compact ? 96 : 112} />
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow }}>
+      <ServiceThumb svc={svc} height={compact ? 104 : 120} fullBleed />
       <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: '#fff' }}>
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
