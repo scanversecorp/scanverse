@@ -214,14 +214,13 @@ async function ensureProfileAuthUser(
   const existing = await findAuthUserForMobile(supabase, supabaseUrl, serviceKey, mobile);
 
   if (existing) {
-    const { error: pwErr } = await supabase.auth.admin.updateUserById(existing.id, { password });
-    if (pwErr) throw new Error(pwErr.message);
-    if (existing.email !== canonicalEmail) {
-      await supabase.auth.admin.updateUserById(existing.id, {
-        email: canonicalEmail,
-        email_confirm: true,
-      });
-    }
+    const updates: { password: string; email_confirm: boolean; email?: string } = {
+      password,
+      email_confirm: true,
+    };
+    if (existing.email !== canonicalEmail) updates.email = canonicalEmail;
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(existing.id, updates);
+    if (updateErr) throw new Error(updateErr.message);
     return { email: canonicalEmail, password };
   }
 
@@ -236,14 +235,13 @@ async function ensureProfileAuthUser(
     if (retryable) {
       const retry = await findAuthUserForMobile(supabase, supabaseUrl, serviceKey, mobile);
       if (retry) {
-        const { error: pwErr } = await supabase.auth.admin.updateUserById(retry.id, { password });
-        if (pwErr) throw new Error(pwErr.message);
-        if (retry.email !== canonicalEmail) {
-          await supabase.auth.admin.updateUserById(retry.id, {
-            email: canonicalEmail,
-            email_confirm: true,
-          });
-        }
+        const updates: { password: string; email_confirm: boolean; email?: string } = {
+          password,
+          email_confirm: true,
+        };
+        if (retry.email !== canonicalEmail) updates.email = canonicalEmail;
+        const { error: updateErr } = await supabase.auth.admin.updateUserById(retry.id, updates);
+        if (updateErr) throw new Error(updateErr.message);
         return { email: canonicalEmail, password };
       }
     }

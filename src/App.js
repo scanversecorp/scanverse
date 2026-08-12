@@ -2337,9 +2337,25 @@ async function invokeProfileAuthSession(mob, { otp, waToken } = {}) {
   if (otp) body.otp = otp;
   else if (waToken) body.wa_token = waToken;
   else throw new Error('Verification required to establish session');
-  const r = await sb().functions.invoke('send-otp', { body });
-  const errMsg = await edgeFnErrorMessageAsync(r);
-  if (r.error || r.data?.success === false) throw new Error(errMsg || 'Auth session failed');
+  const invokeSession = async () => {
+    const r = await sb().functions.invoke('send-otp', { body });
+    const errMsg = await edgeFnErrorMessageAsync(r);
+    if (r.error || r.data?.success === false) {
+      throw new Error(errMsg || 'Auth session failed');
+    }
+    return { r, errMsg };
+  };
+  let r;
+  let errMsg;
+  try {
+    ({ r, errMsg } = await invokeSession());
+  } catch (e) {
+    if (/email not confirmed/i.test(e?.message || '')) {
+      ({ r, errMsg } = await invokeSession());
+    } else {
+      throw e;
+    }
+  }
   const { access_token, refresh_token } = r.data || {};
   if (!access_token || !refresh_token) {
     throw new Error(errMsg || 'Auth session missing tokens');
