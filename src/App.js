@@ -579,11 +579,11 @@ function CancelBookingModal({ booking, onClose, onConfirm, busy }) {
 
 /* --- DESIGN TOKENS · Daylight Trust -------------------------------- */
 const C = {
-  bg:'#f2efe8', surf:'#fffcf8', card:'#fffcf8', deep:'#ebe6dc',
+  bg:'#f5f3ef', surf:'#ffffff', card:'#ffffff', deep:'#f0ebe3',
   acc:'#d63a56', cyan:'#0d47a1', gold:'#b8860b',
   grn:'#007a4d', red:'#c62828', vio:'#7c3aed',
   txt:'#121212', sub:'#3d4f5f', dim:'#5c6b7a',
-  bdr:'rgba(18,18,18,0.14)', gls:'rgba(18,18,18,0.04)',
+  bdr:'rgba(18,18,18,0.2)', gls:'rgba(18,18,18,0.05)',
 };
 const FF = "'Inter',system-ui,sans-serif";
 const BDR = `1.5px solid ${C.bdr}`;
@@ -1957,7 +1957,7 @@ const S = {
   center: {height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:16,fontFamily:FF,padding:20},
   inp: (x={}) => ({width:'100%',background:C.surf,border:BDR,borderRadius:10,padding:'12px 14px',color:C.txt,fontSize:15,outline:'none',fontFamily:FF,boxSizing:'border-box',...x}),
   lbl: {fontSize:11,fontWeight:700,color:C.sub,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:5,display:'block'},
-  card: (x={}) => ({background:C.card,border:BDR,borderRadius:14,padding:16,boxShadow:'0 3px 14px rgba(18,18,18,0.08)',...x}),
+  card: (x={}) => ({background:C.card,border:BDR,borderRadius:14,padding:16,boxShadow:'0 4px 18px rgba(18,18,18,0.12)',...x}),
   err: {background:`${C.red}12`,border:`1.5px solid ${C.red}55`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
 };
 
@@ -2022,8 +2022,8 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
 
   if (hero && !compact) {
     return (
-      <div onClick={onClick} style={{ gridColumn:'1 / -1', borderRadius:20, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 12px 32px ${theme.glow}`, animation:`fadeUp .4s ease ${index * 0.04}s both` }}>
-        <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:`linear-gradient(135deg, ${theme.bgFrom} 0%, ${theme.bgTo} 100%)` }}>
+      <div onClick={onClick} style={{ gridColumn:'1 / -1', borderRadius:20, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 14px 36px ${theme.glow}, 0 2px 8px rgba(18,18,18,0.08)`, animation:`fadeUp .4s ease ${index * 0.04}s both` }}>
+        <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:`linear-gradient(135deg, ${theme.bgFrom} 0%, #fff 55%, ${theme.bgTo} 100%)` }}>
           <div style={{ flex:1, padding:'18px 18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:7 }}>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {svc.household && <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>}
@@ -2043,7 +2043,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
           </div>
           <div style={{ width:148, flexShrink:0, position:'relative' }}>
             <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%' }} />
-            <div style={{ position:'absolute', inset:0, background:`linear-gradient(90deg, ${theme.bgFrom} 0%, transparent 42%)` }} />
+            <div style={{ position:'absolute', inset:0, background:`linear-gradient(90deg, rgba(255,255,255,0.55) 0%, transparent 48%)` }} />
           </div>
         </div>
       </div>
@@ -2052,7 +2052,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
 
   if (compact) {
     return (
-      <div onClick={onClick} style={{ borderRadius:14, overflow:'hidden', cursor:'pointer', border:BDR, background:C.card, boxShadow:'0 4px 16px rgba(18,18,18,0.06)', animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
+      <div onClick={onClick} style={{ borderRadius:14, overflow:'hidden', cursor:'pointer', border:`2px solid ${C.bdr}`, background:C.card, boxShadow:'0 6px 20px rgba(18,18,18,0.1)', animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
         <div style={{ width:72, flexShrink:0, position:'relative' }}>
           <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%' }} />
         </div>
@@ -2066,17 +2066,17 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   }
 
   return (
-    <div onClick={onClick} style={{ borderRadius:16, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 8px 22px ${theme.glow}`, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column' }}>
+    <div onClick={onClick} style={{ borderRadius:16, overflow:'hidden', cursor:'pointer', border:'2px solid transparent', background:`linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg, ${theme.b1}, ${theme.b2}) border-box`, boxShadow:`0 10px 28px ${theme.glow}, 0 2px 8px rgba(18,18,18,0.08)`, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column' }}>
       <div style={{ position:'relative', height:imgH, flexShrink:0, background:theme.bgFrom }}>
         <img src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%' }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 35%, rgba(18,18,18,0.55) 100%)' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 45%, rgba(18,18,18,0.32) 100%)' }} />
         <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4, flexWrap:'wrap' }}>
           {theme.tag && <span style={{ background:theme.b2, color:'#fff', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99 }}>{theme.tag}</span>}
           <span style={{ background:'rgba(255,255,255,0.92)', color:'#b45309', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99 }}>25% OFF</span>
         </div>
         <div style={{ position:'absolute', bottom:8, left:10, right:10, color:'#fff', fontSize:10, fontWeight:600, textShadow:'0 1px 4px rgba(0,0,0,0.4)' }}>{meta.face}</div>
       </div>
-      <div style={{ padding:'11px 12px 13px', background:`linear-gradient(180deg, ${theme.bgFrom} 0%, #fff 100%)`, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
+      <div style={{ padding:'11px 12px 13px', background:`linear-gradient(180deg, #fff 0%, ${theme.bgFrom} 100%)`, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
         <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
         <div style={{ color:C.txt, fontWeight:800, fontSize:14, lineHeight:1.2 }}>{title}</div>
         <div style={{ color:C.sub, fontSize:10, fontWeight:600, lineHeight:1.3 }}>{svc.sub}</div>
@@ -2206,9 +2206,9 @@ function CategorySvcCard({ categoryId, svc, onClick, compact }) {
   const cfg = SUB_CATEGORIES[categoryId];
   const t = cfg?.themes?.[svc.theme] || Object.values(cfg?.themes || {})[0] || { bg: C.surf, border: C.bdr };
   return (
-    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2px solid ${t.border}` }}>
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: `2.5px solid ${t.border}`, boxShadow: '0 6px 20px rgba(18,18,18,0.1)' }}>
       <ServiceThumb svc={svc} height={compact ? 96 : 112} />
-      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: t.bg }}>
+      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: '#fff' }}>
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
         <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
@@ -2941,7 +2941,7 @@ function QRLandingPage({ onContinue }) {
    User browses → picks service → books → THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, addToast }) {
-  const [screen, setScreen] = useState('services'); // services | detail | verify | payment | schedule | login
+  const [screen, setScreen] = useState('services'); // services | top-rated | detail | verify | payment | schedule | login
   const [navTab, setNavTab] = useState('home');
   const [loginIntent, setLoginIntent] = useState(null); // 'bookings' | 'profile'
   const [activeSvc, setActiveSvc] = useState(null);
@@ -3329,13 +3329,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setNavTab('home');
   };
 
-  const goBrowseTopRated = async () => {
+  const goBrowseTopRated = () => {
+    resetBrowseLanding();
     setNavTab('top-rated');
-    if (await tryExistingSession('top-rated')) return;
-    setLoginIntent('top-rated');
-    resetOtpFlow();
-    setErr('');
-    setScreen('login');
+    setScreen('top-rated');
   };
 
   const tryExistingSession = async (intent) => {
@@ -3368,7 +3365,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   };
 
   const guestActiveTab = (() => {
-    if (screen === 'login') return loginIntent === 'top-rated' ? 'top-rated' : (loginIntent || 'bookings');
+    if (screen === 'login') return loginIntent || 'bookings';
     if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'home';
     if (screen === 'services') return 'home';
     if (screen === 'top-rated') return 'top-rated';
@@ -3405,6 +3402,18 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
     setScreen('detail');
   };
+
+  const openBrowseTopRatedSvc = (svc) => {
+    if (svc.parent && SUB_CATEGORIES[svc.parent]) {
+      const cfg = SUB_CATEGORIES[svc.parent];
+      setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
+      setScreen('detail');
+      return;
+    }
+    openBrowseSvc(svc);
+  };
+
+  const topRatedItems = getTopRatedServices();
 
   const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
   if (listCatId && SUB_CATEGORIES[listCatId]) {
@@ -3473,6 +3482,46 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
           <FooterLegalLinks small current={null}/>
         </div>
+      </div>
+    </>
+  );
+
+  // -- TOP RATED (public, no login) -----------------------------------------
+  if (screen === 'top-rated') return browseWrap(
+    <>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.1)' }}>
+        <div style={{ fontWeight: 800, fontSize: 20, fontFamily: FF, color: C.txt }}>⭐ Top Rated</div>
+      </div>
+      <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
+        {topRatedItems.length ? (
+          <>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#fffbeb', border: '2px solid rgba(251,191,36,0.45)' }}>
+              <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>⭐ Hand-picked by ScanV</div>
+              <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>
+                Services, offerings, and courses marked Top Rated by our team — verified quality and great value.
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {topRatedItems.map((svc, i) => {
+                const catId = svc.parent && SUB_CATEGORIES[svc.parent] ? svc.parent : null;
+                if (catId) {
+                  return <CategorySvcCard key={svc.id} categoryId={catId} svc={svc} onClick={() => openBrowseTopRatedSvc(svc)} compact index={i} />;
+                }
+                return <HomeModelCard key={svc.id} svc={svc} onClick={() => openBrowseTopRatedSvc(svc)} index={i} />;
+              })}
+            </div>
+          </>
+        ) : (
+          <div style={{ ...S.card(), padding: 32, textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⭐</div>
+            <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>No Top Rated services yet</div>
+            <div style={{ color: C.sub, fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
+              Check back soon — our team updates Top Rated picks from the pricing admin.
+            </div>
+            <Btn onClick={goBrowseHome}>Browse all services</Btn>
+          </div>
+        )}
+        <AssistBanner />
       </div>
     </>
   );
