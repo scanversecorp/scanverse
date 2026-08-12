@@ -11,7 +11,7 @@
  */
 
 import {
-  useState, useEffect, useRef, useCallback,
+  useState, useEffect, useRef, useCallback, useMemo,
   createContext, useContext, useReducer, Component
 } from 'react';
 /* --- CONFIG ------------------------------------------------------- */
@@ -925,15 +925,19 @@ function clearBookingDraft() {
 function parsePaymentReturnTxn() {
   const params = new URLSearchParams(window.location.search);
   const txnId = params.get('payment');
-  if (txnId?.startsWith('TXN-') && params.get('razorpay_payment_link_status') === 'paid') return txnId;
-  return null;
+  if (!txnId?.startsWith('TXN-')) return null;
+  const paid = params.getAll('razorpay_payment_link_status').some((v) => v === 'paid')
+    || params.get('razorpay_payment_link_status') === 'paid';
+  return paid ? txnId : null;
 }
 
 function clearPaymentReturnUrl() {
   const url = new URL(window.location.href);
   if (!url.searchParams.has('payment') && !url.searchParams.has('razorpay_payment_link_status')) return;
   url.searchParams.delete('payment');
-  url.searchParams.delete('razorpay_payment_link_status');
+  while (url.searchParams.has('razorpay_payment_link_status')) {
+    url.searchParams.delete('razorpay_payment_link_status');
+  }
   const next = url.pathname + (url.search || '') + url.hash;
   window.history.replaceState({}, '', next);
 }
@@ -1011,24 +1015,41 @@ function bookingDraftForIntent(intent) {
 }
 
 const ACTIVE_BOOKING_STATUSES = ['confirmed', 'in_progress', 'in-progress'];
+const CANCELLED_BOOKING_STATUSES = ['cancelled'];
+
+function isDuplicateBookingStatus(status) {
+  return status && !CANCELLED_BOOKING_STATUSES.includes(status);
+}
+
+/** First non-cancelled booking for txn — limit(1) avoids maybeSingle() failure when duplicates exist. */
+async function findBookingByTxn(txnId, { customerId } = {}) {
+  if (!txnId) return null;
+  try {
+    let q = sb().from('bookings')
+      .select('id, status, txn_id, date, time, service_name, service_id, created_at')
+      .eq('txn_id', txnId)
+      .not('status', 'eq', 'cancelled')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (customerId) q = q.eq('customer_id', customerId);
+    const { data } = await q.maybeSingle();
+    return data || null;
+  } catch (_) { return null; }
+}
 
 async function findDuplicateBooking({ customerId, serviceId, date, time, txnId }) {
   try {
-    if (txnId) {
-      const { data: byTxn } = await sb().from('bookings')
-        .select('id, status, txn_id, date, time, service_name, service_id')
-        .eq('txn_id', txnId)
-        .in('status', ACTIVE_BOOKING_STATUSES)
-        .maybeSingle();
-      if (byTxn) return byTxn;
-    }
+    const byTxn = await findBookingByTxn(txnId, customerId ? { customerId } : {});
+    if (byTxn) return byTxn;
     if (customerId && serviceId && date) {
       let q = sb().from('bookings')
-        .select('id, status, txn_id, date, time, service_name, service_id')
+        .select('id, status, txn_id, date, time, service_name, service_id, created_at')
         .eq('customer_id', customerId)
         .eq('service_id', serviceId)
         .eq('date', date)
-        .in('status', ACTIVE_BOOKING_STATUSES);
+        .not('status', 'eq', 'cancelled')
+        .order('created_at', { ascending: true })
+        .limit(1);
       if (time) q = q.eq('time', time);
       const { data: bySlot } = await q.maybeSingle();
       if (bySlot) return bySlot;
@@ -1037,9 +1058,33 @@ async function findDuplicateBooking({ customerId, serviceId, date, time, txnId }
   return null;
 }
 
+function isUniqueViolation(error) {
+  return error?.code === '23505' || /duplicate key|unique constraint/i.test(error?.message || '');
+}
+
+/** One visible booking per txn_id — keeps oldest non-cancelled row. */
+function dedupeBookingsForDisplay(bookings) {
+  const canonicalByTxn = new Map();
+  for (const b of bookings || []) {
+    if (!b.txn_id || !isDuplicateBookingStatus(b.status)) continue;
+    const prev = canonicalByTxn.get(b.txn_id);
+    if (!prev || new Date(b.created_at) < new Date(prev.created_at)) {
+      canonicalByTxn.set(b.txn_id, b);
+    }
+  }
+  const hiddenIds = new Set();
+  for (const b of bookings || []) {
+    if (!b.txn_id || !isDuplicateBookingStatus(b.status)) continue;
+    const canonical = canonicalByTxn.get(b.txn_id);
+    if (canonical && canonical.id !== b.id) hiddenIds.add(b.id);
+  }
+  return (bookings || []).filter((b) => !hiddenIds.has(b.id));
+}
+
 async function findOrphanPaidIntents(userId) {
   if (!userId) return [];
   try {
+    const returnTxn = parsePaymentReturnTxn();
     const { data: intents } = await sb().from('payment_intents')
       .select('txn_id, amount_paise, paid_at, service_id, service_name')
       .eq('user_id', userId)
@@ -1047,13 +1092,16 @@ async function findOrphanPaidIntents(userId) {
       .order('paid_at', { ascending: false })
       .limit(10);
     if (!intents?.length) return [];
-    const txnIds = intents.map((i) => i.txn_id);
-    const { data: bks } = await sb().from('bookings')
-      .select('txn_id')
-      .in('txn_id', txnIds)
-      .in('status', ACTIVE_BOOKING_STATUSES);
-    const booked = new Set((bks || []).map((b) => b.txn_id));
-    return intents.filter((i) => !booked.has(i.txn_id));
+    const pending = [];
+    for (const intent of intents) {
+      if (returnTxn && intent.txn_id === returnTxn) {
+        const existing = await findBookingByTxn(returnTxn, { customerId: userId });
+        if (existing) continue;
+      }
+      const existing = await findBookingByTxn(intent.txn_id, { customerId: userId });
+      if (!existing) pending.push(intent);
+    }
+    return pending;
   } catch (_) {
     return [];
   }
@@ -1062,6 +1110,13 @@ async function findOrphanPaidIntents(userId) {
 async function resumePaidBookingDraft(addToast) {
   const returnTxn = parsePaymentReturnTxn();
   if (!returnTxn) return null;
+  const existing = await findBookingByTxn(returnTxn);
+  if (existing) {
+    clearPaymentReturnUrl();
+    clearBookingDraft();
+    addToast?.('You already have this booking — opening track view', 'success');
+    return { existingBooking: existing };
+  }
   const draft = loadBookingDraft();
   if (!draft || draft.txnId !== returnTxn) return null;
   const payCheck = await fetchPaymentVerification(returnTxn, draft.amountPaise);
@@ -2549,12 +2604,23 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     addToast,
     { serviceId: activeSvc?.id, serviceName: activeSvc?.name },
   );
+  const creatingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const resumed = await resumePaidBookingDraft(addToast);
-      if (cancelled || !resumed || resumed.draft.flow !== 'browse') return;
+      if (cancelled || !resumed) return;
+      if (resumed.existingBooking) {
+        sessionStorage.setItem(TRACK_BOOKING_KEY, resumed.existingBooking.id);
+        const uid = localStorage.getItem('scanv_uid') || resumed.existingBooking.customer_id;
+        if (uid) {
+          const { data: p } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
+          if (p) onRegistered(p, resumed.existingBooking.id);
+        }
+        return;
+      }
+      if (resumed.draft.flow !== 'browse') return;
       const { draft } = resumed;
       const svc = findSvcById(draft.serviceId);
       if (!svc) return;
@@ -2744,9 +2810,11 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   };
 
   const createBooking = async () => {
+    if (creatingRef.current) return;
     if (!bookingDetail?.date) return setErr('Select a date');
     if (!userId||!activeSvc||!txnId) return setErr('Session expired — start again');
     if (!paymentMethod || !browsePay.paymentVerified) return setErr('Complete payment first');
+    creatingRef.current = true;
     setLoading(true); setErr('');
     try {
       const paid = await checkPaymentVerified(txnId, paymentAmountPaise ?? browseTotal);
@@ -2796,7 +2864,27 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         status:'confirmed', txn_id:txnId,
         paid_at:new Date().toISOString(),
       }).select().single();
-      if (error) throw error;
+      if (error) {
+        if (isUniqueViolation(error)) {
+          const dupRetry = await findBookingByTxn(txnId, { customerId: userId });
+          if (dupRetry) {
+            const profile = await upsertCustomerProfile({
+              id: userId,
+              mob: normalizeMobileE164(mobile),
+              firstName, lastName, address, village, city, pincode,
+              silentGeo,
+              lastLat: silentGeo?.lat || bookingDetail.lat || null,
+              lastLng: silentGeo?.lng || bookingDetail.lng || null,
+            });
+            addToast?.('You already have this booking — opening track view', 'success');
+            sessionStorage.setItem(TRACK_BOOKING_KEY, dupRetry.id);
+            clearBookingDraft();
+            onRegistered(profile, dupRetry.id);
+            return;
+          }
+        }
+        throw error;
+      }
       await sb().from('service_requests').insert({
         customer_id:userId, service_name:svc.name, service_type:svc.cat,
         preferred_date:bookingDetail.date, preferred_time:bookingDetail.time||'10:00',
@@ -2833,7 +2921,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       clearBookingDraft();
       onRegistered(profile, bk.id);
     } catch(e) { setErr(e.message||'Booking failed.'); }
-    finally { setLoading(false); }
+    finally { creatingRef.current = false; setLoading(false); }
   };
 
   const resetBrowseLanding = () => {
@@ -4022,13 +4110,19 @@ function BookScreen() {
   const svc=activeSvc;
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
   const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name});
+  const creatingRef = useRef(false);
   if (!svc) { setScreen('services'); return null; }
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const resumed = await resumePaidBookingDraft(addToast);
-      if (cancelled || !resumed || resumed.draft.flow !== 'book') return;
+      if (cancelled || !resumed) return;
+      if (resumed.existingBooking) {
+        goToTrack(setTrackBookingId, setScreen, resumed.existingBooking.id);
+        return;
+      }
+      if (resumed.draft.flow !== 'book') return;
       const { draft } = resumed;
       setTxnId(draft.txnId);
       setPaymentAmountPaise(draft.amountPaise);
@@ -4119,9 +4213,11 @@ function BookScreen() {
   };
 
   const create = async () => {
+    if (creatingRef.current) return;
     if (!date) return addToast('Select a date', 'error');
     if (!txnId) return addToast('Complete payment first', 'error');
     if (!payMethod || !bookPay.paymentVerified) return addToast('Complete UPI payment first', 'error');
+    creatingRef.current = true;
     setLoading(true);
     try {
       const paid = await checkPaymentVerified(txnId, paymentAmountPaise ?? total);
@@ -4167,7 +4263,18 @@ function BookScreen() {
         price, platform_fee: fee, gst_amt: gst, total,
         status: 'confirmed', txn_id: txnId, paid_at: new Date().toISOString(),
       }).select().single();
-      if (error) throw error;
+      if (error) {
+        if (isUniqueViolation(error)) {
+          const dupRetry = await findBookingByTxn(txnId, { customerId: profile.id });
+          if (dupRetry) {
+            addToast('You already have this booking — opening track view', 'success');
+            clearBookingDraft();
+            goToTrack(setTrackBookingId, setScreen, dupRetry.id);
+            return;
+          }
+        }
+        throw error;
+      }
       await sb().from('service_requests').insert({
         customer_id: profile.id, service_name: svc.name, service_type: svc.cat,
         preferred_date: date, preferred_time: time, notes, location_text: loc,
@@ -4189,7 +4296,7 @@ function BookScreen() {
       addToast('Booking confirmed! Track your partner live 📍', 'success');
       goToTrack(setTrackBookingId, setScreen, data.id);
     } catch (e) { addToast(e.message || 'Booking failed', 'error'); }
-    finally { setLoading(false); }
+    finally { creatingRef.current = false; setLoading(false); }
   };
   const confirmPaid = async (method) => {
     if (!bookPay.paymentVerified) {
@@ -4864,14 +4971,15 @@ function BookingsScreen() {
   const load=useCallback(async()=>{
     const col=user.role==='partner'?'partner_id':'customer_id';
     const{data}=await sb().from('bookings').select('*').eq(col,user.id).order('created_at',{ascending:false});
-    setBookings(data||[]);
+    const visible = user.role === 'customer' ? dedupeBookingsForDisplay(data || []) : (data || []);
+    setBookings(visible);
     if (user.role === 'customer') {
       const pending = await findOrphanPaidIntents(user.id);
       setOrphans(pending);
     } else {
       setOrphans([]);
     }
-    const ids=(data||[]).map(b=>b.id);
+    const ids=visible.map(b=>b.id);
     if(ids.length){
       const{data:lives}=await sb().from('vendor_live_locations').select('*').in('booking_id',ids);
       const map={}; (lives||[]).forEach(l=>{ map[l.booking_id]=l.tracking_active?l:{...l,is_base:true}; });
@@ -4892,6 +5000,23 @@ function BookingsScreen() {
   usePartnerLocationShare(user, bookings, addToast);
 
   useEffect(()=>{load();},[load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const returnTxn = parsePaymentReturnTxn();
+      if (!returnTxn || user.role !== 'customer') return;
+      const existing = await findBookingByTxn(returnTxn, { customerId: user.id });
+      if (cancelled || !existing) return;
+      clearPaymentReturnUrl();
+      clearBookingDraft();
+      setOrphans((prev) => prev.filter((i) => i.txn_id !== returnTxn));
+      addToast('Booking found for your payment — opening track', 'success');
+      goToTrack(setTrackBookingId, setScreen, existing.id);
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id, user.role]);
 
   useEffect(()=>{
     const openIds=bookings.filter(b=>b.status==='confirmed'&&bookingSupportsLiveTrack(b)).map(b=>b.id);
@@ -5023,7 +5148,20 @@ function BookingsScreen() {
         txn_id: intent.txn_id,
         paid_at: intent.paid_at || new Date().toISOString(),
       }).select().single();
-      if (error) throw error;
+      if (error) {
+        if (isUniqueViolation(error)) {
+          const dupRetry = await findBookingByTxn(intent.txn_id, { customerId: user.id });
+          if (dupRetry) {
+            clearBookingDraft();
+            setRecovering(null);
+            addToast('Booking already exists for this payment — opening track', 'success');
+            goToTrack(setTrackBookingId, setScreen, dupRetry.id);
+            load();
+            return;
+          }
+        }
+        throw error;
+      }
       await sb().from('service_requests').insert({
         customer_id: user.id,
         service_name: intent.service_name || svc.name,
@@ -7627,6 +7765,32 @@ function AdminBookingsTab({ pin }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [subTab, setSubTab] = useState('bookings');
+  const [cancellingTxn, setCancellingTxn] = useState(null);
+
+  const txnCounts = useMemo(() => {
+    const m = {};
+    for (const b of bookings) {
+      if (!b.txn_id || b.status === 'cancelled') continue;
+      m[b.txn_id] = (m[b.txn_id] || 0) + 1;
+    }
+    return m;
+  }, [bookings]);
+
+  const cancelDuplicateBookings = async (txnId) => {
+    setCancellingTxn(txnId);
+    setErr('');
+    try {
+      const active = bookings
+        .filter((b) => b.txn_id === txnId && b.status !== 'cancelled')
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const [, ...dupes] = active;
+      for (const b of dupes) {
+        await sb().from('bookings').update({ status: 'cancelled' }).eq('id', b.id);
+      }
+      await search();
+    } catch (e) { setErr(e.message); }
+    finally { setCancellingTxn(null); }
+  };
 
   const search = async () => {
     setLoading(true); setErr('');
@@ -7670,6 +7834,16 @@ function AdminBookingsTab({ pin }) {
           <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
             <Badge label={b.status} color={C.acc} /> · ₹{fmtRs(b.total)} · TXN {b.txn_id || '—'}
           </div>
+          {b.txn_id && txnCounts[b.txn_id] > 1 && b.status !== 'cancelled' && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, color: C.gold, fontWeight: 600 }}>
+                ⚠ {txnCounts[b.txn_id]} bookings share this TXN
+              </span>
+              <Btn sm v="outline" disabled={cancellingTxn === b.txn_id} onClick={() => cancelDuplicateBookings(b.txn_id)}>
+                {cancellingTxn === b.txn_id ? 'Cancelling…' : 'Cancel duplicates'}
+              </Btn>
+            </div>
+          )}
         </div>
       ))}
       {subTab === 'payments' && payments.map(pi => (
@@ -8126,7 +8300,20 @@ export default function App() {
       const pendingDraft = loadBookingDraft();
       const resumeBrowseDraft = returnTxn && pendingDraft?.txnId === returnTxn && pendingDraft.flow === 'browse';
 
-      const finishAppBoot = (profile) => {
+      const finishAppBoot = async (profile) => {
+        if (returnTxn) {
+          const existing = await findBookingByTxn(returnTxn, { customerId: profile.id });
+          if (existing) {
+            clearPaymentReturnUrl();
+            clearBookingDraft();
+            setUser(profile);
+            setState('app');
+            setTrackBookingId(existing.id);
+            sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
+            setScreen('track');
+            return;
+          }
+        }
         setUser(profile);
         setState('app');
         const tid = trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
@@ -8148,7 +8335,7 @@ export default function App() {
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
-            finishAppBoot(p);
+            await finishAppBoot(p);
             return;
           }
         }
@@ -8156,7 +8343,7 @@ export default function App() {
         if (uid) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
-            finishAppBoot(p);
+            await finishAppBoot(p);
             return;
           }
         }
