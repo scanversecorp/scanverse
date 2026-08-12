@@ -597,15 +597,30 @@ function serviceImgWebp(src) {
   return src && /\.png$/i.test(src) ? src.replace(/\.png$/i, '.webp') : null;
 }
 
-function ServiceImg({ src, alt = '', loading = 'lazy', style, ...rest }) {
+/** iOS-safe: single img with webp→png onError (picture/source can blank on Safari grids) */
+function ServiceImg({ src, alt = '', loading = 'eager', style, ...rest }) {
   const webp = serviceImgWebp(src);
+  const [imgSrc, setImgSrc] = useState(() => webp || src);
   const imgStyle = { display: 'block', maxWidth: '100%', ...style };
-  if (!webp) return <img src={src} alt={alt} loading={loading} style={imgStyle} {...rest} />;
+
+  useEffect(() => {
+    setImgSrc(webp || src);
+  }, [src, webp]);
+
+  const onError = useCallback(() => {
+    if (webp && imgSrc !== src) setImgSrc(src);
+  }, [webp, src, imgSrc]);
+
   return (
-    <picture style={{ display: 'block', width: imgStyle.width || '100%', height: imgStyle.height, minWidth: 0, margin: 0, lineHeight: 0 }}>
-      <source srcSet={webp} type="image/webp" />
-      <img src={src} alt={alt} loading={loading} style={imgStyle} {...rest} />
-    </picture>
+    <img
+      src={imgSrc}
+      alt={alt}
+      loading={loading}
+      decoding="async"
+      style={imgStyle}
+      onError={onError}
+      {...rest}
+    />
   );
 }
 
@@ -2134,7 +2149,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             </div>
           </div>
           <div style={{ width:148, flexShrink:0, position:'relative', background:C.deep }}>
-            <ServiceImg src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
+            <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
           </div>
         </div>
       </div>
@@ -2145,7 +2160,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
     return (
       <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
         <div style={{ width:72, flexShrink:0, position:'relative', background:C.deep }}>
-          <ServiceImg src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%', filter:IG_TILE.imgFilter }} />
+          <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%', filter:IG_TILE.imgFilter }} />
         </div>
         <div style={{ flex:1, padding:'10px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:3 }}>
           <div style={{ color:theme.b2, fontSize:10, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
@@ -2159,7 +2174,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   return (
     <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column', height:'100%', width:'100%', minWidth:0 }}>
       <div style={{ position:'relative', height:imgH, minHeight:imgH, flexShrink:0, background:C.deep }}>
-        <ServiceImg src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
+        <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
         <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4, flexWrap:'wrap' }}>
           {theme.tag && <span style={{ background:'rgba(255,255,255,0.95)', color:theme.b2, fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>{theme.tag}</span>}
           <span style={{ background:'rgba(255,255,255,0.95)', color:'#b45309', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>25% OFF</span>
@@ -2281,7 +2296,6 @@ function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
       <ServiceImg
         src={src}
         alt=""
-        loading="lazy"
         style={{ width: '100%', height, objectFit: 'cover', objectPosition: 'center 15%', borderRadius: fullBleed ? 0 : 10, filter: IG_TILE.imgFilter }}
       />
     );
