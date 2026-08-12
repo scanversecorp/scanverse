@@ -52,8 +52,60 @@ async function getUnavailableVendorIds(
 
 function dispatchSecretOk(req: Request): boolean {
   const secret = Deno.env.get("DISPATCH_SECRET") || "";
-  if (!secret) return true; // open if not set (dev)
+  if (!secret) {
+    // Fail closed in production; allow only explicit dev bypass
+    return Deno.env.get("OTP_DEV_MODE") === "1" ||
+      Deno.env.get("DISPATCH_OPEN") === "1";
+  }
   return req.headers.get("x-dispatch-secret") === secret;
+}
+
+/** Customer/partner owns booking — used when DISPATCH_SECRET not sent from client */
+async function bookingPartyAuthorized(
+  supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  req: Request,
+  bookingId: string,
+  body: Record<string, unknown>,
+): Promise<boolean> {
+  const { data: bk } = await supabase
+    .from("bookings")
+    .select("customer_id, partner_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!bk) return false;
+
+  const customerId = String(body.customer_id || "").trim();
+  const partnerId = String(body.partner_id || "").trim();
+  if (customerId && String(bk.customer_id) === customerId) return true;
+  if (partnerId && String(bk.partner_id) === partnerId) return true;
+
+  const authHeader = req.headers.get("Authorization") || "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (authHeader && anonKey) {
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData } = await userClient.auth.getUser();
+    const uid = authData?.user?.id;
+    if (uid) {
+      if (String(bk.customer_id) === String(uid)) return true;
+      if (String(bk.partner_id) === String(uid)) return true;
+      const email = authData?.user?.email;
+      if (email) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+        if (prof?.id) {
+          if (String(bk.customer_id) === String(prof.id)) return true;
+          if (String(bk.partner_id) === String(prof.id)) return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 /** pg_cron may call tick with service role bearer (stored in Vault) */
@@ -503,27 +555,9 @@ Deno.serve(async (req: Request) => {
       if (!bookingId) return json({ error: "booking_id required" }, 400);
 
       if (!dispatchSecretOk(req)) {
-        const { data: owned } = await supabase
-          .from("bookings")
-          .select("customer_id")
-          .eq("id", bookingId)
-          .maybeSingle();
-        if (!owned) return json({ error: "Booking not found" }, 404);
-
-        const customerId = String(body.customer_id || "").trim();
-        let authorized = customerId && String(owned.customer_id) === customerId;
-
-        if (!authorized) {
-          const authHeader = req.headers.get("Authorization") || "";
-          const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-          const userClient = createClient(supabaseUrl, anonKey, {
-            global: { headers: { Authorization: authHeader } },
-          });
-          const { data: authData } = await userClient.auth.getUser();
-          const uid = authData?.user?.id;
-          authorized = !!(uid && String(owned.customer_id) === String(uid));
-        }
-
+        const authorized = await bookingPartyAuthorized(
+          supabase, supabaseUrl, req, bookingId, body,
+        );
         if (!authorized) return json({ error: "Unauthorized" }, 401);
       }
 
@@ -627,6 +661,15 @@ Deno.serve(async (req: Request) => {
 
     if (action === "status") {
       const bookingId = String(body.booking_id || url.searchParams.get("booking_id") || "");
+      if (!bookingId) return json({ error: "booking_id required" }, 400);
+
+      if (!dispatchSecretOk(req)) {
+        const authorized = await bookingPartyAuthorized(
+          supabase, supabaseUrl, req, bookingId, body,
+        );
+        if (!authorized) return json({ error: "Unauthorized" }, 401);
+      }
+
       const { data } = await supabase
         .from("booking_dispatch")
         .select("*, booking_dispatch_attempts(*), vendor_partners:business_name")

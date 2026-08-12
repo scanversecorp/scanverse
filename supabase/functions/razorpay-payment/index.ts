@@ -579,9 +579,13 @@ async function handleWebhook(
   body: Record<string, unknown>,
   signature: string | null,
 ): Promise<Response> {
+  const webhookSecret = Deno.env.get("RAZORPAY_WEBHOOK_SECRET");
   const sigOk = await verifyRazorpaySignature(rawBody, signature);
-  if (!sigOk && Deno.env.get("RAZORPAY_WEBHOOK_SECRET")) {
-    return json({ error: "Invalid signature" }, 401);
+  if (webhookSecret) {
+    if (!sigOk) return json({ error: "Invalid signature" }, 401);
+  } else if (Deno.env.get("OTP_DEV_MODE") !== "1") {
+    console.warn("RAZORPAY_WEBHOOK_SECRET not set — rejecting unsigned webhook");
+    return json({ error: "Webhook secret not configured" }, 503);
   }
 
   const event = String(body.event || "");

@@ -4637,7 +4637,13 @@ function useLiveBookingTrack(bookingId) {
     }
     setLive(liveLoc);
     try {
-      const r = await sb().functions.invoke('booking-dispatch', { body: { action: 'status', booking_id: bookingId } });
+      const statusBody = {
+        action: 'status',
+        booking_id: bookingId,
+        customer_id: bk?.customer_id || null,
+        partner_id: bk?.partner_id || null,
+      };
+      const r = await sb().functions.invoke('booking-dispatch', { body: statusBody });
       setDispatch(r.data?.dispatch || null);
     } catch { /* optional */ }
     setLoading(false);

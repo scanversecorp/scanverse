@@ -124,6 +124,15 @@ Client                    Edge Function              Razorpay
 
 ---
 
+## Fixes Applied (12 Aug 2026 — Full Flow Audit)
+
+1. **Migration `20260812000025`** — `auth_matches_profile()` helper resolves TEXT profile ids (`cust_*`, `partner_*`) via JWT email; fixed dispatch/live-location RLS; added bookings SELECT/INSERT/UPDATE policies including partner `markComplete` UPDATE
+2. **`booking-dispatch`** — `DISPATCH_SECRET` fail-closed unless `OTP_DEV_MODE=1` or `DISPATCH_OPEN=1`; `status` action requires booking party auth (customer_id/partner_id/JWT)
+3. **`razorpay-payment`** — Reject unsigned webhooks when `RAZORPAY_WEBHOOK_SECRET` unset (except `OTP_DEV_MODE=1`)
+4. **`App.js`** — Pass `customer_id`/`partner_id` to dispatch `status` for authorized polling
+
+---
+
 ## Recommended Follow-ups
 
 1. Rotate `TWOFACTOR_KEY` that was previously exposed in client (if still active in 2Factor dashboard)
