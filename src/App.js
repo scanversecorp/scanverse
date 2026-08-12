@@ -4465,7 +4465,7 @@ function osmEmbedUrl(vLat, vLng, cLat, cLng) {
 
 function MapOverlayPin({ label, color, pos, pulse }) {
   return (
-    <div style={{ position: 'absolute', left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)', zIndex: 2, pointerEvents: 'none', textAlign: 'center' }}>
+    <div style={{ position: 'absolute', left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)', zIndex: 10, pointerEvents: 'none', textAlign: 'center' }}>
       <div style={{
         width: pulse ? 12 : 10, height: pulse ? 12 : 10, borderRadius: '50%', background: color, margin: '0 auto 2px',
         boxShadow: pulse ? `0 0 0 4px ${color}44` : '0 1px 4px rgba(0,0,0,0.35)',
@@ -4909,7 +4909,7 @@ function usePartnerLocationShare(user, bookings, addToast) {
   const watchRef = useRef(null);
   useEffect(() => {
     if (user?.role !== 'partner') return undefined;
-    const active = bookings.filter(b => b.status === 'confirmed' && b.partner_id);
+    const active = bookings.filter(b => b.status === 'confirmed' && b.partner_id === user.id);
     if (!active.length) {
       if (watchRef.current != null) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; }
       return undefined;
@@ -4961,6 +4961,7 @@ function BookingsScreen() {
   const [disputing,setDisputing]=useState(null);
   const [reason,setReason]=useState('');
   const [liveLocs,setLiveLocs]=useState({});
+  const [dispatchCoords,setDispatchCoords]=useState({});
   const [partners,setPartners]=useState({});
   const [orphans,setOrphans]=useState([]);
   const [recovering,setRecovering]=useState(null);
@@ -4982,8 +4983,35 @@ function BookingsScreen() {
     const ids=visible.map(b=>b.id);
     if(ids.length){
       const{data:lives}=await sb().from('vendor_live_locations').select('*').in('booking_id',ids);
-      const map={}; (lives||[]).forEach(l=>{ map[l.booking_id]=l.tracking_active?l:{...l,is_base:true}; });
+      const map={};
+      (lives||[]).forEach(l=>{
+        map[l.booking_id]=l.tracking_active?l:{...l,is_base:true};
+      });
+      const needVendorBase=visible.filter(b=>b.partner_id&&!map[b.id]);
+      if(needVendorBase.length){
+        const pids=[...new Set(needVendorBase.map(b=>b.partner_id))];
+        const{data:vendors}=await sb().from('vendor_partners').select('profile_id,address_lat,address_lng').in('profile_id',pids);
+        const vByProfile={};
+        (vendors||[]).forEach(v=>{ if(v.profile_id) vByProfile[v.profile_id]=v; });
+        needVendorBase.forEach(b=>{
+          const v=vByProfile[b.partner_id];
+          if(v?.address_lat!=null&&v?.address_lng!=null){
+            map[b.id]={lat:v.address_lat,lng:v.address_lng,tracking_active:false,is_base:true};
+          }
+        });
+      }
       setLiveLocs(map);
+      const needDispatch=visible.filter(b=>b.customer_lat==null&&b.customer_lng==null);
+      if(needDispatch.length){
+        const{data:dispatches}=await sb().from('booking_dispatch').select('booking_id,customer_lat,customer_lng').in('booking_id',needDispatch.map(b=>b.id));
+        const dmap={};
+        (dispatches||[]).forEach(d=>{
+          if(d.customer_lat!=null&&d.customer_lng!=null) dmap[d.booking_id]={customer_lat:d.customer_lat,customer_lng:d.customer_lng};
+        });
+        setDispatchCoords(dmap);
+      } else {
+        setDispatchCoords({});
+      }
       const pids=[...new Set((data||[]).filter(b=>b.partner_id).map(b=>b.partner_id))];
       if(pids.length){
         const{data:vendors}=await sb().from('vendor_partners').select('id,profile_id,business_name,contact_name').in('profile_id',pids);
@@ -5026,19 +5054,22 @@ function BookingsScreen() {
       channel=sb().channel('live-vendor-locs')
         .on('postgres_changes',{event:'*',schema:'public',table:'vendor_live_locations'},(payload)=>{
           const row=payload.new||payload.old;
-          if(row?.booking_id&&openIds.includes(row.booking_id)){
-            if(payload.eventType==='DELETE'||(row.tracking_active===false)){
-              setLiveLocs(prev=>{ const n={...prev}; delete n[row.booking_id]; return n; });
-            } else {
-              setLiveLocs(prev=>({...prev,[row.booking_id]:row}));
-            }
+          if(!row?.booking_id||!openIds.includes(row.booking_id)) return;
+          if(payload.eventType==='DELETE'){
+            setLiveLocs(prev=>{ const n={...prev}; delete n[row.booking_id]; return n; });
+            return;
           }
+          setLiveLocs(prev=>({
+            ...prev,
+            [row.booking_id]: row.tracking_active ? row : { ...row, is_base: true },
+          }));
         })
         .subscribe();
     }catch{}
     const poll=setInterval(async()=>{
-      const{data}=await sb().from('vendor_live_locations').select('*').in('booking_id',openIds).eq('tracking_active',true);
-      const map={}; (data||[]).forEach(l=>{ map[l.booking_id]=l; });
+      const{data}=await sb().from('vendor_live_locations').select('*').in('booking_id',openIds);
+      const map={};
+      (data||[]).forEach(l=>{ map[l.booking_id]=l.tracking_active?l:{...l,is_base:true}; });
       setLiveLocs(prev=>({...prev,...map}));
     },10000);
     return ()=>{ if(channel) sb().removeChannel(channel); clearInterval(poll); };
@@ -5077,6 +5108,7 @@ function BookingsScreen() {
         <LiveVendorMap
           live={liveLocs[b.id]}
           booking={b}
+          dispatch={dispatchCoords[b.id]}
           partnerName={partners[b.partner_id]}
           waitingMessage={trackWaitingMessage(b)}
           viewMode={user.role === 'partner' ? 'partner' : 'customer'}
