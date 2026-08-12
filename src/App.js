@@ -407,7 +407,8 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
     const cancelled = { current: false };
     loadRazorpayLink(cancelled);
     const params = new URLSearchParams(window.location.search);
-    if (params.get('payment') === txnId && params.get('razorpay_payment_link_status') === 'paid') {
+    const returnTxn = parsePaymentReturnTxn();
+    if (returnTxn === txnId || (params.get('payment') === txnId && params.get('razorpay_payment_link_status') === 'paid')) {
       setUpiOpened(true);
       checkPaymentVerified(txnId, amountPaise).then((ok) => {
         if (ok) setPaymentVerified(true);
@@ -484,6 +485,97 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
 }
 const FEE_PCT  = 0.10;
 const GST_RATE = 0.18;
+/** Customer cancel: 30% of total paid = 18% GST + 12% platform service; refund 70% */
+const CANCEL_FEE_GST_PCT = 0.18;
+const CANCEL_FEE_PLATFORM_PCT = 0.12;
+
+function calcCancellationBreakdown(totalPaidPaise) {
+  const totalPaid = Math.max(0, Math.round(Number(totalPaidPaise) || 0));
+  const cancelFeeGstPaise = Math.round(totalPaid * CANCEL_FEE_GST_PCT);
+  const cancelFeePlatformPaise = Math.round(totalPaid * CANCEL_FEE_PLATFORM_PCT);
+  const cancelFeePaise = cancelFeeGstPaise + cancelFeePlatformPaise;
+  const refundPaise = Math.max(0, totalPaid - cancelFeePaise);
+  return { totalPaid, cancelFeePaise, cancelFeeGstPaise, cancelFeePlatformPaise, refundPaise };
+}
+
+function isCancellableBooking(booking) {
+  if (!booking) return false;
+  const s = (booking.status || '').toLowerCase();
+  if (s === 'cancelled' || s === 'completed' || s === 'disputed') return false;
+  return s === 'confirmed' || s === 'in_progress' || s === 'in-progress';
+}
+
+async function invokeCancelBooking(bookingId, addToast) {
+  if (!bookingId) return { error: 'Missing booking' };
+  try {
+    const r = await sb().functions.invoke('razorpay-payment', {
+      body: { action: 'cancel', booking_id: bookingId },
+    });
+    if (r.error) {
+      let detail = r.error.message || 'Cancellation failed';
+      try {
+        const resp = r.error.context;
+        if (resp && typeof resp.json === 'function') {
+          const parsed = await resp.json();
+          if (parsed?.error) detail = parsed.error;
+        }
+      } catch (_) { /* use message */ }
+      addToast?.(detail, 'error');
+      return { error: detail };
+    }
+    if (r.data?.error) {
+      addToast?.(r.data.error, 'error');
+      return r.data;
+    }
+    const bd = r.data?.breakdown || {};
+    const refundRu = fmtRs(bd.refund_paise || 0);
+    const feeRu = fmtRs(bd.cancel_fee_paise || 0);
+    addToast?.(
+      `Booking cancelled · ₹${refundRu} refund pending (fee ₹${feeRu}). Our team will process it manually within 7 business days.`,
+      'success',
+    );
+    return r.data;
+  } catch (e) {
+    addToast?.(e.message || 'Cancellation failed', 'error');
+    return { error: e.message };
+  }
+}
+
+function CancelBookingModal({ booking, onClose, onConfirm, busy }) {
+  const bd = calcCancellationBreakdown(booking?.total || 0);
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: C.surf, borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, textAlign: 'center', marginBottom: 6 }}>Cancel booking?</div>
+        <div style={{ fontSize: 12, color: C.sub, textAlign: 'center', marginBottom: 16, lineHeight: 1.5 }}>
+          {booking?.service_name || 'Your service'} · {booking?.date || 'TBD'}
+        </div>
+        <div style={{ ...S.card(), padding: 14, marginBottom: 14, background: C.card }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Cancellation breakdown</div>
+          {[
+            ['Total paid', bd.totalPaid],
+            ['Cancellation fee (30%)', bd.cancelFeePaise],
+            ['  GST (18% of total)', bd.cancelFeeGstPaise],
+            ['  Platform service (12% of total)', bd.cancelFeePlatformPaise],
+            ['Refund to you (70%)', bd.refundPaise],
+          ].map(([label, paise], i) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 4 ? `1px solid ${C.bdr}` : 'none', fontSize: i === 4 ? 14 : 12, fontWeight: i === 4 ? 800 : i === 0 ? 600 : 400, color: i === 4 ? C.grn : i === 1 ? C.red : C.sub }}>
+              <span>{label}</span>
+              <span style={{ color: i === 4 ? C.grn : C.txt }}>₹{fmtRs(paise)}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5, marginBottom: 14 }}>
+          Fee = 18% GST + 12% platform service of your total paid amount. Refunds are processed manually by our support team within 7 business days — not instant.
+        </div>
+        <Btn v="danger" full disabled={busy} onClick={onConfirm} style={{ marginBottom: 8 }}>
+          {busy ? <><Spin size={14} /> Cancelling…</> : `Confirm cancel · refund ₹${fmtRs(bd.refundPaise)}`}
+        </Btn>
+        <button type="button" onClick={onClose} disabled={busy} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'block', margin: '4px auto 0' }}>Keep booking</button>
+      </div>
+    </div>
+  );
+}
 
 /* --- DESIGN TOKENS · Daylight Trust -------------------------------- */
 const C = {
@@ -922,22 +1014,43 @@ function clearBookingDraft() {
   try { sessionStorage.removeItem(BOOKING_DRAFT_KEY); } catch (_) {}
 }
 
+function normalizeTxnId(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const id = decodeURIComponent(raw.trim());
+  if (!id.startsWith('TXN-')) return null;
+  const hash = id.indexOf('#');
+  return hash > 0 ? id.slice(0, hash) : id;
+}
+
 function parsePaymentReturnTxn() {
   const params = new URLSearchParams(window.location.search);
-  const txnId = params.get('payment');
-  if (!txnId?.startsWith('TXN-')) return null;
   const paid = params.getAll('razorpay_payment_link_status').some((v) => v === 'paid')
     || params.get('razorpay_payment_link_status') === 'paid';
-  return paid ? txnId : null;
+
+  const fromPayment = normalizeTxnId(params.get('payment'));
+  if (fromPayment && paid) return fromPayment;
+
+  const fromRef = normalizeTxnId(params.get('razorpay_payment_link_reference_id'));
+  if (fromRef && (params.get('razorpay_payment_id') || paid || params.get('razorpay_payment_link_status'))) {
+    return fromRef;
+  }
+  return null;
 }
 
 function clearPaymentReturnUrl() {
   const url = new URL(window.location.href);
-  if (!url.searchParams.has('payment') && !url.searchParams.has('razorpay_payment_link_status')) return;
-  url.searchParams.delete('payment');
-  while (url.searchParams.has('razorpay_payment_link_status')) {
-    url.searchParams.delete('razorpay_payment_link_status');
+  const keys = [
+    'payment', 'razorpay_payment_link_status', 'razorpay_payment_id',
+    'razorpay_payment_link_id', 'razorpay_payment_link_reference_id', 'razorpay_signature',
+  ];
+  let changed = false;
+  for (const k of keys) {
+    while (url.searchParams.has(k)) {
+      url.searchParams.delete(k);
+      changed = true;
+    }
   }
+  if (!changed) return;
   const next = url.pathname + (url.search || '') + url.hash;
   window.history.replaceState({}, '', next);
 }
@@ -1021,6 +1134,41 @@ function isDuplicateBookingStatus(status) {
   return status && !CANCELLED_BOOKING_STATUSES.includes(status);
 }
 
+function normalizeLocationKey(loc) {
+  if (!loc) return '';
+  return loc.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function coordsNear(aLat, aLng, bLat, bLng, maxM = 250) {
+  if (aLat == null || aLng == null || bLat == null || bLng == null) return false;
+  const toRad = (d) => d * Math.PI / 180;
+  const R = 6371000;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x)) <= maxM;
+}
+
+/** @returns {{ proceed: boolean, usedExisting?: boolean }} */
+async function handleDuplicateBooking(dup, { addToast, onUseExisting, allowOverride = true }) {
+  if (!dup) return { proceed: true };
+  if (!allowOverride) {
+    addToast?.('You already have this booking — opening track view', 'success');
+    onUseExisting?.(dup);
+    return { proceed: false, usedExisting: true };
+  }
+  const bookAgain = window.confirm(
+    `You already have an active ${dup.service_name || 'booking'} at this location`
+    + (dup.date ? ` (${dup.date}${dup.time ? ` ${dup.time}` : ''})` : '')
+    + '.\n\nClick OK only if you intentionally want another booking at the same location.\nClick Cancel to open your existing booking instead.',
+  );
+  if (bookAgain) return { proceed: true };
+  addToast?.('Opening your existing booking', 'success');
+  onUseExisting?.(dup);
+  return { proceed: false, usedExisting: true };
+}
+
 /** First non-cancelled booking for txn — limit(1) avoids maybeSingle() failure when duplicates exist. */
 async function findBookingByTxn(txnId, { customerId } = {}) {
   if (!txnId) return null;
@@ -1037,22 +1185,37 @@ async function findBookingByTxn(txnId, { customerId } = {}) {
   } catch (_) { return null; }
 }
 
-async function findDuplicateBooking({ customerId, serviceId, date, time, txnId }) {
+async function findDuplicateBooking({ customerId, serviceId, date, time, txnId, location, lat, lng }) {
   try {
     const byTxn = await findBookingByTxn(txnId, customerId ? { customerId } : {});
     if (byTxn) return byTxn;
-    if (customerId && serviceId && date) {
-      let q = sb().from('bookings')
-        .select('id, status, txn_id, date, time, service_name, service_id, created_at')
+    if (customerId && serviceId) {
+      const { data: rows } = await sb().from('bookings')
+        .select('id, status, txn_id, date, time, service_name, service_id, location_text, customer_lat, customer_lng, created_at')
         .eq('customer_id', customerId)
         .eq('service_id', serviceId)
-        .eq('date', date)
-        .not('status', 'eq', 'cancelled')
+        .in('status', ACTIVE_BOOKING_STATUSES)
         .order('created_at', { ascending: true })
-        .limit(1);
-      if (time) q = q.eq('time', time);
-      const { data: bySlot } = await q.maybeSingle();
-      if (bySlot) return bySlot;
+        .limit(20);
+      if (!rows?.length) return null;
+      const locKey = normalizeLocationKey(location);
+      for (const row of rows) {
+        if (locKey && normalizeLocationKey(row.location_text) === locKey) return row;
+        if (coordsNear(lat, lng, row.customer_lat, row.customer_lng)) return row;
+      }
+      if (date) {
+        let q = sb().from('bookings')
+          .select('id, status, txn_id, date, time, service_name, service_id, created_at')
+          .eq('customer_id', customerId)
+          .eq('service_id', serviceId)
+          .eq('date', date)
+          .not('status', 'eq', 'cancelled')
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (time) q = q.eq('time', time);
+        const { data: bySlot } = await q.maybeSingle();
+        if (bySlot) return bySlot;
+      }
     }
   } catch (_) { /* ignore lookup errors */ }
   return null;
@@ -3031,21 +3194,27 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const dup = await findDuplicateBooking({
         customerId: userId, serviceId: svcId,
         date: bookingDetail.date, time: bookingDetail.time || '10:00', txnId,
+        location: loc, lat: custLat, lng: custLng,
       });
       if (dup) {
-        const profile = await upsertCustomerProfile({
-          id: userId,
-          mob: normalizeMobileE164(mobile),
-          firstName, lastName, address, village, city, pincode,
-          silentGeo,
-          lastLat: silentGeo?.lat || bookingDetail.lat || null,
-          lastLng: silentGeo?.lng || bookingDetail.lng || null,
+        const dupAction = await handleDuplicateBooking(dup, {
+          addToast,
+          allowOverride: dup.txn_id !== txnId,
+          onUseExisting: async (existing) => {
+            const profile = await upsertCustomerProfile({
+              id: userId,
+              mob: normalizeMobileE164(mobile),
+              firstName, lastName, address, village, city, pincode,
+              silentGeo,
+              lastLat: silentGeo?.lat || bookingDetail.lat || null,
+              lastLng: silentGeo?.lng || bookingDetail.lng || null,
+            });
+            sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
+            clearBookingDraft();
+            onRegistered(profile, existing.id);
+          },
         });
-        addToast?.('You already have this booking — opening track view', 'success');
-        sessionStorage.setItem(TRACK_BOOKING_KEY, dup.id);
-        clearBookingDraft();
-        onRegistered(profile, dup.id);
-        return;
+        if (!dupAction.proceed) return;
       }
       const {data:bk,error} = await sb().from('bookings').insert({
         customer_id:userId, service_name:svc.name, service_id: svc.id || svc.parent || null,
@@ -4414,12 +4583,18 @@ function BookScreen() {
       const dup = await findDuplicateBooking({
         customerId: profile.id, serviceId: svcId,
         date, time, txnId,
+        location: loc, lat: custLat, lng: custLng,
       });
       if (dup) {
-        addToast('You already have this booking — opening track view', 'success');
-        clearBookingDraft();
-        goToTrack(setTrackBookingId, setScreen, dup.id);
-        return;
+        const dupAction = await handleDuplicateBooking(dup, {
+          addToast,
+          allowOverride: dup.txn_id !== txnId,
+          onUseExisting: (existing) => {
+            clearBookingDraft();
+            goToTrack(setTrackBookingId, setScreen, existing.id);
+          },
+        });
+        if (!dupAction.proceed) return;
       }
       const { data, error } = await sb().from('bookings').insert({
         customer_id: profile.id, service_name: svc.name, service_id: svc.id || svc.parent || null,
@@ -4910,6 +5085,25 @@ function TrackServiceScreen() {
   const status = trackStatusLabel(booking, dispatch, live);
   const steps = ['Confirmed', 'Finding partner', 'Partner assigned', 'Live tracking', 'Complete'];
   const [retryDispatch, setRetryDispatch] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const confirmCancelFromTrack = async () => {
+    if (!booking?.id) return;
+    setCancelling(true);
+    try {
+      const r = await invokeCancelBooking(booking.id, addToast);
+      if (r?.success || r?.already_cancelled) {
+        setShowCancelModal(false);
+        sessionStorage.removeItem(TRACK_BOOKING_KEY);
+        setTrackBookingId?.(null);
+        window.location.hash = '';
+        setScreen('bookings');
+      }
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const retryPartnerAlerts = async () => {
     if (!booking?.id || !user?.id) return addToast('Sign in to retry partner alerts', 'error');
@@ -5051,7 +5245,20 @@ function TrackServiceScreen() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Btn full onClick={() => { setScreen('bookings'); window.location.hash = ''; }}>All bookings</Btn>
             <Btn v="outline" full onClick={() => window.location.reload()}>Refresh map</Btn>
+            {user?.role === 'customer' && isCancellableBooking(booking) && (
+              <Btn v="danger" full onClick={() => setShowCancelModal(true)} disabled={cancelling}>
+                Cancel booking
+              </Btn>
+            )}
           </div>
+          {showCancelModal && booking && (
+            <CancelBookingModal
+              booking={booking}
+              busy={cancelling}
+              onClose={() => !cancelling && setShowCancelModal(false)}
+              onConfirm={confirmCancelFromTrack}
+            />
+          )}
           <div style={{ marginTop: 16, fontSize: 10, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#track?id={bookingId}</code>
           </div>
@@ -5154,6 +5361,7 @@ function usePartnerLocationShare(user, bookings, addToast, onLiveUpdate) {
 const BOOKING_COMPLETED = new Set(['completed','closed']);
 function bookingStatusGroup(status) {
   const s = (status || '').toLowerCase();
+  if (s === 'cancelled') return { label: 'Cancelled', color: C.red };
   if (BOOKING_COMPLETED.has(s)) return { label: 'Completed', color: C.grn };
   return { label: 'In-progress', color: C.gold };
 }
@@ -5282,6 +5490,8 @@ function BookingsScreen() {
   const [recoverTime,setRecoverTime]=useState('10:00');
   const [recoverBusy,setRecoverBusy]=useState(false);
   const [completingId,setCompletingId]=useState(null);
+  const [cancelModalBooking,setCancelModalBooking]=useState(null);
+  const [cancellingId,setCancellingId]=useState(null);
 
   const load=useCallback(async()=>{
     const col=user.role==='partner'?'partner_id':'customer_id';
@@ -5410,7 +5620,22 @@ function BookingsScreen() {
     return 'Searching for nearby partner · map shows your service location';
   };
   const activeBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='In-progress');
-  const doneBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='Completed');
+  const doneBookings=bookings.filter(b=>['Completed','Cancelled'].includes(bookingStatusGroup(b.status).label));
+
+  const confirmCancelBooking=async(b)=>{
+    setCancellingId(b.id);
+    try {
+      const r=await invokeCancelBooking(b.id,addToast);
+      if(r?.success||r?.already_cancelled){
+        setCancelModalBooking(null);
+        if(b.id===sessionStorage.getItem(TRACK_BOOKING_KEY)){
+          sessionStorage.removeItem(TRACK_BOOKING_KEY);
+          setTrackBookingId?.(null);
+        }
+        load();
+      }
+    } finally { setCancellingId(null); }
+  };
 
   const renderBookingCard=(b)=>(
     <div key={b.id} style={{...S.card(),marginBottom:10}}>
@@ -5435,6 +5660,11 @@ function BookingsScreen() {
       {user.role==='customer'&&b.status==='confirmed'&&<WaitEngagementPanel compact />}
       {user.role==='customer'&&bookingStatusGroup(b.status).label==='In-progress'&&bookingSupportsLiveTrack(b)&&(
         <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
+      )}
+      {user.role==='customer'&&isCancellableBooking(b)&&(
+        <Btn sm v="danger" onClick={()=>setCancelModalBooking(b)} disabled={cancellingId===b.id} style={{marginTop:8}}>
+          {cancellingId===b.id?'Cancelling…':'Cancel booking'}
+        </Btn>
       )}
       {user.role==='partner'&&b.status==='confirmed'&&b.partner_id===user.id&&(
         <Btn sm onClick={()=>markComplete(b)} disabled={completingId===b.id} style={{marginTop:8}}>
@@ -5489,14 +5719,22 @@ function BookingsScreen() {
         date: recoverDate,
         time: recoverTime || '10:00',
         txnId: intent.txn_id,
+        location: loc,
+        lat: user.last_lat ?? null,
+        lng: user.last_lng ?? null,
       });
       if (existing) {
-        clearBookingDraft();
-        setRecovering(null);
-        addToast('Booking already exists for this payment — opening track', 'success');
-        goToTrack(setTrackBookingId, setScreen, existing.id);
-        load();
-        return;
+        const dupAction = await handleDuplicateBooking(existing, {
+          addToast,
+          allowOverride: existing.txn_id !== intent.txn_id,
+          onUseExisting: (dup) => {
+            clearBookingDraft();
+            setRecovering(null);
+            goToTrack(setTrackBookingId, setScreen, dup.id);
+            load();
+          },
+        });
+        if (!dupAction.proceed) return;
       }
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Customer';
       const { data: bk, error } = await sb().from('bookings').insert({
@@ -5629,7 +5867,7 @@ function BookingsScreen() {
             {activeBookings.map(renderBookingCard)}
           </>}
           {doneBookings.length>0&&<>
-            <div style={{fontSize:13,fontWeight:700,color:C.txt,marginBottom:10,marginTop:activeBookings.length?16:0}}>Completed ({doneBookings.length})</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.txt,marginBottom:10,marginTop:activeBookings.length?16:0}}>Past ({doneBookings.length})</div>
             {doneBookings.map(renderBookingCard)}
           </>}
         </>):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>
@@ -5638,6 +5876,14 @@ function BookingsScreen() {
           <div style={{fontSize:12}}>Book a service to see your orders here</div>
         </div>}
       </div>
+      {cancelModalBooking && (
+        <CancelBookingModal
+          booking={cancelModalBooking}
+          busy={cancellingId === cancelModalBooking.id}
+          onClose={() => !cancellingId && setCancelModalBooking(null)}
+          onConfirm={() => confirmCancelBooking(cancelModalBooking)}
+        />
+      )}
     </div>
   );
 }
@@ -7016,7 +7262,7 @@ function FaqPage() {
     ['My payment failed but money was deducted — what now?', 'Failed payments are auto-refunded in 5–7 business days. Email payments@dcoreglobal.com with your TXN ID if not resolved.'],
     ['How do I report an issue or complaint?', 'Use Report in the footer (#report) to submit a support ticket. You receive a ticket number (TKT-…) for reference.'],
     ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). You will see basic status, subject, and resolution note when closed.'],
-    ['Can I change or cancel a booking?', 'Contact support before the service time. Admins can update booking status. Cancellation refunds follow the schedule in our Refund Policy.'],
+    ['Can I change or cancel a booking?', 'Yes — open Bookings or Track my service and tap Cancel booking on any confirmed or in-progress order. You will see a breakdown: 30% cancellation fee (18% GST + 12% platform service of total paid) and 70% refund. See /refund for details.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
     ['Who operates ScanV?', 'DCORE Global Corporation, Pune. Marketplace connecting customers with independent service partners. Call +91-9270194842 for help.'],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
@@ -8963,14 +9209,25 @@ function LegalPage({page}) {
     refund: {
       title:'Refund Policy',
       badge:'REFUNDS',
-      updated:'10 August 2026',
+      updated:'13 August 2026',
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ Refunds apply only to the platform fee (10%) collected by DCORE. Service fees paid to Partners — including cash — are outside DCORE’s refund scope.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ When you cancel a confirmed booking in the app, ScanV refunds <strong>70% of your total paid amount</strong> after manual review. A <strong>30% cancellation charge</strong> applies (18% GST + 12% platform service, each calculated on your total paid amount). Refunds are <strong>not automatic</strong> — our support team processes them within <strong>7 business days</strong>.</p>
           </div>
           <div style={{marginBottom:20}}>
-            <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>Cancellation Schedule</div>
+            <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>In-app cancellation (confirmed / in-progress bookings)</div>
+            {[['Total paid','Your booking amount (service + platform fee + GST)'],['Cancellation fee','30% of total paid'],['  GST portion','18% of total paid (within the 30% fee)'],['  Platform service','12% of total paid (within the 30% fee)'],['Refund to you','70% of total paid — processed manually by support/admin within 7 business days']].map(([k,v])=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:13,gap:12}}>
+                <span style={{color:C.sub,flex:1}}>{k}</span><span style={{color:C.txt,fontWeight:500,textAlign:'right',maxWidth:'55%'}}>{v}</span>
+              </div>
+            ))}
+            <div style={{fontSize:12,color:C.dim,marginTop:10,lineHeight:1.6}}>
+              Example: total paid ₹1,000 → cancellation fee ₹300 (GST ₹180 + platform ₹120) → refund ₹700. Use <strong>Bookings → Cancel booking</strong> or <strong>Track my service → Cancel booking</strong> before confirm.
+            </div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>Legacy platform-fee schedule (support-assisted)</div>
             {[['24+ hrs before','Platform fee: 100% refunded'],['2–24 hrs before','Platform fee: 50% refunded'],['Under 2 hrs','Platform fee: no refund'],['No-show','No refund'],['Cancelled by DCORE','100% refunded']].map(([k,v])=>(
               <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:13}}>
                 <span style={{color:C.sub}}>{k}</span><span style={{color:C.txt,fontWeight:500}}>{v}</span>
@@ -8978,11 +9235,11 @@ function LegalPage({page}) {
             ))}
           </div>
           {[
-            ['What DCORE Refunds','DCORE cancels due to unavailable Partner · Technical error causing incorrect charge · Duplicate payment · Payment processed but no booking confirmed'],
-            ['What DCORE Does Not Refund','Service quality disputes (User vs Partner) · User cancellation after Partner assigned · User no-show · Change of mind · Cash payments to Partners · Professional service outcomes (legal, medical, training)'],
+            ['What DCORE Refunds','In-app customer cancellation (70% of total paid) · DCORE cancels due to unavailable Partner · Technical error causing incorrect charge · Duplicate payment · Payment processed but no booking confirmed'],
+            ['What DCORE Does Not Refund','The 30% cancellation fee on customer-initiated cancels · Service quality disputes (User vs Partner) · User no-show · Change of mind after service started · Cash payments to Partners · Professional service outcomes (legal, medical, training)'],
             ['Non-Refundable Categories','Legal consultations (once conducted) · Cloud training (once batch started) · VIP appointments (deposit within 24hrs) · Food (once preparation started) · Healthcare (once consultation complete)'],
-            ['Refund Processing','5–7 business days · Returned to original payment method · UPI refunds: 3–5 business days post-processing · GST credit note issued for all refunds'],
-            ['How to Request','App: Open booking → Raise a dispute → Refund Request · Email: refunds@dcoreglobal.com with your TXN-XXXXXXXX · Response within 24 business hours'],
+            ['Refund Processing','Manual review by Customer Support or Admin · SLA: within 7 business days of cancellation · Returned to original payment method · UPI refunds: 3–5 business days after support marks complete · GST credit note issued'],
+            ['How to Request','App: Bookings or Track → Cancel booking (instant fee breakdown, manual refund queue) · Support desk processes the refund · Email: refunds@dcoreglobal.com with TXN-XXXXXXXX'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
