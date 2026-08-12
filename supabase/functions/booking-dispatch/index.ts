@@ -26,31 +26,14 @@ import {
 const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes
 const MAX_VENDORS = 3;
 const MAX_ATTEMPTS_PER_VENDOR = 2;
-/** Partners with an active job are excluded unless live GPS is within this distance of that job's customer */
-const IN_ROUTE_ARRIVAL_M = 500;
 
-function haversineM(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/** Vendor IDs blocked from new dispatch while on an active job (unless within 500m of current customer). */
+/** Vendor IDs with a confirmed in-progress booking — one active job at a time until completed. */
 async function getUnavailableVendorIds(
   supabase: ReturnType<typeof createClient>,
 ): Promise<Set<string>> {
   const { data: activeBookings } = await supabase
     .from("bookings")
-    .select("id, partner_id, customer_lat, customer_lng")
+    .select("partner_id")
     .eq("status", "confirmed")
     .not("partner_id", "is", null);
 
@@ -61,51 +44,10 @@ async function getUnavailableVendorIds(
   )];
   const { data: vendors } = await supabase
     .from("vendor_partners")
-    .select("id, profile_id, address_lat, address_lng")
+    .select("id, profile_id")
     .in("profile_id", partnerIds);
 
-  const profileToVendor = new Map(
-    (vendors || []).map((v) => [String(v.profile_id), v]),
-  );
-
-  const bookingIds = activeBookings.map((b) => b.id);
-  const { data: liveLocs } = await supabase
-    .from("vendor_live_locations")
-    .select("booking_id, lat, lng, tracking_active")
-    .in("booking_id", bookingIds);
-
-  const liveByBooking = new Map(
-    (liveLocs || []).map((l) => [String(l.booking_id), l]),
-  );
-
-  const unavailable = new Set<string>();
-  for (const b of activeBookings) {
-    const vendor = profileToVendor.get(String(b.partner_id));
-    if (!vendor?.id) continue;
-
-    const custLat = b.customer_lat as number | null;
-    const custLng = b.customer_lng as number | null;
-    if (custLat == null || custLng == null) {
-      unavailable.add(String(vendor.id));
-      continue;
-    }
-
-    const live = liveByBooking.get(String(b.id));
-    let vLat: number | null = live?.tracking_active ? (live.lat as number) : null;
-    let vLng: number | null = live?.tracking_active ? (live.lng as number) : null;
-    if (vLat == null || vLng == null) {
-      vLat = vendor.address_lat as number | null;
-      vLng = vendor.address_lng as number | null;
-    }
-
-    if (vLat != null && vLng != null) {
-      const dist = haversineM(vLat, vLng, custLat, custLng);
-      if (dist <= IN_ROUTE_ARRIVAL_M) continue;
-    }
-
-    unavailable.add(String(vendor.id));
-  }
-  return unavailable;
+  return new Set((vendors || []).map((v) => String(v.id)));
 }
 
 function dispatchSecretOk(req: Request): boolean {
@@ -312,6 +254,12 @@ async function assignVendor(
     .single();
 
   if (!vendor || vendor.status !== "active") return;
+
+  const unavailable = await getUnavailableVendorIds(supabase);
+  if (unavailable.has(String(vendorId))) {
+    console.warn("[dispatch] vendor busy — active booking not completed", vendorId);
+    return;
+  }
 
   const partnerId = vendor.profile_id || vendorId;
 

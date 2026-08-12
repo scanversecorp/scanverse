@@ -4463,6 +4463,23 @@ function osmEmbedUrl(vLat, vLng, cLat, cLng) {
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox.minLng}%2C${bbox.minLat}%2C${bbox.maxLng}%2C${bbox.maxLat}&layer=mapnik`;
 }
 
+function osmStaticMapUrl(vLat, vLng, cLat, cLng, width, height) {
+  const bbox = mapBbox(vLat, vLng, cLat, cLng);
+  const centerLat = ((bbox.minLat + bbox.maxLat) / 2).toFixed(6);
+  const centerLng = ((bbox.minLng + bbox.maxLng) / 2).toFixed(6);
+  const span = Math.max(bbox.maxLat - bbox.minLat, bbox.maxLng - bbox.minLng);
+  let zoom = 15;
+  if (span > 0.08) zoom = 11;
+  else if (span > 0.04) zoom = 12;
+  else if (span > 0.02) zoom = 13;
+  else if (span > 0.01) zoom = 14;
+  const markers = [];
+  if (cLat != null && cLng != null) markers.push(`${cLat},${cLng},blue`);
+  if (vLat != null && vLng != null) markers.push(`${vLat},${vLng},green`);
+  if (!markers.length) return null;
+  return `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLng}&zoom=${zoom}&size=${width}x${height}&maptype=mapnik&markers=${markers.join('|')}`;
+}
+
 function MapOverlayPin({ label, color, pos, pulse }) {
   return (
     <div style={{ position: 'absolute', left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)', zIndex: 10, pointerEvents: 'none', textAlign: 'center' }}>
@@ -4478,6 +4495,8 @@ function MapOverlayPin({ label, color, pos, pulse }) {
 
 function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMessage, viewMode = 'customer' }) {
   const mapH = large ? 320 : 180;
+  const mapW = large ? 650 : 400;
+  const [staticFailed, setStaticFailed] = useState(false);
   const customerCoords = resolveBookingCoords(booking, dispatch);
   const vendorLat = live?.lat ?? null;
   const vendorLng = live?.lng ?? null;
@@ -4489,6 +4508,11 @@ function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMes
   const minsAgo = updated ? Math.max(0, Math.round((Date.now() - updated.getTime()) / 60000)) : null;
   const bbox = mapBbox(vendorLat, vendorLng, customerCoords.lat, customerCoords.lng);
   const embedSrc = osmEmbedUrl(vendorLat, vendorLng, customerCoords.lat, customerCoords.lng);
+  const staticSrc = hasAnyPin && !staticFailed
+    ? osmStaticMapUrl(vendorLat, vendorLng, customerCoords.lat, customerCoords.lng, mapW, mapH)
+    : null;
+  const useOverlayPins = !staticSrc;
+  useEffect(() => { setStaticFailed(false); }, [vendorLat, vendorLng, customerCoords.lat, customerCoords.lng]);
   const isPartnerView = viewMode === 'partner';
   const customerLabel = isPartnerView ? 'Customer · pickup/drop' : 'Your location';
   const vendorLabel = isPartnerView ? 'You · partner' : (partnerName || 'Partner');
@@ -4545,15 +4569,26 @@ function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMes
       )}
       <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: mapH, background: C.deep, position: 'relative' }}>
         {hasAnyPin ? (
-          <>
-            <iframe title="Live booking map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
-            {hasCustomerPin && customerPinPos && (
-              <MapOverlayPin label={customerLabel} color={C.acc} pos={customerPinPos} />
-            )}
-            {hasVendorPin && vendorPinPos && (
-              <MapOverlayPin label={vendorLabel} color={C.grn} pos={vendorPinPos} pulse={hasLiveGps} />
-            )}
-          </>
+          staticSrc ? (
+            <img
+              key={staticSrc}
+              src={staticSrc}
+              alt="Live booking map"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              loading="lazy"
+              onError={() => setStaticFailed(true)}
+            />
+          ) : (
+            <>
+              <iframe title="Live booking map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
+              {useOverlayPins && hasCustomerPin && customerPinPos && (
+                <MapOverlayPin label={customerLabel} color={C.acc} pos={customerPinPos} />
+              )}
+              {useOverlayPins && hasVendorPin && vendorPinPos && (
+                <MapOverlayPin label={vendorLabel} color={C.grn} pos={vendorPinPos} pulse={hasLiveGps} />
+              )}
+            </>
+          )
         ) : (
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center', color: C.dim, fontSize: 12 }}>
             Map appears once your service location is set · tap 📍 on booking to capture GPS
@@ -4905,7 +4940,7 @@ function useVendorLocationTracker(user, { enabled = true, mobile = null, onPosit
   }, [enabled, user?.id, user?.role, user?.phone, mobile, onPosition]);
 }
 
-function usePartnerLocationShare(user, bookings, addToast) {
+function usePartnerLocationShare(user, bookings, addToast, onLiveUpdate) {
   const watchRef = useRef(null);
   useEffect(() => {
     if (user?.role !== 'partner') return undefined;
@@ -4920,24 +4955,28 @@ function usePartnerLocationShare(user, bookings, addToast) {
       if (cancelled || !vendor?.id) return;
       if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
       watchRef.current = navigator.geolocation.watchPosition(async (pos) => {
+        const liveRow = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading,
+          speed_kmh: pos.coords.speed != null ? Math.round(pos.coords.speed * 3.6 * 10) / 10 : null,
+          tracking_active: true,
+          updated_at: new Date().toISOString(),
+        };
         for (const b of active) {
+          onLiveUpdate?.(b.id, liveRow);
           await sbIgnore(sb().from('vendor_live_locations').upsert({
             booking_id: b.id,
             vendor_id: vendor.id,
             partner_id: user.id,
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            heading: pos.coords.heading,
-            speed_kmh: pos.coords.speed != null ? Math.round(pos.coords.speed * 3.6 * 10) / 10 : null,
-            tracking_active: true,
-            updated_at: new Date().toISOString(),
+            ...liveRow,
           }, { onConflict: 'booking_id' }));
         }
       }, () => addToast?.('Enable GPS to share live location with customer', 'error'),
       { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
     })();
     return () => { cancelled = true; if (watchRef.current != null) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; } };
-  }, [user?.id, user?.role, bookings, addToast]);
+  }, [user?.id, user?.role, bookings, addToast, onLiveUpdate]);
 }
 
 const BOOKING_COMPLETED = new Set(['completed','closed']);
@@ -5025,7 +5064,11 @@ function BookingsScreen() {
     setLoading(false);
   },[user.id,user.role]);
 
-  usePartnerLocationShare(user, bookings, addToast);
+  const handlePartnerLiveUpdate = useCallback((bookingId, liveRow) => {
+    setLiveLocs(prev => ({ ...prev, [bookingId]: liveRow }));
+  }, []);
+
+  usePartnerLocationShare(user, bookings, addToast, handlePartnerLiveUpdate);
 
   useEffect(()=>{load();},[load]);
 
