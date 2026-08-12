@@ -236,13 +236,12 @@ async function checkRazorpayApi(
   if (!auth) return { paid: false };
 
   try {
-    const linkRes = await fetch(
-      `https://api.razorpay.com/v1/payment_links/?reference_id=${encodeURIComponent(txnId)}`,
-      { headers: { Authorization: auth } },
-    );
-    if (linkRes.ok) {
-      const linkData = await linkRes.json();
-      const items = linkData.payment_links || linkData.items || [];
+    const refs = [
+      paymentLinkReferenceId(txnId, expectedPaise),
+      txnId,
+    ];
+    for (const ref of refs) {
+      const items = await listPaymentLinksByReference(auth, ref);
       for (const link of items) {
         const paidPaise = Number(link.amount_paid ?? 0);
         const linkAmount = Number(link.amount ?? 0);
@@ -316,29 +315,48 @@ async function checkRazorpayApi(
   return { paid: false };
 }
 
+type PaymentLinkResult =
+  | { ok: true; url: string; id: string }
+  | { ok: false; error: string };
+
+function paymentLinkReferenceId(txnId: string, amountPaise: number): string {
+  return `${txnId}#${amountPaise}`;
+}
+
+async function listPaymentLinksByReference(
+  auth: string,
+  referenceId: string,
+): Promise<Record<string, unknown>[]> {
+  const res = await fetch(
+    `https://api.razorpay.com/v1/payment_links/?reference_id=${encodeURIComponent(referenceId)}`,
+    { headers: { Authorization: auth } },
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.payment_links || data.items || [];
+}
+
 async function createPaymentLink(
   txnId: string,
   amountPaise: number,
-): Promise<{ url: string; id: string } | null> {
+): Promise<PaymentLinkResult> {
   const auth = razorpayAuth();
-  if (!auth) return null;
+  if (!auth) {
+    return { ok: false, error: "Razorpay keys not configured on server" };
+  }
+
+  const referenceId = paymentLinkReferenceId(txnId, amountPaise);
 
   try {
-    const existing = await fetch(
-      `https://api.razorpay.com/v1/payment_links/?reference_id=${encodeURIComponent(txnId)}`,
-      { headers: { Authorization: auth } },
-    );
-    if (existing.ok) {
-      const existingData = await existing.json();
-      const items = existingData.payment_links || existingData.items || [];
+    for (const ref of [referenceId, txnId]) {
+      const items = await listPaymentLinksByReference(auth, ref);
       for (const link of items) {
-        if (
-          link.status !== "cancelled" &&
-          link.status !== "expired" &&
-          Number(link.amount) === amountPaise
-        ) {
+        if (link.status === "cancelled" || link.status === "expired") continue;
+        if (Number(link.amount) === amountPaise) {
           const url = link.short_url || link.url;
-          if (url) return { url: String(url), id: String(link.id || "") };
+          if (url) {
+            return { ok: true, url: String(url), id: String(link.id || "") };
+          }
         }
       }
     }
@@ -353,7 +371,7 @@ async function createPaymentLink(
         amount: amountPaise,
         currency: "INR",
         accept_partial: false,
-        reference_id: txnId,
+        reference_id: referenceId,
         description: `ScanV Booking ${txnId}`,
         notes: { txn_id: txnId, reference_id: txnId },
         callback_url:
@@ -365,16 +383,21 @@ async function createPaymentLink(
     if (!res.ok) {
       const errText = await res.text();
       console.error("createPaymentLink failed:", res.status, errText);
-      return null;
+      let detail = errText.slice(0, 200);
+      try {
+        const parsed = JSON.parse(errText);
+        detail = String(parsed.error?.description || parsed.error?.reason || detail);
+      } catch { /* keep raw */ }
+      return { ok: false, error: `Razorpay API ${res.status}: ${detail}` };
     }
 
     const link = await res.json();
     const url = link.short_url || link.url;
-    if (!url) return null;
-    return { url: String(url), id: String(link.id || "") };
+    if (!url) return { ok: false, error: "Razorpay returned no payment link URL" };
+    return { ok: true, url: String(url), id: String(link.id || "") };
   } catch (e) {
     console.error("createPaymentLink error:", e);
-    return null;
+    return { ok: false, error: String(e) };
   }
 }
 
@@ -402,13 +425,6 @@ async function handleRegister(
     return json({ success: true, txn_id: txnId, already_paid: true });
   }
 
-  if (existing && existing.amount_paise !== amountPaise && existing.status === "pending") {
-    return json({
-      error: "Amount mismatch for existing intent",
-      expected_paise: existing.amount_paise,
-    }, 409);
-  }
-
   const { error } = await supabase.from("payment_intents").upsert(
     {
       txn_id: txnId,
@@ -426,9 +442,10 @@ async function handleRegister(
 
   let paymentLinkUrl: string | null = null;
   let paymentLinkId: string | null = existing?.razorpay_payment_link_id || null;
+  let razorpayError: string | null = null;
 
   const link = await createPaymentLink(txnId, amountPaise);
-  if (link) {
+  if (link.ok) {
     paymentLinkUrl = link.url;
     paymentLinkId = link.id;
     await supabase
@@ -436,6 +453,8 @@ async function handleRegister(
       .update({ razorpay_payment_link_id: link.id })
       .eq("txn_id", txnId)
       .eq("status", "pending");
+  } else {
+    razorpayError = link.error;
   }
 
   return json({
@@ -445,6 +464,10 @@ async function handleRegister(
     payment_link_url: paymentLinkUrl,
     payment_link_id: paymentLinkId,
     razorpay_configured: Boolean(razorpayAuth()),
+    ...(razorpayError ? { razorpay_error: razorpayError } : {}),
+    ...(existing && existing.amount_paise !== amountPaise
+      ? { amount_updated: true, previous_amount_paise: existing.amount_paise }
+      : {}),
   });
 }
 
