@@ -3568,11 +3568,6 @@ function BookScreen() {
   const [loading,setLoading]=useState(false);
   const [txnId,setTxnId]=useState(null);
   const [payMethod,setPayMethod]=useState(null);
-  const svc=activeSvc;
-  const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
-  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?total:0,user?.id,addToast);
-  if (!svc) { setScreen('services'); return null; }
-  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
   const [bookOtpSent,setBookOtpSent]=useState(false);
   const [bookOtpCode,setBookOtpCode]=useState(['','','','','','']);
   const [bookOtpTarget,setBookOtpTarget]=useState('');
@@ -3583,6 +3578,11 @@ function BookScreen() {
   const [bookAddress,setBookAddress]=useState(user?.address||'');
   const [bookCity,setBookCity]=useState(user?.city||'');
   const [bookPincode,setBookPincode]=useState(user?.pincode||'');
+  const svc=activeSvc;
+  const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
+  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?total:0,user?.id,addToast);
+  if (!svc) { setScreen('services'); return null; }
+  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
