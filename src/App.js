@@ -1848,13 +1848,48 @@ async function getBattery() {
 
 function emptyOtpDigits() { return ['','','','','','']; }
 
+const OTP_RESEND_COOLDOWN_SEC = 30;
+
+function handleOtpInputChange(i, raw, digits, setDigits, idPrefix) {
+  const ch = raw.replace(/\D/g, '').slice(-1);
+  const nd = [...digits];
+  nd[i] = ch;
+  setDigits(nd);
+  if (ch && i < 5) document.getElementById(`${idPrefix}${i + 1}`)?.focus();
+}
+
+function handleOtpInputKeyDown(i, e, digits, idPrefix) {
+  if (e.key === 'Backspace' && !digits[i] && i > 0) {
+    document.getElementById(`${idPrefix}${i - 1}`)?.focus();
+  }
+}
+
 function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
+  const [cd, setCd] = useState(OTP_RESEND_COOLDOWN_SEC);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    setCd(OTP_RESEND_COOLDOWN_SEC);
+  }, [mobile]);
+
+  useEffect(() => {
+    if (cd > 0) timerRef.current = setTimeout(() => setCd(c => c - 1), 1000);
+    return () => clearTimeout(timerRef.current);
+  }, [cd]);
+
+  const handleResend = () => {
+    if (cd > 0 || loading) return;
+    Promise.resolve(onResend?.()).then(() => setCd(OTP_RESEND_COOLDOWN_SEC));
+  };
+
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ color: C.grn, fontSize: 12, marginBottom: 10, fontWeight: 700, textAlign: 'center' }}>✅ OTP sent to +91 {mobile}</div>
       <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
         <button type="button" onClick={onChangeNumber} style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Change number</button>
-        <button type="button" onClick={onResend} disabled={loading} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 12, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: FF, opacity: loading ? 0.5 : 1 }}>{loading ? 'Sending…' : 'Resend OTP'}</button>
+        <button type="button" onClick={handleResend} disabled={loading || cd > 0} style={{ background: 'none', border: 'none', color: cd > 0 ? C.dim : C.sub, fontSize: 12, fontWeight: 700, cursor: loading || cd > 0 ? 'not-allowed' : 'pointer', fontFamily: FF, opacity: loading ? 0.5 : cd > 0 ? 0.6 : 1 }}>
+          {loading ? 'Sending…' : cd > 0 ? `Resend in ${cd}s` : 'Resend OTP'}
+        </button>
       </div>
     </div>
   );
@@ -2765,8 +2800,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
-                    onChange={e=>{const nd=[...otpCode];nd[i]=e.target.value.replace(/\D/g,'').slice(-1);setOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`votp-${i+1}`)?.focus();}}
-                    onKeyDown={e=>{if(e.key==='Backspace'&&!otpCode[i]&&i>0)document.getElementById(`votp-${i-1}`)?.focus();}}
+                    onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'votp-')}
+                    onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'votp-')}
                     style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
                 ))}
               </div>
@@ -2822,8 +2857,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
-                    onChange={e=>{const nd=[...otpCode];nd[i]=e.target.value.replace(/\D/g,'').slice(-1);setOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`lotp-${i+1}`)?.focus();}}
-                    onKeyDown={e=>{if(e.key==='Backspace'&&!otpCode[i]&&i>0)document.getElementById(`lotp-${i-1}`)?.focus();}}
+                    onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'lotp-')}
+                    onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'lotp-')}
                     style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
                 ))}
               </div>
@@ -2939,7 +2974,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       // 1. Send OTP via Twilio Verify (server-side, no DLT needed)
       //    Twilio generates and sends the OTP -- we don’t need to store it
       setLoading(false);
-      setPhase('otp'); setCd(120); setDigits(['','','','','','']);
+      setPhase('otp'); setCd(OTP_RESEND_COOLDOWN_SEC); setDigits(['','','','','','']);
       setWaToken('');
       // 2. Fire SMS via Edge Function in background
       sb().functions.invoke('send-otp', { body: { mobile: mob } })
@@ -3240,11 +3275,8 @@ function RegistrationFlow({ onComplete, prefill }) {
       <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
         {digits.map((d,i)=>(
           <input key={i} maxLength={1} value={d} inputMode="numeric" id={`otp-${i}`}
-            onChange={e=>{
-              const nd=[...digits]; nd[i]=e.target.value.replace(/\D/,'').slice(-1); setDigits(nd);
-              if(e.target.value&&i<5) document.getElementById(`otp-${i+1}`)?.focus();
-            }}
-            onKeyDown={e=>{if(e.key==='Backspace'&&!digits[i]&&i>0) document.getElementById(`otp-${i-1}`)?.focus();}}
+            onChange={e=>handleOtpInputChange(i,e.target.value,digits,setDigits,'otp-')}
+            onKeyDown={e=>handleOtpInputKeyDown(i,e,digits,'otp-')}
             style={{width:44,height:52,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:10,color:C.acc,fontFamily:'monospace',fontSize:24,outline:'none'}}/>
         ))}
       </div>
@@ -3253,7 +3285,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         <span style={{color:C.sub,fontFamily:'monospace'}}>
           {cd>0?`Resend in ${Math.floor(cd/60)}:${String(cd%60).padStart(2,'0')}`:<span style={{color:C.red}}>Expired</span>}
         </span>
-        <button onClick={sendOTP} disabled={cd>0||loading} style={{background:'none',border:'none',color:C.acc,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif",opacity:cd>0?.4:1}}>Resend OTP</button>
+        <button onClick={()=>{ sendOTP(); setCd(OTP_RESEND_COOLDOWN_SEC); }} disabled={cd>0||loading} style={{background:'none',border:'none',color:C.acc,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif",opacity:cd>0?.4:1}}>Resend OTP</button>
       </div>
 
       {/* Setup instructions for OTP */}
@@ -3790,8 +3822,8 @@ function BookScreen() {
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
                 {bookOtpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
-                    onChange={e=>{const nd=[...bookOtpCode];nd[i]=e.target.value.replace(/\D/,'').slice(-1);setBookOtpCode(nd);if(e.target.value&&i<5)document.getElementById(`botp-${i+1}`)?.focus();}}
-                    onKeyDown={e=>{if(e.key==='Backspace'&&!bookOtpCode[i]&&i>0)document.getElementById(`botp-${i-1}`)?.focus();}}
+                    onChange={e=>handleOtpInputChange(i,e.target.value,bookOtpCode,setBookOtpCode,'botp-')}
+                    onKeyDown={e=>handleOtpInputKeyDown(i,e,bookOtpCode,'botp-')}
                     style={{width:40,height:48,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:8,color:C.acc,fontFamily:'monospace',fontSize:22,outline:'none'}}/>
                 ))}
               </div>
@@ -4694,16 +4726,20 @@ function VendorOnboardPage() {
     { enableHighAccuracy: true, maximumAge: 0 });
   };
 
-  const sendOtp = async () => {
+  const sendOtp = async (resend = false) => {
     if (phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
     setLoading(true); setErr('');
     try {
       await vendorOnboardFetch('send-otp', { mobile: '+91' + phone.replace(/\D/g, '') });
       setOtpSent(true);
-      setMsg('OTP sent to +91' + phone);
-    } catch (e) { setErr(e.message); }
+      setOtp(emptyOtpDigits());
+      if (resend) setErr('');
+      setMsg(resend ? 'OTP resent to +91' + phone : 'OTP sent to +91' + phone);
+    } catch (e) { setErr(e.message); if (!resend) setOtpSent(false); }
     finally { setLoading(false); }
   };
+
+  const resetPhoneOtp = () => { setOtpSent(false); setOtp(emptyOtpDigits()); setErr(''); setMsg(''); };
 
   const verifyOtp = async () => {
     const code = otp.join('');
@@ -4853,11 +4889,13 @@ function VendorOnboardPage() {
               <input type="tel" maxLength={10} value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={phoneVerified} />
             </div>
           </Field>
-          {!otpSent ? <Btn full onClick={sendOtp} disabled={loading}>{loading ? <><Spin size={16} /> Sending…</> : 'Send OTP →'}</Btn> : <>
+          {!otpSent ? <Btn full onClick={() => sendOtp()} disabled={loading}>{loading ? <><Spin size={16} /> Sending…</> : 'Send OTP →'}</Btn> : <>
+            <OtpSentFooter mobile={phone} onChangeNumber={resetPhoneOtp} onResend={() => sendOtp(true)} loading={loading} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
               {otp.map((d, i) => (
-                <input key={i} maxLength={1} value={d} inputMode="numeric"
-                  onChange={e => { const nd = [...otp]; nd[i] = e.target.value.replace(/\D/, '').slice(-1); setOtp(nd); }}
+                <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
+                  onChange={e => handleOtpInputChange(i, e.target.value, otp, setOtp, 'votp-')}
+                  onKeyDown={e => handleOtpInputKeyDown(i, e, otp, 'votp-')}
                   style={{ width: 40, height: 48, textAlign: 'center', background: d ? `${C.acc}20` : C.deep, border: `1.5px solid ${d ? C.acc : C.bdr}`, borderRadius: 8, color: C.acc, fontFamily: 'monospace', fontSize: 22, outline: 'none' }} />
               ))}
             </div>
