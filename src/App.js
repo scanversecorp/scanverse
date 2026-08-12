@@ -4986,6 +4986,12 @@ function bookingStatusGroup(status) {
   return { label: 'In-progress', color: C.gold };
 }
 
+function formatBookingRef(booking) {
+  if (!booking?.id) return '';
+  const shortId = String(booking.id).slice(0, 8).toUpperCase();
+  return booking.txn_id ? `${booking.txn_id} · #${shortId}` : `#${shortId}`;
+}
+
 function PartnerGpsTracker() {
   const { user } = useApp();
   useVendorLocationTracker(user, { enabled: user?.role === 'partner' });
@@ -5007,6 +5013,7 @@ function BookingsScreen() {
   const [recoverDate,setRecoverDate]=useState('');
   const [recoverTime,setRecoverTime]=useState('10:00');
   const [recoverBusy,setRecoverBusy]=useState(false);
+  const [completingId,setCompletingId]=useState(null);
 
   const load=useCallback(async()=>{
     const col=user.role==='partner'?'partner_id':'customer_id';
@@ -5140,7 +5147,7 @@ function BookingsScreen() {
   const renderBookingCard=(b)=>(
     <div key={b.id} style={{...S.card(),marginBottom:10}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-        <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
+        <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{user.role==='partner'&&b.partner_id===user.id&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:700,fontFamily:'monospace'}}>Booking {formatBookingRef(b)}</div>}{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
         <div style={{textAlign:'right'}}>
           <div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div>
           <Badge label={bookingStatusGroup(b.status).label} color={bookingStatusGroup(b.status).color}/>
@@ -5161,7 +5168,11 @@ function BookingsScreen() {
       {user.role==='customer'&&bookingStatusGroup(b.status).label==='In-progress'&&bookingSupportsLiveTrack(b)&&(
         <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
       )}
-      {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={()=>markComplete(b)}>✓ Mark complete</Btn>}
+      {user.role==='partner'&&b.status==='confirmed'&&b.partner_id===user.id&&(
+        <Btn sm onClick={()=>markComplete(b)} disabled={completingId===b.id} style={{marginTop:8}}>
+          {completingId===b.id ? <><Spin size={14} /> Completing…</> : '✓ Mark delivered / complete'}
+        </Btn>
+      )}
       {b.status==='completed'&&user.role==='customer'&&(
         <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
           {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>✅ Rated {stars[b.id]}⭐</div>}
@@ -5173,11 +5184,25 @@ function BookingsScreen() {
   );
 
   const markComplete=async(b)=>{
-    await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);
-    await sbIgnore(sb().from('vendor_live_locations').update({ tracking_active: false }).eq('booking_id', b.id));
-    await sbIgnore(sb().from('service_requests').update({ status: 'completed' }).eq('txn_id', b.txn_id));
-    addToast('Complete ✅ — live tracking stopped','success');
-    load();
+    if (b.partner_id !== user.id || b.status !== 'confirmed') return addToast('Only your active assigned booking can be completed', 'error');
+    const ref = formatBookingRef(b);
+    if (!window.confirm(`Mark booking ${ref} as delivered/completed?\n\nThis stops live GPS sharing and frees you for new jobs.`)) return;
+    setCompletingId(b.id);
+    try {
+      const { error } = await sb().from('bookings').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      }).eq('id', b.id).eq('partner_id', user.id).eq('status', 'confirmed');
+      if (error) throw error;
+      await sbIgnore(sb().from('vendor_live_locations').update({ tracking_active: false }).eq('booking_id', b.id));
+      if (b.txn_id) await sbIgnore(sb().from('service_requests').update({ status: 'completed' }).eq('txn_id', b.txn_id));
+      addToast('Delivered ✅ — live tracking stopped, you can take new jobs', 'success');
+      load();
+    } catch (e) {
+      addToast(e.message || 'Could not mark booking complete', 'error');
+    } finally {
+      setCompletingId(null);
+    }
   };
 
   const completeOrphanBooking = async (intent) => {
