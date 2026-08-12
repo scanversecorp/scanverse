@@ -3765,35 +3765,58 @@ function RegistrationFlow({ onComplete, prefill }) {
     } catch(e) { /* silent fail */ }
 
     setPhase('gps');
-    navigator.geolocation.getCurrentPosition(
-      async pos=>{
-        const {latitude:lat,longitude:lng}=pos.coords;
-        const geoData=await reverseGeo(lat,lng); setGeo({lat,lng,...geoData,source:'gps'});
-        setForm(p=>({...p,address:geoData.address,village:geoData.village,city:geoData.city,state:geoData.state,pincode:geoData.pincode}));
-        const {data:vs}=await sb().from('visitor_sessions').insert({
-          ip_address:ipAddr,user_agent:device.userAgent,lat,lng,
-          address:geoData.address,village:geoData.village,city:geoData.city,
-          state:geoData.state,pincode:geoData.pincode,country:geoData.country,
-          device_type:device.deviceType,os_name:device.osName,browser:device.browser,
-          screen_res:device.screenRes,language:device.language,timezone:device.timezone,
-          consent_given:true,consent_at:new Date().toISOString(),verified:false,
+    requestNativeGps({
+      onFast: async ({ lat, lng }) => {
+        const geoData = await reverseGeo(lat, lng);
+        setGeo({ lat, lng, ...geoData, source: 'gps' });
+        setForm(p => ({
+          ...p,
+          address: geoData.address,
+          village: geoData.village,
+          city: geoData.city,
+          state: geoData.state,
+          pincode: geoData.pincode,
+        }));
+        const { data: vs } = await sb().from('visitor_sessions').insert({
+          ip_address: ipAddr, user_agent: device.userAgent, lat, lng,
+          address: geoData.address, village: geoData.village, city: geoData.city,
+          state: geoData.state, pincode: geoData.pincode, country: geoData.country,
+          device_type: device.deviceType, os_name: device.osName, browser: device.browser,
+          screen_res: device.screenRes, language: device.language, timezone: device.timezone,
+          consent_given: true, consent_at: new Date().toISOString(), verified: false,
         }).select('id').single();
         if (vs?.id) setSessionId(vs.id);
         setPhase('form');
       },
-      async ()=>{
-        const {data:vs}=await sb().from('visitor_sessions').insert({
-          ip_address:ipAddr,user_agent:device?.userAgent||'',
-          device_type:device?.deviceType||'',os_name:device?.osName||'',browser:device?.browser||'',
-          screen_res:device?.screenRes||'',language:device?.language||'',timezone:device?.timezone||'',
-          consent_given:true,consent_at:new Date().toISOString(),verified:false,
+      onAccurate: async ({ lat, lng }) => {
+        const geoData = await reverseGeo(lat, lng);
+        setGeo({ lat, lng, ...geoData, source: 'gps' });
+        setForm(p => ({
+          ...p,
+          address: geoData.address || p.address,
+          village: geoData.village || p.village,
+          city: geoData.city || p.city,
+          state: geoData.state || p.state,
+          pincode: geoData.pincode || p.pincode,
+        }));
+      },
+      onError: async () => {
+        const { data: vs } = await sb().from('visitor_sessions').insert({
+          ip_address: ipAddr, user_agent: device?.userAgent || '',
+          device_type: device?.deviceType || '', os_name: device?.osName || '', browser: device?.browser || '',
+          screen_res: device?.screenRes || '', language: device?.language || '', timezone: device?.timezone || '',
+          consent_given: true, consent_at: new Date().toISOString(), verified: false,
         }).select('id').single();
         if (vs?.id) setSessionId(vs.id);
         setPhase('form');
       },
-      {timeout:8000,maximumAge:0,enableHighAccuracy:true}
-    );
+    });
   };
+
+  useEffect(() => {
+    if (phase === 'consent') startCollection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sendOTP = async () => {
     if (!form.firstName.trim()) return setErr('Enter your first name');
@@ -3979,12 +4002,12 @@ function RegistrationFlow({ onComplete, prefill }) {
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:18,fontSize:11,color:C.dim,lineHeight:1.6}}>
         <strong style={{color:C.sub}}>Before we begin:</strong> ScanV collects your GPS location, IP address and device details to show nearby services and enable local deliveries. Data is stored securely in India under the <strong style={{color:C.sub}}>DPDP Act 2023</strong>. You can update or delete your data anytime in Profile.
       </div>
-      <Btn full onClick={startCollection}>Allow location & get started →</Btn>
-      <div style={{textAlign:'center',marginTop:10}}>
-        <button onClick={()=>{setPhase('form');}} style={{background:'none',border:'none',color:C.sub,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>
-          Enter location manually instead
-        </button>
-      </div>
+      {(phase === 'collecting' || phase === 'gps') && (
+        <div style={{ textAlign: 'center', padding: '8px 0' }}>
+          <Spin size={32} />
+          <div style={{ color: C.sub, fontSize: 12, marginTop: 10 }}>Getting your location… tap Allow if prompted</div>
+        </div>
+      )}
     </>
   );
 
@@ -5394,35 +5417,42 @@ function gpsDistanceM(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const GPS_PROMPT_PREFIX = 'scanv_gps_prompt_';
-
-function gpsPromptDayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function gpsPromptStorageKey(role, userId) {
-  return `${GPS_PROMPT_PREFIX}${role || 'guest'}_${userId || 'guest'}_${gpsPromptDayKey()}`;
-}
-
-function wasGpsPromptedToday(role, userId) {
-  try { return localStorage.getItem(gpsPromptStorageKey(role, userId)) === '1'; } catch { return false; }
-}
-
-function markGpsPromptedToday(role, userId) {
-  try { localStorage.setItem(gpsPromptStorageKey(role, userId), '1'); } catch { /* ignore */ }
-}
-
-function hasStoredCustomerGps(user, silentGeo) {
-  const lat = user?.last_lat ?? silentGeo?.lat;
-  const lng = user?.last_lng ?? silentGeo?.lng;
-  return lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
-}
-
-function hasStoredPartnerGps(vendor) {
-  if (!vendor) return false;
-  const lat = vendor.gps_lat ?? vendor.address_lat;
-  const lng = vendor.gps_lng ?? vendor.address_lng;
-  return lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+/** Cached position first (triggers native permission popup), then high-accuracy refresh in background */
+function requestNativeGps({ onFast, onAccurate, onError } = {}) {
+  if (!navigator.geolocation) {
+    onError?.({ code: 0, message: 'GPS not supported' });
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      onFast?.({ lat, lng, accuracy: pos.coords.accuracy, pos });
+      navigator.geolocation.getCurrentPosition(
+        (pos2) => onAccurate?.({
+          lat: pos2.coords.latitude,
+          lng: pos2.coords.longitude,
+          accuracy: pos2.coords.accuracy,
+          pos: pos2,
+        }),
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 },
+      );
+    },
+    () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          onFast?.({ lat, lng, accuracy: pos.coords.accuracy, pos });
+          onAccurate?.({ lat, lng, accuracy: pos.coords.accuracy, pos });
+        },
+        (err) => onError?.(err),
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 },
+      );
+    },
+    { enableHighAccuracy: false, maximumAge: 600000, timeout: 8000 },
+  );
 }
 
 function isGpsPortalRoute() {
@@ -5473,219 +5503,41 @@ async function persistPartnerGps(user, vendor, lat, lng) {
   });
 }
 
-function GpsPermissionPrompt({
-  open,
-  busy,
-  manual,
-  manualAddr,
-  onManualAddr,
-  onEnable,
-  onManual,
-  onManualBack,
-  onManualSave,
-  onDismiss,
-  audienceLabel,
-}) {
-  if (!open) return null;
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-    }}>
-      <div style={{ ...S.card(), maxWidth: 340, width: '100%', padding: '28px 24px', textAlign: 'center' }}>
-        {!manual ? (
-          <>
-            <div style={{ fontSize: 44, lineHeight: 1, marginBottom: 16, opacity: 0.85 }}>📍</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Location permission not enabled</div>
-            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 22 }}>
-              Please enable location permission for a better delivery experience{audienceLabel ? ` — ${audienceLabel}` : ''}.
-            </div>
-            <button type="button" onClick={onEnable} disabled={busy} style={{
-              background: 'none', border: 'none', color: C.grn, fontWeight: 700, fontSize: 15,
-              cursor: busy ? 'wait' : 'pointer', fontFamily: FF, marginBottom: 14,
-            }}>
-              {busy ? 'Getting location…' : 'Enable location'}
-            </button>
-            <div>
-              <button type="button" onClick={onManual} disabled={busy} style={{
-                background: 'none', border: 'none', color: C.grn, fontWeight: 700, fontSize: 15,
-                cursor: 'pointer', fontFamily: FF,
-              }}>
-                Select location manually
-              </button>
-            </div>
-            <button type="button" onClick={onDismiss} disabled={busy} style={{
-              marginTop: 18, background: 'none', border: 'none', color: C.dim, fontSize: 12, cursor: 'pointer', fontFamily: FF,
-            }}>
-              Not now
-            </button>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, marginBottom: 8, textAlign: 'left' }}>Enter your location</div>
-            <div style={{ fontSize: 12, color: C.sub, marginBottom: 12, textAlign: 'left', lineHeight: 1.5 }}>
-              Type your address or area — we will save coordinates for nearby matching.
-            </div>
-            <textarea
-              value={manualAddr}
-              onChange={(e) => onManualAddr(e.target.value)}
-              rows={3}
-              placeholder="e.g. Shop 12, Wakad Main Road, Pune 411057"
-              style={{ ...S.inp(), resize: 'vertical', width: '100%', marginBottom: 12, textAlign: 'left' }}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Btn v="outline" full onClick={onManualBack} disabled={busy}>Back</Btn>
-              <Btn full onClick={onManualSave} disabled={busy || !manualAddr.trim()}>
-                {busy ? 'Saving…' : 'Save location'}
-              </Btn>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DailyGpsPrompt({ user, silentGeo, setSilentGeo, setUser, addToast, setScreen }) {
-  const [open, setOpen] = useState(false);
-  const [manual, setManual] = useState(false);
-  const [manualAddr, setManualAddr] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [partnerVendor, setPartnerVendor] = useState(null);
-  const role = user?.role || 'guest';
-  const userId = user?.id || 'guest';
-
-  useVendorLocationTracker(user, { enabled: user?.role === 'partner' && !open });
+/** Persist logged-in GPS to backend; partners also get continuous watch via useVendorLocationTracker */
+function AppGpsBootstrap({ user, silentGeo, setSilentGeo, setUser }) {
+  useVendorLocationTracker(user, { enabled: user?.role === 'partner' });
 
   useEffect(() => {
-    if (isGpsPortalRoute()) return undefined;
+    if (!user?.id || silentGeo?.lat == null || silentGeo?.lng == null) return undefined;
     let cancelled = false;
-
     (async () => {
-      if (wasGpsPromptedToday(role, userId)) return;
-
-      if (role === 'partner') {
-        const { data: vendor } = await sb().from('vendor_partners')
-          .select('id, phone, status, gps_lat, gps_lng, address_lat, address_lng')
-          .eq('profile_id', user.id)
-          .maybeSingle();
-        if (cancelled) return;
-        if (!vendor || vendor.status === 'offboarded') {
-          markGpsPromptedToday(role, userId);
-          return;
-        }
-        setPartnerVendor(vendor);
-        if (hasStoredPartnerGps(vendor)) {
-          markGpsPromptedToday(role, userId);
-          return;
-        }
-        setManualAddr([user?.address, user?.village, user?.city, user?.pincode].filter(Boolean).join(', '));
-        setOpen(true);
-        return;
-      }
-
-      if (hasStoredCustomerGps(user, silentGeo)) {
-        markGpsPromptedToday(role, userId);
-        return;
-      }
-
-      setManualAddr([user?.address, user?.village, user?.city, user?.pincode].filter(Boolean).join(', '));
-      if (!cancelled) setOpen(true);
-    })();
-
-    return () => { cancelled = true; };
-  }, [role, userId, user?.last_lat, user?.last_lng, silentGeo?.lat, silentGeo?.lng]);
-
-  const closePrompt = (markToday = true) => {
-    if (markToday) markGpsPromptedToday(role, userId);
-    setOpen(false);
-    setManual(false);
-  };
-
-  const enableGps = () => {
-    if (!navigator.geolocation) {
-      addToast?.('GPS not supported on this device', 'error');
-      setManual(true);
-      return;
-    }
-    setBusy(true);
-    navigator.geolocation.getCurrentPosition(async (pos) => {
       try {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const geo = await reverseGeo(lat, lng);
-        if (role === 'partner') {
-          await persistPartnerGps(user, partnerVendor, lat, lng);
-          addToast?.('Partner GPS shared — you can receive nearby jobs', 'success');
-        } else {
-          await persistCustomerGps(user, lat, lng, geo, setUser, setSilentGeo);
-          addToast?.('Location saved — better service matching', 'success');
+        if (user.role === 'partner') {
+          const { data: vendor } = await sb().from('vendor_partners')
+            .select('id, phone, status')
+            .eq('profile_id', user.id)
+            .maybeSingle();
+          if (cancelled || !vendor || vendor.status === 'offboarded') return;
+          await persistPartnerGps(user, vendor, silentGeo.lat, silentGeo.lng);
+        } else if (user.last_lat == null || user.last_lng == null) {
+          await persistCustomerGps(user, silentGeo.lat, silentGeo.lng, silentGeo, setUser, setSilentGeo);
         }
-        closePrompt(true);
-      } catch (e) {
-        addToast?.(e.message || 'Could not save location', 'error');
-      } finally {
-        setBusy(false);
-      }
-    }, () => {
-      setBusy(false);
-      addToast?.('Location blocked — enter address manually', 'error');
-      setManual(true);
-    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-  };
+      } catch (_) { /* non-blocking */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role, user?.last_lat, user?.last_lng, silentGeo?.lat, silentGeo?.lng]);
 
-  const saveManual = async () => {
-    const q = manualAddr.trim();
-    if (!q) return;
-    setBusy(true);
-    try {
-      const coords = await forwardGeocode(q);
-      if (!coords) throw new Error('Could not find that address — try area + PIN code');
-      const geo = await reverseGeo(coords.lat, coords.lng);
-      if (role === 'partner') {
-        await persistPartnerGps(user, partnerVendor, coords.lat, coords.lng);
-        addToast?.('Partner location saved', 'success');
-      } else {
-        await persistCustomerGps(user, coords.lat, coords.lng, { ...geo, address: q }, setUser, setSilentGeo);
-        addToast?.('Location saved', 'success');
-      }
-      closePrompt(true);
-    } catch (e) {
-      addToast?.(e.message || 'Save failed', 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const audienceLabel = role === 'partner' ? 'required for job offers & dispatch' : 'required to match nearby services';
-
-  return (
-    <GpsPermissionPrompt
-      open={open}
-      busy={busy}
-      manual={manual}
-      manualAddr={manualAddr}
-      onManualAddr={setManualAddr}
-      onEnable={enableGps}
-      onManual={() => setManual(true)}
-      onManualBack={() => setManual(false)}
-      onManualSave={saveManual}
-      onDismiss={() => closePrompt(true)}
-      audienceLabel={audienceLabel}
-    />
-  );
+  return null;
 }
 
 function PartnerGpsTracker() {
   const ctx = useApp();
   return (
-    <DailyGpsPrompt
+    <AppGpsBootstrap
       user={ctx.user}
       silentGeo={ctx.silentGeo}
       setSilentGeo={ctx.setSilentGeo}
       setUser={ctx.setUser}
-      addToast={ctx.addToast}
-      setScreen={ctx.setScreen}
     />
   );
 }
@@ -6973,7 +6825,9 @@ function VendorOnboardPage() {
   const [stateName, setStateName] = useState('Maharashtra');
   const [countryCode, setCountryCode] = useState('IN');
   const [gps, setGps] = useState(null);
+  const [gpsState, setGpsState] = useState('idle'); // idle | acquiring | captured | denied
   const [gpsCheck, setGpsCheck] = useState(null);
+  const gpsStartedRef = useRef(false);
   const [aadhaar, setAadhaar] = useState('');
   const [aadhaarOk, setAadhaarOk] = useState(false);
   const [ekycRef, setEkycRef] = useState('');
@@ -6994,45 +6848,78 @@ function VendorOnboardPage() {
   const allSvcs = allVendorSelectableServices();
   const mobileE164 = () => '+91' + phone.replace(/\D/g, '');
 
-  const captureGps = (auto = false) => {
-    if (!auto) setLoading(true);
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
-      setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, ...geo });
-      setCity(geo.city || city);
-      setPincode(geo.pincode || pincode);
-      setVillage(geo.village || village);
-      try {
-        const ip = await getIP();
-        const check = await vendorOnboardFetch('check-gps', {
-          lat: pos.coords.latitude, lng: pos.coords.longitude, ip,
-          requested_country_code: countryCode,
-        });
-        setGpsCheck(check);
-        if (!check.country_allowed && countryCode !== 'IN') {
-          setErr(check.message || 'Country not allowed for your GPS location');
-          setCountryCode('IN');
-        } else if (auto) {
-          setMsg('Live GPS active — we use your location for nearby job alerts 📍');
-        }
-      } catch (e) { if (!auto) setErr(e.message); }
-      if (!auto) setLoading(false);
-    }, () => {
-      if (!auto) { setErr('GPS required for partner onboarding'); setLoading(false); }
-    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  const enrichGps = async (lat, lng) => {
+    try {
+      const geo = await reverseGeo(lat, lng);
+      setGps((prev) => ({ ...(prev || {}), lat, lng, ...geo }));
+      if (geo.city) setCity((c) => c || geo.city);
+      if (geo.pincode) setPincode((p) => p || geo.pincode);
+      if (geo.village) setVillage((v) => v || geo.village);
+      if (geo.address) {
+        setShopOrFlat((s) => s || geo.address.split(',')[0]?.trim() || '');
+        setStreetName((s) => s || geo.address.split(',').slice(1).join(',').trim() || '');
+      }
+      const ip = await getIP();
+      const check = await vendorOnboardFetch('check-gps', {
+        lat, lng, ip, requested_country_code: countryCode,
+      });
+      setGpsCheck(check);
+      if (!check.country_allowed && countryCode !== 'IN') {
+        setErr(check.message || 'Country not allowed for your GPS location');
+        setCountryCode('IN');
+      }
+    } catch (_) { /* non-blocking */ }
   };
 
+  const applyGpsCoords = (lat, lng, { quiet = false } = {}) => {
+    setGps((prev) => ({ ...(prev || {}), lat, lng }));
+    setGpsState('captured');
+    setGpsAllowedConfirmed(true);
+    if (!quiet) setMsg('Location captured ✓ — used for nearby job matching');
+    enrichGps(lat, lng);
+  };
+
+  const startGpsCapture = (quiet = false) => {
+    if (!navigator.geolocation) {
+      setGpsState('denied');
+      if (!quiet) setErr('GPS not supported — complete your address; we geocode on submit');
+      return;
+    }
+    setGpsState('acquiring');
+    requestNativeGps({
+      onFast: ({ lat, lng }) => applyGpsCoords(lat, lng, { quiet }),
+      onAccurate: ({ lat, lng }) => {
+        setGps((prev) => ({ ...(prev || {}), lat, lng }));
+        setGpsState('captured');
+        setGpsAllowedConfirmed(true);
+        enrichGps(lat, lng);
+        vendorOnboardFetch('update-location', { mobile: mobileE164(), lat, lng }).catch(() => {});
+      },
+      onError: () => {
+        setGpsState('denied');
+        if (!quiet) setErr('Location blocked — complete address below; we geocode on submit');
+      },
+    });
+  };
+
+  const captureGps = (auto = false) => startGpsCapture(auto);
+
   useEffect(() => {
-    if (step === 3 && phoneVerified && !addServicesMode && !gps) {
-      captureGps(true);
+    if (phoneVerified && !addServicesMode && !gpsStartedRef.current) {
+      gpsStartedRef.current = true;
+      startGpsCapture(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, phoneVerified, addServicesMode]);
+  }, [phoneVerified, addServicesMode]);
 
   useVendorLocationTracker(null, {
-    enabled: phoneVerified && step >= 3 && step <= 7,
+    enabled: phoneVerified && step >= 2 && step <= 7,
     mobile: phoneVerified ? mobileE164() : null,
-    onPosition: ({ lat, lng }) => setGps((prev) => ({ ...(prev || {}), lat, lng })),
+    onPosition: ({ lat, lng }) => {
+      setGps((prev) => ({ ...(prev || {}), lat, lng }));
+      setGpsState('captured');
+      setGpsAllowedConfirmed(true);
+    },
   });
 
   const sendOtp = async (resend = false) => {
@@ -7076,7 +6963,8 @@ function VendorOnboardPage() {
           : `Account found (${p.status}). You can update your service selections.`);
       } else {
         setStep(2);
-        setMsg('Phone verified ✓');
+        setMsg('Phone verified ✓ · acquiring your location in background…');
+        startGpsCapture(true);
       }
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
@@ -7158,7 +7046,6 @@ function VendorOnboardPage() {
     }));
     if (!services.length) return setErr('Select at least one service');
     if (!addServicesMode) {
-      if (!gps) return setErr('Capture GPS location first');
       if (!aadhaarOk) return setErr('Complete Aadhaar eKYC first');
       if (!appInstalledConfirmed || !gpsAllowedConfirmed) {
         return setErr('Confirm ScanV app installation and GPS permission');
@@ -7177,6 +7064,19 @@ function VendorOnboardPage() {
       }
       const ip = await getIP();
       const fullContact = `${firstName.trim()} ${lastName.trim()}`.trim();
+      let gpsLat = gps?.lat ?? null;
+      let gpsLng = gps?.lng ?? null;
+      if (gpsLat == null || gpsLng == null) {
+        const addr = [shopOrFlat, streetName, village, city, pincode, stateName].filter(Boolean).join(', ');
+        const geo = await forwardGeocode(addr);
+        if (!geo) {
+          setErr('Allow GPS or enter a complete address we can locate');
+          setLoading(false);
+          return;
+        }
+        gpsLat = geo.lat;
+        gpsLng = geo.lng;
+      }
       const r = await vendorOnboardFetch('register', {
         phone: mobileE164(),
         first_name: firstName.trim(),
@@ -7194,10 +7094,10 @@ function VendorOnboardPage() {
         state: stateName,
         country: COUNTRY_OPTIONS.find(c => c.code === countryCode)?.name || 'India',
         country_code: countryCode,
-        gps_lat: gps.lat,
-        gps_lng: gps.lng,
-        address_lat: gps.lat,
-        address_lng: gps.lng,
+        gps_lat: gpsLat,
+        gps_lng: gpsLng,
+        address_lat: gpsLat,
+        address_lng: gpsLng,
         ip,
         aadhaar_number: aadhaarDigitsOnly(aadhaar),
         ekyc_ref: ekycRef || undefined,
@@ -7268,6 +7168,16 @@ function VendorOnboardPage() {
             </div>
           </Field>
           <Field label="Highest education"><input value={highestEducation} onChange={e => setHighestEducation(e.target.value)} style={S.inp()} placeholder="e.g. 12th, Graduate, ITI" /></Field>
+          {gpsState === 'acquiring' && (
+            <div style={{ fontSize: 12, color: C.cyan, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Spin size={14} /> Acquiring GPS… allow location if your browser asks
+            </div>
+          )}
+          {gpsState === 'captured' && gps?.lat != null && (
+            <div style={{ fontSize: 12, color: C.grn, marginBottom: 12, fontWeight: 600 }}>
+              ✓ Location captured — nearby job matching enabled
+            </div>
+          )}
           <Btn full onClick={() => {
             if (!firstName.trim() || !lastName.trim() || !businessName.trim()) return setErr('First name, last name, and business name are required');
             setContactName(`${firstName.trim()} ${lastName.trim()}`.trim());
@@ -7305,14 +7215,33 @@ function VendorOnboardPage() {
               {COUNTRY_OPTIONS.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
             </select>
           </Field>
-          <Field label="GPS location" req note="Required — used to match you with nearby bookings">
-            <Btn v="outline" full onClick={() => captureGps(false)} disabled={loading}>{gps ? `✓ Live GPS: ${gps.lat?.toFixed(4)}, ${gps.lng?.toFixed(4)}` : loading ? 'Getting GPS…' : '📍 Capture GPS location'}</Btn>
+          <Field label="GPS location" note="Captured automatically after phone verify — tap Allow when prompted">
+            <div style={{ ...S.card(), padding: 12, marginBottom: 4 }}>
+              {gpsState === 'captured' && gps?.lat != null ? (
+                <div style={{ color: C.grn, fontWeight: 700, fontSize: 13 }}>
+                  ✓ GPS active · {Number(gps.lat).toFixed(4)}, {Number(gps.lng).toFixed(4)}
+                </div>
+              ) : gpsState === 'acquiring' ? (
+                <div style={{ color: C.cyan, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Spin size={14} /> Acquiring location…
+                </div>
+              ) : gpsState === 'denied' ? (
+                <div style={{ color: C.gold, fontSize: 12, lineHeight: 1.5 }}>
+                  Location not shared — complete address below; we geocode when you submit
+                </div>
+              ) : (
+                <div style={{ color: C.sub, fontSize: 12 }}>Waiting for location permission…</div>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: C.dim, marginTop: 8, lineHeight: 1.5 }}>
-              GPS starts automatically on this step and stays active during registration.
+              GPS starts right after OTP verify and stays active during registration. You can continue while location loads.
             </div>
             {gpsCheck?.vpn_suspected && <div style={{ color: C.red, fontSize: 11, marginTop: 6 }}>⚠ VPN/proxy detected — disable VPN for accurate location</div>}
           </Field>
-          <Btn full onClick={() => { if (!shopOrFlat || !streetName || !city || !pincode || !gps) return setErr('Complete all required address fields + GPS'); setStep(4); setErr(''); }}>Continue →</Btn>
+          <Btn full onClick={() => {
+            if (!shopOrFlat || !streetName || !city || !pincode) return setErr('Complete all required address fields');
+            setStep(4); setErr('');
+          }}>Continue →</Btn>
         </>}
 
         {step === 4 && <>
@@ -10547,6 +10476,32 @@ export default function App() {
     setUser(null); setState('browse'); setScreen('services');
   },[]);
 
+  // Native GPS permission popup on app open (cached first, high-accuracy in background)
+  useEffect(() => {
+    if (isGpsPortalRoute()) return undefined;
+    let cancelled = false;
+    (async () => {
+      const device = detectDevice();
+      let ipAddr = '';
+      try { ipAddr = await getIP(); } catch (_) { /* non-blocking */ }
+      requestNativeGps({
+        onFast: async ({ lat, lng }) => {
+          if (cancelled) return;
+          let geo = {};
+          try { geo = await reverseGeo(lat, lng); } catch (_) { /* non-blocking */ }
+          setSilentGeo((prev) => ({ ...(prev || {}), lat, lng, ...geo, device, ip: ipAddr }));
+        },
+        onAccurate: async ({ lat, lng }) => {
+          if (cancelled) return;
+          let geo = {};
+          try { geo = await reverseGeo(lat, lng); } catch (_) { /* non-blocking */ }
+          setSilentGeo((prev) => ({ ...(prev || {}), lat, lng, ...geo, device, ip: ipAddr }));
+        },
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Check if QR scan (?qr=1 in URL)
   const isQRScan = new URLSearchParams(window.location.search).get('qr')==='1';
   // Pass silentGeo down via context
@@ -10570,11 +10525,6 @@ export default function App() {
           canvas_fp:canvasFP, battery_level:battery.level,
           consent_given:true, consent_at:new Date().toISOString(), verified:false,
         }).then(()=>{}).catch(()=>{});
-        // Silently get GPS
-        navigator.geolocation.getCurrentPosition(async pos=>{
-          const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
-          setSilentGeo({lat:pos.coords.latitude,lng:pos.coords.longitude,...geo,device,ip:ipAddr});
-        },()=>{}, {timeout:8000,enableHighAccuracy:true,maximumAge:0});
       } catch(e){}
 
       const returnTxn = parsePaymentReturnTxn();
@@ -10787,12 +10737,6 @@ export default function App() {
   // BROWSE: Show services without registration wall
   if (state==='browse') return (
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
-    <DailyGpsPrompt
-      user={null}
-      silentGeo={silentGeo}
-      setSilentGeo={setSilentGeo}
-      addToast={addToast}
-    />
     <BrowseFlow
       silentGeo={silentGeo}
       onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='investments')setScreen('investments');else setScreen('services');}}
