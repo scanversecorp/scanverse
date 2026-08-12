@@ -15,6 +15,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "REACT_APP_TS=1786395600000 react-scripts build",
+    "optimize-images": "node scripts/optimize-images.mjs",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -36,5 +37,8 @@
     ]
   },
   "_deployed": "2026-08-10T00:32:58.221Z",
-  "_built": "2026-08-10T07:43:07.686Z"
+  "_built": "2026-08-10T07:43:07.686Z",
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
 }
