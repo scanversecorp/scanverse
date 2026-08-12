@@ -2,15 +2,17 @@
  * ScanV vendor onboarding edge function
  *
  * Actions:
- *   send-otp     — { mobile }
- *   verify-otp   — { mobile, otp }
- *   validate-pan — { pan }
- *   ekyc-aadhaar — { aadhaar, name?, otp? }  (Digio/Signzy when configured)
- *   check-gps    — { lat, lng, ip? }
- *   register     — full vendor payload
- *   list         — admin list (PIN header)
- *   offboard     — { vendor_id } (PIN header)
- *   activate     — { vendor_id } (PIN header)
+ *   send-otp        — { mobile }
+ *   verify-otp      — { mobile, otp }
+ *   lookup-partner  — { mobile }  (requires recent OTP)
+ *   validate-pan    — { pan }
+ *   ekyc-aadhaar    — { aadhaar, name?, otp?, ekyc_ref? }
+ *   check-gps       — { lat, lng, ip? }
+ *   register        — full vendor payload (+ ekyc_ref)
+ *   update-services — { mobile, services[] }  (existing partner)
+ *   list            — admin list (PIN header)
+ *   offboard        — { vendor_id } (PIN header)
+ *   activate        — { vendor_id } (PIN header)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
@@ -22,9 +24,12 @@ import {
   generateOtp,
   validatePan,
   validateAadhaar,
+  hashSensitive,
   geoCountryFromLatLng,
   ipCountry,
 } from "../_shared/notify.ts";
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 function adminPinOk(req: Request): boolean {
   const pin = req.headers.get("x-vendor-admin-pin") || "";
@@ -32,38 +37,150 @@ function adminPinOk(req: Request): boolean {
   return !!expected && pin === expected;
 }
 
+async function assertRecentOtpVerified(
+  supabase: SupabaseClient,
+  mobile: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: otpRow } = await supabase
+    .from("vendor_otp")
+    .select("id")
+    .eq("mobile", mobile)
+    .eq("purpose", "onboard")
+    .eq("verified", true)
+    .gt("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (!otpRow) return { ok: false, error: "Phone not verified — complete OTP first" };
+  return { ok: true };
+}
+
+async function storeEkycSession(
+  supabase: SupabaseClient,
+  params: {
+    ekycRef: string;
+    aadhaarHash: string;
+    last4: string;
+    verified: boolean;
+    provider: string;
+  },
+): Promise<void> {
+  await supabase.from("vendor_ekyc_sessions").upsert({
+    ekyc_ref: params.ekycRef,
+    aadhaar_hash: params.aadhaarHash,
+    last4: params.last4,
+    verified: params.verified,
+    provider: params.provider,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  }, { onConflict: "ekyc_ref" });
+}
+
+async function getVerifiedEkycSession(
+  supabase: SupabaseClient,
+  aadhaarHash: string,
+  ekycRef?: string,
+) {
+  let query = supabase
+    .from("vendor_ekyc_sessions")
+    .select("ekyc_ref, last4, provider")
+    .eq("aadhaar_hash", aadhaarHash)
+    .eq("verified", true)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (ekycRef) query = query.eq("ekyc_ref", ekycRef);
+  const { data } = await query.maybeSingle();
+  return data;
+}
+
+function digioAuthHeaders(apiKey?: string): Record<string, string> {
+  const clientId = Deno.env.get("DIGIO_CLIENT_ID");
+  const clientSecret = Deno.env.get("DIGIO_CLIENT_SECRET");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (clientId && clientSecret) {
+    headers.Authorization = `Basic ${btoa(`${clientId}:${clientSecret}`)}`;
+  }
+  if (apiKey) headers["X-API-KEY"] = apiKey;
+  return headers;
+}
+
 async function digioEkyc(
   aadhaar: string,
   name: string,
-): Promise<{ verified: boolean; ref?: string; last4?: string; error?: string }> {
+  otp?: string,
+  ekycRef?: string,
+): Promise<{
+  verified: boolean;
+  pending?: boolean;
+  requires_otp?: boolean;
+  ref?: string;
+  ekyc_ref?: string;
+  last4?: string;
+  provider?: string;
+  error?: string;
+}> {
+  const digits = aadhaar.replace(/\s/g, "");
+  const last4 = digits.slice(-4);
   const apiKey = Deno.env.get("DIGIO_API_KEY");
   const clientId = Deno.env.get("DIGIO_CLIENT_ID");
   const clientSecret = Deno.env.get("DIGIO_CLIENT_SECRET");
+  const hasDigio = !!(apiKey || (clientId && clientSecret));
 
-  if (!apiKey && !(clientId && clientSecret)) {
-    // Stub: format-only validation for dev; production requires Digio/Signzy
-    if (!validateAadhaar(aadhaar)) {
-      return { verified: false, error: "Invalid Aadhaar number format" };
-    }
-    const last4 = aadhaar.replace(/\s/g, "").slice(-4);
-    if (Deno.env.get("EKYC_STRICT") === "1") {
-      return { verified: false, error: "eKYC provider not configured (set DIGIO_API_KEY)" };
-    }
-    return { verified: true, ref: `stub-${Date.now()}`, last4 };
+  if (!validateAadhaar(aadhaar)) {
+    return { verified: false, error: "Invalid Aadhaar number (check digits)" };
   }
 
-  // Digio Aadhaar eKYC API (simplified — full flow uses redirect/OTP on Aadhaar-linked mobile)
+  // Step 2: complete Digio OTP verification
+  if (hasDigio && otp && ekycRef) {
+    try {
+      const res = await fetch("https://api.digio.in/v2/client/kyc/aadhaar/verify", {
+        method: "POST",
+        headers: digioAuthHeaders(apiKey),
+        body: JSON.stringify({ id: ekycRef, otp: String(otp).trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          verified: false,
+          error: typeof data === "object" && data !== null && "message" in data
+            ? String((data as { message: string }).message)
+            : "Aadhaar OTP verification failed",
+        };
+      }
+      const status = typeof data === "object" && data !== null && "status" in data
+        ? String((data as { status: string }).status)
+        : "verified";
+      const verified = status === "verified" || status === "success" || status === "completed";
+      return {
+        verified,
+        ref: ekycRef,
+        ekyc_ref: ekycRef,
+        last4,
+        provider: "digio",
+        ...(verified ? {} : { error: "Aadhaar OTP verification incomplete" }),
+      };
+    } catch (e) {
+      return { verified: false, error: e instanceof Error ? e.message : "eKYC verify error" };
+    }
+  }
+
+  if (!hasDigio) {
+    if (Deno.env.get("EKYC_STRICT") === "1") {
+      return {
+        verified: false,
+        error: "eKYC provider not configured (set DIGIO_CLIENT_ID/SECRET or DIGIO_API_KEY)",
+      };
+    }
+    const ref = `stub-${Date.now()}`;
+    return { verified: true, ref, ekyc_ref: ref, last4, provider: "stub" };
+  }
+
+  // Step 1: initiate Digio Aadhaar eKYC (OTP sent to Aadhaar-linked mobile)
   try {
-    const auth = btoa(`${clientId}:${clientSecret}`);
     const res = await fetch("https://api.digio.in/v2/client/kyc/aadhaar/initiate", {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-        ...(apiKey ? { "X-API-KEY": apiKey } : {}),
-      },
+      headers: digioAuthHeaders(apiKey),
       body: JSON.stringify({
-        aadhaar_number: aadhaar.replace(/\s/g, ""),
+        aadhaar_number: digits,
         name,
         consent: true,
       }),
@@ -74,24 +191,96 @@ async function digioEkyc(
         verified: false,
         error: typeof data === "object" && data !== null && "message" in data
           ? String((data as { message: string }).message)
-          : "eKYC failed",
+          : "eKYC initiation failed",
       };
     }
-    const last4 = aadhaar.replace(/\s/g, "").slice(-4);
     const ref = typeof data === "object" && data !== null && "id" in data
       ? String((data as { id: string }).id)
       : `digio-${Date.now()}`;
     const status = typeof data === "object" && data !== null && "status" in data
       ? String((data as { status: string }).status)
       : "pending";
+    if (status === "verified" || status === "success" || status === "completed") {
+      return { verified: true, ref, ekyc_ref: ref, last4, provider: "digio" };
+    }
     return {
-      verified: status === "verified" || status === "success",
+      verified: false,
+      pending: true,
+      requires_otp: true,
       ref,
+      ekyc_ref: ref,
       last4,
-      ...(status === "pending" ? { error: "Complete eKYC on your Aadhaar-linked mobile" } : {}),
+      provider: "digio",
+      error: "Enter OTP sent to your Aadhaar-linked mobile",
     };
   } catch (e) {
     return { verified: false, error: e instanceof Error ? e.message : "eKYC error" };
+  }
+}
+
+async function resolveAadhaarForRegister(
+  supabase: SupabaseClient,
+  body: Record<string, unknown>,
+  contactName: string,
+): Promise<
+  | { ok: true; last4: string; ref: string | null; provider: string }
+  | { ok: false; error: string }
+> {
+  const aadhaar = String(body.aadhaar_number || "");
+  if (!aadhaar) return { ok: false, error: "Aadhaar eKYC is required" };
+
+  const aadhaarHash = await hashSensitive(aadhaar);
+  const ekycRef = body.ekyc_ref ? String(body.ekyc_ref) : null;
+  const session = await getVerifiedEkycSession(supabase, aadhaarHash, ekycRef || undefined);
+  if (session) {
+    return {
+      ok: true,
+      last4: session.last4,
+      ref: session.ekyc_ref,
+      provider: session.provider || "session",
+    };
+  }
+
+  const ekyc = await digioEkyc(aadhaar, contactName);
+  if (!ekyc.verified) {
+    return { ok: false, error: ekyc.error || "Aadhaar eKYC failed — verify in step 3 first" };
+  }
+  const ref = ekyc.ref || ekyc.ekyc_ref || null;
+  if (ref) {
+    await storeEkycSession(supabase, {
+      ekycRef: ref,
+      aadhaarHash,
+      last4: ekyc.last4 || aadhaar.replace(/\s/g, "").slice(-4),
+      verified: true,
+      provider: ekyc.provider || "digio",
+    });
+  }
+  return {
+    ok: true,
+    last4: ekyc.last4 || aadhaar.replace(/\s/g, "").slice(-4),
+    ref,
+    provider: ekyc.provider || "unknown",
+  };
+}
+
+async function upsertPartnerServices(
+  supabase: SupabaseClient,
+  vendorId: string,
+  services: Array<{ service_id: string; category_id: string }>,
+  replace = false,
+): Promise<void> {
+  if (!services.length) return;
+  if (replace) {
+    await supabase.from("vendor_partner_services").delete().eq("vendor_id", vendorId);
+  }
+  for (const s of services) {
+    const { error } = await supabase.from("vendor_partner_services").upsert({
+      vendor_id: vendorId,
+      service_id: s.service_id,
+      category_id: s.category_id,
+      is_active: true,
+    }, { onConflict: "vendor_id,service_id" });
+    if (error) throw error;
   }
 }
 
@@ -155,12 +344,33 @@ Deno.serve(async (req: Request) => {
       return json({ success: true, mobile_verified: true });
     }
 
+    if (action === "lookup-partner") {
+      const mobile = normalizeMobile(String(body.mobile || body.phone || ""));
+      if (!mobile) return json({ error: "Invalid mobile" }, 400);
+      const otpCheck = await assertRecentOtpVerified(supabase, mobile);
+      if (!otpCheck.ok) return json({ error: otpCheck.error }, 400);
+
+      const { data: partner, error } = await supabase
+        .from("vendor_partners")
+        .select("id, business_name, contact_name, phone, status, aadhaar_verified, aadhaar_last4, vendor_partner_services(service_id, category_id, is_active)")
+        .eq("phone", mobile)
+        .maybeSingle();
+      if (error) throw error;
+      if (!partner) return json({ found: false });
+
+      const canAddServices = partner.status === "active" || partner.status === "pending";
+      return json({
+        found: true,
+        can_add_services: canAddServices,
+        partner,
+      });
+    }
+
     if (action === "validate-pan") {
       const pan = String(body.pan || "").trim().toUpperCase();
       if (!pan) return json({ valid: true, optional: true });
       if (!validatePan(pan)) return json({ valid: false, error: "Invalid PAN format (AAAAA9999A)" });
 
-      // Optional NSDL-style check via provider
       const panApiKey = Deno.env.get("PAN_VERIFY_API_KEY");
       if (panApiKey) {
         const res = await fetch("https://api.attestr.com/api/v1/public/checkx/pan", {
@@ -185,8 +395,31 @@ Deno.serve(async (req: Request) => {
     if (action === "ekyc-aadhaar") {
       const aadhaar = String(body.aadhaar || "");
       const name = String(body.name || "");
-      const result = await digioEkyc(aadhaar, name);
-      return json(result);
+      const otp = body.otp ? String(body.otp) : undefined;
+      const ekycRef = body.ekyc_ref ? String(body.ekyc_ref) : undefined;
+      const result = await digioEkyc(aadhaar, name, otp, ekycRef);
+
+      const aadhaarHash = await hashSensitive(aadhaar);
+      const ref = result.ref || result.ekyc_ref;
+      if (ref) {
+        await storeEkycSession(supabase, {
+          ekycRef: ref,
+          aadhaarHash,
+          last4: result.last4 || aadhaar.replace(/\s/g, "").slice(-4),
+          verified: !!result.verified,
+          provider: result.provider || (result.pending ? "digio-pending" : "unknown"),
+        });
+      }
+
+      return json({
+        verified: result.verified,
+        pending: result.pending,
+        requires_otp: result.requires_otp,
+        ekyc_ref: result.ekyc_ref || result.ref,
+        last4: result.last4,
+        provider: result.provider,
+        error: result.error,
+      });
     }
 
     if (action === "check-gps") {
@@ -223,21 +456,48 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (action === "update-services") {
+      const mobile = normalizeMobile(String(body.phone || body.mobile || ""));
+      if (!mobile) return json({ error: "Valid phone required" }, 400);
+
+      const otpCheck = await assertRecentOtpVerified(supabase, mobile);
+      if (!otpCheck.ok) return json({ error: otpCheck.error }, 400);
+
+      const { data: partner } = await supabase
+        .from("vendor_partners")
+        .select("id, status, business_name")
+        .eq("phone", mobile)
+        .maybeSingle();
+      if (!partner) return json({ error: "No partner account for this mobile" }, 404);
+      if (partner.status === "offboarded") {
+        return json({ error: "Partner account is offboarded — contact ScanV support" }, 403);
+      }
+      if (partner.status !== "active" && partner.status !== "pending") {
+        return json({ error: `Cannot update services while status is ${partner.status}` }, 403);
+      }
+
+      const services: Array<{ service_id: string; category_id: string }> =
+        Array.isArray(body.services) ? body.services : [];
+      if (!services.length) return json({ error: "Select at least one service" }, 400);
+
+      await upsertPartnerServices(supabase, partner.id, services, false);
+
+      return json({
+        success: true,
+        vendor_id: partner.id,
+        status: partner.status,
+        message: partner.status === "active"
+          ? `Services updated for ${partner.business_name}. New categories are live on your profile.`
+          : `Services saved for ${partner.business_name}. Pending ScanV activation.`,
+      });
+    }
+
     if (action === "register") {
       const mobile = normalizeMobile(String(body.phone || body.mobile || ""));
       if (!mobile) return json({ error: "Valid phone required" }, 400);
 
-      // Verify OTP was completed
-      const { data: otpRow } = await supabase
-        .from("vendor_otp")
-        .select("id")
-        .eq("mobile", mobile)
-        .eq("purpose", "onboard")
-        .eq("verified", true)
-        .gt("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
-        .limit(1)
-        .maybeSingle();
-      if (!otpRow) return json({ error: "Phone not verified — complete OTP first" }, 400);
+      const otpCheck = await assertRecentOtpVerified(supabase, mobile);
+      if (!otpCheck.ok) return json({ error: otpCheck.error }, 400);
 
       const lat = Number(body.gps_lat || body.address_lat);
       const lng = Number(body.gps_lng || body.address_lng);
@@ -259,30 +519,21 @@ Deno.serve(async (req: Request) => {
       const pan = body.pan_number ? String(body.pan_number).trim().toUpperCase() : null;
       if (pan && !validatePan(pan)) return json({ error: "Invalid PAN format" }, 400);
 
-      let aadhaarLast4: string | null = null;
-      let aadhaarVerified = false;
-      let aadhaarRef: string | null = null;
-      if (body.aadhaar_number) {
-        const ekyc = await digioEkyc(String(body.aadhaar_number), String(body.contact_name || ""));
-        if (!ekyc.verified) return json({ error: ekyc.error || "Aadhaar eKYC failed" }, 400);
-        aadhaarLast4 = ekyc.last4 || String(body.aadhaar_number).replace(/\s/g, "").slice(-4);
-        aadhaarVerified = true;
-        aadhaarRef = ekyc.ref || null;
-      } else {
-        return json({ error: "Aadhaar eKYC is required" }, 400);
-      }
+      const contactName = String(body.contact_name || "");
+      const aadhaarResult = await resolveAadhaarForRegister(supabase, body, contactName);
+      if (!aadhaarResult.ok) return json({ error: aadhaarResult.error }, 400);
 
       const vendorPayload = {
         business_name: String(body.business_name || "").trim(),
-        contact_name: String(body.contact_name || "").trim(),
+        contact_name: contactName.trim(),
         phone: mobile,
         phone_verified: true,
         email: body.email ? String(body.email).trim() : null,
         pan_number: pan,
         pan_verified: !!pan && !!body.pan_verified,
-        aadhaar_last4: aadhaarLast4,
-        aadhaar_verified: aadhaarVerified,
-        aadhaar_ekyc_ref: aadhaarRef,
+        aadhaar_last4: aadhaarResult.last4,
+        aadhaar_verified: true,
+        aadhaar_ekyc_ref: aadhaarResult.ref,
         shop_or_flat: String(body.shop_or_flat || "").trim(),
         building_name: body.building_name ? String(body.building_name).trim() : null,
         street_name: String(body.street_name || "").trim(),
@@ -325,6 +576,12 @@ Deno.serve(async (req: Request) => {
             .single();
           if (error) throw error;
           vendorId = updated.id;
+        } else if (existing.status === "active" || existing.status === "pending") {
+          return json({
+            error: "Phone already registered — use Add Services after OTP instead of full registration",
+            code: "ALREADY_REGISTERED",
+            can_add_services: true,
+          }, 409);
         } else {
           return json({ error: "Phone already registered as partner" }, 409);
         }
@@ -338,19 +595,10 @@ Deno.serve(async (req: Request) => {
         vendorId = inserted.id;
       }
 
-      // Service selections
       const services: Array<{ service_id: string; category_id: string }> =
         Array.isArray(body.services) ? body.services : [];
       if (services.length) {
-        await supabase.from("vendor_partner_services").delete().eq("vendor_id", vendorId);
-        await supabase.from("vendor_partner_services").insert(
-          services.map((s) => ({
-            vendor_id: vendorId,
-            service_id: s.service_id,
-            category_id: s.category_id,
-            is_active: true,
-          })),
-        );
+        await upsertPartnerServices(supabase, vendorId, services, true);
       }
 
       return json({

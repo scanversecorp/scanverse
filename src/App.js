@@ -4643,6 +4643,8 @@ function VendorOnboardPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState(emptyOtpDigits());
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [existingPartner, setExistingPartner] = useState(null);
+  const [addServicesMode, setAddServicesMode] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
@@ -4658,10 +4660,14 @@ function VendorOnboardPage() {
   const [gpsCheck, setGpsCheck] = useState(null);
   const [aadhaar, setAadhaar] = useState('');
   const [aadhaarOk, setAadhaarOk] = useState(false);
+  const [ekycRef, setEkycRef] = useState('');
+  const [aadhaarOtp, setAadhaarOtp] = useState('');
+  const [aadhaarOtpRequired, setAadhaarOtpRequired] = useState(false);
   const [pan, setPan] = useState('');
   const [panOk, setPanOk] = useState(null);
   const [selectedSvcs, setSelectedSvcs] = useState({});
   const allSvcs = allVendorSelectableServices();
+  const mobileE164 = () => '+91' + phone.replace(/\D/g, '');
 
   const captureGps = () => {
     setLoading(true);
@@ -4704,21 +4710,54 @@ function VendorOnboardPage() {
     if (code.length < 6) return setErr('Enter 6-digit OTP');
     setLoading(true); setErr('');
     try {
-      await vendorOnboardFetch('verify-otp', { mobile: '+91' + phone.replace(/\D/g, ''), otp: code });
+      await vendorOnboardFetch('verify-otp', { mobile: mobileE164(), otp: code });
       setPhoneVerified(true);
-      setStep(2);
-      setMsg('Phone verified ✓');
+      const lookup = await vendorOnboardFetch('lookup-partner', { mobile: mobileE164() });
+      if (lookup.found && lookup.can_add_services) {
+        const p = lookup.partner;
+        setExistingPartner(p);
+        setAddServicesMode(true);
+        setBusinessName(p.business_name || '');
+        setContactName(p.contact_name || '');
+        setAadhaarOk(!!p.aadhaar_verified);
+        const pre = {};
+        (p.vendor_partner_services || []).filter(s => s.is_active).forEach(s => { pre[s.service_id] = true; });
+        setSelectedSvcs(pre);
+        setStep(5);
+        setMsg(p.status === 'active'
+          ? `Welcome back, ${p.business_name}! Add or update your services below.`
+          : `Account found (${p.status}). You can update your service selections.`);
+      } else {
+        setStep(2);
+        setMsg('Phone verified ✓');
+      }
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
   const verifyAadhaar = async () => {
     if (aadhaar.replace(/\s/g, '').length !== 12) return setErr('Enter 12-digit Aadhaar');
+    if (aadhaarOtpRequired && aadhaarOtp.replace(/\D/g, '').length !== 6) {
+      return setErr('Enter 6-digit OTP sent to Aadhaar-linked mobile');
+    }
     setLoading(true); setErr('');
     try {
-      const r = await vendorOnboardFetch('ekyc-aadhaar', { aadhaar, name: contactName });
+      const payload = { aadhaar, name: contactName };
+      if (aadhaarOtpRequired && ekycRef) {
+        payload.otp = aadhaarOtp.replace(/\D/g, '');
+        payload.ekyc_ref = ekycRef;
+      }
+      const r = await vendorOnboardFetch('ekyc-aadhaar', payload);
+      if (r.requires_otp && !r.verified) {
+        setAadhaarOtpRequired(true);
+        setEkycRef(r.ekyc_ref || r.ref || '');
+        setMsg(r.error || 'OTP sent to your Aadhaar-linked mobile — enter it below');
+        return;
+      }
       if (!r.verified) throw new Error(r.error || 'Aadhaar eKYC failed');
       setAadhaarOk(true);
+      setAadhaarOtpRequired(false);
+      setEkycRef(r.ekyc_ref || r.ref || '');
       setMsg('Aadhaar verified ✓ (last 4: ' + (r.last4 || '****') + ')');
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
@@ -4743,13 +4782,24 @@ function VendorOnboardPage() {
       service_id: s.service_id, category_id: s.category_id,
     }));
     if (!services.length) return setErr('Select at least one service');
-    if (!gps) return setErr('Capture GPS location first');
-    if (!aadhaarOk) return setErr('Complete Aadhaar eKYC first');
+    if (!addServicesMode) {
+      if (!gps) return setErr('Capture GPS location first');
+      if (!aadhaarOk) return setErr('Complete Aadhaar eKYC first');
+    }
     setLoading(true); setErr('');
     try {
+      if (addServicesMode && existingPartner) {
+        const r = await vendorOnboardFetch('update-services', {
+          phone: mobileE164(),
+          services,
+        });
+        setMsg(r.message || 'Services updated!');
+        setStep(6);
+        return;
+      }
       const ip = await getIP();
       const r = await vendorOnboardFetch('register', {
-        phone: '+91' + phone.replace(/\D/g, ''),
+        phone: mobileE164(),
         business_name: businessName,
         contact_name: contactName,
         email,
@@ -4768,6 +4818,7 @@ function VendorOnboardPage() {
         address_lng: gps.lng,
         ip,
         aadhaar_number: aadhaar,
+        ekyc_ref: ekycRef || undefined,
         pan_number: pan || null,
         pan_verified: !!pan && panOk,
         services,
@@ -4859,9 +4910,14 @@ function VendorOnboardPage() {
             Aadhaar eKYC is mandatory. Your full Aadhaar is never stored — only last 4 digits after verification via UIDAI-approved provider.
           </div>
           <Field label="Aadhaar number" req note="12 digits — OTP sent to Aadhaar-linked mobile">
-            <input type="tel" maxLength={14} value={aadhaar} onChange={e => setAadhaar(e.target.value.replace(/\D/g, '').slice(0, 12))} style={S.inp()} placeholder="XXXX XXXX XXXX" disabled={aadhaarOk} />
+            <input type="tel" maxLength={14} value={aadhaar} onChange={e => setAadhaar(e.target.value.replace(/\D/g, '').slice(0, 12))} style={S.inp()} placeholder="XXXX XXXX XXXX" disabled={aadhaarOk || aadhaarOtpRequired} />
           </Field>
-          {!aadhaarOk ? <Btn full onClick={verifyAadhaar} disabled={loading}>{loading ? <><Spin size={16} /> Verifying…</> : 'Verify Aadhaar (eKYC) →'}</Btn>
+          {aadhaarOtpRequired && !aadhaarOk && (
+            <Field label="Aadhaar OTP" req note="6-digit OTP from UIDAI / Aadhaar-linked mobile">
+              <input type="tel" maxLength={6} value={aadhaarOtp} onChange={e => setAadhaarOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} style={S.inp()} placeholder="123456" />
+            </Field>
+          )}
+          {!aadhaarOk ? <Btn full onClick={verifyAadhaar} disabled={loading}>{loading ? <><Spin size={16} /> Verifying…</> : aadhaarOtpRequired ? 'Submit Aadhaar OTP →' : 'Verify Aadhaar (eKYC) →'}</Btn>
             : <Btn full onClick={() => setStep(4)}>Continue →</Btn>}
         </>}
 
@@ -4876,7 +4932,16 @@ function VendorOnboardPage() {
         </>}
 
         {step === 5 && <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Select services you can provide</div>
+          {addServicesMode && existingPartner && (
+            <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
+              Signed in as <strong style={{ color: C.txt }}>{existingPartner.business_name}</strong>
+              {' '}({existingPartner.status === 'active' ? 'active partner' : 'pending activation'}).
+              Check additional services below — existing selections stay active.
+            </div>
+          )}
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>
+            {addServicesMode ? 'Add or update your services' : 'Select services you can provide'}
+          </div>
           <div style={{ maxHeight: 360, overflowY: 'auto', marginBottom: 16 }}>
             {Object.entries(
               allSvcs.reduce((acc, s) => { (acc[s.cat] = acc[s.cat] || []).push(s); return acc; }, {})
@@ -4892,14 +4957,22 @@ function VendorOnboardPage() {
               </div>
             ))}
           </div>
-          <Btn full onClick={submit} disabled={loading}>{loading ? <><Spin size={16} /> Submitting…</> : 'Submit partner application →'}</Btn>
+          <Btn full onClick={submit} disabled={loading}>{loading ? <><Spin size={16} /> Submitting…</> : addServicesMode ? 'Save service updates →' : 'Submit partner application →'}</Btn>
         </>}
 
         {step === 6 && (
           <div style={{ ...S.card(), textAlign: 'center', padding: 32 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Application submitted!</div>
-            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>ScanV will review and activate your partner account. Once active, you'll receive booking alerts via SMS, call & WhatsApp.</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 8 }}>
+              {addServicesMode ? 'Services updated!' : 'Application submitted!'}
+            </div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>
+              {addServicesMode
+                ? (existingPartner?.status === 'active'
+                  ? 'Your profile now includes the updated service categories. You will receive booking alerts for newly added services.'
+                  : 'Service selections saved. ScanV will activate your partner account shortly.')
+                : 'ScanV will review and activate your partner account. Once active, you\'ll receive booking alerts via SMS, call & WhatsApp.'}
+            </div>
           </div>
         )}
 

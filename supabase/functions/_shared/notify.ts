@@ -268,10 +268,54 @@ export function validatePan(pan: string): boolean {
   return /^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(pan.trim());
 }
 
-/** Validate Aadhaar number format (12 digits, Verhoeff not checked here) */
+/** Verhoeff checksum for Aadhaar (UIDAI uses this algorithm) */
+const VERHOEFF_D = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 0, 1, 2, 3, 4, 6, 7, 8],
+  [6, 5, 9, 0, 1, 2, 3, 4, 7, 8],
+  [7, 6, 5, 9, 0, 1, 2, 3, 4, 8],
+  [8, 7, 6, 5, 9, 0, 1, 2, 3, 4],
+  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+];
+const VERHOEFF_P = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+];
+const VERHOEFF_INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9];
+
+function verhoeffCheck(num: string): boolean {
+  let c = 0;
+  const digits = num.replace(/\s/g, "").split("").reverse();
+  for (let i = 0; i < digits.length; i++) {
+    c = VERHOEFF_D[c][VERHOEFF_P[i % 8][Number(digits[i])]];
+  }
+  return c === 0;
+}
+
+/** Validate Aadhaar number (12 digits + Verhoeff checksum) */
 export function validateAadhaar(num: string): boolean {
   const d = num.replace(/\s/g, "");
-  return /^\d{12}$/.test(d);
+  if (!/^\d{12}$/.test(d)) return false;
+  return verhoeffCheck(d);
+}
+
+/** SHA-256 hash for sensitive identifiers (Aadhaar) — never store raw Aadhaar */
+export async function hashSensitive(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value.replace(/\s/g, ""));
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /** Hash OTP for storage */
