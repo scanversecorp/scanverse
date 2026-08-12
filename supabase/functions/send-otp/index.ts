@@ -133,6 +133,11 @@ async function assertRecentOtpVerified(
   return { ok: false, error: "OTP verification required" };
 }
 
+function emailMatches(userEmail: string | undefined, target: string): boolean {
+  return !!userEmail && userEmail.toLowerCase() === target.toLowerCase();
+}
+
+/** listUsers SDK has no email filter — paginate and match exactly */
 async function findAuthUserByEmail(
   supabase: SupabaseClient,
   supabaseUrl: string,
@@ -140,19 +145,50 @@ async function findAuthUserByEmail(
   email: string,
 ): Promise<{ id: string; email?: string } | null> {
   const target = email.toLowerCase();
+  const perPage = 1000;
 
-  const { data, error } = await supabase.auth.admin.listUsers({
-    filter: email,
-    page: 1,
-    perPage: 1,
-  });
-  if (!error) {
-    const match = data.users?.find((u) => u.email?.toLowerCase() === target);
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) break;
+    const match = data.users?.find((u) => emailMatches(u.email, target));
     if (match) return match;
+    if (!data.users?.length || data.users.length < perPage) break;
   }
 
   const res = await fetch(
-    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=1`,
+    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=50`,
+    {
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+    },
+  );
+  if (res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    const users = (payload as { users?: Array<{ id: string; email?: string }> }).users;
+    const match = users?.find((u) => emailMatches(u.email, target));
+    if (match) return match;
+  }
+
+  return null;
+}
+
+async function findAuthUserForMobile(
+  supabase: SupabaseClient,
+  supabaseUrl: string,
+  serviceKey: string,
+  mobile: string,
+): Promise<{ id: string; email?: string } | null> {
+  for (const email of profileAuthEmails(mobile)) {
+    const found = await findAuthUserByEmail(supabase, supabaseUrl, serviceKey, email);
+    if (found) return found;
+  }
+  const digits = mobile.replace(/\D/g, "").slice(-10);
+  if (!digits) return null;
+
+  const res = await fetch(
+    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(digits)}&page=1&per_page=50`,
     {
       headers: {
         Authorization: `Bearer ${serviceKey}`,
@@ -163,7 +199,7 @@ async function findAuthUserByEmail(
   if (!res.ok) return null;
   const payload = await res.json().catch(() => ({}));
   const users = (payload as { users?: Array<{ id: string; email?: string }> }).users;
-  return users?.find((u) => u.email?.toLowerCase() === target) || null;
+  return users?.find((u) => u.email?.includes(digits)) || null;
 }
 
 async function ensureProfileAuthUser(
@@ -174,13 +210,8 @@ async function ensureProfileAuthUser(
 ) {
   const canonicalEmail = profileAuthEmail(mobile);
   const password = profileAuthPassword(mobile);
-  const emails = profileAuthEmails(mobile);
 
-  let existing: { id: string; email?: string } | null = null;
-  for (const email of emails) {
-    existing = await findAuthUserByEmail(supabase, supabaseUrl, serviceKey, email);
-    if (existing) break;
-  }
+  const existing = await findAuthUserForMobile(supabase, supabaseUrl, serviceKey, mobile);
 
   if (existing) {
     const { error: pwErr } = await supabase.auth.admin.updateUserById(existing.id, { password });
@@ -201,13 +232,23 @@ async function ensureProfileAuthUser(
   });
   if (createErr) {
     const msg = createErr.message || "";
-    if (/already registered|already exists|duplicate/i.test(msg)) {
-      const retry = await findAuthUserByEmail(supabase, supabaseUrl, serviceKey, canonicalEmail);
+    const retryable = /already registered|already exists|duplicate|database error/i.test(msg);
+    if (retryable) {
+      const retry = await findAuthUserForMobile(supabase, supabaseUrl, serviceKey, mobile);
       if (retry) {
         const { error: pwErr } = await supabase.auth.admin.updateUserById(retry.id, { password });
         if (pwErr) throw new Error(pwErr.message);
+        if (retry.email !== canonicalEmail) {
+          await supabase.auth.admin.updateUserById(retry.id, {
+            email: canonicalEmail,
+            email_confirm: true,
+          });
+        }
         return { email: canonicalEmail, password };
       }
+    }
+    if (/profiles_email_key|duplicate key/i.test(msg)) {
+      throw new Error("Profile already exists — retry OTP verify");
     }
     throw new Error(createErr.message);
   }
@@ -215,21 +256,55 @@ async function ensureProfileAuthUser(
   return { email: canonicalEmail, password };
 }
 
+/** Client invoke sends apikey/Authorization; env SUPABASE_ANON_KEY is optional fallback */
+function resolveAnonKey(req: Request): string | null {
+  const fromEnv = Deno.env.get("SUPABASE_ANON_KEY");
+  if (fromEnv) return fromEnv;
+
+  const apikey = req.headers.get("apikey")?.trim();
+  if (apikey) return apikey;
+
+  const auth = req.headers.get("Authorization")?.trim();
+  if (auth?.startsWith("Bearer ")) {
+    const token = auth.slice(7).trim();
+    if (token) return token;
+  }
+  return null;
+}
+
 async function signInAndReturnTokens(
   supabaseUrl: string,
-  anonKey: string,
+  apiKey: string,
   email: string,
   password: string,
 ) {
-  const anonClient = createClient(supabaseUrl, anonKey);
-  const { data, error } = await anonClient.auth.signInWithPassword({ email, password });
-  if (error || !data.session) {
-    throw new Error(error?.message || "Sign-in failed after profile auth setup");
+  const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const payload = await res.json().catch(() => ({})) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    error?: string;
+    error_description?: string;
+    msg?: string;
+  };
+  if (!res.ok || !payload.access_token || !payload.refresh_token) {
+    throw new Error(
+      payload.error_description || payload.msg || payload.error
+        || "Sign-in failed after profile auth setup",
+    );
   }
   return {
-    access_token: data.session.access_token,
-    refresh_token: data.session.refresh_token,
-    expires_in: data.session.expires_in,
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token,
+    expires_in: payload.expires_in,
   };
 }
 
@@ -241,7 +316,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!supabaseUrl || !serviceKey) {
       return json({ error: "Server misconfigured" }, 500);
     }
@@ -289,29 +363,33 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "session") {
-      if (!anonKey) return json({ error: "Server misconfigured" }, 500);
+      try {
+        const otp = String(body.otp || "").trim();
+        const waToken = String(body.wa_token || "").trim();
+        let verified = false;
+        if (otp) {
+          verified = await verifyOtpStored(supabase, mobile, otp)
+            || await verifyOtpRecentlyUsed(supabase, mobile, otp);
+        } else if (waToken) verified = await verifyWaToken(supabase, mobile, waToken);
+        else return json({ success: false, error: "OTP or WhatsApp token required" });
 
-      const otp = String(body.otp || "").trim();
-      const waToken = String(body.wa_token || "").trim();
-      let verified = false;
-      if (otp) {
-        verified = await verifyOtpStored(supabase, mobile, otp)
-          || await verifyOtpRecentlyUsed(supabase, mobile, otp);
-      } else if (waToken) verified = await verifyWaToken(supabase, mobile, waToken);
-      else return json({ success: false, error: "OTP or WhatsApp token required" }, 400);
+        if (!verified) {
+          return json({ success: false, error: "Invalid or expired verification" });
+        }
 
-      if (!verified) {
-        return json({ success: false, error: "Invalid or expired verification" });
+        const { email, password } = await ensureProfileAuthUser(
+          supabase,
+          supabaseUrl,
+          serviceKey,
+          mobile,
+        );
+        const authKey = resolveAnonKey(req) || serviceKey;
+        const tokens = await signInAndReturnTokens(supabaseUrl, authKey, email, password);
+        return json({ success: true, ...tokens });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Session failed";
+        return json({ success: false, error: msg });
       }
-
-      const { email, password } = await ensureProfileAuthUser(
-        supabase,
-        supabaseUrl,
-        serviceKey,
-        mobile,
-      );
-      const tokens = await signInAndReturnTokens(supabaseUrl, anonKey, email, password);
-      return json({ success: true, ...tokens });
     }
 
     // Send OTP

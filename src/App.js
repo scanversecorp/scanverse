@@ -2256,7 +2256,7 @@ function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
 async function invokeSendOtp(mobile) {
   const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
   const r = await sb().functions.invoke('send-otp', { body: { mobile: norm } });
-  const bodyErr = edgeFnErrorMessage(r);
+  const bodyErr = await edgeFnErrorMessageAsync(r);
   if (r.error || r.data?.success === false) {
     throw new Error(bodyErr || 'OTP service unavailable');
   }
@@ -2276,6 +2276,7 @@ async function verifyOtpCode(mobile, code) {
 /** Parse edge function error body even when HTTP status is non-2xx */
 function edgeFnErrorMessage(r) {
   if (r.data?.error) return r.data.error;
+  if (r.data?.success === false && r.data?.error) return r.data.error;
   const ctx = r.error?.context;
   if (typeof ctx === 'string') {
     try {
@@ -2296,6 +2297,24 @@ function edgeFnErrorMessage(r) {
     return r.data?.error || 'Request failed — try again';
   }
   return msg || r.data?.error || '';
+}
+
+/** Async parse — reads Response body from FunctionsHttpError.context */
+async function edgeFnErrorMessageAsync(r) {
+  if (r.data?.error) return r.data.error;
+  if (r.data?.success === false && r.data?.error) return r.data.error;
+  const sync = edgeFnErrorMessage(r);
+  if (sync && !/^Request failed — try again$/i.test(sync)) return sync;
+  try {
+    const resp = r.error?.context;
+    if (resp && typeof resp.json === 'function') {
+      const parsed = await resp.json();
+      if (parsed?.error) return parsed.error;
+      if (parsed?.message) return parsed.message;
+      if (parsed?.msg) return parsed.msg;
+    }
+  } catch (_) {}
+  return sync || 'Request failed — try again';
 }
 
 function profileAuthEmail(mob) {
@@ -2319,7 +2338,7 @@ async function invokeProfileAuthSession(mob, { otp, waToken } = {}) {
   else if (waToken) body.wa_token = waToken;
   else throw new Error('Verification required to establish session');
   const r = await sb().functions.invoke('send-otp', { body });
-  const errMsg = edgeFnErrorMessage(r);
+  const errMsg = await edgeFnErrorMessageAsync(r);
   if (r.error || r.data?.success === false) throw new Error(errMsg || 'Auth session failed');
   const { access_token, refresh_token } = r.data || {};
   if (!access_token || !refresh_token) {
@@ -2753,8 +2772,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const mob = normalizeMobileE164(mobile);
       if (!waVerified) {
         const code = otpCode.join('');
-        const ok = await verifyOtpCode(mob, code);
-        if (!ok) throw new Error('Invalid OTP. Try again.');
+        if (code.length < 6) throw new Error('Enter 6-digit OTP');
       }
 
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
@@ -2807,8 +2825,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const mob = normalizeMobileE164(mobile);
       if (!waVerified) {
         const code = otpCode.join('');
-        const ok = await verifyOtpCode(mob, code);
-        if (!ok) throw new Error('Invalid OTP. Try again.');
+        if (code.length < 6) throw new Error('Enter 6-digit OTP');
       }
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
       const profileId = customerProfileId(mob);
@@ -4206,8 +4223,8 @@ function BookScreen() {
     setLoading(true);
     try{
       const mob=normalizeMobileE164(bookPhone);
-      const ok=await verifyOtpCode(mob,code);
-      if(!ok) throw new Error('Invalid OTP');
+      const code=bookOtpCode.join('');
+      if(code.length<6) throw new Error('Enter 6-digit OTP');
       await ensureProfileAuthSession(mob, { otp: code });
       const uid=await resolveCustomerProfileId(mob);
       const profile=await upsertCustomerProfile({
