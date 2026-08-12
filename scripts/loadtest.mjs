@@ -18,7 +18,7 @@ const targets = [
   },
   {
     name: 'Supabase REST health (service_prices_public)',
-    url: `${SUPABASE_URL}/rest/v1/service_prices_public?select=id&limit=1`,
+    url: `${SUPABASE_URL}/rest/v1/service_prices_public?select=service_id&limit=1`,
     opts: {
       method: 'GET',
       headers: {
