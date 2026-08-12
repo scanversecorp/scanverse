@@ -201,11 +201,13 @@ async function assignVendor(
 
   const { data: vendor } = await supabase
     .from("vendor_partners")
-    .select("id, profile_id, business_name, contact_name, phone")
+    .select("id, profile_id, business_name, contact_name, phone, status")
     .eq("id", vendorId)
     .single();
 
-  const partnerId = vendor?.profile_id || vendorId;
+  if (!vendor || vendor.status !== "active") return;
+
+  const partnerId = vendor.profile_id || vendorId;
 
   await supabase.from("booking_dispatch").update({
     status: "assigned",

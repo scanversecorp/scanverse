@@ -4989,7 +4989,7 @@ function VendorOnboardPage() {
 }
 
 /* ================================================================
-   VENDOR ADMIN — #vendor-admin (Activate / offboard partners)
+   VENDOR ADMIN — #vendor-admin (Activate / pause / offboard / enroll)
 ================================================================ */
 function VendorAdminPage() {
   const [pin, setPin] = useState(() => sessionStorage.getItem(VENDOR_PIN_KEY) || '');
@@ -4999,6 +4999,13 @@ function VendorAdminPage() {
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [filter, setFilter] = useState('all');
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [enroll, setEnroll] = useState({
+    business_name: '', contact_name: '', phone: '', email: '',
+    shop_or_flat: '', street_name: '', city: '', pincode: '', state: 'Maharashtra',
+    activate_immediately: false, services: {},
+  });
+  const enrollSvcs = allVendorSelectableServices();
 
   const load = useCallback(async (usePin) => {
     setLoading(true); setErr('');
@@ -5016,29 +5023,67 @@ function VendorAdminPage() {
 
   const login = () => load(pin);
 
-  const activate = async (id) => {
-    setLoading(true);
+  const runAction = async (action, id, confirmMsg) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    const labels = { activate: 'activated', pause: 'paused', unpause: 'unpaused', offboard: 'offboarded', delete: 'deleted' };
+    setLoading(true); setErr('');
     try {
-      await vendorOnboardFetch('activate', { vendor_id: id }, pin);
+      await vendorOnboardFetch(action, { vendor_id: id }, pin);
       await load(pin);
-      setMsg('Partner activated');
+      setMsg(`Partner ${labels[action] || action}`);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
-  const offboard = async (id) => {
-    if (!window.confirm('Offboard this partner? They will stop receiving bookings.')) return;
-    setLoading(true);
+  const activate = (id) => runAction('activate', id);
+  const pause = (id) => runAction('pause', id, 'Pause this partner? They will stop receiving new bookings until unpaused.');
+  const unpause = (id) => runAction('unpause', id);
+  const offboard = (id) => runAction('offboard', id, 'Offboard this partner? They will stop receiving bookings permanently until re-activated.');
+  const deleteVendor = (id) => runAction('delete', id, 'Delete this partner record? Only works if they have no dispatch history.');
+
+  const submitEnroll = async () => {
+    const mob = '+91' + enroll.phone.replace(/\D/g, '');
+    if (enroll.phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
+    if (!enroll.business_name.trim() || !enroll.contact_name.trim()) return setErr('Business and contact name required');
+    if (!enroll.shop_or_flat.trim() || !enroll.street_name.trim() || !enroll.city.trim() || !enroll.pincode.trim()) {
+      return setErr('Complete address fields');
+    }
+    const services = Object.entries(enroll.services)
+      .filter(([, on]) => on)
+      .map(([service_id]) => {
+        const s = enrollSvcs.find(x => x.service_id === service_id);
+        return s ? { service_id: s.service_id, category_id: s.category_id } : null;
+      })
+      .filter(Boolean);
+    setLoading(true); setErr('');
     try {
-      await vendorOnboardFetch('offboard', { vendor_id: id }, pin);
+      const res = await vendorOnboardFetch('enroll', {
+        phone: mob,
+        business_name: enroll.business_name.trim(),
+        contact_name: enroll.contact_name.trim(),
+        email: enroll.email.trim() || undefined,
+        shop_or_flat: enroll.shop_or_flat.trim(),
+        street_name: enroll.street_name.trim(),
+        city: enroll.city.trim(),
+        pincode: enroll.pincode.trim(),
+        state: enroll.state.trim(),
+        activate_immediately: enroll.activate_immediately,
+        services,
+      }, pin);
       await load(pin);
-      setMsg('Partner offboarded');
+      setMsg(res.message || 'Partner enrolled');
+      setShowEnroll(false);
+      setEnroll({
+        business_name: '', contact_name: '', phone: '', email: '',
+        shop_or_flat: '', street_name: '', city: '', pincode: '', state: 'Maharashtra',
+        activate_immediately: false, services: {},
+      });
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
   const shown = filter === 'all' ? vendors : vendors.filter(v => v.status === filter);
-  const statusColor = { pending: C.cyan, active: C.grn, suspended: C.red, offboarded: C.dim };
+  const statusColor = { pending: C.cyan, active: C.grn, paused: C.gold, suspended: C.red, offboarded: C.dim };
 
   if (!authed) {
     return (
@@ -5046,7 +5091,7 @@ function VendorAdminPage() {
         <div style={{ ...S.card(), maxWidth: 360, width: '100%', padding: 24 }}>
           <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER ONLY</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Partner Admin</div>
-          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20 }}>Activate or offboard ScanV partners. Not linked in public nav.</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20 }}>Activate, pause, offboard, or enroll ScanV partners. Not linked in public nav.</div>
           <Field label="Admin PIN">
             <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" />
           </Field>
@@ -5070,6 +5115,7 @@ function VendorAdminPage() {
             <div style={{ fontSize: 18, fontWeight: 800, color: C.txt }}>ScanV Partners ({vendors.length})</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            <Btn sm onClick={() => setShowEnroll(s => !s)} disabled={loading}>{showEnroll ? 'Cancel enroll' : '+ Enroll vendor'}</Btn>
             <Btn v="outline" sm onClick={() => load(pin)} disabled={loading}>Reload</Btn>
             <Btn v="ghost" sm onClick={() => { setAuthed(false); sessionStorage.removeItem(VENDOR_PIN_KEY); }}>Lock</Btn>
           </div>
@@ -5079,12 +5125,41 @@ function VendorAdminPage() {
       </div>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          {['all', 'pending', 'active', 'offboarded'].map(f => (
+          {['all', 'pending', 'active', 'paused', 'offboarded'].map(f => (
             <button key={f} onClick={() => setFilter(f)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${filter === f ? C.acc : C.bdr}`, background: filter === f ? `${C.acc}18` : C.surf, color: filter === f ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
               {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
+        {showEnroll && (
+          <div style={{ ...S.card(), marginBottom: 16, padding: 16 }}>
+            <div style={{ fontWeight: 800, color: C.txt, marginBottom: 12 }}>Enroll new partner</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+              <Field label="Business name"><input value={enroll.business_name} onChange={e => setEnroll(s => ({ ...s, business_name: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Contact name"><input value={enroll.contact_name} onChange={e => setEnroll(s => ({ ...s, contact_name: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Mobile (+91)"><input value={enroll.phone} onChange={e => setEnroll(s => ({ ...s, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} style={S.inp()} placeholder="10 digits" /></Field>
+              <Field label="Email (optional)"><input value={enroll.email} onChange={e => setEnroll(s => ({ ...s, email: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Shop / flat"><input value={enroll.shop_or_flat} onChange={e => setEnroll(s => ({ ...s, shop_or_flat: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Street"><input value={enroll.street_name} onChange={e => setEnroll(s => ({ ...s, street_name: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="City"><input value={enroll.city} onChange={e => setEnroll(s => ({ ...s, city: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Pincode"><input value={enroll.pincode} onChange={e => setEnroll(s => ({ ...s, pincode: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="State"><input value={enroll.state} onChange={e => setEnroll(s => ({ ...s, state: e.target.value }))} style={S.inp()} /></Field>
+            </div>
+            <div style={{ marginTop: 12, maxHeight: 160, overflowY: 'auto', border: BDR, borderRadius: 8, padding: 10 }}>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services (optional)</div>
+              {enrollSvcs.slice(0, 40).map(s => (
+                <label key={s.service_id} style={{ display: 'block', fontSize: 11, color: C.sub, marginBottom: 4, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!enroll.services[s.service_id]} onChange={e => setEnroll(st => ({ ...st, services: { ...st.services, [s.service_id]: e.target.checked } }))} /> {s.cat} · {s.name}
+                </label>
+              ))}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, color: C.sub, cursor: 'pointer' }}>
+              <input type="checkbox" checked={enroll.activate_immediately} onChange={e => setEnroll(s => ({ ...s, activate_immediately: e.target.checked }))} />
+              Activate immediately (skip pending)
+            </label>
+            <Btn onClick={submitEnroll} disabled={loading} style={{ marginTop: 12 }}>Enroll partner</Btn>
+          </div>
+        )}
         {shown.map(v => (
           <div key={v.id} style={{ ...S.card(), marginBottom: 10, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
@@ -5099,8 +5174,27 @@ function VendorAdminPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                 <Badge label={v.status} color={statusColor[v.status] || C.sub} />
-                {v.status === 'pending' && <Btn sm onClick={() => activate(v.id)} disabled={loading}>Activate</Btn>}
-                {v.status === 'active' && <Btn v="danger" sm onClick={() => offboard(v.id)} disabled={loading}>Offboard</Btn>}
+                {v.status === 'pending' && (
+                  <>
+                    <Btn sm onClick={() => activate(v.id)} disabled={loading}>Activate</Btn>
+                    <Btn v="ghost" sm onClick={() => deleteVendor(v.id)} disabled={loading}>Delete</Btn>
+                  </>
+                )}
+                {v.status === 'active' && (
+                  <>
+                    <Btn v="outline" sm onClick={() => pause(v.id)} disabled={loading}>Pause</Btn>
+                    <Btn v="danger" sm onClick={() => offboard(v.id)} disabled={loading}>Offboard</Btn>
+                  </>
+                )}
+                {v.status === 'paused' && (
+                  <>
+                    <Btn sm onClick={() => unpause(v.id)} disabled={loading}>Unpause</Btn>
+                    <Btn v="danger" sm onClick={() => offboard(v.id)} disabled={loading}>Offboard</Btn>
+                  </>
+                )}
+                {v.status === 'offboarded' && (
+                  <Btn v="ghost" sm onClick={() => deleteVendor(v.id)} disabled={loading}>Delete</Btn>
+                )}
               </div>
             </div>
           </div>

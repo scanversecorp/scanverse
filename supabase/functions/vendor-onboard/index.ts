@@ -13,6 +13,10 @@
  *   list            — admin list (PIN header)
  *   offboard        — { vendor_id } (PIN header)
  *   activate        — { vendor_id } (PIN header)
+ *   pause           — { vendor_id } (PIN header)
+ *   unpause         — { vendor_id } (PIN header)
+ *   delete          — { vendor_id } (PIN header)
+ *   enroll          — admin direct enrollment (PIN header)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
@@ -284,6 +288,61 @@ async function upsertPartnerServices(
   }
 }
 
+type VendorRow = {
+  phone: string;
+  contact_name?: string | null;
+  business_name?: string | null;
+  shop_or_flat?: string | null;
+  street_name?: string | null;
+  city?: string | null;
+  pincode?: string | null;
+  village?: string | null;
+  address_lat?: number | null;
+  address_lng?: number | null;
+  email?: string | null;
+};
+
+/** Link vendor to a TEXT profiles row (same pattern as customer cust_* ids). */
+async function ensurePartnerProfile(
+  supabase: SupabaseClient,
+  vendor: VendorRow,
+): Promise<string> {
+  const phone = normalizeMobile(vendor.phone) || vendor.phone;
+  const digits = phone.replace(/\D/g, "");
+  const defaultId = `partner_${digits}`;
+
+  const { data: byPhone } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  const profileId = byPhone?.id || defaultId;
+  const nameParts = String(vendor.contact_name || "").trim().split(/\s+/);
+  const firstName = nameParts[0] || String(vendor.business_name || "Partner");
+  const lastName = nameParts.slice(1).join(" ");
+
+  const { error } = await supabase.from("profiles").upsert({
+    id: profileId,
+    role: "partner",
+    first_name: firstName,
+    last_name: lastName,
+    name: `${firstName} ${lastName}`.trim(),
+    phone,
+    email: vendor.email || `${digits.slice(-10)}@scanv.partner`,
+    mobile_verified: true,
+    address: [vendor.shop_or_flat, vendor.street_name, vendor.city].filter(Boolean).join(", "),
+    city: vendor.city || "",
+    pincode: vendor.pincode || "",
+    village: vendor.village || "",
+    last_lat: vendor.address_lat ?? null,
+    last_lng: vendor.address_lng ?? null,
+    status: "active",
+  }, { onConflict: "id" });
+  if (error) throw error;
+  return profileId;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -469,8 +528,8 @@ Deno.serve(async (req: Request) => {
         .eq("phone", mobile)
         .maybeSingle();
       if (!partner) return json({ error: "No partner account for this mobile" }, 404);
-      if (partner.status === "offboarded") {
-        return json({ error: "Partner account is offboarded — contact ScanV support" }, 403);
+      if (partner.status === "offboarded" || partner.status === "paused") {
+        return json({ error: "Partner account is not active — contact ScanV support" }, 403);
       }
       if (partner.status !== "active" && partner.status !== "pending") {
         return json({ error: `Cannot update services while status is ${partner.status}` }, 403);
@@ -576,11 +635,11 @@ Deno.serve(async (req: Request) => {
             .single();
           if (error) throw error;
           vendorId = updated.id;
-        } else if (existing.status === "active" || existing.status === "pending") {
+        } else if (existing.status === "active" || existing.status === "pending" || existing.status === "paused") {
           return json({
             error: "Phone already registered — use Add Services after OTP instead of full registration",
             code: "ALREADY_REGISTERED",
-            can_add_services: true,
+            can_add_services: existing.status !== "paused",
           }, 409);
         } else {
           return json({ error: "Phone already registered as partner" }, 409);
@@ -646,52 +705,200 @@ Deno.serve(async (req: Request) => {
         .eq("id", vendorId)
         .single();
       if (!vendor) return json({ error: "Vendor not found" }, 404);
-
-      let profileId = vendor.profile_id;
-      if (!profileId) {
-        const syntheticEmail = `${vendor.phone.replace(/\D/g, "")}@scanv.partner`;
-        const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-          email: syntheticEmail,
-          phone: vendor.phone,
-          email_confirm: true,
-          phone_confirm: true,
-          user_metadata: { role: "partner", business_name: vendor.business_name },
-        });
-        if (authErr && !/already/i.test(authErr.message)) {
-          return json({ error: authErr.message }, 500);
-        }
-        profileId = authUser?.user?.id;
-        if (profileId) {
-          await supabase.from("profiles").upsert({
-            id: profileId,
-            role: "partner",
-            first_name: vendor.contact_name?.split(" ")[0] || vendor.contact_name,
-            last_name: vendor.contact_name?.split(" ").slice(1).join(" ") || "",
-            phone: vendor.phone,
-            mobile_verified: true,
-            address: [vendor.shop_or_flat, vendor.street_name, vendor.city].filter(Boolean).join(", "),
-            city: vendor.city,
-            pincode: vendor.pincode,
-            village: vendor.village,
-            last_lat: vendor.address_lat,
-            last_lng: vendor.address_lng,
-            status: "active",
-          }).catch(() => {});
-          await supabase.from("vendor_partners").update({ profile_id: profileId }).eq("id", vendorId);
-        }
+      if (vendor.status === "offboarded") {
+        return json({ error: "Offboarded partner must re-register via onboarding before activation" }, 400);
       }
+
+      const profileId = vendor.profile_id || await ensurePartnerProfile(supabase, vendor);
 
       const { error } = await supabase
         .from("vendor_partners")
         .update({
           status: "active",
-          onboarded_at: new Date().toISOString(),
+          onboarded_at: vendor.onboarded_at || new Date().toISOString(),
           offboarded_at: null,
-          profile_id: profileId || vendor.profile_id,
+          profile_id: profileId,
+          phone_verified: true,
         })
         .eq("id", vendorId);
       if (error) throw error;
+
+      await supabase
+        .from("vendor_partner_services")
+        .update({ is_active: true })
+        .eq("vendor_id", vendorId);
+
       return json({ success: true, status: "active", profile_id: profileId });
+    }
+
+    if (action === "pause") {
+      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      const vendorId = String(body.vendor_id || "");
+      if (!vendorId) return json({ error: "vendor_id required" }, 400);
+      const { error } = await supabase
+        .from("vendor_partners")
+        .update({ status: "paused" })
+        .eq("id", vendorId)
+        .eq("status", "active");
+      if (error) throw error;
+      return json({ success: true, status: "paused" });
+    }
+
+    if (action === "unpause") {
+      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      const vendorId = String(body.vendor_id || "");
+      if (!vendorId) return json({ error: "vendor_id required" }, 400);
+
+      const { data: vendor } = await supabase
+        .from("vendor_partners")
+        .select("*")
+        .eq("id", vendorId)
+        .single();
+      if (!vendor) return json({ error: "Vendor not found" }, 404);
+      if (vendor.status !== "paused") {
+        return json({ error: "Only paused partners can be unpaused" }, 400);
+      }
+
+      const profileId = vendor.profile_id || await ensurePartnerProfile(supabase, vendor);
+      const { error } = await supabase
+        .from("vendor_partners")
+        .update({ status: "active", profile_id: profileId })
+        .eq("id", vendorId);
+      if (error) throw error;
+      return json({ success: true, status: "active", profile_id: profileId });
+    }
+
+    if (action === "delete") {
+      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      const vendorId = String(body.vendor_id || "");
+      if (!vendorId) return json({ error: "vendor_id required" }, 400);
+
+      const { data: vendor } = await supabase
+        .from("vendor_partners")
+        .select("id, status")
+        .eq("id", vendorId)
+        .maybeSingle();
+      if (!vendor) return json({ error: "Vendor not found" }, 404);
+
+      const { count: attemptCount } = await supabase
+        .from("booking_dispatch_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_id", vendorId);
+      if ((attemptCount ?? 0) > 0) {
+        return json({ error: "Cannot delete — vendor has dispatch history. Offboard instead." }, 400);
+      }
+
+      const { count: dispatchCount } = await supabase
+        .from("booking_dispatch")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_vendor_id", vendorId);
+      if ((dispatchCount ?? 0) > 0) {
+        return json({ error: "Cannot delete — vendor was assigned to bookings. Offboard instead." }, 400);
+      }
+
+      await supabase.from("vendor_partner_services").delete().eq("vendor_id", vendorId);
+      const { error } = await supabase.from("vendor_partners").delete().eq("id", vendorId);
+      if (error) throw error;
+      return json({ success: true, deleted: true });
+    }
+
+    if (action === "enroll") {
+      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+
+      const mobile = normalizeMobile(String(body.phone || body.mobile || ""));
+      if (!mobile) return json({ error: "Valid phone required" }, 400);
+
+      const businessName = String(body.business_name || "").trim();
+      const contactName = String(body.contact_name || "").trim();
+      const shopOrFlat = String(body.shop_or_flat || "").trim();
+      const streetName = String(body.street_name || "").trim();
+      const city = String(body.city || "").trim();
+      const pincode = String(body.pincode || "").trim();
+      const state = String(body.state || "Maharashtra").trim();
+      if (!businessName || !contactName || !shopOrFlat || !streetName || !city || !pincode || !state) {
+        return json({ error: "business_name, contact_name, and full address are required" }, 400);
+      }
+
+      const activateNow = body.activate_immediately === true || body.activate === true;
+      const lat = body.address_lat != null ? Number(body.address_lat) : null;
+      const lng = body.address_lng != null ? Number(body.address_lng) : null;
+
+      const vendorPayload = {
+        business_name: businessName,
+        contact_name: contactName,
+        phone: mobile,
+        phone_verified: true,
+        email: body.email ? String(body.email).trim() : null,
+        shop_or_flat: shopOrFlat,
+        building_name: body.building_name ? String(body.building_name).trim() : null,
+        street_name: streetName,
+        village: body.village ? String(body.village).trim() : null,
+        city,
+        pincode,
+        state,
+        country: String(body.country || "India"),
+        country_code: String(body.country_code || "IN").toUpperCase(),
+        address_lat: lat,
+        address_lng: lng,
+        aadhaar_verified: body.aadhaar_verified === true,
+        aadhaar_last4: body.aadhaar_last4 ? String(body.aadhaar_last4) : null,
+        pan_verified: body.pan_verified === true,
+        pan_number: body.pan_number ? String(body.pan_number).trim().toUpperCase() : null,
+        status: activateNow ? "active" : "pending",
+        onboarded_at: activateNow ? new Date().toISOString() : null,
+        notes: body.notes ? String(body.notes).trim() : "Admin enrolled",
+      };
+
+      const { data: existing } = await supabase
+        .from("vendor_partners")
+        .select("id, status")
+        .eq("phone", mobile)
+        .maybeSingle();
+
+      let vendorId: string;
+      if (existing) {
+        if (existing.status === "active" || existing.status === "pending") {
+          return json({ error: "Phone already registered as partner" }, 409);
+        }
+        const { data: updated, error } = await supabase
+          .from("vendor_partners")
+          .update({ ...vendorPayload, offboarded_at: null })
+          .eq("id", existing.id)
+          .select("id")
+          .single();
+        if (error) throw error;
+        vendorId = updated.id;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("vendor_partners")
+          .insert(vendorPayload)
+          .select("id")
+          .single();
+        if (error) throw error;
+        vendorId = inserted.id;
+      }
+
+      const services: Array<{ service_id: string; category_id: string }> =
+        Array.isArray(body.services) ? body.services : [];
+      if (services.length) {
+        await upsertPartnerServices(supabase, vendorId, services, true);
+      }
+
+      let profileId: string | null = null;
+      if (activateNow) {
+        profileId = await ensurePartnerProfile(supabase, { ...vendorPayload, phone: mobile });
+        await supabase.from("vendor_partners").update({ profile_id: profileId }).eq("id", vendorId);
+      }
+
+      return json({
+        success: true,
+        vendor_id: vendorId,
+        status: activateNow ? "active" : "pending",
+        profile_id: profileId,
+        message: activateNow
+          ? `${businessName} enrolled and activated`
+          : `${businessName} enrolled — pending activation`,
+      });
     }
 
     return json({ error: "Unknown action" }, 400);
