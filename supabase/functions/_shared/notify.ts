@@ -110,27 +110,39 @@ export async function sendSms(
     };
   }
 
-  // 2Factor.in (India) — pass otpCode so SMS matches vendor_otp hash
+  // 2Factor.in (India) — OTP route when otpCode set; transactional SMS for dispatch alerts
   if (twoFactorKey) {
     const phone10 = mobileDigitsE164(norm).slice(-10);
     const otp = otpCode || message.match(/\b(\d{6})\b/)?.[1];
-    const url = otp
-      ? `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`
-      : `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/AUTOGEN/ScanV%20OTP`;
-    const res = await fetch(url);
-    const bodyText = await res.text().catch(() => "");
-    if (res.ok) {
-      let ref: string | undefined;
-      try {
-        const data = JSON.parse(bodyText);
-        if (data?.Details) ref = String(data.Details);
-        else if (data?.SessionId) ref = String(data.SessionId);
-      } catch {
-        if (bodyText && bodyText.length < 80) ref = bodyText.trim();
+    if (otp) {
+      const url = `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`;
+      const res = await fetch(url);
+      const bodyText = await res.text().catch(() => "");
+      if (res.ok) {
+        let ref: string | undefined;
+        try {
+          const data = JSON.parse(bodyText);
+          if (data?.Details) ref = String(data.Details);
+          else if (data?.SessionId) ref = String(data.SessionId);
+        } catch {
+          if (bodyText && bodyText.length < 80) ref = bodyText.trim();
+        }
+        return { ok: true, provider: "2factor", ref };
       }
-      return { ok: true, provider: "2factor", ref };
+      return { ok: false, error: bodyText || "2Factor SMS failed" };
     }
-    return { ok: false, error: bodyText || "2Factor SMS failed" };
+    // Transactional SMS (booking alerts, not OTP)
+    const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";
+    const transUrl =
+      `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${encodeURIComponent(twoFactorKey)}` +
+      `&to=${encodeURIComponent(phone10)}&from=${encodeURIComponent(sender)}` +
+      `&msg=${encodeURIComponent(message.slice(0, 480))}`;
+    const transRes = await fetch(transUrl);
+    const transBody = await transRes.text().catch(() => "");
+    if (transRes.ok) {
+      return { ok: true, provider: "2factor-trans", ref: transBody.slice(0, 120) };
+    }
+    return { ok: false, error: transBody || "2Factor transactional SMS failed" };
   }
 
   return { ok: false, error: "No SMS provider configured (MSG91/Twilio/2Factor)" };

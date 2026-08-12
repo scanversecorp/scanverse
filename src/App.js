@@ -1405,13 +1405,23 @@ async function vendorOnboardFetch(action, payload = {}, pin) {
   return data;
 }
 
-async function invokeBookingDispatch({ bookingId, serviceId, serviceName, lat, lng, location, date, time }) {
+function serviceCategoryId(serviceId) {
+  if (!serviceId) return '';
+  for (const [catId, cfg] of Object.entries(SUB_CATEGORIES)) {
+    if (cfg.svcs?.some((s) => s.id === serviceId)) return catId;
+  }
+  return serviceId;
+}
+
+async function invokeBookingDispatch({ bookingId, serviceId, serviceName, categoryId, customerId, lat, lng, location, date, time }) {
   try {
     const r = await sb().functions.invoke('booking-dispatch', {
       body: {
         action: 'start',
         booking_id: bookingId,
         service_id: serviceId || '',
+        category_id: categoryId || '',
+        customer_id: customerId || null,
         service_name: serviceName,
         lat: lat ?? null,
         lng: lng ?? null,
@@ -2705,6 +2715,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       invokeBookingDispatch({
         bookingId: bk.id,
         serviceId: svc.id || svc.parent || activeSvc?.id || '',
+        categoryId: svc.parent || activeSvc?.parent || '',
+        customerId: userId,
         serviceName: svc.name,
         lat: silentGeo?.lat || bookingDetail.lat || null,
         lng: silentGeo?.lng || bookingDetail.lng || null,
@@ -4060,7 +4072,8 @@ function BookScreen() {
         payer_vpa: payCheck.payer_vpa || null,
       }).catch(() => {});
       await invokeBookingDispatch({
-        bookingId: data.id, serviceId: svc.id || svc.parent || '', serviceName: svc.name,
+        bookingId: data.id, serviceId: svc.id || svc.parent || '', categoryId: svc.parent || '',
+        customerId: profile.id, serviceName: svc.name,
         lat: custLat, lng: custLng, location: loc, date, time,
       });
       setBooking(data);
@@ -4386,9 +4399,36 @@ function trackStatusLabel(booking, dispatch, live) {
 function TrackServiceScreen() {
   const { user, setScreen, setActiveSvc, trackBookingId, setTrackBookingId, addToast } = useApp();
   const bookingId = trackBookingId || trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
-  const { booking, live, dispatch, partnerName, loading } = useLiveBookingTrack(bookingId);
+  const { booking, live, dispatch, partnerName, loading, refresh } = useLiveBookingTrack(bookingId);
   const status = trackStatusLabel(booking, dispatch, live);
   const steps = ['Confirmed', 'Finding partner', 'Partner assigned', 'Live tracking', 'Complete'];
+  const [retryDispatch, setRetryDispatch] = useState(false);
+
+  const retryPartnerAlerts = async () => {
+    if (!booking?.id || !user?.id) return addToast('Sign in to retry partner alerts', 'error');
+    setRetryDispatch(true);
+    try {
+      const r = await invokeBookingDispatch({
+        bookingId: booking.id,
+        serviceId: booking.service_id || '',
+        categoryId: serviceCategoryId(booking.service_id),
+        customerId: user.id,
+        serviceName: booking.service_name,
+        lat: booking.customer_lat,
+        lng: booking.customer_lng,
+        location: booking.location_text || '',
+        date: booking.date,
+        time: booking.time,
+      });
+      if (r?.error) throw new Error(r.error);
+      addToast(r?.duplicate ? 'Partner alerts re-sent 📲' : 'Partner alerts started 📲', 'success');
+      refresh?.();
+    } catch (e) {
+      addToast(e.message || 'Could not alert partners', 'error');
+    } finally {
+      setRetryDispatch(false);
+    }
+  };
 
   useEffect(() => {
     if (bookingId) sessionStorage.setItem(TRACK_BOOKING_KEY, bookingId);
@@ -4443,6 +4483,13 @@ function TrackServiceScreen() {
           {!booking?.partner_id && booking?.status === 'confirmed' && (
             <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
               <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — SMS, phone call & WhatsApp. Partner will appear on the map once assigned.
+              {!dispatch && (
+                <div style={{ marginTop: 10 }}>
+                  <Btn sm v="ghost" onClick={retryPartnerAlerts} disabled={retryDispatch}>
+                    {retryDispatch ? 'Alerting partners…' : 'Send partner alerts now'}
+                  </Btn>
+                </div>
+              )}
             </div>
           )}
 
@@ -4718,6 +4765,8 @@ function BookingsScreen() {
       await invokeBookingDispatch({
         bookingId: bk.id,
         serviceId: svc.id || svc.parent || '',
+        categoryId: svc.parent || '',
+        customerId: user.id,
         serviceName: intent.service_name || svc.name,
         lat: user.last_lat ?? null,
         lng: user.last_lng ?? null,

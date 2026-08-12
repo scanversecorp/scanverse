@@ -73,19 +73,27 @@ async function logAttempt(
   });
 }
 
+function serviceMatchOr(serviceId: string, categoryId: string): string {
+  const ids = [serviceId, categoryId].filter(Boolean);
+  const uniq = [...new Set(ids)];
+  return uniq.map((id) => `service_id.eq.${id},category_id.eq.${id}`).join(",");
+}
+
 async function getVendorQueue(
   supabase: ReturnType<typeof createClient>,
   serviceId: string,
   lat: number | null,
   lng: number | null,
   excludeIds: string[] = [],
+  categoryId = "",
 ): Promise<Array<{ vendor_id: string; business_name: string; phone: string; distance_km: number }>> {
+  const matchOr = serviceMatchOr(serviceId, categoryId);
   if (!lat || !lng) {
     const { data } = await supabase
       .from("vendor_partner_services")
       .select("vendor_id, vendor_partners!inner(id, business_name, phone, status, address_lat, address_lng)")
       .eq("is_active", true)
-      .or(`service_id.eq.${serviceId},category_id.eq.${serviceId}`)
+      .or(matchOr)
       .limit(MAX_VENDORS);
     return (data || [])
       .filter((r: { vendor_partners: { status: string; id: string } }) =>
@@ -101,6 +109,7 @@ async function getVendorQueue(
 
   const { data, error } = await supabase.rpc("find_nearest_vendors", {
     p_service_id: serviceId,
+    p_category_id: categoryId || null,
     p_lat: lat,
     p_lng: lng,
     p_limit: MAX_VENDORS,
@@ -254,6 +263,7 @@ async function processDispatchTick(
   const lat = dispatch.customer_lat as number | null;
   const lng = dispatch.customer_lng as number | null;
   const serviceId = String(dispatch.service_id || "");
+  const categoryId = String(dispatch.category_id || "");
   const rank = Number(dispatch.vendor_rank || 1);
   const attemptNum = Number(dispatch.attempt_num || 1);
 
@@ -266,7 +276,14 @@ async function processDispatchTick(
     if (!triedVendorIds.includes(a.vendor_id)) triedVendorIds.push(a.vendor_id);
   }
 
-  const queue = await getVendorQueue(supabase, serviceId, lat, lng, triedVendorIds.slice(0, rank - 1));
+  const queue = await getVendorQueue(
+    supabase,
+    serviceId,
+    lat,
+    lng,
+    triedVendorIds.slice(0, rank - 1),
+    categoryId,
+  );
   const vendor = queue[rank - 1];
   if (!vendor) {
     if (rank >= MAX_VENDORS) {
@@ -460,22 +477,28 @@ Deno.serve(async (req: Request) => {
       if (!bookingId) return json({ error: "booking_id required" }, 400);
 
       if (!dispatchSecretOk(req)) {
-        const authHeader = req.headers.get("Authorization") || "";
-        const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-        const userClient = createClient(supabaseUrl, anonKey, {
-          global: { headers: { Authorization: authHeader } },
-        });
-        const { data: authData, error: authErr } = await userClient.auth.getUser();
-        const uid = authData?.user?.id;
-        if (authErr || !uid) return json({ error: "Unauthorized" }, 401);
         const { data: owned } = await supabase
           .from("bookings")
           .select("customer_id")
           .eq("id", bookingId)
           .maybeSingle();
-        if (!owned || String(owned.customer_id) !== String(uid)) {
-          return json({ error: "Unauthorized" }, 401);
+        if (!owned) return json({ error: "Booking not found" }, 404);
+
+        const customerId = String(body.customer_id || "").trim();
+        let authorized = customerId && String(owned.customer_id) === customerId;
+
+        if (!authorized) {
+          const authHeader = req.headers.get("Authorization") || "";
+          const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+          const userClient = createClient(supabaseUrl, anonKey, {
+            global: { headers: { Authorization: authHeader } },
+          });
+          const { data: authData } = await userClient.auth.getUser();
+          const uid = authData?.user?.id;
+          authorized = !!(uid && String(owned.customer_id) === String(uid));
         }
+
+        if (!authorized) return json({ error: "Unauthorized" }, 401);
       }
 
       const { data: existing } = await supabase
@@ -483,7 +506,23 @@ Deno.serve(async (req: Request) => {
         .select("id")
         .eq("booking_id", bookingId)
         .maybeSingle();
-      if (existing) return json({ success: true, dispatch_id: existing.id, duplicate: true });
+      if (existing) {
+        const { data: full } = await supabase
+          .from("booking_dispatch")
+          .select("*")
+          .eq("id", existing.id)
+          .maybeSingle();
+        if (full && !["assigned", "exhausted", "cancelled"].includes(String(full.status))) {
+          const { count } = await supabase
+            .from("booking_dispatch_attempts")
+            .select("*", { count: "exact", head: true })
+            .eq("dispatch_id", full.id);
+          if (!count) {
+            await processDispatchTick(supabase, full);
+          }
+        }
+        return json({ success: true, dispatch_id: existing.id, duplicate: true, retried: true });
+      }
 
       const acceptCode = generateAcceptCode();
       const { data: dispatch, error } = await supabase
@@ -491,6 +530,7 @@ Deno.serve(async (req: Request) => {
         .insert({
           booking_id: bookingId,
           service_id: serviceId,
+          category_id: String(body.category_id || body.parent_id || ""),
           service_name: serviceName,
           customer_lat: body.lat != null ? Number(body.lat) : null,
           customer_lng: body.lng != null ? Number(body.lng) : null,
