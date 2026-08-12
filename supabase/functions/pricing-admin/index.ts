@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
         sub_service_name: r.sub_service_name ? String(r.sub_service_name) : null,
         current_amount_paise: Number(r.current_amount_paise) || newAmt,
         new_amount_paise: newAmt,
+        top_rated: Number(r.top_rated) === 1 ? 1 : 0,
         ...split,
         updated_at: new Date().toISOString(),
       };

@@ -1289,15 +1289,33 @@ async function resumePaidBookingDraft(addToast) {
   return { draft, payCheck };
 }
 
+const TOP_RATED_BY_ID = {};
+
 function applyLivePricingRows(rows) {
   if (!rows?.length) return;
   for (const row of rows) {
     const svc = findSvcById(row.service_id);
+    if (row.top_rated != null) {
+      const flag = Number(row.top_rated) === 1 ? 1 : 0;
+      TOP_RATED_BY_ID[row.service_id] = flag;
+      if (svc) svc.top_rated = flag;
+    }
     if (!svc) continue;
     if (row.price_paise != null) svc.price = row.price_paise;
     if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
   }
   syncParentFromPrices(rows);
+}
+
+function getTopRatedServices() {
+  const seen = new Set();
+  const out = [];
+  for (const [id, flag] of Object.entries(TOP_RATED_BY_ID)) {
+    if (flag !== 1 || seen.has(id)) continue;
+    const svc = findSvcById(id);
+    if (svc) { seen.add(id); out.push(svc); }
+  }
+  return out.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
 /** Parent cards without DB rows show min sub-service price after live sync. */
@@ -1328,7 +1346,7 @@ async function fetchLivePricing(onApplied) {
       console.warn('[ScanV] Supabase not ready — using catalog prices');
       return [];
     }
-    const { data, error } = await sb().from('service_prices_public').select('service_id,price_paise,mrp_paise');
+    const { data, error } = await sb().from('service_prices_public').select('service_id,price_paise,mrp_paise,top_rated');
     if (error) {
       console.warn('[ScanV] Live pricing fetch failed:', error.message);
       return [];
@@ -1405,6 +1423,8 @@ function splitPricingRow(row, field, value) {
     next.partner_amount_paise = next.new_amount_paise - next.scanv_amount_paise;
   } else if (field === 'current_amount_paise') {
     next.current_amount_paise = num(value);
+  } else if (field === 'top_rated') {
+    next.top_rated = Number(value) === 1 ? 1 : 0;
   }
   return next;
 }
@@ -2307,10 +2327,10 @@ function AssistBanner() {
   );
 }
 
-function GuestBottomNav({ activeTab, onHome, onInvestments, onBookings, onProfile }) {
+function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }) {
   const tabs = [
     {id:'home', icon:'🏠', label:'Home', go:onHome},
-    {id:'investments', icon:'📈', label:'Investments', go:onInvestments},
+    {id:'top-rated', icon:'⭐', label:'Top Rated', go:onTopRated},
     {id:'bookings', icon:'📅', label:'Bookings', go:onBookings},
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
@@ -3309,10 +3329,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     setNavTab('home');
   };
 
-  const goBrowseInvestments = async () => {
-    setNavTab('investments');
-    if (await tryExistingSession('investments')) return;
-    setLoginIntent('investments');
+  const goBrowseTopRated = async () => {
+    setNavTab('top-rated');
+    if (await tryExistingSession('top-rated')) return;
+    setLoginIntent('top-rated');
     resetOtpFlow();
     setErr('');
     setScreen('login');
@@ -3348,10 +3368,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   };
 
   const guestActiveTab = (() => {
-    if (screen === 'login') return loginIntent === 'investments' ? 'investments' : (loginIntent || 'bookings');
+    if (screen === 'login') return loginIntent === 'top-rated' ? 'top-rated' : (loginIntent || 'bookings');
     if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'home';
     if (screen === 'services') return 'home';
-    if (screen === 'investments') return 'investments';
+    if (screen === 'top-rated') return 'top-rated';
     return navTab;
   })();
 
@@ -3363,7 +3383,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       <GuestBottomNav
         activeTab={guestActiveTab}
         onHome={goBrowseHome}
-        onInvestments={goBrowseInvestments}
+        onTopRated={goBrowseTopRated}
         onBookings={goBrowseBookings}
         onProfile={goBrowseProfile}
       />
@@ -4204,13 +4224,13 @@ function BottomNav() {
   const unread=notifs.filter(n=>!n.read).length;
   const tabs=[
     {id:'services',icon:'🏠',label:'Home'},
-    {id:'investments',icon:'📈',label:'Investments'},
+    {id:'top-rated',icon:'⭐',label:'Top Rated'},
     {id:'bookings',icon:'📅',label:'Bookings'},
     ...(['admin','partner'].includes(user?.role)?[{id:'crm',icon:'📊',label:'CRM'}]:[]),
     {id:'profile',icon:'👤',label:'Profile'},
   ];
   const goTab=(id)=>{
-    if (id==='services'||id==='investments') setActiveSvc(null);
+    if (id==='services'||id==='top-rated') setActiveSvc(null);
     setScreen(id);
   };
   return (
@@ -4323,113 +4343,54 @@ const SVC_DETAIL = {
   'four-wheeler': { desc:'Car mechanic, pick-up & drop servicing, on-site fixing, washing, deep cleaning, and detailing — 6 car services · 25% off · live GPS.', features:['Home/roadside mechanic','Pick-up & drop servicing','On-site fixing','Wash & deep clean','Live partner map'], turnaround:'45 min–2 days', rating:'4.8 ⭐', bookings:'4,200+' },
 };
 
-const INVESTMENT_TYPES = [
-  'Mutual funds & SIP',
-  'Fixed deposit / bonds',
-  'Equity / stocks',
-  'Business investment',
-  'Real estate',
-  'Gold / commodities',
-  'Other',
-];
-const INVESTMENT_AMOUNTS = ['Under ₹1 lakh', '₹1 – 5 lakh', '₹5 – 25 lakh', '₹25 lakh – 1 crore', 'Above ₹1 crore'];
-const INVESTMENT_HORIZONS = ['Short term (< 1 year)', 'Medium (1 – 3 years)', 'Long (3 – 5 years)', 'Very long (5+ years)'];
-const INVESTMENT_GOALS = ['Wealth creation', 'Retirement planning', 'Tax saving (80C etc.)', 'Regular income', 'Business expansion', 'Child education'];
-const INVESTMENT_RISK = ['Low — capital safety first', 'Medium — balanced growth', 'High — aggressive growth'];
+function TopRatedScreen() {
+  const { setActiveSvc, setScreen } = useApp();
+  const items = getTopRatedServices();
 
-function genInvestmentRequestNumber() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = crypto.getRandomValues(new Uint8Array(4));
-  let code = 'INV-';
-  for (let i = 0; i < 4; i++) code += chars[bytes[i] % chars.length];
-  return code;
-}
-
-function InvestmentsScreen() {
-  const { user, setScreen, addToast } = useApp();
-  const [form, setForm] = useState({
-    investment_type: INVESTMENT_TYPES[0],
-    amount_range: INVESTMENT_AMOUNTS[1],
-    time_horizon: INVESTMENT_HORIZONS[1],
-    investment_goal: INVESTMENT_GOALS[0],
-    risk_appetite: INVESTMENT_RISK[1],
-    notes: '',
-  });
-  const [busy, setBusy] = useState(false);
-  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
-
-  const submit = async () => {
-    if (!form.investment_type || !form.amount_range) return addToast('Select investment type and amount', 'error');
-    setBusy(true);
-    try {
-      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Customer';
-      const { error } = await sb().from('investment_requests').insert({
-        request_number: genInvestmentRequestNumber(),
-        customer_id: user.id,
-        customer_name: fullName,
-        customer_mobile: user.phone || '',
-        customer_email: user.email || null,
-        investment_type: form.investment_type,
-        amount_range: form.amount_range,
-        time_horizon: form.time_horizon,
-        investment_goal: form.investment_goal,
-        risk_appetite: form.risk_appetite,
-        notes: form.notes.trim() || null,
-        status: 'new',
-      });
-      if (error) throw error;
-      addToast('Investment requirement submitted — our team will contact you', 'success');
-      setScreen('services');
-    } catch (e) {
-      addToast(e.message || 'Could not submit', 'error');
-    } finally {
-      setBusy(false);
+  const openSvc = (svc) => {
+    if (svc.parent && SUB_CATEGORIES[svc.parent]) {
+      const cfg = SUB_CATEGORIES[svc.parent];
+      setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
+      setScreen('book');
+      return;
     }
+    setActiveSvc(svc);
+    setScreen(SUB_CATEGORIES[svc.id] ? 'services' : 'book');
   };
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF }}>
-      <TopBar title="Investments" />
+      <TopBar title="Top Rated" />
       <div style={{ padding: 16 }}>
-        <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#eef6ff', border: `1.5px solid ${C.cyan}44` }}>
-          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>Tell us your investment requirement</div>
-          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>
-            Share your goals and budget. ScanV support will review and respond within 2 business days. After submit you&apos;ll return to browse services.
+        {items.length ? (
+          <>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#fffbeb', border: '1.5px solid #fbbf2444' }}>
+              <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>⭐ Hand-picked by ScanV</div>
+              <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>
+                Services, offerings, and courses marked Top Rated by our team — verified quality and great value.
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {items.map((svc, i) => {
+                const catId = svc.parent && SUB_CATEGORIES[svc.parent] ? svc.parent : null;
+                if (catId) {
+                  return <CategorySvcCard key={svc.id} categoryId={catId} svc={svc} onClick={() => openSvc(svc)} compact index={i} />;
+                }
+                return <HomeModelCard key={svc.id} svc={svc} onClick={() => openSvc(svc)} index={i} />;
+              })}
+            </div>
+          </>
+        ) : (
+          <div style={{ ...S.card(), padding: 32, textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⭐</div>
+            <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>No Top Rated services yet</div>
+            <div style={{ color: C.sub, fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
+              Check back soon — our team updates Top Rated picks from the pricing admin.
+            </div>
+            <Btn onClick={() => setScreen('services')}>Browse all services</Btn>
           </div>
-        </div>
-        <Field label="Your name"><input value={`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || ''} readOnly style={{ ...S.inp(), opacity: 0.85 }} /></Field>
-        <Field label="Mobile"><input value={user.phone || ''} readOnly style={{ ...S.inp(), opacity: 0.85 }} /></Field>
-        <Field label="Investment type" req>
-          <select value={form.investment_type} onChange={e => f('investment_type', e.target.value)} style={S.inp()}>
-            {INVESTMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Amount you wish to invest" req>
-          <select value={form.amount_range} onChange={e => f('amount_range', e.target.value)} style={S.inp()}>
-            {INVESTMENT_AMOUNTS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Time horizon">
-          <select value={form.time_horizon} onChange={e => f('time_horizon', e.target.value)} style={S.inp()}>
-            {INVESTMENT_HORIZONS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Primary goal">
-          <select value={form.investment_goal} onChange={e => f('investment_goal', e.target.value)} style={S.inp()}>
-            {INVESTMENT_GOALS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Risk appetite">
-          <select value={form.risk_appetite} onChange={e => f('risk_appetite', e.target.value)} style={S.inp()}>
-            {INVESTMENT_RISK.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Additional notes">
-          <textarea value={form.notes} onChange={e => f('notes', e.target.value)} rows={3} placeholder="Existing investments, preferred banks/AMCs, questions…" style={{ ...S.inp(), resize: 'vertical' }} />
-        </Field>
-        <Btn full onClick={submit} disabled={busy} style={{ marginTop: 8 }}>
-          {busy ? <><Spin size={16} /> Submitting…</> : 'Submit requirement →'}
-        </Btn>
+        )}
+        <AssistBanner />
       </div>
     </div>
   );
@@ -6353,7 +6314,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   };
 
   const updateRow = (idx, field, rawVal) => {
-    setRows(prev => prev.map((r, i) => i === idx ? splitPricingRow(r, field, field.includes('pct') ? rawVal : paiseFromInp(rawVal)) : r));
+    setRows(prev => prev.map((r, i) => i === idx ? splitPricingRow(r, field, field.includes('pct') || field === 'top_rated' ? rawVal : paiseFromInp(rawVal)) : r));
   };
 
   const saveAll = async () => {
@@ -6438,7 +6399,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1100 }}>
             <thead>
               <tr>
-                {[['#','num'],['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['','save']].map(([label, key])=>(
+                {[['#','num'],['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['Top Rated','top_rated'],['','save']].map(([label, key])=>(
                   <th key={key} style={{ ...th, ...(key === 'num' ? { width:36, textAlign:'center' } : {}) }}>{label}</th>
                 ))}
               </tr>
@@ -6460,6 +6421,12 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
                     <td style={td}><input type="number" step="0.01" value={r.partner_pct} onChange={e=>updateRow(idx,'partner_pct',e.target.value)} style={{ ...inp, width:56 }}/></td>
                     <td style={td}><input type="number" value={paiseInp(r.scanv_amount_paise)} onChange={e=>updateRow(idx,'scanv_amount_paise',e.target.value)} style={inp}/></td>
                     <td style={td}><input type="number" step="0.01" value={r.scanv_pct} onChange={e=>updateRow(idx,'scanv_pct',e.target.value)} style={{ ...inp, width:56 }}/></td>
+                    <td style={td}>
+                      <select value={r.top_rated ?? 0} onChange={e=>updateRow(idx,'top_rated',e.target.value)} style={{ ...inp, width:96 }}>
+                        <option value={0}>Discounted</option>
+                        <option value={1}>Top Rated</option>
+                      </select>
+                    </td>
                     <td style={td}><Btn v="ghost" sm onClick={()=>saveOne(idx)} disabled={saving}>Save</Btn></td>
                   </tr>
                 );
@@ -6469,7 +6436,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           {!shown.length && !loading && <div style={{ padding:40, textAlign:'center', color:C.dim }}>No rows — deploy migration & edge function first</div>}
         </div>
         <div style={{ marginTop:14, fontSize:11, color:C.dim, lineHeight:1.6 }}>
-          <strong>#</strong> is the fixed row number (1–{rows.length}) — use it when asking to change a specific row. Change <strong>New ₹</strong> to update card prices on the live app. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
+          <strong>#</strong> is the fixed row number (1–{rows.length}) — use it when asking to change a specific row. Change <strong>New ₹</strong> to update card prices on the live app. Set <strong>Top Rated</strong> to show a service on the customer Top Rated tab. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
         </div>
       </div>
       {!embedded && <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />}
@@ -10748,7 +10715,7 @@ export default function App() {
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
     <BrowseFlow
       silentGeo={silentGeo}
-      onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='investments')setScreen('investments');else setScreen('services');}}
+      onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='top-rated')setScreen('top-rated');else setScreen('services');}}
       addToast={addToast}
     />
     </Boundary>
@@ -10766,7 +10733,7 @@ export default function App() {
     if (screen==='book')     return <BookScreen/>;
     if (screen==='track')    return <TrackServiceScreen/>;
     if (screen==='services' || screen==='home') return <ServicesScreen/>;
-    if (screen==='investments') return <InvestmentsScreen/>;
+    if (screen==='top-rated') return <TopRatedScreen/>;
     if (screen==='bookings') return <BookingsScreen/>;
     if (screen==='crm')      return <CRMScreen/>;
     if (screen==='qr')       return <QRScreen/>;
