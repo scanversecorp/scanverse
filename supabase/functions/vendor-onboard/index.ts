@@ -386,6 +386,18 @@ async function upsertPartnerServices(
   }
 }
 
+async function countPartnerServices(
+  supabase: SupabaseClient,
+  vendorId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("vendor_partner_services")
+    .select("id", { count: "exact", head: true })
+    .eq("vendor_id", vendorId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 type VendorRow = {
   phone: string;
   contact_name?: string | null;
@@ -1194,6 +1206,11 @@ Deno.serve(async (req: Request) => {
         return json({ error: `Cannot activate partner with status ${vendor.status}` }, 400);
       }
 
+      const svcCount = await countPartnerServices(supabase, vendorId);
+      if (svcCount < 1) {
+        return json({ error: "Add at least one service before activating this partner" }, 400);
+      }
+
       const profileId = vendor.profile_id || await ensurePartnerProfile(supabase, vendor);
 
       const { error } = await supabase
@@ -1309,6 +1326,12 @@ Deno.serve(async (req: Request) => {
       const lat = body.address_lat != null ? Number(body.address_lat) : null;
       const lng = body.address_lng != null ? Number(body.address_lng) : null;
 
+      const services: Array<{ service_id: string; category_id: string }> =
+        Array.isArray(body.services) ? body.services : [];
+      if (activateNow && services.length < 1) {
+        return json({ error: "Select at least one service to activate immediately" }, 400);
+      }
+
       const vendorPayload = {
         business_name: businessName,
         contact_name: contactName,
@@ -1374,8 +1397,6 @@ Deno.serve(async (req: Request) => {
         vendorId = inserted.id;
       }
 
-      const services: Array<{ service_id: string; category_id: string }> =
-        Array.isArray(body.services) ? body.services : [];
       if (services.length) {
         await upsertPartnerServices(supabase, vendorId, services, true);
       }

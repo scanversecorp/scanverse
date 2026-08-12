@@ -6353,6 +6353,14 @@ function vendorStatusNorm(v) {
   return String(v?.status || '').trim().toLowerCase();
 }
 
+function vendorHasServices(v) {
+  return (v?.vendor_partner_services || []).length > 0;
+}
+
+function selectedServiceCount(selected) {
+  return Object.values(selected || {}).filter(Boolean).length;
+}
+
 function vendorCanActivate(v) {
   const s = vendorStatusNorm(v);
   return s === 'pending' || s === 'offboarded' || s === 'paused' || s === 'suspended';
@@ -6571,7 +6579,14 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, o
                     <td style={{ ...tdStyle, position: 'sticky', right: 0, background: C.card, minWidth: 140, maxWidth: 140, whiteSpace: 'normal', overflow: 'visible' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {canEdit && vendorCanActivate(v) && (
-                          <Btn sm onClick={() => onAction('activate', v.id)} disabled={loading}>Activate</Btn>
+                          <Btn
+                            sm
+                            onClick={() => onAction('activate', v.id)}
+                            disabled={loading || !vendorHasServices(v)}
+                            title={vendorHasServices(v) ? 'Activate partner' : 'Add at least one service via Edit first'}
+                          >
+                            Activate
+                          </Btn>
                         )}
                         {canEdit && (
                           <Btn v="outline" sm onClick={() => onEdit?.(v)} disabled={loading}>Edit</Btn>
@@ -7128,7 +7143,7 @@ function vendorEditFormFromVendor(v) {
   const phoneDigits = String(v?.phone || '').replace(/\D/g, '').slice(-10);
   const mobile2Digits = String(v?.mobile2 || '').replace(/\D/g, '').slice(-10);
   const svcMap = {};
-  (v?.vendor_partner_services || []).filter((s) => s.is_active).forEach((s) => {
+  (v?.vendor_partner_services || []).forEach((s) => {
     svcMap[s.service_id] = true;
   });
   return {
@@ -7163,7 +7178,9 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [err, setErr] = useState('');
-  const pending = vendorCanActivate(vendor);
+  const activatable = vendorCanActivate(vendor);
+  const serviceCount = selectedServiceCount(form.services);
+  const canActivateNow = activatable && serviceCount > 0;
 
   const f = (key, val) => setForm((st) => ({ ...st, [key]: val }));
 
@@ -7218,10 +7235,28 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
   };
 
   const activate = async () => {
+    if (selectedServiceCount(form.services) < 1) {
+      return setErr('Select at least one service before activating');
+    }
     if (!window.confirm('Activate this partner? They will rejoin dispatch and start receiving bookings.')) return;
     setActivating(true);
     setErr('');
     try {
+      const services = Object.entries(form.services)
+        .filter(([, on]) => on)
+        .map(([service_id]) => {
+          const s = allSvcs.find((x) => x.service_id === service_id);
+          return s ? { service_id: s.service_id, category_id: s.category_id } : null;
+        })
+        .filter(Boolean);
+      await vendorOnboardFetch('update', {
+        vendor_id: vendor.id,
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        business_name: form.business_name.trim(),
+        phone: '+91' + form.phone.replace(/\D/g, ''),
+        services,
+      }, pin);
       await onActivate?.(vendor.id);
       onClose?.();
     } catch (e) {
@@ -7278,7 +7313,7 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
           GPS allowed confirmed
         </label>
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services</div>
+          <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services {activatable && <span style={{ color: C.red }}>* required for Activate</span>}</div>
           <VendorServicePicker
             allSvcs={allSvcs}
             selected={form.services}
@@ -7287,10 +7322,12 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
           />
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-          {pending && (
-            <Btn onClick={activate} disabled={saving || activating}>{activating ? 'Activating…' : 'Activate partner'}</Btn>
+          {activatable && (
+            <Btn onClick={activate} disabled={!canActivateNow || saving || activating} title={canActivateNow ? '' : 'Select at least one service'}>
+              {activating ? 'Activating…' : 'Activate partner'}
+            </Btn>
           )}
-          <Btn v={pending ? 'outline' : undefined} onClick={save} disabled={saving || activating}>{saving ? 'Saving…' : 'Save changes'}</Btn>
+          <Btn v={activatable ? 'outline' : undefined} onClick={save} disabled={saving || activating}>{saving ? 'Saving…' : 'Save changes'}</Btn>
           <Btn v="outline" onClick={onClose} disabled={saving || activating}>Cancel</Btn>
         </div>
       </div>
@@ -7350,6 +7387,12 @@ function VendorAdminPage() {
       delete: 'Delete this partner record? Only works if they have no dispatch history.',
     };
     if (confirms[action] && !window.confirm(confirms[action])) return;
+    if (action === 'activate') {
+      const partner = vendors.find((x) => x.id === id);
+      if (!vendorHasServices(partner)) {
+        return setErr('Add at least one service (Edit partner) before activating.');
+      }
+    }
     const labels = { activate: 'activated', pause: 'paused', unpause: 'unpaused', offboard: 'offboarded', delete: 'deleted' };
     setLoading(true); setErr('');
     try {
@@ -7367,6 +7410,9 @@ function VendorAdminPage() {
     if (!enroll.business_name.trim() || !contact) return setErr('Business and name required');
     if (!enroll.shop_or_flat.trim() || !enroll.street_name.trim() || !enroll.city.trim() || !enroll.pincode.trim()) {
       return setErr('Complete address fields');
+    }
+    if (enroll.activate_immediately && !Object.values(enroll.services).some(Boolean)) {
+      return setErr('Select at least one service to activate immediately');
     }
     const services = Object.entries(enroll.services)
       .filter(([, on]) => on)
