@@ -2286,8 +2286,37 @@ function phoneFromProfileId(id) {
   return m ? `+91${m[1]}` : null;
 }
 
+/** Server-side profile auth after OTP/WA verify (resets legacy random passwords) */
+async function invokeProfileAuthSession(mob, { otp, waToken } = {}) {
+  const norm = normalizeMobileE164(mob);
+  const body = { mobile: norm, action: 'establish_session' };
+  if (otp) body.otp = otp;
+  else if (waToken) body.wa_token = waToken;
+  else throw new Error('Verification required to establish session');
+  const r = await sb().functions.invoke('send-otp', { body });
+  const errMsg = r.data?.error || r.error?.message;
+  if (r.error || r.data?.success === false) throw new Error(errMsg || 'Auth session failed');
+  const password = profileAuthPassword(norm);
+  const emails = [
+    r.data?.email,
+    profileAuthEmail(norm),
+    `${String(norm).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
+  ].filter(Boolean);
+  let lastErr;
+  for (const email of [...new Set(emails)]) {
+    try {
+      const { data: si, error } = await sb().auth.signInWithPassword({ email, password });
+      if (si?.session) return si.session;
+      if (error) lastErr = error;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw new Error(lastErr?.message || 'Could not sign in after verification');
+}
+
 /** Establish Supabase auth session so profiles RLS (auth_matches_profile) allows own-row access */
-async function ensureProfileAuthSession(mob) {
+async function ensureProfileAuthSession(mob, { otp, waToken } = {}) {
   const password = profileAuthPassword(mob);
   const emails = [
     profileAuthEmail(mob),
@@ -2312,6 +2341,7 @@ async function ensureProfileAuthSession(mob) {
       lastErr = e;
     }
   }
+  if (otp || waToken) return invokeProfileAuthSession(mob, { otp, waToken });
   throw new Error(lastErr?.message || 'Could not establish sign-in session. Try again.');
 }
 
@@ -2710,7 +2740,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         if (!ok) throw new Error('Invalid OTP. Try again.');
       }
 
-      await ensureProfileAuthSession(mob);
+      await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
       const uid = await resolveCustomerProfileId(mob);
       const dev = detectDevice();
       const profile = await upsertCustomerProfile({
@@ -2763,7 +2793,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         const ok = await verifyOtpCode(mob, code);
         if (!ok) throw new Error('Invalid OTP. Try again.');
       }
-      await ensureProfileAuthSession(mob);
+      await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
       const profileId = customerProfileId(mob);
       const {data:existing} = await sb().from('profiles').select('*').eq('id', profileId).maybeSingle();
       if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
@@ -3501,7 +3531,7 @@ function RegistrationFlow({ onComplete, prefill }) {
   const verifyOTP_direct = async (mob) => {
     setLoading(true); setErr('');
     try {
-      await ensureProfileAuthSession(mob);
+      await ensureProfileAuthSession(mob, { waToken });
       setPhase('completing');
       await finalise(null, profileAuthEmail(mob), mob);
     } catch(e) { setErr(e.message||'Verification failed.'); setPhase('form'); }
@@ -3522,7 +3552,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       } catch(e) { console.warn('[Verify]', e.message); }
       if (!ok) throw new Error('Invalid or expired OTP. Request a new one.');
 
-      await ensureProfileAuthSession(mob);
+      await ensureProfileAuthSession(mob, { otp: token });
       setPhase('completing');
       await finalise(null, profileAuthEmail(mob), mob);
     } catch(e) { setErr(e.message||'Verification failed.'); }
@@ -4161,7 +4191,7 @@ function BookScreen() {
       const mob=normalizeMobileE164(bookPhone);
       const ok=await verifyOtpCode(mob,code);
       if(!ok) throw new Error('Invalid OTP');
-      await ensureProfileAuthSession(mob);
+      await ensureProfileAuthSession(mob, { otp: code });
       const uid=await resolveCustomerProfileId(mob);
       const profile=await upsertCustomerProfile({
         id:uid, mob,
