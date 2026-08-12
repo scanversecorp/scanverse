@@ -1267,7 +1267,8 @@ const ADMIN_HUB_ALIASES = new Set(['admin', 'admin-hub']);
 const EXEC_DASHBOARD_HASH = 'exec';
 const EXEC_DASHBOARD_ALIASES = new Set(['exec', 'exec-dashboard']);
 const OTP_DELIVERY_REPORT_HASH = 'otp-delivery-report';
-const OTP_DELIVERY_CALLBACK_URL = 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/otp-delivery-report?key=ScanV2026';
+const OTP_DELIVERY_CALLBACK_URL = process.env.REACT_APP_OTP_DELIVERY_CALLBACK_URL
+  || `${SB_URL}/functions/v1/otp-delivery-report`;
 
 function isExecDashboardRoute() {
   return EXEC_DASHBOARD_ALIASES.has(hashBase());
@@ -2269,18 +2270,45 @@ async function verifyOtpCode(mobile, code) {
     const r = await sb().functions.invoke('send-otp', { body: { mobile: norm, otp: code, action: 'verify' } });
     if (r.data?.success) return true;
   } catch (_) {}
-  return verifyCustomOTP(norm, code);
+  return false;
 }
 
-async function sendSMSViaSB(mobile, otp) {
-  // Store OTP in DB first
-  await sbIgnore(sb().from('custom_otp').insert({
-    mobile, otp,
-    expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
-  }));
+function profileAuthEmail(mob) {
+  return `${String(mob || '').replace(/\D/g, '').slice(-10)}@scanv.app`;
 }
 
-// SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
+function profileAuthPassword(mob) {
+  return `ScanV_${String(mob || '').replace(/\D/g, '').slice(-10)}`;
+}
+
+function phoneFromProfileId(id) {
+  const m = /^cust_(\d{10})$/.exec(String(id || ''));
+  return m ? `+91${m[1]}` : null;
+}
+
+/** Establish Supabase auth session so profiles RLS (auth_matches_profile) allows own-row access */
+async function ensureProfileAuthSession(mob) {
+  const password = profileAuthPassword(mob);
+  const emails = [
+    profileAuthEmail(mob),
+    `${String(mob).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
+  ];
+  try {
+    const { data: { session } } = await sb().auth.getSession();
+    if (session?.user?.email && emails.includes(session.user.email)) return session;
+  } catch (_) {}
+  for (const email of emails) {
+    try {
+      const { data: su, error: se } = await sb().auth.signUp({ email, password });
+      if (!se && su?.session) return su.session;
+      if (se?.message?.includes('already registered')) {
+        const { data: si } = await sb().auth.signInWithPassword({ email, password });
+        if (si?.session) return si.session;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
 
 /* --- WHATSAPP VERIFICATION (outbound message → user replies) --- */
 
@@ -2353,29 +2381,8 @@ function WaSentPanel({ mobile10, token, waChecking, onUseSms }) {
   );
 }
 
-async function generateAndSendOTP(mobile) {
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  // Invalidate old OTPs for this mobile
-  await sb().from('custom_otp').update({used:true}).eq('mobile', mobile).eq('used', false);
-  await sendSMSViaSB(mobile, otp);
-  return otp; // returned so app can show it as fallback during dev
-}
 
-async function verifyCustomOTP(mobile, enteredOtp) {
-  const { data, error } = await sb().from('custom_otp')
-    .select('*')
-    .eq('mobile', mobile)
-    .eq('otp', enteredOtp)
-    .eq('used', false)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', {ascending:false})
-    .limit(1)
-    .single();
-  if (error || !data) return false;
-  // Mark used
-  await sb().from('custom_otp').update({used:true}).eq('id', data.id);
-  return true;
-}
+// SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
 
 /** E.164 India mobile (+91XXXXXXXXXX) */
 function normalizeMobileE164(mobile) {
@@ -2389,16 +2396,17 @@ function customerProfileId(mob) {
   return `cust_${mob.replace(/\D/g, '')}`;
 }
 
-/** Resolve profile id: existing phone match → stored uid → mobile-based id */
+/** Resolve profile id: deterministic mobile id → stored uid → new mobile-based id */
 async function resolveCustomerProfileId(mob) {
-  const { data: existing } = await sb().from('profiles').select('id').eq('phone', mob).maybeSingle();
-  if (existing?.id) return existing.id;
+  const profileId = customerProfileId(mob);
+  const { data: byId } = await sb().from('profiles').select('id,phone').eq('id', profileId).maybeSingle();
+  if (byId?.id) return byId.id;
   const stored = localStorage.getItem('scanv_uid');
   if (stored) {
     const { data: p } = await sb().from('profiles').select('id,phone').eq('id', stored).maybeSingle();
     if (p?.phone === mob) return p.id;
   }
-  return customerProfileId(mob);
+  return profileId;
 }
 
 /** Upsert customer profile in Supabase and persist uid locally */
@@ -2747,7 +2755,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         const ok = await verifyOtpCode(mob, code);
         if (!ok) throw new Error('Invalid OTP. Try again.');
       }
-      const {data:existing} = await sb().from('profiles').select('*').eq('phone',mob).maybeSingle();
+      await ensureProfileAuthSession(mob);
+      const profileId = customerProfileId(mob);
+      const {data:existing} = await sb().from('profiles').select('*').eq('id', profileId).maybeSingle();
       if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
       const {data:prof} = await sb().from('profiles').update({
         mobile_verified:true,
@@ -2946,6 +2956,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   const tryExistingSession = async (intent) => {
     const uid = localStorage.getItem('scanv_uid');
     if (!uid) return false;
+    const mob = phoneFromProfileId(uid);
+    if (mob) await ensureProfileAuthSession(mob);
     const { data: prof } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
     if (!prof?.first_name) return false;
     onRegistered(prof, null, intent);
@@ -3465,10 +3477,6 @@ function RegistrationFlow({ onComplete, prefill }) {
                 clearInterval(poll);
                 setWaChecking(false);
                 setPhase('completing');
-                await sb().from('custom_otp').insert({
-                  mobile: mob, otp: 'WA-VERIFIED',
-                  expires_at: new Date(Date.now() + 60000).toISOString(), used: true,
-                }).then(() => {});
                 await verifyOTP_direct(mob);
               }
             } catch (_) { /* keep polling */ }
@@ -3483,8 +3491,8 @@ function RegistrationFlow({ onComplete, prefill }) {
   const verifyOTP_direct = async (mob) => {
     setLoading(true); setErr('');
     try {
-      const fakeEmail = `${mob.replace(/^\+91/,'').replace(/\s/g,'')}@scanv.app`;
-      const fakePass  = `ScanV_${mob.slice(-4)}_${Date.now()}`;
+      const fakeEmail = profileAuthEmail(mob);
+      const fakePass  = profileAuthPassword(mob);
       let userId;
       try {
         const { data:su, error:se } = await sb().auth.signUp({ email:fakeEmail, password:fakePass });
@@ -3510,14 +3518,12 @@ function RegistrationFlow({ onComplete, prefill }) {
       try {
         const r = await sb().functions.invoke('send-otp', { body: { mobile: mob, otp: token, action: 'verify' } });
         if (r.data?.success) ok = true;
-      } catch(e) { console.warn('[Verify Twilio]', e.message); }
-      // Fallback: check custom_otp table (for screen OTP / other providers)
-      if (!ok) ok = await verifyCustomOTP(mob, token);
+      } catch(e) { console.warn('[Verify]', e.message); }
       if (!ok) throw new Error('Invalid or expired OTP. Request a new one.');
 
       // Create Supabase auth user via email (phone auth needs SMS provider)
-      const fakeEmail = `${mob.replace(/\+/,'').replace(/\s/g,'')}@scanv.app`;
-      const fakePass  = `ScanV_${mob.slice(-4)}_${Date.now()}`;
+      const fakeEmail = profileAuthEmail(mob);
+      const fakePass  = profileAuthPassword(mob);
       let userId;
       try {
         const { data:su, error:se } = await sb().auth.signUp({ email:fakeEmail, password:fakePass });
@@ -7594,7 +7600,7 @@ function AdminOtpDeliveryTab({ pin, showCallbackUrl }) {
         <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
           <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>2Factor.in Delivery Report URL</div>
           <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>
-            Paste this in 2Factor control panel → Callback / Delivery Report settings. Statuses recorded: <strong>delivered</strong>, <strong>failed</strong> (incl. REJECTED), <strong>pending</strong>, <strong>unknown</strong>.
+            Paste this in 2Factor control panel → Callback / Delivery Report settings. Append <code>?key=&lt;OTP_REPORT_SECRET&gt;</code> from Supabase secrets (or set <code>REACT_APP_OTP_DELIVERY_CALLBACK_URL</code> at build time). Statuses recorded: <strong>delivered</strong>, <strong>failed</strong> (incl. REJECTED), <strong>pending</strong>, <strong>unknown</strong>.
           </div>
           <pre style={{ fontSize: 11, color: C.acc, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{OTP_DELIVERY_CALLBACK_URL}</pre>
         </div>
@@ -8447,6 +8453,8 @@ export default function App() {
         }
         const uid=localStorage.getItem('scanv_uid');
         if (uid) {
+          const mob = phoneFromProfileId(uid);
+          if (mob) await ensureProfileAuthSession(mob);
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
             await finishAppBoot(p);

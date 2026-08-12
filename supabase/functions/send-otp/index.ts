@@ -57,6 +57,7 @@ Deno.serve(async (req: Request) => {
           .limit(1)
           .maybeSingle();
         if (custom && custom.otp === otp && new Date(custom.expires_at) > new Date()) {
+          await supabase.from("custom_otp").update({ used: true }).eq("id", custom.id);
           return json({ success: true, provider: "custom_otp" });
         }
         return json({ success: false, error: "Invalid or expired OTP" });
