@@ -942,6 +942,9 @@ const TWO_WHEELER_SVCS = [
   { id:'tw-deep', parent:'two-wheeler', theme:'care', icon:'✨', img:'/services/two-wheeler/deep-clean.png', name:'Deep Cleaning', sub:'Engine bay wipe · degrease · polish · 1–2 hrs', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV two-wheeler deep clean — thorough degrease, engine bay wipe, plastic polish, and under-seat vacuum for a showroom-fresh bike.',
     features:['Engine bay degrease','Full body polish','Seat & storage clean','Rust spot treatment','Premium products'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,400+' },
+  { id:'tw-polish', parent:'two-wheeler', theme:'care', icon:'🪩', img:'/services/two-wheeler/polish.png', name:'Bike Polish & Wax', sub:'Body wax · chrome shine · chain lube · 45 min', unit:'visit', mrp:11900, price:discPaise(11900), cash:false,
+    desc:'ScanV bike polish & wax — premium body wax, chrome buff, tyre dressing, and chain lube for a glossy showroom finish at your parking spot.',
+    features:['Premium body wax','Chrome & plastic polish','Tyre dressing','Chain lube included','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,700+' },
   { id:'tw-battery', parent:'two-wheeler', theme:'roadside', icon:'🔋', img:'/services/two-wheeler/battery.png', name:'Battery & Tyre Check', sub:'Health test · air · replacement guidance', unit:'visit', mrp:12900, price:discPaise(12900), cash:false,
     desc:'ScanV battery & tyre check — doorstep health diagnostics, air top-up, and honest replacement guidance from verified partners. No upsell pressure.',
     features:['Battery load test','Tyre pressure check','Tread inspection','Replacement quote','Monsoon prep add-on'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,900+' },
@@ -970,6 +973,9 @@ const FOUR_WHEELER_SVCS = [
   { id:'fw-detail', parent:'four-wheeler', theme:'care', icon:'💎', img:'/services/four-wheeler/detailing.png', name:'Detailing & Interior', sub:'Polish · ceramic prep · leather care · premium', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV car detailing — premium polish, leather conditioning, ceramic prep, and full interior restoration from specialist partners.',
     features:['Machine polish','Leather conditioning','Ceramic prep','Dashboard restore','Premium finish'], turnaround:'1–2 days', rating:'4.9 ⭐', bookings:'920+' },
+  { id:'fw-sanitize', parent:'four-wheeler', theme:'care', icon:'🧴', img:'/services/four-wheeler/sanitize.png', name:'Interior Sanitization', sub:'Ozone · AC disinfect · fabric spray · 1 hr', unit:'visit', mrp:24900, price:discPaise(24900), cash:false,
+    desc:'ScanV interior sanitization — ozone treatment, AC vent disinfect, fabric and touch-point spray for a fresh, germ-free cabin.',
+    features:['Ozone cabin treatment','AC vent disinfect','Fabric & seat spray','Touch-point wipe-down','Pet & smoke odour help'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,100+' },
 ];
 
 const SUB_CATEGORIES = {
@@ -981,8 +987,8 @@ const SUB_CATEGORIES = {
   property:  { title:'Property & rentals', subtitle:'Buy · rent · verify · 25% off', cat:'Property & Rentals', themes:PR_THEME, svcs:PROPERTY_SVCS, themeOrder:['find','verify'] },
   delivery:  { title:'Deliveries', subtitle:'Courier · parcels · express · 25% off', cat:'Deliveries', themes:DL_THEME, svcs:DELIVERY_SVCS, themeOrder:['local','express'] },
   food:      { title:'Food', subtitle:'Tiffin · restaurant · catering · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
-  'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · deep clean · 6 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
-  'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · detailing · 6 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
+  'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · polish · 7 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
+  'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 7 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
 };
 
 const ALL_SUB_SVCS = Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
@@ -1951,8 +1957,8 @@ const SVCS = [
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurant · catering · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
-  { id:'two-wheeler', icon:'🛵', name:'Two Wheeler Support', sub:'Mechanic · pick-up · wash · 6 services', cat:'Two Wheeler Support', cash:false, ...svcDisc(299), twowheeler:true },
-  { id:'four-wheeler', icon:'🚗', name:'Four Wheeler Support', sub:'Car service · pick-up · detailing · 6 services', cat:'Four Wheeler Support', cash:false, ...svcDisc(499), fourwheeler:true },
+  { id:'two-wheeler', icon:'🛵', name:'Two Wheeler Support', sub:'Mechanic · pick-up · wash · 7 services', cat:'Two Wheeler Support', cash:false, ...svcDisc(299), twowheeler:true },
+  { id:'four-wheeler', icon:'🚗', name:'Four Wheeler Support', sub:'Car service · pick-up · sanitization · 7 services', cat:'Four Wheeler Support', cash:false, ...svcDisc(499), fourwheeler:true },
 ];
 
 const SVC_CARD_THEME = {
@@ -4467,8 +4473,8 @@ const SVC_DETAIL = {
   household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 14 services · 25% off.', features:['Deep cleaning visits','Sofa & upholstery clean','Hourly home help','Ironing & pressing','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Same-day courier, documents, parcels, groceries, and inter-city express — 6 delivery services · 25% off.', features:['Same-day pickup','Document handover','Grocery & essentials run','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Home tiffin, breakfast plans, restaurant orders, office lunch, and catering — 6 food services · 25% off.', features:['Monthly tiffin plans','Breakfast & snacks plan','Restaurant delivery','Office lunch boxes','Party catering'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
-  'two-wheeler': { desc:'Mechanic support, pick-up & drop servicing, roadside fixing, washing, and deep cleaning — 6 bike services · 25% off · live GPS.', features:['Roadside mechanic','Pick-up & drop servicing','On-road fixing','Bike wash & deep clean','Live partner tracking'], turnaround:'30–90 min', rating:'4.8 ⭐', bookings:'6,400+' },
-  'four-wheeler': { desc:'Car mechanic, pick-up & drop servicing, on-site fixing, washing, deep cleaning, and detailing — 6 car services · 25% off · live GPS.', features:['Home/roadside mechanic','Pick-up & drop servicing','On-site fixing','Wash & deep clean','Live partner map'], turnaround:'45 min–2 days', rating:'4.8 ⭐', bookings:'4,200+' },
+  'two-wheeler': { desc:'Mechanic support, pick-up & drop servicing, roadside fixing, washing, polish, and deep cleaning — 7 bike services · 25% off · live GPS.', features:['Roadside mechanic','Pick-up & drop servicing','On-road fixing','Bike wash & polish','Live partner tracking'], turnaround:'30–90 min', rating:'4.8 ⭐', bookings:'6,400+' },
+  'four-wheeler': { desc:'Car mechanic, pick-up & drop servicing, on-site fixing, washing, sanitization, deep cleaning, and detailing — 7 car services · 25% off · live GPS.', features:['Home/roadside mechanic','Pick-up & drop servicing','On-site fixing','Wash & sanitization','Live partner map'], turnaround:'45 min–2 days', rating:'4.8 ⭐', bookings:'4,200+' },
 };
 
 function TopRatedScreen() {
