@@ -268,6 +268,11 @@ export function validatePan(pan: string): boolean {
   return /^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(pan.trim());
 }
 
+/** Strip spaces, dashes, and any non-digits from Aadhaar input */
+export function normalizeAadhaarDigits(num: string): string {
+  return num.replace(/\D/g, "");
+}
+
 /** Verhoeff checksum for Aadhaar (UIDAI uses this algorithm) */
 const VERHOEFF_D = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -275,10 +280,10 @@ const VERHOEFF_D = [
   [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
   [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
   [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-  [5, 9, 0, 1, 2, 3, 4, 6, 7, 8],
-  [6, 5, 9, 0, 1, 2, 3, 4, 7, 8],
-  [7, 6, 5, 9, 0, 1, 2, 3, 4, 8],
-  [8, 7, 6, 5, 9, 0, 1, 2, 3, 4],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
   [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
 ];
 const VERHOEFF_P = [
@@ -295,7 +300,7 @@ const VERHOEFF_INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9];
 
 function verhoeffCheck(num: string): boolean {
   let c = 0;
-  const digits = num.replace(/\s/g, "").split("").reverse();
+  const digits = normalizeAadhaarDigits(num).split("").reverse();
   for (let i = 0; i < digits.length; i++) {
     c = VERHOEFF_D[c][VERHOEFF_P[i % 8][Number(digits[i])]];
   }
@@ -304,14 +309,14 @@ function verhoeffCheck(num: string): boolean {
 
 /** Validate Aadhaar number (12 digits + Verhoeff checksum) */
 export function validateAadhaar(num: string): boolean {
-  const d = num.replace(/\s/g, "");
+  const d = normalizeAadhaarDigits(num);
   if (!/^\d{12}$/.test(d)) return false;
   return verhoeffCheck(d);
 }
 
 /** SHA-256 hash for sensitive identifiers (Aadhaar) — never store raw Aadhaar */
 export async function hashSensitive(value: string): Promise<string> {
-  const data = new TextEncoder().encode(value.replace(/\s/g, ""));
+  const data = new TextEncoder().encode(normalizeAadhaarDigits(value));
   const hash = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))

@@ -4666,6 +4666,17 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
 /* ================================================================
    VENDOR ONBOARDING — #vendor-onboard (Partner self-registration)
 ================================================================ */
+function aadhaarDigitsOnly(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 12);
+}
+
+function formatAadhaarDisplay(value) {
+  const d = aadhaarDigitsOnly(value);
+  const parts = [];
+  for (let i = 0; i < d.length; i += 4) parts.push(d.slice(i, i + 4));
+  return parts.join(' ');
+}
+
 function VendorOnboardPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -4774,13 +4785,14 @@ function VendorOnboardPage() {
   };
 
   const verifyAadhaar = async () => {
-    if (aadhaar.replace(/\s/g, '').length !== 12) return setErr('Enter 12-digit Aadhaar');
+    const aadhaarDigits = aadhaarDigitsOnly(aadhaar);
+    if (aadhaarDigits.length !== 12) return setErr('Enter 12-digit Aadhaar');
     if (aadhaarOtpRequired && aadhaarOtp.replace(/\D/g, '').length !== 6) {
       return setErr('Enter the 6-digit OTP from your Aadhaar-linked mobile');
     }
     setLoading(true); setErr('');
     try {
-      const payload = { aadhaar, name: contactName };
+      const payload = { aadhaar: aadhaarDigits, name: contactName };
       if (aadhaarOtpRequired && ekycRef) {
         payload.otp = aadhaarOtp.replace(/\D/g, '');
         payload.ekyc_ref = ekycRef;
@@ -4864,7 +4876,7 @@ function VendorOnboardPage() {
         address_lat: gps.lat,
         address_lng: gps.lng,
         ip,
-        aadhaar_number: aadhaar,
+        aadhaar_number: aadhaarDigitsOnly(aadhaar),
         ekyc_ref: ekycRef || undefined,
         pan_number: pan || null,
         pan_verified: !!pan && panOk,
@@ -4960,8 +4972,8 @@ function VendorOnboardPage() {
           </div>
           <Field label="Aadhaar number" req note={aadhaarOtpSent
             ? 'OTP sent — check Aadhaar-linked mobile'
-            : '12 digits — we validate format & checksum before any OTP step'}>
-            <input type="tel" maxLength={14} value={aadhaar} onChange={e => setAadhaar(e.target.value.replace(/\D/g, '').slice(0, 12))} style={S.inp()} placeholder="XXXX XXXX XXXX" disabled={aadhaarOk || aadhaarOtpRequired} />
+            : '12 digits — spaces/dashes OK; we validate checksum before OTP'}>
+            <input type="tel" maxLength={14} value={formatAadhaarDisplay(aadhaar)} onChange={e => setAadhaar(aadhaarDigitsOnly(e.target.value))} style={S.inp()} placeholder="XXXX XXXX XXXX" disabled={aadhaarOk || aadhaarOtpRequired} />
           </Field>
           {aadhaarOtpRequired && !aadhaarOk && (
             <Field label="Aadhaar OTP" req note="6-digit OTP from UIDAI / your Aadhaar-linked mobile">

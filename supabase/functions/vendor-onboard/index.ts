@@ -28,6 +28,7 @@ import {
   generateOtp,
   validatePan,
   validateAadhaar,
+  normalizeAadhaarDigits,
   hashSensitive,
   geoCountryFromLatLng,
   ipCountry,
@@ -137,7 +138,7 @@ async function digioEkyc(
   otp?: string,
   ekycRef?: string,
 ): Promise<EkycResult> {
-  const digits = aadhaar.replace(/\s/g, "");
+  const digits = normalizeAadhaarDigits(aadhaar);
   const last4 = digits.slice(-4);
   const apiKey = Deno.env.get("DIGIO_API_KEY");
   const clientId = Deno.env.get("DIGIO_CLIENT_ID");
@@ -303,14 +304,14 @@ async function resolveAadhaarForRegister(
     await storeEkycSession(supabase, {
       ekycRef: ref,
       aadhaarHash,
-      last4: ekyc.last4 || aadhaar.replace(/\s/g, "").slice(-4),
+      last4: ekyc.last4 || normalizeAadhaarDigits(aadhaar).slice(-4),
       verified: true,
       provider: ekyc.provider || "digio",
     });
   }
   return {
     ok: true,
-    last4: ekyc.last4 || aadhaar.replace(/\s/g, "").slice(-4),
+    last4: ekyc.last4 || normalizeAadhaarDigits(aadhaar).slice(-4),
     ref,
     provider: ekyc.provider || "unknown",
   };
@@ -513,7 +514,7 @@ Deno.serve(async (req: Request) => {
         await storeEkycSession(supabase, {
           ekycRef: ref,
           aadhaarHash,
-          last4: result.last4 || aadhaar.replace(/\s/g, "").slice(-4),
+          last4: result.last4 || normalizeAadhaarDigits(aadhaar).slice(-4),
           verified: !!result.verified,
           provider: result.provider || (result.pending ? "digio-pending" : "unknown"),
         });
