@@ -609,19 +609,22 @@ function ServiceImg({ src, alt = '', loading = 'lazy', style, ...rest }) {
   );
 }
 
-/** iOS-safe 2-column grid + odd last tile centered */
-const MOBILE_GRID_2 = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, width: '100%' };
+/** iOS-safe 2-column grid + odd last tile centered at half width */
+const MOBILE_GRID_2 = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, width: '100%', alignItems: 'stretch' };
 
-function SvcGrid2({ items, renderItem }) {
+function SvcGrid2({ items, renderItem, gap = 10 }) {
   const oddLast = items.length % 2 === 1;
+  const halfW = `calc(50% - ${gap / 2}px)`;
   return (
-    <div style={MOBILE_GRID_2}>
+    <div style={{ ...MOBILE_GRID_2, gap }}>
       {items.map((item, i) => (
         <div
           key={item.id || i}
           style={{
             minWidth: 0,
-            ...(oddLast && i === items.length - 1 ? { gridColumn: '1 / -1', maxWidth: 'calc(50% - 5px)', marginLeft: 'auto', marginRight: 'auto', width: '100%' } : null),
+            display: 'flex',
+            flexDirection: 'column',
+            ...(oddLast && i === items.length - 1 ? { gridColumn: '1 / -1', maxWidth: halfW, marginLeft: 'auto', marginRight: 'auto', width: '100%' } : null),
           }}
         >
           {renderItem(item, i)}
@@ -2148,8 +2151,8 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   }
 
   return (
-    <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column' }}>
-      <div style={{ position:'relative', height:imgH, flexShrink:0, background:C.deep }}>
+    <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column', height:'100%', width:'100%', minWidth:0 }}>
+      <div style={{ position:'relative', height:imgH, minHeight:imgH, flexShrink:0, background:C.deep }}>
         <ServiceImg src={theme.img} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
         <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4, flexWrap:'wrap' }}>
           {theme.tag && <span style={{ background:'rgba(255,255,255,0.95)', color:theme.b2, fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>{theme.tag}</span>}
@@ -2281,13 +2284,16 @@ function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
 }
 
 function CategorySvcCard({ categoryId, svc, onClick, compact }) {
+  const imgH = compact ? 104 : 120;
   return (
-    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow, minWidth: 0 }}>
-      <ServiceThumb svc={svc} categoryId={categoryId} height={compact ? 104 : 120} fullBleed />
-      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: '#fff' }}>
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow, minWidth: 0, height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, height: imgH, minHeight: imgH, overflow: 'hidden' }}>
+        <ServiceThumb svc={svc} categoryId={categoryId} height={imgH} fullBleed />
+      </div>
+      <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: '#fff', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
-        <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8 }}>{svc.sub}</div>
+        <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8, flex: 1 }}>{svc.sub}</div>
         <PriceTag svc={svc} sm={compact} />
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
@@ -2374,9 +2380,7 @@ function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderC
       {categories.length > 0 && (
         <div style={{ marginBottom: 14 }}>
           {subBlocks.length > 0 && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {categories.map((s, i) => renderCategory(s, i))}
-          </div>
+          <SvcGrid2 gap={12} items={categories} renderItem={(s, i) => renderCategory(s, i)} />
         </div>
       )}
     </>
@@ -3549,11 +3553,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
             </div>
             {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:12}}>
-              {svcList.map((s,i)=>(
-                <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />
-              ))}
-            </div>
+            <SvcGrid2 gap={12} items={svcList} renderItem={(s, i) => <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />} />
           </>
         )}
         <AssistBanner/>
@@ -4498,15 +4498,17 @@ function TopRatedScreen() {
                 Services, offerings, and courses marked Top Rated by our team — verified quality and great value.
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {items.map((svc, i) => {
+            <SvcGrid2
+              gap={12}
+              items={items}
+              renderItem={(svc, i) => {
                 const catId = svc.parent && SUB_CATEGORIES[svc.parent] ? svc.parent : null;
                 if (catId) {
-                  return <CategorySvcCard key={svc.id} categoryId={catId} svc={svc} onClick={() => openSvc(svc)} compact index={i} />;
+                  return <CategorySvcCard key={svc.id} categoryId={catId} svc={svc} onClick={() => openSvc(svc)} compact />;
                 }
                 return <HomeModelCard key={svc.id} svc={svc} onClick={() => openSvc(svc)} index={i} />;
-              })}
-            </div>
+              }}
+            />
           </>
         ) : (
           <div style={{ ...S.card(), padding: 32, textAlign: 'center' }}>
@@ -4632,16 +4634,8 @@ function ServicesScreen() {
           />
         ) : (
         <>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          {list.length > 0 && (
-            <div style={{ gridColumn:'1 / -1' }}>
-              <HomeHeroCarousel services={list} onSelect={openCategory} />
-            </div>
-          )}
-          {list.map((s,i)=>(
-            <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>openCategory(s)} />
-          ))}
-        </div>
+        {list.length > 0 && <HomeHeroCarousel services={list} onSelect={openCategory} />}
+        <SvcGrid2 gap={10} items={list} renderItem={(s, i) => <HomeModelCard key={s.id} svc={s} index={i} onClick={()=>openCategory(s)} />} />
         </>
         )}
       </div>
