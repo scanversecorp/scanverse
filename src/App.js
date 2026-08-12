@@ -5978,6 +5978,297 @@ function formatAadhaarDisplay(value) {
   return parts.join(' ');
 }
 
+function useDebouncedValue(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+function vendorFirstName(v) {
+  if (v?.first_name) return v.first_name;
+  const parts = String(v?.contact_name || '').trim().split(/\s+/);
+  return parts[0] || '—';
+}
+
+function vendorLastName(v) {
+  if (v?.last_name) return v.last_name;
+  const parts = String(v?.contact_name || '').trim().split(/\s+/);
+  return parts.slice(1).join(' ') || '—';
+}
+
+function maskAadhaarLast4(last4) {
+  if (!last4) return '—';
+  return `**** ${String(last4).slice(-4)}`;
+}
+
+function vehicleTypeLabel(type) {
+  if (type === '2W') return '2 Wheeler';
+  if (type === '4W') return '4 Wheeler';
+  return type || '—';
+}
+
+async function uploadVendorPhoto(mobileE164, file) {
+  const contentType = file.type || 'image/jpeg';
+  const { signed_url, path } = await vendorOnboardFetch('photo-upload-url', {
+    mobile: mobileE164,
+    content_type: contentType,
+  });
+  const uploadRes = await fetch(signed_url, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  });
+  if (!uploadRes.ok) throw new Error('Photo upload failed — try again');
+  return path;
+}
+
+const VENDOR_ADMIN_COLUMNS = [
+  { key: 'first_name', label: 'First name', width: 110, get: vendorFirstName },
+  { key: 'last_name', label: 'Last name', width: 110, get: vendorLastName },
+  { key: 'phone', label: 'Mobile', width: 120, get: (v) => v.phone || '—' },
+  { key: 'mobile2', label: 'Mobile 2', width: 120, get: (v) => v.mobile2 || '—' },
+  { key: 'aadhaar_last4', label: 'Aadhaar', width: 90, get: (v) => maskAadhaarLast4(v.aadhaar_last4) },
+  { key: 'pan_number', label: 'PAN', width: 100, get: (v) => v.pan_number || '—' },
+  { key: 'shop_or_flat', label: 'Flat', width: 90, get: (v) => v.shop_or_flat || '—' },
+  { key: 'building_name', label: 'Building', width: 100, get: (v) => v.building_name || '—' },
+  { key: 'street_name', label: 'Street', width: 120, get: (v) => v.street_name || '—' },
+  { key: 'village', label: 'Village', width: 100, get: (v) => v.village || '—' },
+  { key: 'city', label: 'City', width: 90, get: (v) => v.city || '—' },
+  { key: 'pincode', label: 'Pincode', width: 80, get: (v) => v.pincode || '—' },
+  { key: 'state', label: 'State', width: 100, get: (v) => v.state || '—' },
+  { key: 'country', label: 'Country', width: 90, get: (v) => v.country || '—' },
+  { key: 'vehicle_number', label: 'Vehicle #', width: 100, get: (v) => v.vehicle_number || '—' },
+  { key: 'vehicle_type', label: 'Vehicle type', width: 95, get: (v) => vehicleTypeLabel(v.vehicle_type) },
+  { key: 'license_number', label: 'License', width: 100, get: (v) => v.license_number || '—' },
+  { key: 'highest_education', label: 'Education', width: 110, get: (v) => v.highest_education || '—' },
+  { key: 'business_name', label: 'Business', width: 130, get: (v) => v.business_name || '—' },
+  { key: 'status', label: 'Status', width: 80, get: (v) => v.status || '—' },
+];
+
+function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap }) {
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [colFilters, setColFilters] = useState({});
+  const [sortKey, setSortKey] = useState('business_name');
+  const [sortDir, setSortDir] = useState('asc');
+  const [photoModal, setPhotoModal] = useState(null);
+  const [gpsModal, setGpsModal] = useState(null);
+  const [gpsHistory, setGpsHistory] = useState([]);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const debouncedSearch = useDebouncedValue(globalSearch, 250);
+
+  const setColFilter = (key, val) => setColFilters((prev) => ({ ...prev, [key]: val }));
+
+  const filtered = useMemo(() => {
+    let list = rows.slice();
+    const term = debouncedSearch.trim().toLowerCase();
+    if (term) {
+      list = list.filter((v) => {
+        const hay = [
+          vendorFirstName(v), vendorLastName(v), v.phone, v.mobile2,
+          maskAadhaarLast4(v.aadhaar_last4), v.pan_number,
+          v.shop_or_flat, v.building_name, v.street_name, v.village,
+          v.city, v.pincode, v.state, v.country,
+          v.vehicle_number, vehicleTypeLabel(v.vehicle_type), v.license_number,
+          v.highest_education, v.business_name, v.status,
+        ].join(' ').toLowerCase();
+        return hay.includes(term);
+      });
+    }
+    for (const col of VENDOR_ADMIN_COLUMNS) {
+      const f = (colFilters[col.key] || '').trim().toLowerCase();
+      if (!f) continue;
+      list = list.filter((v) => String(col.get(v)).toLowerCase().includes(f));
+    }
+    const col = VENDOR_ADMIN_COLUMNS.find((c) => c.key === sortKey);
+    const getter = col?.get || ((v) => v[sortKey] || '');
+    list.sort((a, b) => {
+      const av = String(getter(a)).toLowerCase();
+      const bv = String(getter(b)).toLowerCase();
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [rows, debouncedSearch, colFilters, sortKey, sortDir]);
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const openPhoto = async (vendor) => {
+    if (!vendor.photo_path) return;
+    setPhotoModal({ loading: true, vendor });
+    try {
+      const r = await vendorOnboardFetch('photo-view-url', { vendor_id: vendor.id }, pin);
+      setPhotoModal({ loading: false, vendor, url: r.signed_url });
+    } catch (e) {
+      setPhotoModal({ loading: false, vendor, error: e.message });
+    }
+  };
+
+  const openGpsHistory = async (vendor) => {
+    setGpsModal(vendor);
+    setGpsLoading(true);
+    setGpsHistory([]);
+    try {
+      const r = await vendorOnboardFetch('gps-history', { vendor_id: vendor.id, limit: 50 }, pin);
+      setGpsHistory(r.history || []);
+    } catch (_) { setGpsHistory([]); }
+    finally { setGpsLoading(false); }
+  };
+
+  const thStyle = {
+    position: 'sticky', top: 0, zIndex: 2, background: C.surf,
+    borderBottom: BDR, padding: '8px 6px', fontSize: 10, fontWeight: 700,
+    color: C.sub, textAlign: 'left', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none',
+  };
+  const tdStyle = {
+    padding: '8px 6px', fontSize: 11, color: C.txt, borderBottom: `1px solid ${C.bdr}`,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140,
+  };
+  const filterInp = { ...S.inp(), padding: '4px 6px', fontSize: 10, minWidth: 0, width: '100%' };
+
+  return (
+    <>
+      <div style={{ ...S.card(), padding: 12, marginBottom: 12 }}>
+        <Field label="Global search (all columns)">
+          <input value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} style={S.inp()} placeholder="Search partners…" />
+        </Field>
+        <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>Showing {filtered.length} of {rows.length} · column filters apply instantly</div>
+      </div>
+      <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+          <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 2400, width: '100%' }}>
+            <thead>
+              <tr>
+                {VENDOR_ADMIN_COLUMNS.map((col) => (
+                  <th key={col.key} style={{ ...thStyle, minWidth: col.width, width: col.width }} onClick={() => toggleSort(col.key)}>
+                    {col.label}{sortKey === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                ))}
+                <th style={{ ...thStyle, minWidth: 70, width: 70, cursor: 'default' }}>Photo</th>
+                <th style={{ ...thStyle, minWidth: 130, width: 130, cursor: 'default' }}>GPS</th>
+                <th style={{ ...thStyle, minWidth: 160, width: 160, cursor: 'default' }}>Services</th>
+                <th style={{ ...thStyle, minWidth: 120, width: 120, cursor: 'default', right: 0, position: 'sticky' }}>Actions</th>
+              </tr>
+              <tr>
+                {VENDOR_ADMIN_COLUMNS.map((col) => (
+                  <th key={`f-${col.key}`} style={{ ...thStyle, top: 36, cursor: 'default', padding: '4px 6px' }}>
+                    <input value={colFilters[col.key] || ''} onChange={(e) => setColFilter(col.key, e.target.value)} placeholder="Filter…" style={filterInp} onClick={(e) => e.stopPropagation()} />
+                  </th>
+                ))}
+                <th style={{ ...thStyle, top: 36, cursor: 'default' }} />
+                <th style={{ ...thStyle, top: 36, cursor: 'default' }} />
+                <th style={{ ...thStyle, top: 36, cursor: 'default' }} />
+                <th style={{ ...thStyle, top: 36, cursor: 'default', position: 'sticky', right: 0 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((v) => {
+                const lat = v.gps_lat ?? v.address_lat;
+                const lng = v.gps_lng ?? v.address_lng;
+                const activeSvcs = (v.vendor_partner_services || []).filter((s) => s.is_active);
+                return (
+                  <tr key={v.id} style={{ background: C.card }}>
+                    {VENDOR_ADMIN_COLUMNS.map((col) => (
+                      <td key={col.key} style={{ ...tdStyle, maxWidth: col.width }} title={String(col.get(v))}>{col.get(v)}</td>
+                    ))}
+                    <td style={tdStyle}>
+                      {v.photo_path ? (
+                        <button type="button" onClick={() => openPhoto(v)} style={{ background: C.deep, border: BDR, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 14 }} title="View photo">👁</button>
+                      ) : '—'}
+                    </td>
+                    <td style={tdStyle}>
+                      {lat != null ? (
+                        <button type="button" onClick={() => openGpsHistory(v)} style={{ background: 'none', border: 'none', color: C.cyan, cursor: 'pointer', fontSize: 11, fontFamily: FF, padding: 0 }}>
+                          {Number(lat).toFixed(4)}, {Number(lng).toFixed(4)} ↗
+                        </button>
+                      ) : '—'}
+                    </td>
+                    <td style={{ ...tdStyle, whiteSpace: 'normal', maxWidth: 160 }}>
+                      {activeSvcs.slice(0, 3).map((s) => (
+                        <span key={s.service_id} style={{ fontSize: 9, display: 'inline-block', margin: '1px 2px', padding: '1px 5px', borderRadius: 8, background: `${C.acc}18`, color: C.acc }}>
+                          {svcNameMap[s.service_id]?.name || s.service_id}
+                        </span>
+                      ))}
+                      {activeSvcs.length > 3 && <span style={{ fontSize: 9, color: C.dim }}>+{activeSvcs.length - 3}</span>}
+                    </td>
+                    <td style={{ ...tdStyle, position: 'sticky', right: 0, background: C.card, maxWidth: 120 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {v.status === 'pending' && <>
+                          <Btn sm onClick={() => onAction('activate', v.id)} disabled={loading}>Activate</Btn>
+                          <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
+                        </>}
+                        {v.status === 'active' && <>
+                          <Btn v="outline" sm onClick={() => onAction('pause', v.id)} disabled={loading}>Pause</Btn>
+                          <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
+                        </>}
+                        {v.status === 'paused' && <>
+                          <Btn sm onClick={() => onAction('unpause', v.id)} disabled={loading}>Unpause</Btn>
+                          <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
+                        </>}
+                        {v.status === 'offboarded' && (
+                          <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!filtered.length && !loading && (
+            <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners match filters</div>
+          )}
+        </div>
+      </div>
+      {photoModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setPhotoModal(null)}>
+          <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 16 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>{vendorFirstName(photoModal.vendor)} {vendorLastName(photoModal.vendor)} — Photo</div>
+            {photoModal.loading && <div style={{ color: C.sub, fontSize: 12 }}>Loading…</div>}
+            {photoModal.error && <div style={{ color: C.red, fontSize: 12 }}>{photoModal.error}</div>}
+            {photoModal.url && <img src={photoModal.url} alt="Partner" style={{ width: '100%', borderRadius: 8, maxHeight: 360, objectFit: 'contain' }} />}
+            <Btn v="outline" full onClick={() => setPhotoModal(null)} style={{ marginTop: 12 }}>Close</Btn>
+          </div>
+        </div>
+      )}
+      {gpsModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setGpsModal(null)}>
+          <div style={{ ...S.card(), maxWidth: 480, width: '100%', padding: 16, maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>GPS — {vendorFirstName(gpsModal)} {vendorLastName(gpsModal)}</div>
+            <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>
+              Current: {(gpsModal.gps_lat ?? gpsModal.address_lat) != null
+                ? `${Number(gpsModal.gps_lat ?? gpsModal.address_lat).toFixed(5)}, ${Number(gpsModal.gps_lng ?? gpsModal.address_lng).toFixed(5)}`
+                : 'No GPS on file'}
+            </div>
+            {gpsLoading ? <div style={{ color: C.dim, fontSize: 12 }}>Loading history…</div> : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <thead><tr style={{ color: C.sub }}>
+                  <th style={{ textAlign: 'left', padding: 4 }}>Time</th>
+                  <th style={{ textAlign: 'left', padding: 4 }}>Lat</th>
+                  <th style={{ textAlign: 'left', padding: 4 }}>Lng</th>
+                </tr></thead>
+                <tbody>
+                  {gpsHistory.map((h) => (
+                    <tr key={h.id}><td style={{ padding: 4 }}>{fmtDt(h.recorded_at)}</td><td style={{ padding: 4 }}>{Number(h.lat).toFixed(5)}</td><td style={{ padding: 4 }}>{Number(h.lng).toFixed(5)}</td></tr>
+                  ))}
+                  {!gpsHistory.length && <tr><td colSpan={3} style={{ padding: 8, color: C.dim }}>No history yet</td></tr>}
+                </tbody>
+              </table>
+            )}
+            <Btn v="outline" full onClick={() => setGpsModal(null)} style={{ marginTop: 12 }}>Close</Btn>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function VendorOnboardPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -5989,9 +6280,13 @@ function VendorOnboardPage() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [existingPartner, setExistingPartner] = useState(null);
   const [addServicesMode, setAddServicesMode] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [contactName, setContactName] = useState('');
+  const [mobile2, setMobile2] = useState('');
   const [email, setEmail] = useState('');
+  const [highestEducation, setHighestEducation] = useState('');
   const [shopOrFlat, setShopOrFlat] = useState('');
   const [buildingName, setBuildingName] = useState('');
   const [streetName, setStreetName] = useState('');
@@ -6012,6 +6307,12 @@ function VendorOnboardPage() {
   const [pan, setPan] = useState('');
   const [panOk, setPanOk] = useState(null);
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const [vehicleType, setVehicleType] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [photoPath, setPhotoPath] = useState('');
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [appInstalledConfirmed, setAppInstalledConfirmed] = useState(false);
+  const [gpsAllowedConfirmed, setGpsAllowedConfirmed] = useState(false);
   const [selectedSvcs, setSelectedSvcs] = useState({});
   const allSvcs = allVendorSelectableServices();
   const mobileE164 = () => '+91' + phone.replace(/\D/g, '');
@@ -6045,14 +6346,14 @@ function VendorOnboardPage() {
   };
 
   useEffect(() => {
-    if (step === 2 && phoneVerified && !addServicesMode && !gps) {
+    if (step === 3 && phoneVerified && !addServicesMode && !gps) {
       captureGps(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, phoneVerified, addServicesMode]);
 
   useVendorLocationTracker(null, {
-    enabled: phoneVerified && step >= 2 && step <= 5,
+    enabled: phoneVerified && step >= 3 && step <= 7,
     mobile: phoneVerified ? mobileE164() : null,
     onPosition: ({ lat, lng }) => setGps((prev) => ({ ...(prev || {}), lat, lng })),
   });
@@ -6086,11 +6387,13 @@ function VendorOnboardPage() {
         setAddServicesMode(true);
         setBusinessName(p.business_name || '');
         setContactName(p.contact_name || '');
+        setFirstName(p.first_name || vendorFirstName(p));
+        setLastName(p.last_name || vendorLastName(p));
         setAadhaarOk(!!p.aadhaar_verified);
         const pre = {};
         (p.vendor_partner_services || []).filter(s => s.is_active).forEach(s => { pre[s.service_id] = true; });
         setSelectedSvcs(pre);
-        setStep(5);
+        setStep(7);
         setMsg(p.status === 'active'
           ? `Welcome back, ${p.business_name}! Add or update your services below.`
           : `Account found (${p.status}). You can update your service selections.`);
@@ -6109,8 +6412,9 @@ function VendorOnboardPage() {
       return setErr('Enter the 6-digit OTP from your Aadhaar-linked mobile');
     }
     setLoading(true); setErr('');
+    const fullName = `${firstName} ${lastName}`.trim() || contactName;
     try {
-      const payload = { aadhaar: aadhaarDigits, name: contactName };
+      const payload = { aadhaar: aadhaarDigits, name: fullName };
       if (aadhaarOtpRequired && ekycRef) {
         payload.otp = aadhaarOtp.replace(/\D/g, '');
         payload.ekyc_ref = ekycRef;
@@ -6143,8 +6447,9 @@ function VendorOnboardPage() {
   const verifyPan = async () => {
     if (!pan.trim()) { setPanOk(true); return; }
     setLoading(true); setErr('');
+    const fullName = `${firstName} ${lastName}`.trim() || contactName;
     try {
-      const r = await vendorOnboardFetch('validate-pan', { pan, name: contactName });
+      const r = await vendorOnboardFetch('validate-pan', { pan, name: fullName });
       setPanOk(r.valid);
       if (!r.valid) setErr(r.error || 'Invalid PAN');
       else setMsg('PAN validated ✓');
@@ -6154,6 +6459,22 @@ function VendorOnboardPage() {
 
   const toggleSvc = (id) => setSelectedSvcs(prev => ({ ...prev, [id]: !prev[id] }));
 
+  const handlePhotoSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return setErr('Photo must be under 5 MB');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      return setErr('Photo must be JPEG, PNG, or WebP');
+    }
+    setPhotoUploading(true); setErr('');
+    try {
+      const path = await uploadVendorPhoto(mobileE164(), file);
+      setPhotoPath(path);
+      setMsg('Photo uploaded ✓');
+    } catch (ex) { setErr(ex.message); }
+    finally { setPhotoUploading(false); }
+  };
+
   const submit = async () => {
     const services = allSvcs.filter(s => selectedSvcs[s.service_id]).map(s => ({
       service_id: s.service_id, category_id: s.category_id,
@@ -6162,6 +6483,9 @@ function VendorOnboardPage() {
     if (!addServicesMode) {
       if (!gps) return setErr('Capture GPS location first');
       if (!aadhaarOk) return setErr('Complete Aadhaar eKYC first');
+      if (!appInstalledConfirmed || !gpsAllowedConfirmed) {
+        return setErr('Confirm ScanV app installation and GPS permission');
+      }
     }
     setLoading(true); setErr('');
     try {
@@ -6171,14 +6495,18 @@ function VendorOnboardPage() {
           services,
         });
         setMsg(r.message || 'Services updated!');
-        setStep(6);
+        setStep(8);
         return;
       }
       const ip = await getIP();
+      const fullContact = `${firstName.trim()} ${lastName.trim()}`.trim();
       const r = await vendorOnboardFetch('register', {
         phone: mobileE164(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        contact_name: fullContact,
+        mobile2: mobile2.replace(/\D/g, '').length === 10 ? '+91' + mobile2.replace(/\D/g, '') : null,
         business_name: businessName,
-        contact_name: contactName,
         email,
         shop_or_flat: shopOrFlat,
         building_name: buildingName,
@@ -6199,15 +6527,21 @@ function VendorOnboardPage() {
         pan_number: pan || null,
         pan_verified: !!pan && panOk,
         vehicle_number: vehicleNumber.trim() || null,
+        vehicle_type: vehicleType || null,
+        license_number: licenseNumber.trim() || null,
+        photo_path: photoPath || null,
+        highest_education: highestEducation.trim() || null,
+        app_installed_confirmed: appInstalledConfirmed,
+        gps_allowed_confirmed: gpsAllowedConfirmed,
         services,
       });
       setMsg(r.message || 'Registration submitted!');
-      setStep(6);
+      setStep(8);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
-  const stepLabels = ['Phone OTP', 'Business & address', 'Aadhaar eKYC', 'PAN (optional)', 'Services', 'Done'];
+  const stepLabels = ['Phone OTP', 'Personal', 'Address & GPS', 'Vehicle & photo', 'Aadhaar eKYC', 'PAN & app', 'Services', 'Done'];
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
@@ -6246,9 +6580,25 @@ function VendorOnboardPage() {
         </>}
 
         {step === 2 && <>
+          <Field label="First name" req><input value={firstName} onChange={e => setFirstName(e.target.value)} style={S.inp()} placeholder="Rahul" /></Field>
+          <Field label="Last name" req><input value={lastName} onChange={e => setLastName(e.target.value)} style={S.inp()} placeholder="Sharma" /></Field>
           <Field label="Business / shop name" req><input value={businessName} onChange={e => setBusinessName(e.target.value)} style={S.inp()} placeholder="Sharma Home Services" /></Field>
-          <Field label="Contact person name" req><input value={contactName} onChange={e => setContactName(e.target.value)} style={S.inp()} placeholder="Rahul Sharma" /></Field>
           <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={S.inp()} placeholder="partner@example.com" /></Field>
+          <Field label="Alternate mobile (optional)" note="Second contact number">
+            <div style={{ display: 'flex', alignItems: 'center', background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '11px 12px', background: C.card, borderRight: `1px solid ${C.bdr}`, color: C.sub, fontSize: 14, fontWeight: 600 }}>+91</div>
+              <input type="tel" maxLength={10} value={mobile2} onChange={e => setMobile2(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} />
+            </div>
+          </Field>
+          <Field label="Highest education"><input value={highestEducation} onChange={e => setHighestEducation(e.target.value)} style={S.inp()} placeholder="e.g. 12th, Graduate, ITI" /></Field>
+          <Btn full onClick={() => {
+            if (!firstName.trim() || !lastName.trim() || !businessName.trim()) return setErr('First name, last name, and business name are required');
+            setContactName(`${firstName.trim()} ${lastName.trim()}`.trim());
+            setStep(3); setErr('');
+          }}>Continue →</Btn>
+        </>}
+
+        {step === 3 && <>
           <Field label="Shop # / Flat #" req><input value={shopOrFlat} onChange={e => setShopOrFlat(e.target.value)} style={S.inp()} placeholder="Shop 12 / Flat 302" /></Field>
           <Field label="Building name"><input value={buildingName} onChange={e => setBuildingName(e.target.value)} style={S.inp()} placeholder="Rose Plaza" /></Field>
           <Field label="Street name" req><input value={streetName} onChange={e => setStreetName(e.target.value)} style={S.inp()} placeholder="Wakad Main Road" /></Field>
@@ -6281,17 +6631,34 @@ function VendorOnboardPage() {
           <Field label="GPS location" req note="Required — used to match you with nearby bookings">
             <Btn v="outline" full onClick={() => captureGps(false)} disabled={loading}>{gps ? `✓ Live GPS: ${gps.lat?.toFixed(4)}, ${gps.lng?.toFixed(4)}` : loading ? 'Getting GPS…' : '📍 Capture GPS location'}</Btn>
             <div style={{ fontSize: 11, color: C.dim, marginTop: 8, lineHeight: 1.5 }}>
-              GPS starts automatically on this step and stays active during registration — used to match you with nearby customer bookings.
+              GPS starts automatically on this step and stays active during registration.
             </div>
             {gpsCheck?.vpn_suspected && <div style={{ color: C.red, fontSize: 11, marginTop: 6 }}>⚠ VPN/proxy detected — disable VPN for accurate location</div>}
           </Field>
-          <Field label="Vehicle number (optional)" note="For delivery, two-wheeler, or four-wheeler partners — e.g. MH12AB1234">
-            <input value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value.toUpperCase().slice(0, 15))} style={S.inp()} placeholder="MH12AB1234" />
-          </Field>
-          <Btn full onClick={() => { if (!businessName || !contactName || !shopOrFlat || !streetName || !city || !pincode || !gps) return setErr('Complete all required fields + GPS'); setStep(3); setErr(''); }}>Continue →</Btn>
+          <Btn full onClick={() => { if (!shopOrFlat || !streetName || !city || !pincode || !gps) return setErr('Complete all required address fields + GPS'); setStep(4); setErr(''); }}>Continue →</Btn>
         </>}
 
-        {step === 3 && <>
+        {step === 4 && <>
+          <Field label="Vehicle number" note="For delivery / two-wheeler / four-wheeler partners">
+            <input value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value.toUpperCase().slice(0, 15))} style={S.inp()} placeholder="MH12AB1234" />
+          </Field>
+          <Field label="Vehicle type">
+            <select value={vehicleType} onChange={e => setVehicleType(e.target.value)} style={S.inp()}>
+              <option value="">Select…</option>
+              <option value="2W">2 Wheeler</option>
+              <option value="4W">4 Wheeler</option>
+            </select>
+          </Field>
+          <Field label="Driving license number"><input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value.toUpperCase().slice(0, 20))} style={S.inp()} placeholder="DL-XX-YYYY-NNNNNNN" /></Field>
+          <Field label="Partner photo" note="JPEG/PNG/WebP, max 5 MB — stored securely; admin views via secure link only">
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoSelect} disabled={photoUploading} style={{ fontSize: 12, color: C.sub }} />
+            {photoPath && <div style={{ fontSize: 11, color: C.grn, marginTop: 6 }}>✓ Photo uploaded</div>}
+            {photoUploading && <div style={{ fontSize: 11, color: C.sub, marginTop: 6 }}>Uploading…</div>}
+          </Field>
+          <Btn full onClick={() => setStep(5)}>Continue →</Btn>
+        </>}
+
+        {step === 5 && <>
           <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
             Aadhaar eKYC is mandatory. Your full Aadhaar is never stored — only last 4 digits after verification via UIDAI-approved provider (Digio when configured).
           </div>
@@ -6309,20 +6676,34 @@ function VendorOnboardPage() {
             <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>Verified in test mode (Digio not configured) — ScanV may manually review before activation.</div>
           )}
           {!aadhaarOk ? <Btn full onClick={verifyAadhaar} disabled={loading}>{loading ? <><Spin size={16} /> Verifying…</> : aadhaarOtpRequired ? 'Submit Aadhaar OTP →' : 'Verify Aadhaar (eKYC) →'}</Btn>
-            : <Btn full onClick={() => setStep(4)}>Continue →</Btn>}
+            : <Btn full onClick={() => setStep(6)}>Continue →</Btn>}
         </>}
 
-        {step === 4 && <>
+        {step === 6 && <>
           <Field label="PAN card (optional)" note="Format: AAAAA9999A — validated if provided">
             <input value={pan} onChange={e => setPan(e.target.value.toUpperCase().slice(0, 10))} style={S.inp()} placeholder="ABCDE1234F" />
           </Field>
+          <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={appInstalledConfirmed} onChange={e => setAppInstalledConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>I confirm I have installed the ScanV app (or will install before going live) to receive booking alerts.</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={gpsAllowedConfirmed} onChange={e => setGpsAllowedConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>I allow ScanV to use my GPS location for nearby job matching and live dispatch while I am an active partner.</span>
+            </label>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {pan && <Btn v="outline" onClick={verifyPan} disabled={loading}>Validate PAN</Btn>}
-            <Btn full onClick={() => { if (pan && panOk === false) return setErr('Fix PAN or leave blank'); setStep(5); setErr(''); }}>{pan ? 'Continue →' : 'Skip PAN →'}</Btn>
+            <Btn full onClick={() => {
+              if (pan && panOk === false) return setErr('Fix PAN or leave blank');
+              if (!appInstalledConfirmed || !gpsAllowedConfirmed) return setErr('Confirm app installation and GPS permission');
+              setStep(7); setErr('');
+            }}>{pan ? 'Continue →' : 'Skip PAN →'}</Btn>
           </div>
         </>}
 
-        {step === 5 && <>
+        {step === 7 && <>
           {addServicesMode && existingPartner && (
             <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
               Signed in as <strong style={{ color: C.txt }}>{existingPartner.business_name}</strong>
@@ -6343,7 +6724,7 @@ function VendorOnboardPage() {
           <Btn full onClick={submit} disabled={loading} style={{ marginTop: 16 }}>{loading ? <><Spin size={16} /> Submitting…</> : addServicesMode ? 'Save service updates →' : 'Submit partner application →'}</Btn>
         </>}
 
-        {step === 6 && (
+        {step === 8 && (
           <div style={{ ...S.card(), textAlign: 'center', padding: 32 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 8 }}>
@@ -6359,7 +6740,7 @@ function VendorOnboardPage() {
           </div>
         )}
 
-        {step > 1 && step < 6 && (
+        {step > 1 && step < 8 && (
           <button type="button" onClick={() => setStep(s => s - 1)} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 12, marginTop: 16, cursor: 'pointer', fontFamily: FF }}>← Back</button>
         )}
         <div style={{ marginTop: 24, fontSize: 11, color: C.dim, textAlign: 'center' }}>
@@ -6381,36 +6762,20 @@ function VendorAdminPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [searchName, setSearchName] = useState('');
-  const [searchCity, setSearchCity] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterService, setFilterService] = useState('');
-  const [expandedId, setExpandedId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [showEnroll, setShowEnroll] = useState(false);
   const [enroll, setEnroll] = useState({
-    business_name: '', contact_name: '', phone: '', email: '',
+    business_name: '', first_name: '', last_name: '', phone: '', email: '',
     shop_or_flat: '', street_name: '', city: '', pincode: '', state: 'Maharashtra',
-    vehicle_number: '', activate_immediately: false, services: {},
+    vehicle_number: '', vehicle_type: '', activate_immediately: false, services: {},
   });
   const enrollSvcs = allVendorSelectableServices();
   const svcNameMap = useMemo(() => vendorServiceNameMap(enrollSvcs), [enrollSvcs]);
-  const categoryOptions = useMemo(() => {
-    const cats = new Map();
-    for (const s of enrollSvcs) cats.set(s.category_id, s.cat);
-    return [...cats.entries()].map(([id, label]) => ({ id, label }));
-  }, [enrollSvcs]);
 
-  const load = useCallback(async (usePin, filters = {}) => {
+  const load = useCallback(async (usePin) => {
     setLoading(true); setErr('');
     try {
-      const { vendors: data } = await vendorOnboardFetch('list', {
-        status: filters.status && filters.status !== 'all' ? filters.status : undefined,
-        city: filters.city || undefined,
-        search: filters.search || undefined,
-        category_id: filters.category_id || undefined,
-        service_id: filters.service_id || undefined,
-      }, usePin);
+      const { vendors: data } = await vendorOnboardFetch('list', {}, usePin);
       setVendors(data || []);
       setAuthed(true);
       sessionStorage.setItem(VENDOR_PIN_KEY, usePin);
@@ -6423,16 +6788,13 @@ function VendorAdminPage() {
 
   const login = () => load(pin);
 
-  const applyFilters = () => load(pin, {
-    status: filter,
-    city: searchCity.trim(),
-    search: searchName.trim(),
-    category_id: filterCategory,
-    service_id: filterService,
-  });
-
-  const runAction = async (action, id, confirmMsg) => {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  const handleTableAction = async (action, id) => {
+    const confirms = {
+      pause: 'Pause this partner? They will stop receiving new bookings until unpaused.',
+      offboard: 'Offboard this partner? They will stop receiving bookings permanently until re-activated.',
+      delete: 'Delete this partner record? Only works if they have no dispatch history.',
+    };
+    if (confirms[action] && !window.confirm(confirms[action])) return;
     const labels = { activate: 'activated', pause: 'paused', unpause: 'unpaused', offboard: 'offboarded', delete: 'deleted' };
     setLoading(true); setErr('');
     try {
@@ -6443,16 +6805,11 @@ function VendorAdminPage() {
     finally { setLoading(false); }
   };
 
-  const activate = (id) => runAction('activate', id);
-  const pause = (id) => runAction('pause', id, 'Pause this partner? They will stop receiving new bookings until unpaused.');
-  const unpause = (id) => runAction('unpause', id);
-  const offboard = (id) => runAction('offboard', id, 'Offboard this partner? They will stop receiving bookings permanently until re-activated.');
-  const deleteVendor = (id) => runAction('delete', id, 'Delete this partner record? Only works if they have no dispatch history.');
-
   const submitEnroll = async () => {
     const mob = '+91' + enroll.phone.replace(/\D/g, '');
     if (enroll.phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
-    if (!enroll.business_name.trim() || !enroll.contact_name.trim()) return setErr('Business and contact name required');
+    const contact = `${enroll.first_name.trim()} ${enroll.last_name.trim()}`.trim() || enroll.contact_name?.trim();
+    if (!enroll.business_name.trim() || !contact) return setErr('Business and name required');
     if (!enroll.shop_or_flat.trim() || !enroll.street_name.trim() || !enroll.city.trim() || !enroll.pincode.trim()) {
       return setErr('Complete address fields');
     }
@@ -6468,7 +6825,9 @@ function VendorAdminPage() {
       const res = await vendorOnboardFetch('enroll', {
         phone: mob,
         business_name: enroll.business_name.trim(),
-        contact_name: enroll.contact_name.trim(),
+        first_name: enroll.first_name.trim(),
+        last_name: enroll.last_name.trim(),
+        contact_name: contact,
         email: enroll.email.trim() || undefined,
         shop_or_flat: enroll.shop_or_flat.trim(),
         street_name: enroll.street_name.trim(),
@@ -6476,6 +6835,7 @@ function VendorAdminPage() {
         pincode: enroll.pincode.trim(),
         state: enroll.state.trim(),
         vehicle_number: enroll.vehicle_number.trim() || undefined,
+        vehicle_type: enroll.vehicle_type || undefined,
         activate_immediately: enroll.activate_immediately,
         services,
       }, pin);
@@ -6483,48 +6843,17 @@ function VendorAdminPage() {
       setMsg(res.message || 'Partner enrolled');
       setShowEnroll(false);
       setEnroll({
-        business_name: '', contact_name: '', phone: '', email: '',
+        business_name: '', first_name: '', last_name: '', phone: '', email: '',
         shop_or_flat: '', street_name: '', city: '', pincode: '', state: 'Maharashtra',
-        vehicle_number: '', activate_immediately: false, services: {},
+        vehicle_number: '', vehicle_type: '', activate_immediately: false, services: {},
       });
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
-  const shown = useMemo(() => {
-    let list = filter === 'all' ? vendors : vendors.filter(v => v.status === filter);
-    const term = searchName.trim().toLowerCase();
-    if (term) {
-      list = list.filter(v => {
-        const hay = [v.business_name, v.contact_name, v.phone, v.email, v.vehicle_number].filter(Boolean).join(' ').toLowerCase();
-        return hay.includes(term);
-      });
-    }
-    const cityTerm = searchCity.trim().toLowerCase();
-    if (cityTerm) {
-      list = list.filter(v =>
-        [v.city, v.village, v.pincode, v.state].filter(Boolean).join(' ').toLowerCase().includes(cityTerm),
-      );
-    }
-    if (filterCategory) {
-      list = list.filter(v =>
-        (v.vendor_partner_services || []).some(s => s.is_active && s.category_id === filterCategory),
-      );
-    }
-    if (filterService) {
-      list = list.filter(v =>
-        (v.vendor_partner_services || []).some(s => s.is_active && s.service_id === filterService),
-      );
-    }
-    return list;
-  }, [vendors, filter, searchName, searchCity, filterCategory, filterService]);
-
-  const serviceOptionsForCategory = useMemo(() => {
-    if (!filterCategory) return enrollSvcs;
-    return enrollSvcs.filter(s => s.category_id === filterCategory);
-  }, [enrollSvcs, filterCategory]);
-
-  const statusColor = { pending: C.cyan, active: C.grn, paused: C.gold, suspended: C.red, offboarded: C.dim };
+  const statusFiltered = useMemo(() => (
+    statusFilter === 'all' ? vendors : vendors.filter((v) => v.status === statusFilter)
+  ), [vendors, statusFilter]);
 
   if (!authed) {
     return (
@@ -6564,48 +6893,21 @@ function VendorAdminPage() {
         {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8 }}>{msg}</div>}
         {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8 }}>{err}</div>}
       </div>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
+      <div style={{ padding: '0 16px 16px', flex: 1, minHeight: 0 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          {['all', 'pending', 'active', 'paused', 'offboarded'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${filter === f ? C.acc : C.bdr}`, background: filter === f ? `${C.acc}18` : C.surf, color: filter === f ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
+          {['all', 'pending', 'active', 'paused', 'offboarded'].map((f) => (
+            <button key={f} type="button" onClick={() => setStatusFilter(f)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${statusFilter === f ? C.acc : C.bdr}`, background: statusFilter === f ? `${C.acc}18` : C.surf, color: statusFilter === f ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
               {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
-        </div>
-        <div style={{ ...S.card(), marginBottom: 14, padding: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Filters</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
-            <Field label="Name / phone / email">
-              <input value={searchName} onChange={e => setSearchName(e.target.value)} style={S.inp()} placeholder="Search partners…" />
-            </Field>
-            <Field label="City / location">
-              <input value={searchCity} onChange={e => setSearchCity(e.target.value)} style={S.inp()} placeholder="Pune, Wakad…" />
-            </Field>
-            <Field label="Category">
-              <select value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setFilterService(''); }} style={S.inp()}>
-                <option value="">All categories</option>
-                {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Service">
-              <select value={filterService} onChange={e => setFilterService(e.target.value)} style={S.inp()}>
-                <option value="">All services</option>
-                {serviceOptionsForCategory.map(s => <option key={s.service_id} value={s.service_id}>{s.name}</option>)}
-              </select>
-            </Field>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-            <Btn sm onClick={applyFilters} disabled={loading}>Apply server filters</Btn>
-            <Btn v="outline" sm onClick={() => { setSearchName(''); setSearchCity(''); setFilterCategory(''); setFilterService(''); setFilter('all'); load(pin); }} disabled={loading}>Clear</Btn>
-            <span style={{ fontSize: 11, color: C.dim, alignSelf: 'center' }}>Showing {shown.length} of {vendors.length}</span>
-          </div>
         </div>
         {showEnroll && (
           <div style={{ ...S.card(), marginBottom: 16, padding: 16 }}>
             <div style={{ fontWeight: 800, color: C.txt, marginBottom: 12 }}>Enroll new partner</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+              <Field label="First name"><input value={enroll.first_name} onChange={e => setEnroll(s => ({ ...s, first_name: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Last name"><input value={enroll.last_name} onChange={e => setEnroll(s => ({ ...s, last_name: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Business name"><input value={enroll.business_name} onChange={e => setEnroll(s => ({ ...s, business_name: e.target.value }))} style={S.inp()} /></Field>
-              <Field label="Contact name"><input value={enroll.contact_name} onChange={e => setEnroll(s => ({ ...s, contact_name: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Mobile (+91)"><input value={enroll.phone} onChange={e => setEnroll(s => ({ ...s, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} style={S.inp()} placeholder="10 digits" /></Field>
               <Field label="Email (optional)"><input value={enroll.email} onChange={e => setEnroll(s => ({ ...s, email: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Shop / flat"><input value={enroll.shop_or_flat} onChange={e => setEnroll(s => ({ ...s, shop_or_flat: e.target.value }))} style={S.inp()} /></Field>
@@ -6613,10 +6915,17 @@ function VendorAdminPage() {
               <Field label="City"><input value={enroll.city} onChange={e => setEnroll(s => ({ ...s, city: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Pincode"><input value={enroll.pincode} onChange={e => setEnroll(s => ({ ...s, pincode: e.target.value }))} style={S.inp()} /></Field>
               <Field label="State"><input value={enroll.state} onChange={e => setEnroll(s => ({ ...s, state: e.target.value }))} style={S.inp()} /></Field>
-              <Field label="Vehicle # (optional)"><input value={enroll.vehicle_number} onChange={e => setEnroll(s => ({ ...s, vehicle_number: e.target.value.toUpperCase() }))} style={S.inp()} placeholder="MH12AB1234" /></Field>
+              <Field label="Vehicle #"><input value={enroll.vehicle_number} onChange={e => setEnroll(s => ({ ...s, vehicle_number: e.target.value.toUpperCase() }))} style={S.inp()} placeholder="MH12AB1234" /></Field>
+              <Field label="Vehicle type">
+                <select value={enroll.vehicle_type} onChange={e => setEnroll(s => ({ ...s, vehicle_type: e.target.value }))} style={S.inp()}>
+                  <option value="">—</option>
+                  <option value="2W">2 Wheeler</option>
+                  <option value="4W">4 Wheeler</option>
+                </select>
+              </Field>
             </div>
             <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services (optional — full catalog)</div>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services (optional)</div>
               <VendorServicePicker
                 allSvcs={enrollSvcs}
                 selected={enroll.services}
@@ -6631,90 +6940,16 @@ function VendorAdminPage() {
             <Btn onClick={submitEnroll} disabled={loading} style={{ marginTop: 12 }}>Enroll partner</Btn>
           </div>
         )}
-        {shown.map(v => {
-          const activeSvcs = (v.vendor_partner_services || []).filter(s => s.is_active);
-          const isOpen = expandedId === v.id;
-          return (
-          <div key={v.id} style={{ ...S.card(), marginBottom: 10, padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{v.business_name}</div>
-                <div style={{ fontSize: 12, color: C.sub }}>{v.contact_name} · {v.phone}{v.email ? ` · ${v.email}` : ''}</div>
-                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
-                  {v.shop_or_flat}{v.building_name ? `, ${v.building_name}` : ''}, {v.street_name}{v.village ? `, ${v.village}` : ''}, {v.city} {v.pincode}, {v.state}
-                </div>
-                <div style={{ fontSize: 10, color: C.dim, marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {v.phone_verified && <span style={{ color: C.grn }}>✓ Phone</span>}
-                  {v.aadhaar_verified && <span style={{ color: C.grn }}>✓ Aadhaar{ v.aadhaar_last4 ? ` ···${v.aadhaar_last4}` : ''}</span>}
-                  {v.pan_verified && <span style={{ color: C.grn }}>✓ PAN</span>}
-                  {v.pan_number && !v.pan_verified && <span>PAN: {v.pan_number}</span>}
-                  {v.vehicle_number && <span>🚗 {v.vehicle_number}</span>}
-                  {v.address_lat != null && <span>📍 {Number(v.address_lat).toFixed(4)}, {Number(v.address_lng).toFixed(4)}</span>}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                  {activeSvcs.slice(0, isOpen ? activeSvcs.length : 8).map(s => (
-                    <span key={s.service_id} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 12, background: `${C.acc}18`, color: C.acc, fontWeight: 600 }}>
-                      {svcNameMap[s.service_id]?.name || s.service_id}
-                    </span>
-                  ))}
-                  {!isOpen && activeSvcs.length > 8 && (
-                    <span style={{ fontSize: 10, color: C.dim }}>+{activeSvcs.length - 8} more</span>
-                  )}
-                  {!activeSvcs.length && <span style={{ fontSize: 10, color: C.dim }}>No services</span>}
-                </div>
-                <button type="button" onClick={() => setExpandedId(isOpen ? null : v.id)}
-                  style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 11, fontWeight: 700, cursor: 'pointer', marginTop: 8, fontFamily: FF }}>
-                  {isOpen ? 'Hide details ↑' : 'Full details ↓'}
-                </button>
-                {isOpen && (
-                  <div style={{ marginTop: 10, fontSize: 11, color: C.sub, lineHeight: 1.7, background: C.deep, borderRadius: 8, padding: 10 }}>
-                    <div><strong>ID:</strong> {v.id}</div>
-                    <div><strong>Status:</strong> {v.status} · <strong>Country:</strong> {v.country || 'India'} ({v.country_code || 'IN'})</div>
-                    <div><strong>Created:</strong> {fmtDt(v.created_at)} · <strong>Onboarded:</strong> {v.onboarded_at ? fmtDt(v.onboarded_at) : '—'}</div>
-                    {v.offboarded_at && <div><strong>Offboarded:</strong> {fmtDt(v.offboarded_at)}</div>}
-                    {v.notes && <div><strong>Notes:</strong> {v.notes}</div>}
-                    {v.is_vpn_suspected && <div style={{ color: C.gold }}>⚠ VPN suspected at registration</div>}
-                    <div style={{ marginTop: 6 }}><strong>All services ({activeSvcs.length}):</strong></div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                      {activeSvcs.map(s => (
-                        <span key={s.service_id} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 8, background: C.card, border: BDR }}>
-                          {svcNameMap[s.service_id]?.cat || s.category_id}: {svcNameMap[s.service_id]?.name || s.service_id}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                <Badge label={v.status} color={statusColor[v.status] || C.sub} />
-                <div style={{ fontSize: 10, color: C.dim }}>{activeSvcs.length} services</div>
-                {v.status === 'pending' && (
-                  <>
-                    <Btn sm onClick={() => activate(v.id)} disabled={loading}>Activate</Btn>
-                    <Btn v="ghost" sm onClick={() => deleteVendor(v.id)} disabled={loading}>Delete</Btn>
-                  </>
-                )}
-                {v.status === 'active' && (
-                  <>
-                    <Btn v="outline" sm onClick={() => pause(v.id)} disabled={loading}>Pause</Btn>
-                    <Btn v="danger" sm onClick={() => offboard(v.id)} disabled={loading}>Offboard</Btn>
-                  </>
-                )}
-                {v.status === 'paused' && (
-                  <>
-                    <Btn sm onClick={() => unpause(v.id)} disabled={loading}>Unpause</Btn>
-                    <Btn v="danger" sm onClick={() => offboard(v.id)} disabled={loading}>Offboard</Btn>
-                  </>
-                )}
-                {v.status === 'offboarded' && (
-                  <Btn v="ghost" sm onClick={() => deleteVendor(v.id)} disabled={loading}>Delete</Btn>
-                )}
-              </div>
-            </div>
-          </div>
-          );
-        })}
-        {!shown.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>}
+        <VendorAdminTable
+          rows={statusFiltered}
+          pin={pin}
+          loading={loading}
+          onAction={handleTableAction}
+          svcNameMap={svcNameMap}
+        />
+        {!statusFiltered.length && !loading && (
+          <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>
+        )}
       </div>
       <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>

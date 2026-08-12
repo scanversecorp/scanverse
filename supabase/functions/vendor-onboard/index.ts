@@ -11,6 +11,9 @@
  *   register        — full vendor payload (+ ekyc_ref)
  *   update-services — { mobile, services[] }  (existing partner)
  *   update-location — { mobile?, profile_id?, lat, lng }  (continuous partner GPS)
+ *   photo-upload-url — { mobile } signed upload URL (OTP required)
+ *   photo-view-url   — { vendor_id } signed view URL (PIN header)
+ *   gps-history      — { vendor_id, limit? } (PIN header)
  *   list            — admin list (PIN header)
  *   offboard        — { vendor_id } (PIN header)
  *   activate        — { vendor_id } (PIN header)
@@ -358,6 +361,8 @@ async function upsertPartnerServices(
 type VendorRow = {
   phone: string;
   contact_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   business_name?: string | null;
   shop_or_flat?: string | null;
   street_name?: string | null;
@@ -368,6 +373,111 @@ type VendorRow = {
   address_lng?: number | null;
   email?: string | null;
 };
+
+const VENDOR_PHOTO_BUCKET = "vendor-photos";
+const PHOTO_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function splitContactName(contactName: string): { first: string; last: string } {
+  const parts = String(contactName || "").trim().split(/\s+/).filter(Boolean);
+  return {
+    first: parts[0] || "",
+    last: parts.slice(1).join(" "),
+  };
+}
+
+function resolveVendorNames(body: Record<string, unknown>): {
+  first_name: string;
+  last_name: string;
+  contact_name: string;
+} {
+  const firstRaw = String(body.first_name || "").trim();
+  const lastRaw = String(body.last_name || "").trim();
+  const contactRaw = String(body.contact_name || "").trim();
+  if (firstRaw) {
+    const contact_name = `${firstRaw} ${lastRaw}`.trim();
+    return { first_name: firstRaw, last_name: lastRaw, contact_name: contact_name || firstRaw };
+  }
+  const split = splitContactName(contactRaw);
+  return {
+    first_name: split.first,
+    last_name: split.last,
+    contact_name: contactRaw || split.first,
+  };
+}
+
+function normalizeMobile2(value: unknown): string | null {
+  if (!value) return null;
+  const m = normalizeMobile(String(value));
+  return m || null;
+}
+
+function normalizeVehicleType(value: unknown): "2W" | "4W" | null {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return null;
+  if (raw === "2W" || raw === "2" || raw.includes("2W") || raw.includes("TWO")) return "2W";
+  if (raw === "4W" || raw === "4" || raw.includes("4W") || raw.includes("FOUR")) return "4W";
+  return null;
+}
+
+function vendorProfileFields(body: Record<string, unknown>) {
+  const names = resolveVendorNames(body);
+  const mobile2 = normalizeMobile2(body.mobile2 || body.phone2);
+  const vehicleType = normalizeVehicleType(body.vehicle_type);
+  return {
+    first_name: names.first_name || null,
+    last_name: names.last_name || null,
+    contact_name: names.contact_name,
+    mobile2,
+    vehicle_type: vehicleType,
+    license_number: body.license_number ? String(body.license_number).trim().toUpperCase() : null,
+    photo_path: body.photo_path ? String(body.photo_path).trim() : null,
+    highest_education: body.highest_education ? String(body.highest_education).trim() : null,
+    app_installed_confirmed: body.app_installed_confirmed === true,
+    gps_allowed_confirmed: body.gps_allowed_confirmed === true,
+  };
+}
+
+async function recordGpsHistory(
+  supabase: SupabaseClient,
+  vendorId: string,
+  lat: number,
+  lng: number,
+  accuracyM?: number | null,
+): Promise<void> {
+  await supabase.from("vendor_gps_history").insert({
+    vendor_id: vendorId,
+    lat,
+    lng,
+    accuracy_m: accuracyM ?? null,
+    source: "app",
+  });
+}
+
+async function signedPhotoUploadUrl(
+  supabase: SupabaseClient,
+  mobile: string,
+  contentType: string,
+) {
+  const mime = contentType.toLowerCase();
+  if (!PHOTO_MIME.has(mime)) {
+    return { ok: false as const, error: "Photo must be JPEG, PNG, or WebP" };
+  }
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+  const digits = mobile.replace(/\D/g, "");
+  const path = `pending/${digits}/${Date.now()}.${ext}`;
+  const { data, error } = await supabase.storage
+    .from(VENDOR_PHOTO_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error || !data?.signedUrl) {
+    return { ok: false as const, error: error?.message || "Could not create upload URL" };
+  }
+  return {
+    ok: true as const,
+    signed_url: data.signedUrl,
+    path,
+    token: data.token,
+  };
+}
 
 /** Link vendor to a TEXT profiles row (same pattern as customer cust_* ids). */
 async function ensurePartnerProfile(
@@ -385,9 +495,11 @@ async function ensurePartnerProfile(
     .maybeSingle();
 
   const profileId = byPhone?.id || defaultId;
-  const nameParts = String(vendor.contact_name || "").trim().split(/\s+/);
-  const firstName = nameParts[0] || String(vendor.business_name || "Partner");
-  const lastName = nameParts.slice(1).join(" ");
+  const firstName = String(vendor.first_name || "").trim()
+    || splitContactName(String(vendor.contact_name || "")).first
+    || String(vendor.business_name || "Partner");
+  const lastName = String(vendor.last_name || "").trim()
+    || splitContactName(String(vendor.contact_name || "")).last;
 
   const { error } = await supabase.from("profiles").upsert({
     id: profileId,
@@ -641,7 +753,56 @@ Deno.serve(async (req: Request) => {
         await supabase.from("profiles").update({ last_lat: lat, last_lng: lng }).eq("id", pid);
       }
 
+      await recordGpsHistory(supabase, vendor.id, lat, lng, body.accuracy_m != null ? Number(body.accuracy_m) : null);
+
       return json({ success: true, vendor_id: vendor.id, lat, lng });
+    }
+
+    if (action === "photo-upload-url") {
+      const mobile = normalizeMobile(String(body.phone || body.mobile || ""));
+      if (!mobile) return json({ error: "Valid phone required" }, 400);
+      const otpCheck = await assertRecentOtpVerified(supabase, mobile);
+      if (!otpCheck.ok) return json({ error: otpCheck.error }, 400);
+      const contentType = String(body.content_type || "image/jpeg");
+      const result = await signedPhotoUploadUrl(supabase, mobile, contentType);
+      if (!result.ok) return json({ error: result.error }, 400);
+      return json({
+        signed_url: result.signed_url,
+        path: result.path,
+        token: result.token,
+      });
+    }
+
+    if (action === "photo-view-url") {
+      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      const vendorId = String(body.vendor_id || "");
+      if (!vendorId) return json({ error: "vendor_id required" }, 400);
+      const { data: vendor } = await supabase
+        .from("vendor_partners")
+        .select("photo_path")
+        .eq("id", vendorId)
+        .maybeSingle();
+      if (!vendor?.photo_path) return json({ error: "No photo on file" }, 404);
+      const { data, error } = await supabase.storage
+        .from(VENDOR_PHOTO_BUCKET)
+        .createSignedUrl(vendor.photo_path, 3600);
+      if (error || !data?.signedUrl) return json({ error: error?.message || "Could not load photo" }, 500);
+      return json({ signed_url: data.signedUrl, expires_in: 3600 });
+    }
+
+    if (action === "gps-history") {
+      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      const vendorId = String(body.vendor_id || "");
+      if (!vendorId) return json({ error: "vendor_id required" }, 400);
+      const limit = Math.min(Math.max(Number(body.limit) || 50, 1), 200);
+      const { data, error } = await supabase
+        .from("vendor_gps_history")
+        .select("id, lat, lng, accuracy_m, source, recorded_at")
+        .eq("vendor_id", vendorId)
+        .order("recorded_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return json({ history: data || [], count: data?.length || 0 });
     }
 
     if (action === "update-services") {
@@ -708,13 +869,21 @@ Deno.serve(async (req: Request) => {
       if (pan && !validatePan(pan)) return json({ error: "Invalid PAN format" }, 400);
 
       const contactName = String(body.contact_name || "");
-      const aadhaarResult = await resolveAadhaarForRegister(supabase, body, contactName);
+      const profileFields = vendorProfileFields(body);
+      const aadhaarResult = await resolveAadhaarForRegister(supabase, body, profileFields.contact_name || contactName);
       if (!aadhaarResult.ok) return json({ error: aadhaarResult.error }, 400);
+
+      if (!profileFields.app_installed_confirmed || !profileFields.gps_allowed_confirmed) {
+        return json({ error: "Confirm ScanV app installation and GPS permission before submitting" }, 400);
+      }
 
       const vendorPayload = {
         business_name: String(body.business_name || "").trim(),
-        contact_name: contactName.trim(),
+        contact_name: profileFields.contact_name.trim(),
+        first_name: profileFields.first_name,
+        last_name: profileFields.last_name,
         phone: mobile,
+        mobile2: profileFields.mobile2,
         phone_verified: true,
         email: body.email ? String(body.email).trim() : null,
         pan_number: pan,
@@ -739,6 +908,12 @@ Deno.serve(async (req: Request) => {
         ip_country: gpsCheck.ipC,
         is_vpn_suspected: gpsCheck.vpn,
         vehicle_number: body.vehicle_number ? String(body.vehicle_number).trim().toUpperCase() : null,
+        vehicle_type: profileFields.vehicle_type,
+        license_number: profileFields.license_number,
+        photo_path: profileFields.photo_path,
+        highest_education: profileFields.highest_education,
+        app_installed_confirmed: profileFields.app_installed_confirmed,
+        gps_allowed_confirmed: profileFields.gps_allowed_confirmed,
         status: "pending",
       };
 
@@ -790,6 +965,10 @@ Deno.serve(async (req: Request) => {
         await upsertPartnerServices(supabase, vendorId, services, true);
       }
 
+      if (lat && lng) {
+        await recordGpsHistory(supabase, vendorId, lat, lng);
+      }
+
       return json({
         success: true,
         vendor_id: vendorId,
@@ -828,12 +1007,21 @@ Deno.serve(async (req: Request) => {
           const hay = [
             v.business_name,
             v.contact_name,
+            v.first_name,
+            v.last_name,
             v.phone,
+            v.mobile2,
             v.email,
             v.city,
             v.village,
             v.street_name,
+            v.pincode,
+            v.state,
             v.vehicle_number,
+            v.license_number,
+            v.highest_education,
+            v.pan_number,
+            v.aadhaar_last4,
           ].filter(Boolean).join(" ").toLowerCase();
           return hay.includes(search);
         });
@@ -989,7 +1177,8 @@ Deno.serve(async (req: Request) => {
       if (!mobile) return json({ error: "Valid phone required" }, 400);
 
       const businessName = String(body.business_name || "").trim();
-      const contactName = String(body.contact_name || "").trim();
+      const profileFields = vendorProfileFields(body);
+      const contactName = profileFields.contact_name.trim();
       const shopOrFlat = String(body.shop_or_flat || "").trim();
       const streetName = String(body.street_name || "").trim();
       const city = String(body.city || "").trim();
@@ -1006,7 +1195,10 @@ Deno.serve(async (req: Request) => {
       const vendorPayload = {
         business_name: businessName,
         contact_name: contactName,
+        first_name: profileFields.first_name,
+        last_name: profileFields.last_name,
         phone: mobile,
+        mobile2: profileFields.mobile2,
         phone_verified: true,
         email: body.email ? String(body.email).trim() : null,
         shop_or_flat: shopOrFlat,
@@ -1028,6 +1220,12 @@ Deno.serve(async (req: Request) => {
         onboarded_at: activateNow ? new Date().toISOString() : null,
         notes: body.notes ? String(body.notes).trim() : "Admin enrolled",
         vehicle_number: body.vehicle_number ? String(body.vehicle_number).trim().toUpperCase() : null,
+        vehicle_type: profileFields.vehicle_type,
+        license_number: profileFields.license_number,
+        photo_path: profileFields.photo_path,
+        highest_education: profileFields.highest_education,
+        app_installed_confirmed: profileFields.app_installed_confirmed,
+        gps_allowed_confirmed: profileFields.gps_allowed_confirmed,
       };
 
       const { data: existing } = await supabase
