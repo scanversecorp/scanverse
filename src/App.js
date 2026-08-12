@@ -1009,14 +1009,6 @@ function findSvcByName(name) {
   return ALL_SUB_SVCS.find(s => s.name === name) || SVCS.find(s => s.name === name) || null;
 }
 
-/** Sub-services that must not show misleading stock photos (md5 duplicates / wrong category art) */
-const PHOTOLESS_SVC_IDS = new Set([
-  'tw-mechanic', 'tw-pickup', 'tw-fix', 'tw-wash', 'tw-deep', 'tw-battery',
-  'fw-mechanic', 'fw-pickup', 'fw-fix', 'fw-wash', 'fw-deep', 'fw-detail',
-  'dl-sameday', 'dl-doc', 'dl-parcel', 'dl-intercity', 'dl-bulk',
-  'pr-site',
-]);
-
 function svcParentId(svc) {
   if (!svc) return null;
   if (svc.parent) return svc.parent;
@@ -1024,8 +1016,7 @@ function svcParentId(svc) {
 }
 
 function resolveSvcImage(svc) {
-  if (!svc?.img || PHOTOLESS_SVC_IDS.has(svc.id)) return null;
-  return svc.img;
+  return svc?.img || null;
 }
 
 function effectiveSvcPrices(svc) {
