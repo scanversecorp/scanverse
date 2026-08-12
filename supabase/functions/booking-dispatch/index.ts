@@ -201,6 +201,17 @@ async function notifyVendor(
   return { callFailed: callFailed || !call.ok };
 }
 
+async function dispatchIgnore(
+  query: PromiseLike<{ error?: { message?: string } | null }>,
+) {
+  try {
+    const { error } = await query;
+    if (error) console.warn("[dispatch]", error.message);
+  } catch (e) {
+    console.warn("[dispatch]", e instanceof Error ? e.message : e);
+  }
+}
+
 async function assignVendor(
   supabase: ReturnType<typeof createClient>,
   dispatchId: string,
@@ -227,13 +238,16 @@ async function assignVendor(
     next_action_at: null,
   }).eq("id", dispatchId);
 
-  await supabase.from("bookings").update({ partner_id: partnerId, status: "confirmed" })
-    .eq("id", bookingId).catch(() => {});
+  await dispatchIgnore(
+    supabase.from("bookings").update({ partner_id: partnerId, status: "confirmed" })
+      .eq("id", bookingId),
+  );
 
   const { data: bk } = await supabase.from("bookings").select("txn_id").eq("id", bookingId).single();
   if (bk?.txn_id) {
-    await supabase.from("service_requests").update({ status: "assigned" })
-      .eq("txn_id", bk.txn_id).catch(() => {});
+    await dispatchIgnore(
+      supabase.from("service_requests").update({ status: "assigned" }).eq("txn_id", bk.txn_id),
+    );
   }
 
   // Seed live tracking from vendor base location until partner GPS updates
@@ -243,15 +257,17 @@ async function assignVendor(
     .eq("id", vendorId)
     .maybeSingle();
   if (vp?.address_lat && vp?.address_lng) {
-    await supabase.from("vendor_live_locations").upsert({
-      booking_id: bookingId,
-      vendor_id: vendorId,
-      partner_id: partnerId,
-      lat: vp.address_lat,
-      lng: vp.address_lng,
-      tracking_active: true,
-      updated_at: now,
-    }, { onConflict: "booking_id" }).catch(() => {});
+    await dispatchIgnore(
+      supabase.from("vendor_live_locations").upsert({
+        booking_id: bookingId,
+        vendor_id: vendorId,
+        partner_id: partnerId,
+        lat: vp.address_lat,
+        lng: vp.address_lng,
+        tracking_active: false,
+        updated_at: now,
+      }, { onConflict: "booking_id" }),
+    );
   }
 }
 
@@ -512,10 +528,12 @@ Deno.serve(async (req: Request) => {
         }
       }
       if (custLat && custLng) {
-        await supabase.from("bookings").update({
-          customer_lat: custLat,
-          customer_lng: custLng,
-        }).eq("id", bookingId).catch(() => {});
+        await dispatchIgnore(
+          supabase.from("bookings").update({
+            customer_lat: custLat,
+            customer_lng: custLng,
+          }).eq("id", bookingId),
+        );
       }
 
       const acceptCode = generateAcceptCode();

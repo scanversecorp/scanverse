@@ -1010,6 +1010,33 @@ function bookingDraftForIntent(intent) {
   return draft?.txnId === intent?.txn_id ? draft : null;
 }
 
+const ACTIVE_BOOKING_STATUSES = ['confirmed', 'in_progress', 'in-progress'];
+
+async function findDuplicateBooking({ customerId, serviceId, date, time, txnId }) {
+  try {
+    if (txnId) {
+      const { data: byTxn } = await sb().from('bookings')
+        .select('id, status, txn_id, date, time, service_name, service_id')
+        .eq('txn_id', txnId)
+        .in('status', ACTIVE_BOOKING_STATUSES)
+        .maybeSingle();
+      if (byTxn) return byTxn;
+    }
+    if (customerId && serviceId && date) {
+      let q = sb().from('bookings')
+        .select('id, status, txn_id, date, time, service_name, service_id')
+        .eq('customer_id', customerId)
+        .eq('service_id', serviceId)
+        .eq('date', date)
+        .in('status', ACTIVE_BOOKING_STATUSES);
+      if (time) q = q.eq('time', time);
+      const { data: bySlot } = await q.maybeSingle();
+      if (bySlot) return bySlot;
+    }
+  } catch (_) { /* ignore lookup errors */ }
+  return null;
+}
+
 async function findOrphanPaidIntents(userId) {
   if (!userId) return [];
   try {
@@ -1021,7 +1048,10 @@ async function findOrphanPaidIntents(userId) {
       .limit(10);
     if (!intents?.length) return [];
     const txnIds = intents.map((i) => i.txn_id);
-    const { data: bks } = await sb().from('bookings').select('txn_id').in('txn_id', txnIds);
+    const { data: bks } = await sb().from('bookings')
+      .select('txn_id')
+      .in('txn_id', txnIds)
+      .in('status', ACTIVE_BOOKING_STATUSES);
     const booked = new Set((bks || []).map((b) => b.txn_id));
     return intents.filter((i) => !booked.has(i.txn_id));
   } catch (_) {
@@ -2735,6 +2765,26 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const loc   = bookingDetail.loc||`${village}, ${city} ${pincode}`.trim();
       const custLat = silentGeo?.lat || bookingDetail.lat || null;
       const custLng = silentGeo?.lng || bookingDetail.lng || null;
+      const svcId = svc.id || svc.parent || null;
+      const dup = await findDuplicateBooking({
+        customerId: userId, serviceId: svcId,
+        date: bookingDetail.date, time: bookingDetail.time || '10:00', txnId,
+      });
+      if (dup) {
+        const profile = await upsertCustomerProfile({
+          id: userId,
+          mob: normalizeMobileE164(mobile),
+          firstName, lastName, address, village, city, pincode,
+          silentGeo,
+          lastLat: silentGeo?.lat || bookingDetail.lat || null,
+          lastLng: silentGeo?.lng || bookingDetail.lng || null,
+        });
+        addToast?.('You already have this booking — opening track view', 'success');
+        sessionStorage.setItem(TRACK_BOOKING_KEY, dup.id);
+        clearBookingDraft();
+        onRegistered(profile, dup.id);
+        return;
+      }
       const {data:bk,error} = await sb().from('bookings').insert({
         customer_id:userId, service_name:svc.name, service_id: svc.id || svc.parent || null,
         customer_name:`${firstName} ${lastName}`.trim(),
@@ -4098,6 +4148,17 @@ function BookScreen() {
       const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
       const custLat = bookLat ?? profile.last_lat ?? silentGeo?.lat ?? null;
       const custLng = bookLng ?? profile.last_lng ?? silentGeo?.lng ?? null;
+      const svcId = svc.id || svc.parent || null;
+      const dup = await findDuplicateBooking({
+        customerId: profile.id, serviceId: svcId,
+        date, time, txnId,
+      });
+      if (dup) {
+        addToast('You already have this booking — opening track view', 'success');
+        clearBookingDraft();
+        goToTrack(setTrackBookingId, setScreen, dup.id);
+        return;
+      }
       const { data, error } = await sb().from('bookings').insert({
         customer_id: profile.id, service_name: svc.name, service_id: svc.id || svc.parent || null,
         customer_name: fullName || user.name, customer_email: profile.email || user.email || '',
@@ -4264,54 +4325,128 @@ function BookScreen() {
   );
 }
 
-function osmEmbedUrl(vLat, vLng, cLat, cLng) {
-  const lat = vLat || cLat || 18.6298;
-  const lng = vLng || cLng || 73.7997;
-  const pad = 0.012;
-  const minLng = Math.min(lng, cLng ?? lng) - pad;
-  const maxLng = Math.max(lng, cLng ?? lng) + pad;
-  const minLat = Math.min(lat, cLat ?? lat) - pad;
-  const maxLat = Math.max(lat, cLat ?? lat) + pad;
-  let url = `https://www.openstreetmap.org/export/embed.html?bbox=${minLng}%2C${minLat}%2C${maxLng}%2C${maxLat}&layer=mapnik`;
-  if (vLat && vLng) url += `&marker=${vLat}%2C${vLng}`;
-  return url;
+function mapBbox(vLat, vLng, cLat, cLng) {
+  const points = [];
+  if (vLat != null && vLng != null) points.push({ lat: vLat, lng: vLng });
+  if (cLat != null && cLng != null) points.push({ lat: cLat, lng: cLng });
+  if (!points.length) {
+    return { minLat: 18.6178, maxLat: 18.6418, minLng: 73.7877, maxLng: 73.8117 };
+  }
+  const lats = points.map((p) => p.lat);
+  const lngs = points.map((p) => p.lng);
+  const pad = points.length > 1 ? 0.008 : 0.012;
+  return {
+    minLat: Math.min(...lats) - pad,
+    maxLat: Math.max(...lats) + pad,
+    minLng: Math.min(...lngs) - pad,
+    maxLng: Math.max(...lngs) + pad,
+  };
 }
 
-function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMessage }) {
+function latLngToMapPct(lat, lng, bbox) {
+  const spanLng = bbox.maxLng - bbox.minLng || 0.001;
+  const spanLat = bbox.maxLat - bbox.minLat || 0.001;
+  const x = ((lng - bbox.minLng) / spanLng) * 100;
+  const y = ((bbox.maxLat - lat) / spanLat) * 100;
+  return { left: `${Math.min(96, Math.max(4, x))}%`, top: `${Math.min(96, Math.max(4, y))}%` };
+}
+
+function osmEmbedUrl(vLat, vLng, cLat, cLng) {
+  const bbox = mapBbox(vLat, vLng, cLat, cLng);
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox.minLng}%2C${bbox.minLat}%2C${bbox.maxLng}%2C${bbox.maxLat}&layer=mapnik`;
+}
+
+function MapOverlayPin({ label, color, pos, pulse }) {
+  return (
+    <div style={{ position: 'absolute', left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)', zIndex: 2, pointerEvents: 'none', textAlign: 'center' }}>
+      <div style={{
+        width: pulse ? 12 : 10, height: pulse ? 12 : 10, borderRadius: '50%', background: color, margin: '0 auto 2px',
+        boxShadow: pulse ? `0 0 0 4px ${color}44` : '0 1px 4px rgba(0,0,0,0.35)',
+        animation: pulse ? 'heroPulse 1.5s ease infinite' : undefined,
+      }} />
+      <div style={{ fontSize: 9, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>{label}</div>
+    </div>
+  );
+}
+
+function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMessage, viewMode = 'customer' }) {
   const mapH = large ? 320 : 180;
-  const coords = resolveBookingCoords(booking, dispatch);
-  const hasLive = live?.tracking_active && live.lat != null && live.lng != null;
-  const hasCustomerPin = coords.lat != null && coords.lng != null;
+  const customerCoords = resolveBookingCoords(booking, dispatch);
+  const vendorLat = live?.lat ?? null;
+  const vendorLng = live?.lng ?? null;
+  const hasVendorPin = vendorLat != null && vendorLng != null;
+  const hasCustomerPin = customerCoords.lat != null && customerCoords.lng != null;
+  const hasLiveGps = live?.tracking_active && hasVendorPin && !live?.is_base;
+  const hasAnyPin = hasVendorPin || hasCustomerPin;
   const updated = live?.updated_at ? new Date(live.updated_at) : null;
   const minsAgo = updated ? Math.max(0, Math.round((Date.now() - updated.getTime()) / 60000)) : null;
-  const mapsLink = hasLive ? `https://www.google.com/maps/dir/?api=1&destination=${live.lat},${live.lng}` : null;
-  const embedSrc = hasLive
-    ? osmEmbedUrl(live.lat, live.lng, coords.lat, coords.lng)
-    : osmEmbedUrl(coords.lat, coords.lng, null, null);
+  const bbox = mapBbox(vendorLat, vendorLng, customerCoords.lat, customerCoords.lng);
+  const embedSrc = osmEmbedUrl(vendorLat, vendorLng, customerCoords.lat, customerCoords.lng);
+  const isPartnerView = viewMode === 'partner';
+  const customerLabel = isPartnerView ? 'Customer · pickup/drop' : 'Your location';
+  const vendorLabel = isPartnerView ? 'You · partner' : (partnerName || 'Partner');
+  const customerPinPos = hasCustomerPin ? latLngToMapPct(customerCoords.lat, customerCoords.lng, bbox) : null;
+  const vendorPinPos = hasVendorPin ? latLngToMapPct(vendorLat, vendorLng, bbox) : null;
+  const mapsDest = isPartnerView
+    ? (hasCustomerPin ? `${customerCoords.lat},${customerCoords.lng}` : null)
+    : (hasVendorPin ? `${vendorLat},${vendorLng}` : (hasCustomerPin ? `${customerCoords.lat},${customerCoords.lng}` : null));
+  const mapsLink = mapsDest ? `https://www.google.com/maps/dir/?api=1&destination=${mapsDest}` : null;
 
   return (
     <div style={{ marginTop: large ? 0 : 12, borderTop: large ? 'none' : `1px solid ${C.bdr}`, paddingTop: large ? 0 : 12 }}>
-      {hasLive ? (
+      {hasLiveGps ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.grn, boxShadow: `0 0 0 3px ${C.grn}44`, animation: 'heroPulse 1.5s ease infinite' }} />
-              <span style={{ fontSize: large ? 14 : 12, fontWeight: 700, color: C.grn }}>Live partner location</span>
+              <span style={{ fontSize: large ? 14 : 12, fontWeight: 700, color: C.grn }}>
+                {isPartnerView ? 'Live GPS shared with customer' : 'Live partner location'}
+              </span>
             </div>
             <span style={{ fontSize: 10, color: C.dim }}>{minsAgo === 0 ? 'Just now' : minsAgo != null ? `${minsAgo}m ago` : ''}</span>
           </div>
           <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>
-            {partnerName || 'Your partner'} is en route · tracking until service is closed
+            {isPartnerView
+              ? 'Customer destination and your position shown on map'
+              : `${partnerName || 'Your partner'} is en route · tracking until service is closed`}
           </div>
         </>
+      ) : hasVendorPin && live?.is_base ? (
+        <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>
+          {isPartnerView ? 'Your base location shown · enable GPS for live tracking' : `${partnerName || 'Partner'} base location shown · live GPS when they start sharing`}
+        </div>
       ) : waitingMessage ? (
         <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5, textAlign: large ? 'center' : 'left' }}>
           {waitingMessage}
         </div>
       ) : null}
-      <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: mapH, background: C.deep }}>
-        {hasLive || hasCustomerPin ? (
-          <iframe title="Live partner map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
+      {(hasCustomerPin || hasVendorPin) && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+          {hasCustomerPin && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.acc, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.acc, display: 'inline-block' }} />
+              {customerLabel}
+            </span>
+          )}
+          {hasVendorPin && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.grn, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.grn, display: 'inline-block' }} />
+              {vendorLabel}{hasLiveGps ? ' · live' : live?.is_base ? ' · base' : ''}
+            </span>
+          )}
+        </div>
+      )}
+      <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: mapH, background: C.deep, position: 'relative' }}>
+        {hasAnyPin ? (
+          <>
+            <iframe title="Live booking map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
+            {hasCustomerPin && customerPinPos && (
+              <MapOverlayPin label={customerLabel} color={C.acc} pos={customerPinPos} />
+            )}
+            {hasVendorPin && vendorPinPos && (
+              <MapOverlayPin label={vendorLabel} color={C.grn} pos={vendorPinPos} pulse={hasLiveGps} />
+            )}
+          </>
         ) : (
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center', color: C.dim, fontSize: 12 }}>
             Map appears once your service location is set · tap 📍 on booking to capture GPS
@@ -4320,7 +4455,7 @@ function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMes
       </div>
       {mapsLink && (
         <a href={mapsLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 11, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>
-          Open in Google Maps ↗
+          Open directions in Google Maps ↗
         </a>
       )}
     </div>
@@ -4347,7 +4482,18 @@ function useLiveBookingTrack(bookingId) {
       }
     }
     const { data: loc } = await sb().from('vendor_live_locations').select('*').eq('booking_id', bookingId).maybeSingle();
-    setLive(loc?.tracking_active && loc.lat != null && loc.lng != null ? loc : null);
+    let liveLoc = loc?.lat != null && loc?.lng != null ? loc : null;
+    if (liveLoc && !liveLoc.tracking_active) liveLoc = { ...liveLoc, is_base: true };
+    if (!liveLoc && bk?.partner_id) {
+      const { data: vp } = await sb().from('vendor_partners')
+        .select('address_lat, address_lng')
+        .eq('profile_id', bk.partner_id)
+        .maybeSingle();
+      if (vp?.address_lat != null && vp?.address_lng != null) {
+        liveLoc = { lat: vp.address_lat, lng: vp.address_lng, tracking_active: false, is_base: true };
+      }
+    }
+    setLive(liveLoc);
     try {
       const r = await sb().functions.invoke('booking-dispatch', { body: { action: 'status', booking_id: bookingId } });
       setDispatch(r.data?.dispatch || null);
@@ -4437,8 +4583,8 @@ function trackStatusLabel(booking, dispatch, live) {
   if (booking.status === 'completed') return { label: 'Service completed', color: C.grn, step: 4 };
   if (booking.status === 'cancelled' || booking.status === 'disputed') return { label: booking.status, color: C.red, step: 0 };
   if (dispatch?.status === 'exhausted') return { label: 'Finding partner — trying more vendors', color: C.gold, step: 1 };
-  if (live?.tracking_active) return { label: 'Partner en route — live GPS', color: C.grn, step: 3 };
-  if (booking.partner_id) return { label: 'Partner assigned — awaiting GPS', color: C.cyan, step: 2 };
+  if (live?.tracking_active && !live?.is_base) return { label: 'Partner en route — live GPS', color: C.grn, step: 3 };
+  if (live?.lat != null || booking.partner_id) return { label: live?.is_base ? 'Partner assigned — base location' : 'Partner assigned — awaiting GPS', color: C.cyan, step: 2 };
   if (dispatch?.status === 'dispatching') return { label: 'Contacting nearest partner…', color: C.cyan, step: 1 };
   return { label: 'Booking confirmed — finding partner', color: C.acc, step: 1 };
 }
@@ -4547,11 +4693,14 @@ function TrackServiceScreen() {
               dispatch={dispatch}
               partnerName={partnerName}
               large
+              viewMode="customer"
               waitingMessage={
-                live?.tracking_active
+                live?.tracking_active && !live?.is_base
                   ? null
                   : booking?.partner_id
-                    ? `Partner assigned — waiting for ${partnerName || 'partner'} to share live GPS…`
+                    ? live?.is_base
+                      ? `${partnerName || 'Partner'} base location shown · live GPS when they start sharing`
+                      : `Partner assigned — waiting for ${partnerName || 'partner'} to share live GPS…`
                     : 'Partner will appear on map once assigned · map shows your service location'
               }
             />
@@ -4725,7 +4874,7 @@ function BookingsScreen() {
     const ids=(data||[]).map(b=>b.id);
     if(ids.length){
       const{data:lives}=await sb().from('vendor_live_locations').select('*').in('booking_id',ids);
-      const map={}; (lives||[]).forEach(l=>{ map[l.booking_id]=l; });
+      const map={}; (lives||[]).forEach(l=>{ map[l.booking_id]=l.tracking_active?l:{...l,is_base:true}; });
       setLiveLocs(map);
       const pids=[...new Set((data||[]).filter(b=>b.partner_id).map(b=>b.partner_id))];
       if(pids.length){
@@ -4770,11 +4919,20 @@ function BookingsScreen() {
     return ()=>{ if(channel) sb().removeChannel(channel); clearInterval(poll); };
   },[bookings]);
 
-  const showTrackMap=(b)=>user.role==='customer'&&b.status==='confirmed'&&bookingSupportsLiveTrack(b);
-  const trackWaitingMessage=(b)=>{
-    const live=liveLocs[b.id];
-    if(live?.tracking_active) return null;
-    if(b.partner_id) return `Waiting for ${partners[b.partner_id]||'partner'} to share live GPS…`;
+  const showTrackMap = (b) => b.status === 'confirmed' && bookingSupportsLiveTrack(b) && (
+    user.role === 'customer' || (user.role === 'partner' && b.partner_id === user.id)
+  );
+  const trackWaitingMessage = (b) => {
+    const live = liveLocs[b.id];
+    if (live?.tracking_active && !live?.is_base) return null;
+    if (user.role === 'partner') {
+      if (b.customer_lat != null) return 'Customer pickup/drop shown · enable GPS to share your live position';
+      return 'Enable GPS to share your location with the customer';
+    }
+    if (live?.is_base || (live?.lat != null && !live?.tracking_active)) {
+      return `${partners[b.partner_id] || 'Partner'} base location shown · live GPS when they start sharing`;
+    }
+    if (b.partner_id) return `Waiting for ${partners[b.partner_id] || 'partner'} to share live GPS…`;
     return 'Searching for nearby partner · map shows your service location';
   };
   const activeBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='In-progress');
@@ -4790,7 +4948,15 @@ function BookingsScreen() {
           <div style={{fontSize:10,color:C.dim,marginTop:4,textTransform:'capitalize'}}>{b.status?.replace(/_/g,' ')}</div>
         </div>
       </div>
-      {showTrackMap(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]} waitingMessage={trackWaitingMessage(b)}/>}
+      {showTrackMap(b) && (
+        <LiveVendorMap
+          live={liveLocs[b.id]}
+          booking={b}
+          partnerName={partners[b.partner_id]}
+          waitingMessage={trackWaitingMessage(b)}
+          viewMode={user.role === 'partner' ? 'partner' : 'customer'}
+        />
+      )}
       {user.role==='customer'&&b.status==='confirmed'&&<WaitEngagementPanel compact />}
       {user.role==='customer'&&bookingStatusGroup(b.status).label==='In-progress'&&bookingSupportsLiveTrack(b)&&(
         <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
@@ -4824,6 +4990,21 @@ function BookingsScreen() {
       const loc = [user.address, user.city, user.pincode].filter(Boolean).join(', ') || user.last_address || '';
       const payCheck = await fetchPaymentVerification(intent.txn_id, intent.amount_paise);
       if (!payCheck.verified) throw new Error('Payment no longer verified — contact support');
+      const existing = await findDuplicateBooking({
+        customerId: user.id,
+        serviceId: svc.id || svc.parent || null,
+        date: recoverDate,
+        time: recoverTime || '10:00',
+        txnId: intent.txn_id,
+      });
+      if (existing) {
+        clearBookingDraft();
+        setRecovering(null);
+        addToast('Booking already exists for this payment — opening track', 'success');
+        goToTrack(setTrackBookingId, setScreen, existing.id);
+        load();
+        return;
+      }
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Customer';
       const { data: bk, error } = await sb().from('bookings').insert({
         customer_id: user.id,
