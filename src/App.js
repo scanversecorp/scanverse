@@ -328,7 +328,14 @@ async function registerPaymentIntent(txnId, amountPaise, userId, meta = {}) {
       return { error: data.error || e.message || 'Payment registration failed' };
     } catch (e2) {
       try {
-        await sb().from('payment_intents').upsert({ txn_id: txnId, amount_paise: amountPaise, user_id: userId || null, status: 'pending' }, { onConflict: 'txn_id', ignoreDuplicates: true });
+        await sb().from('payment_intents').upsert({
+          txn_id: txnId,
+          amount_paise: amountPaise,
+          user_id: userId || null,
+          status: 'pending',
+          ...(meta.serviceId ? { service_id: meta.serviceId } : {}),
+          ...(meta.serviceName ? { service_name: meta.serviceName } : {}),
+        }, { onConflict: 'txn_id', ignoreDuplicates: true });
       } catch (_2) {}
       return { error: e2.message || e.message || 'Payment registration failed' };
     }
@@ -953,14 +960,54 @@ function bookingTotalsForSvc(svc) {
   return { price, fee, gst, total: price + fee + gst };
 }
 
-function inferServiceFromTotalPaise(totalPaise) {
+function inferServiceFromTotalPaise(totalPaise, hints = {}) {
+  const { serviceId = null, serviceName = null } = hints;
+  const matches = [];
   for (const svc of ALL_SUB_SVCS) {
-    if (bookingTotalsForSvc(svc).total === totalPaise) return svc;
+    if (bookingTotalsForSvc(svc).total === totalPaise) matches.push(svc);
   }
   for (const svc of SVCS) {
-    if (bookingTotalsForSvc(svc).total === totalPaise) return svc;
+    if (bookingTotalsForSvc(svc).total === totalPaise) matches.push(svc);
   }
-  return null;
+  if (!matches.length) return null;
+  if (serviceId) {
+    const byId = matches.find(s => s.id === serviceId);
+    if (byId) return byId;
+  }
+  if (serviceName) {
+    const byName = matches.find(s => s.name === serviceName);
+    if (byName) return byName;
+  }
+  return matches[0];
+}
+
+function resolveServiceForPaidIntent(intent, draft = null) {
+  if (!intent) return null;
+  if (intent.service_id) {
+    const byIntentId = findSvcById(intent.service_id);
+    if (byIntentId) return byIntentId;
+  }
+  if (draft?.txnId === intent.txn_id && draft?.serviceId) {
+    const byDraftId = findSvcById(draft.serviceId);
+    if (byDraftId) return byDraftId;
+  }
+  if (intent.service_name) {
+    const byIntentName = findSvcByName(intent.service_name);
+    if (byIntentName) return byIntentName;
+  }
+  if (draft?.txnId === intent.txn_id && draft?.serviceName) {
+    const byDraftName = findSvcByName(draft.serviceName);
+    if (byDraftName) return byDraftName;
+  }
+  return inferServiceFromTotalPaise(intent.amount_paise, {
+    serviceId: intent.service_id || draft?.serviceId || null,
+    serviceName: intent.service_name || draft?.serviceName || null,
+  });
+}
+
+function bookingDraftForIntent(intent) {
+  const draft = loadBookingDraft();
+  return draft?.txnId === intent?.txn_id ? draft : null;
 }
 
 async function findOrphanPaidIntents(userId) {
@@ -4620,7 +4667,7 @@ function BookingsScreen() {
     if (!recoverDate) return addToast('Select a date', 'error');
     setRecoverBusy(true);
     try {
-      const svc = findSvcById(intent.service_id) || inferServiceFromTotalPaise(intent.amount_paise);
+      const svc = resolveServiceForPaidIntent(intent, bookingDraftForIntent(intent));
       if (!svc) throw new Error('Could not match service — contact support with ref ' + intent.txn_id);
       const { price, fee, gst, total } = bookingTotalsForSvc(svc);
       const loc = [user.address, user.city, user.pincode].filter(Boolean).join(', ') || user.last_address || '';
@@ -4709,7 +4756,7 @@ function BookingsScreen() {
               <div key={intent.txn_id} style={{ marginBottom: recovering === intent.txn_id ? 10 : 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontSize: 12, color: C.txt }}>
-                    <div style={{ fontWeight: 700 }}>{intent.service_name || inferServiceFromTotalPaise(intent.amount_paise)?.name || 'Service'}</div>
+                    <div style={{ fontWeight: 700 }}>{resolveServiceForPaidIntent(intent, bookingDraftForIntent(intent))?.name || intent.service_name || 'Service'}</div>
                     <div style={{ color: C.dim }}>{intent.txn_id} · ₹{((intent.amount_paise || 0) / 100).toLocaleString('en-IN')}</div>
                   </div>
                   <Btn sm onClick={() => { setRecovering(intent.txn_id); setRecoverDate(''); setRecoverTime('10:00'); }}>
