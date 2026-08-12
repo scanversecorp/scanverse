@@ -1547,8 +1547,10 @@ async function invokeBookingDispatch(opts, addToast) {
       return r.data;
     }
     const n = r.data?.nearest_count ?? r.data?.vendors_notified?.length ?? 0;
-    if (n > 0) {
-      addToast?.(`Alerting ${n} nearest partner${n > 1 ? 's' : ''} via SMS, call & WhatsApp 📲`, 'success');
+    if (r.data?.dispatch_skipped) {
+      addToast?.('Partner dispatch is turned off in admin settings', 'error');
+    } else if (n > 0) {
+      addToast?.(`Offering job to nearest partner in the ScanV app — SMS/call/WhatsApp sent as backup`, 'success');
     } else if (r.data?.empty_queue) {
       const eq = r.data.empty_queue;
       const hint = eq.reason === 'vendors_missing_gps'
@@ -4903,7 +4905,7 @@ function TrackServiceScreen() {
 
           {!booking?.partner_id && booking?.status === 'confirmed' && (
             <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
-              <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — we alert the <strong>3 nearest active partners</strong> by GPS (SMS, call & WhatsApp). First to accept gets the job.
+              <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — we offer the job to the <strong>3 nearest active partners</strong> one-by-one in the ScanV app (SMS, call & WhatsApp are sent as backup). First to accept gets the job and live map tracking starts.
               {!dispatch && (
                 <div style={{ marginTop: 10 }}>
                   <Btn sm v="ghost" onClick={retryPartnerAlerts} disabled={retryDispatch}>
@@ -5082,6 +5084,102 @@ function PartnerGpsTracker() {
   const { user } = useApp();
   useVendorLocationTracker(user, { enabled: user?.role === 'partner' });
   return null;
+}
+
+function usePartnerJobOffers(user) {
+  const [offers, setOffers] = useState([]);
+
+  const loadOffers = useCallback(async () => {
+    if (user?.role !== 'partner') return;
+    const { data: vendor } = await sb().from('vendor_partners').select('id').eq('profile_id', user.id).eq('status', 'active').maybeSingle();
+    if (!vendor?.id) { setOffers([]); return; }
+    const { data: attempts } = await sb().from('booking_dispatch_attempts')
+      .select('id, dispatch_id, attempt_num, created_at, booking_dispatch:dispatch_id(id, booking_id, service_name, customer_location, scheduled_date, scheduled_time, customer_lat, customer_lng, accept_code, vendor_rank, attempt_num, status)')
+      .eq('vendor_id', vendor.id)
+      .eq('channel', 'app')
+      .eq('status', 'offered')
+      .order('created_at', { ascending: false });
+    setOffers((attempts || []).filter((a) => {
+      const st = a.booking_dispatch?.status;
+      return st === 'dispatching' || st === 'pending';
+    }));
+  }, [user?.id, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'partner') return undefined;
+    loadOffers();
+    let channel;
+    try {
+      channel = sb().channel(`partner-offers-${user.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_dispatch_attempts' }, () => loadOffers())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_dispatch' }, () => loadOffers())
+        .subscribe();
+    } catch {}
+    const poll = setInterval(loadOffers, 5000);
+    return () => { if (channel) sb().removeChannel(channel); clearInterval(poll); };
+  }, [user?.id, user?.role, loadOffers]);
+
+  return { offers, reload: loadOffers };
+}
+
+function PartnerJobOffersPanel({ user, addToast, onAccepted }) {
+  const { offers, reload } = usePartnerJobOffers(user);
+  const [responding, setResponding] = useState(null);
+
+  const respond = async (offer, response) => {
+    const code = offer.booking_dispatch?.accept_code;
+    if (!code) return addToast('Offer expired', 'error');
+    setResponding(`${offer.id}-${response}`);
+    try {
+      const r = await sb().functions.invoke('booking-dispatch', {
+        body: { action: 'respond', accept_code: code, response, partner_id: user.id },
+      });
+      if (r.error || r.data?.error) throw new Error(r.error?.message || r.data?.error);
+      addToast(response === 'accept' ? 'Job accepted — map & navigation below' : 'Job declined', 'success');
+      reload();
+      if (response === 'accept') onAccepted?.();
+    } catch (e) {
+      addToast(e.message || 'Could not respond', 'error');
+    } finally {
+      setResponding(null);
+    }
+  };
+
+  if (!offers.length) return null;
+
+  return (
+    <div style={{ margin: '0 16px 12px' }}>
+      {offers.map((offer) => {
+        const d = offer.booking_dispatch;
+        return (
+          <div key={offer.id} style={{ ...S.card(), padding: 16, marginBottom: 10, border: `2px solid ${C.acc}`, boxShadow: '0 4px 20px rgba(0,122,77,0.12)' }}>
+            <div style={{ fontSize: 11, color: C.acc, fontWeight: 800, letterSpacing: 0.5, marginBottom: 6 }}>🚨 NEW JOB OFFER</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>{d?.service_name || 'Service'}</div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{d?.scheduled_date || 'ASAP'} · {d?.scheduled_time || ''}</div>
+            {d?.customer_location && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>📍 {d.customer_location}</div>}
+            {d?.customer_lat != null && d?.customer_lng != null && (
+              <div style={{ marginTop: 10 }}>
+                <LiveVendorMap
+                  booking={{ customer_lat: d.customer_lat, customer_lng: d.customer_lng, location_text: d.customer_location }}
+                  dispatch={d}
+                  viewMode="partner"
+                  waitingMessage="Customer pickup / service location"
+                />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <Btn full disabled={!!responding} onClick={() => respond(offer, 'accept')}>
+                {responding === `${offer.id}-accept` ? <><Spin size={14} /> Accepting…</> : '✓ Accept job'}
+              </Btn>
+              <Btn v="outline" full disabled={!!responding} onClick={() => respond(offer, 'reject')}>
+                {responding === `${offer.id}-reject` ? '…' : 'Decline'}
+              </Btn>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function BookingsScreen() {
@@ -5399,12 +5497,15 @@ function BookingsScreen() {
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title="Bookings"/>
       {user.role==='partner'&&(
-        <div style={{margin:'0 16px 8px',background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',fontSize:11,color:C.grn,fontWeight:700,lineHeight:1.5}}>
-          📍 Live GPS active — your location is used for nearby job dispatch alerts
-          {bookings.some(b=>b.status==='confirmed'&&b.partner_id)&&(
-            <span style={{ display: 'block', fontWeight: 600, marginTop: 4 }}>Also sharing live GPS with customers on assigned bookings</span>
-          )}
-        </div>
+        <>
+          <PartnerJobOffersPanel user={user} addToast={addToast} onAccepted={load} />
+          <div style={{margin:'0 16px 8px',background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',fontSize:11,color:C.grn,fontWeight:700,lineHeight:1.5}}>
+            📍 Live GPS active — used to match you with nearby paid jobs in the ScanV app (SMS/call/WhatsApp backup if you miss the alert)
+            {bookings.some(b=>b.status==='confirmed'&&b.partner_id)&&(
+              <span style={{ display: 'block', fontWeight: 600, marginTop: 4 }}>Also sharing live GPS with customers on assigned bookings</span>
+            )}
+          </div>
+        </>
       )}
       <div style={{padding:16}}>
         {!!orphans.length && user.role === 'customer' && (
@@ -6471,7 +6572,7 @@ function FaqPage() {
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
     ['Who operates ScanV?', 'DCORE Global Corporation, Pune. Marketplace connecting customers with independent service partners. Call +91-9270194842 for help.'],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
-    ['How are partners assigned?', 'After payment, our dispatch system notifies nearby verified partners. First to accept is assigned to your booking.'],
+    ['How are partners assigned?', 'After payment, we offer the job to the 3 nearest active partners one-by-one in the ScanV app. SMS, call & WhatsApp are sent as backup. First partner to accept is assigned and live map tracking starts.'],
     ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Track progress at #track-ticket.'],
   ];
   return (
@@ -7808,6 +7909,63 @@ function AdminStatCard({ label, value, sub, color }) {
   );
 }
 
+function AdminDispatchModePanel({ pin, onSaved }) {
+  const [mode, setMode] = useState('both');
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [updatedAt, setUpdatedAt] = useState('');
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true); setErr('');
+    try {
+      const data = await adminHubFetch('get_platform_settings', { keys: ['dispatch_mode'] }, pin);
+      setMode(data.dispatch_mode || 'both');
+      setOptions(data.dispatch_mode_options || []);
+      const row = (data.rows || []).find((r) => r.key === 'dispatch_mode');
+      setUpdatedAt(row?.updated_at || '');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [pin]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setSaving(true); setErr('');
+    try {
+      await adminHubFetch('update_platform_setting', { key: 'dispatch_mode', value: mode, updated_by: 'admin-ui' }, pin);
+      onSaved?.(`Dispatch mode set to ${mode}`);
+      load();
+    } catch (e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div style={{ ...S.card(), padding: 16 }}><Spin size={20} /></div>;
+
+  return (
+    <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+      <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 4 }}>Vendor dispatch flow</div>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 14, lineHeight: 1.55 }}>
+        Controls how paid bookings alert the 3 nearest GPS-matched partners (one-by-one, 60s each). Default: in-app Uber-style offers plus SMS/call/WhatsApp backup.
+      </div>
+      {options.map((opt) => (
+        <label key={opt.value} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: `1px solid ${C.bdr}`, cursor: 'pointer' }}>
+          <input type="radio" name="dispatch_mode" checked={mode === opt.value} onChange={() => setMode(opt.value)} style={{ marginTop: 3, accentColor: C.acc }} />
+          <span>
+            <span style={{ display: 'block', fontWeight: 700, color: C.txt, fontSize: 13 }}>{opt.label}</span>
+            <span style={{ display: 'block', fontSize: 11, color: C.dim, marginTop: 2, lineHeight: 1.5 }}>{opt.description}</span>
+          </span>
+        </label>
+      ))}
+      {updatedAt && <div style={{ fontSize: 10, color: C.dim, marginTop: 10 }}>Last updated {new Date(updatedAt).toLocaleString('en-IN')}</div>}
+      {err && <div style={{ color: C.red, fontSize: 12, marginTop: 10 }}>{err}</div>}
+      <Btn onClick={save} disabled={saving} style={{ marginTop: 14 }}>{saving ? 'Saving…' : 'Save dispatch mode'}</Btn>
+    </div>
+  );
+}
+
 function AdminSupportQuickSearch({ pin }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
@@ -8206,6 +8364,7 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'vendors' && (
           <div>
+            <AdminDispatchModePanel pin={usePin} onSaved={(m) => setMsg(m)} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 13, color: C.sub }}>Activate/offboard partners. Pending dispatches: {stats?.pending_dispatches ?? '—'}</div>
               <div style={{ display: 'flex', gap: 8 }}>

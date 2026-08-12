@@ -1,13 +1,13 @@
 /**
- * ScanV booking dispatch — nearest vendor match + SMS/call/WhatsApp retries
+ * ScanV booking dispatch — nearest vendor match + in-app Uber-style offers
  *
  * Actions:
  *   start        — { booking_id, service_id, service_name, lat, lng, location, date, time }
  *   tick         — process due dispatches (cron or manual)
- *   respond      — vendor accepts/rejects { accept_code, action: accept|reject, mobile? }
+ *   respond      — partner accept/reject in app { accept_code, response: accept|reject, partner_id? }
  *   call-status  — Twilio webhook for call outcomes
  *   twiml        — Twilio voice TwiML for outbound calls
- *   inbound-sms  — SMS reply webhook (ACCEPT BK-XXXX)
+ *   inbound-sms  — SMS reply webhook (ACCEPT BK-XXXX) — optional fallback
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
@@ -23,9 +23,34 @@ import {
   geocodeAddress,
 } from "../_shared/notify.ts";
 
-const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes
+const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes between retry rounds
+const OFFER_TIMEOUT_MS = 60 * 1000; // 60s per partner before moving to next nearest
 const MAX_VENDORS = 3;
 const MAX_ATTEMPTS_PER_VENDOR = 2;
+
+type DispatchMode = "both" | "in_app" | "external" | "disabled";
+const DISPATCH_MODES = new Set<string>(["both", "in_app", "external", "disabled"]);
+
+async function getDispatchMode(
+  supabase: ReturnType<typeof createClient>,
+): Promise<DispatchMode> {
+  const { data } = await supabase
+    .from("platform_settings")
+    .select("value")
+    .eq("key", "dispatch_mode")
+    .maybeSingle();
+  const mode = String(data?.value || "both").toLowerCase();
+  if (DISPATCH_MODES.has(mode)) return mode as DispatchMode;
+  return "both";
+}
+
+function inAppOffersEnabled(mode: DispatchMode): boolean {
+  return mode === "both" || mode === "in_app";
+}
+
+function externalAlertsEnabled(mode: DispatchMode): boolean {
+  return mode === "both" || mode === "external";
+}
 
 /** Vendor IDs with a confirmed in-progress booking — one active job at a time until completed. */
 async function getUnavailableVendorIds(
@@ -106,6 +131,63 @@ async function bookingPartyAuthorized(
     }
   }
   return false;
+}
+
+/** Resolve active vendor from partner profile id, phone, or JWT */
+async function resolveVendorFromRequest(
+  supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<{ id: string; phone: string; profile_id: string | null } | null> {
+  const profileId = String(body.partner_id || body.profile_id || "").trim();
+  if (profileId) {
+    const { data: v } = await supabase
+      .from("vendor_partners")
+      .select("id, phone, profile_id")
+      .eq("profile_id", profileId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (v) return v;
+  }
+
+  const mobile = normalizeMobile(String(body.mobile || ""));
+  if (mobile) {
+    const { data: v } = await supabase
+      .from("vendor_partners")
+      .select("id, phone, profile_id")
+      .eq("phone", mobile)
+      .eq("status", "active")
+      .maybeSingle();
+    if (v) return v;
+  }
+
+  const authHeader = req.headers.get("Authorization") || "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (authHeader && anonKey) {
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData } = await userClient.auth.getUser();
+    const email = authData?.user?.email;
+    if (email) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+      if (prof?.id) {
+        const { data: v } = await supabase
+          .from("vendor_partners")
+          .select("id, phone, profile_id")
+          .eq("profile_id", prof.id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (v) return v;
+      }
+    }
+  }
+  return null;
 }
 
 /** pg_cron may call tick with service role bearer (stored in Vault) */
@@ -395,7 +477,7 @@ async function assignVendor(
   dispatchId: string,
   bookingId: string,
   vendorId: string,
-) {
+): Promise<boolean> {
   const now = new Date().toISOString();
 
   const { data: vendor } = await supabase
@@ -404,28 +486,49 @@ async function assignVendor(
     .eq("id", vendorId)
     .single();
 
-  if (!vendor || vendor.status !== "active") return;
+  if (!vendor || vendor.status !== "active") return false;
 
   const unavailable = await getUnavailableVendorIds(supabase);
   if (unavailable.has(String(vendorId))) {
     console.warn("[dispatch] vendor busy — active booking not completed", vendorId);
-    return;
+    return false;
   }
 
   const partnerId = vendor.profile_id || vendorId;
 
-  await supabase.from("booking_dispatch").update({
-    status: "assigned",
-    assigned_vendor_id: vendorId,
-    assigned_at: now,
-    accepted_at: now,
-    next_action_at: null,
-  }).eq("id", dispatchId);
+  const { data: claimed } = await supabase
+    .from("booking_dispatch")
+    .update({
+      status: "assigned",
+      assigned_vendor_id: vendorId,
+      assigned_at: now,
+      accepted_at: now,
+      next_action_at: null,
+    })
+    .eq("id", dispatchId)
+    .in("status", ["pending", "dispatching"])
+    .select("id")
+    .maybeSingle();
+
+  if (!claimed) return false;
 
   await dispatchIgnore(
     supabase.from("bookings").update({ partner_id: partnerId, status: "confirmed" })
       .eq("id", bookingId),
   );
+
+  await supabase.from("booking_dispatch_attempts")
+    .update({ status: "accepted", completed_at: now })
+    .eq("dispatch_id", dispatchId)
+    .eq("vendor_id", vendorId)
+    .eq("channel", "app")
+    .eq("status", "offered");
+
+  await supabase.from("booking_dispatch_attempts")
+    .update({ status: "timeout", completed_at: now })
+    .eq("dispatch_id", dispatchId)
+    .eq("channel", "app")
+    .eq("status", "offered");
 
   const { data: bk } = await supabase.from("bookings").select("txn_id").eq("id", bookingId).single();
   if (bk?.txn_id) {
@@ -434,7 +537,6 @@ async function assignVendor(
     );
   }
 
-  // Seed live tracking from vendor base location until partner GPS updates
   const { data: vp } = await supabase
     .from("vendor_partners")
     .select("address_lat, address_lng, gps_lat, gps_lng")
@@ -455,12 +557,93 @@ async function assignVendor(
       }, { onConflict: "booking_id" }),
     );
   }
+  return true;
 }
 
 type DispatchTickResult = {
   vendors: Array<{ vendor_id: string; business_name: string; distance_km: number }>;
   empty_diagnostics?: EmptyQueueDiagnostics;
+  current_vendor_rank?: number;
+  offer_mode?: string;
 };
+
+async function offerVendorInApp(
+  supabase: ReturnType<typeof createClient>,
+  dispatch: Record<string, unknown>,
+  vendor: VendorQueueRow,
+  attemptNum: number,
+  mode: DispatchMode,
+) {
+  if (inAppOffersEnabled(mode)) {
+    await logAttempt(
+      supabase,
+      String(dispatch.id),
+      vendor.vendor_id,
+      attemptNum,
+      "app",
+      "offered",
+      "in_app",
+    );
+  }
+  if (externalAlertsEnabled(mode)) {
+    await notifyVendor(supabase, dispatch, vendor, attemptNum);
+  }
+}
+
+async function markOfferEnded(
+  supabase: ReturnType<typeof createClient>,
+  dispatchId: string,
+  vendorId: string,
+  status: string,
+) {
+  const now = new Date().toISOString();
+  await supabase.from("booking_dispatch_attempts")
+    .update({ status, completed_at: now })
+    .eq("dispatch_id", dispatchId)
+    .eq("vendor_id", vendorId)
+    .eq("channel", "app")
+    .eq("status", "offered");
+}
+
+async function advanceToNextVendor(
+  supabase: ReturnType<typeof createClient>,
+  dispatch: Record<string, unknown>,
+  queue: VendorQueueRow[],
+): Promise<DispatchTickResult> {
+  const vendorRank = Number(dispatch.vendor_rank || 1);
+  const attemptNum = Number(dispatch.attempt_num || 1);
+  const nextRank = vendorRank + 1;
+
+  if (nextRank > Math.min(queue.length, MAX_VENDORS)) {
+    if (attemptNum < MAX_ATTEMPTS_PER_VENDOR) {
+      await supabase.from("booking_dispatch").update({
+        vendor_rank: 1,
+        attempt_num: attemptNum + 1,
+        next_action_at: new Date(Date.now() + RETRY_GAP_MS).toISOString(),
+      }).eq("id", dispatch.id);
+      return { vendors: [], offer_mode: "retry_scheduled" };
+    }
+    await supabase.from("booking_dispatch").update({
+      status: "exhausted",
+      exhausted_at: new Date().toISOString(),
+      next_action_at: null,
+    }).eq("id", dispatch.id);
+    return { vendors: [] };
+  }
+
+  await supabase.from("booking_dispatch").update({
+    vendor_rank: nextRank,
+    next_action_at: new Date().toISOString(),
+  }).eq("id", dispatch.id);
+
+  const { data: refreshed } = await supabase
+    .from("booking_dispatch")
+    .select("*")
+    .eq("id", dispatch.id)
+    .maybeSingle();
+  if (refreshed) return processDispatchTick(supabase, refreshed);
+  return { vendors: [] };
+}
 
 async function processDispatchTick(
   supabase: ReturnType<typeof createClient>,
@@ -470,11 +653,17 @@ async function processDispatchTick(
     return { vendors: [] };
   }
 
+  const dispatchMode = await getDispatchMode(supabase);
+  if (dispatchMode === "disabled") {
+    return { vendors: [], offer_mode: "disabled" };
+  }
+
   const lat = dispatch.customer_lat as number | null;
   const lng = dispatch.customer_lng as number | null;
   const serviceId = String(dispatch.service_id || "");
   const categoryId = String(dispatch.category_id || "");
   const attemptNum = Number(dispatch.attempt_num || 1);
+  const vendorRank = Number(dispatch.vendor_rank || 1);
 
   const { queue, rpc_error: rpcError, blocked_count: blockedCount = 0 } = await getVendorQueue(
     supabase, serviceId, lat, lng, [], categoryId,
@@ -495,36 +684,84 @@ async function processDispatchTick(
       booking_id: dispatch.booking_id,
       ...emptyDiagnostics,
     });
-    return { vendors: [], empty_diagnostics: emptyDiagnostics };
+    return { vendors: [], empty_diagnostics: emptyDiagnostics, offer_mode: dispatchMode };
   }
 
+  const { data: openOffer } = inAppOffersEnabled(dispatchMode)
+    ? await supabase
+      .from("booking_dispatch_attempts")
+      .select("id, vendor_id, created_at")
+      .eq("dispatch_id", dispatch.id)
+      .eq("channel", "app")
+      .eq("status", "offered")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    : { data: null as { id: string; vendor_id: string; created_at: string } | null };
+
+  let externalPending: { id: string; vendor_id: string } | null = null;
+  if (!openOffer && externalAlertsEnabled(dispatchMode) && !inAppOffersEnabled(dispatchMode)) {
+    const currentVendor = top3[vendorRank - 1];
+    if (currentVendor) {
+      const { data: extAttempt } = await supabase
+        .from("booking_dispatch_attempts")
+        .select("id, vendor_id")
+        .eq("dispatch_id", dispatch.id)
+        .eq("vendor_id", currentVendor.vendor_id)
+        .eq("channel", "sms")
+        .eq("attempt_num", attemptNum)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      externalPending = extAttempt;
+    }
+  }
+
+  const pendingOffer = openOffer || externalPending;
+
+  const nextActionAt = dispatch.next_action_at
+    ? new Date(String(dispatch.next_action_at)).getTime()
+    : 0;
+  if (pendingOffer && nextActionAt > 0 && Date.now() >= nextActionAt) {
+    if (openOffer) {
+      await markOfferEnded(supabase, String(dispatch.id), String(openOffer.vendor_id), "timeout");
+    }
+    return advanceToNextVendor(supabase, dispatch, top3);
+  }
+
+  if (pendingOffer) {
+    const current = top3[vendorRank - 1];
+    return {
+      vendors: current ? [{
+        vendor_id: current.vendor_id,
+        business_name: current.business_name,
+        distance_km: current.distance_km,
+      }] : [],
+      current_vendor_rank: vendorRank,
+      offer_mode: `${dispatchMode}_waiting`,
+    };
+  }
+
+  const idx = vendorRank - 1;
+  if (idx >= top3.length) {
+    return advanceToNextVendor(supabase, dispatch, top3);
+  }
+
+  const vendor = top3[idx];
   await supabase.from("booking_dispatch").update({ status: "dispatching" }).eq("id", dispatch.id);
-
-  // Alert nearest 3 GPS-matched partners in parallel (first accept wins)
-  for (const vendor of top3) {
-    await notifyVendor(supabase, dispatch, vendor, attemptNum);
-  }
-
-  if (attemptNum < MAX_ATTEMPTS_PER_VENDOR) {
-    await supabase.from("booking_dispatch").update({
-      attempt_num: attemptNum + 1,
-      vendor_rank: MAX_VENDORS,
-      next_action_at: new Date(Date.now() + RETRY_GAP_MS).toISOString(),
-    }).eq("id", dispatch.id);
-  } else {
-    await supabase.from("booking_dispatch").update({
-      status: "exhausted",
-      exhausted_at: new Date().toISOString(),
-      next_action_at: null,
-    }).eq("id", dispatch.id);
-  }
+  await offerVendorInApp(supabase, dispatch, vendor, attemptNum, dispatchMode);
+  await supabase.from("booking_dispatch").update({
+    next_action_at: new Date(Date.now() + OFFER_TIMEOUT_MS).toISOString(),
+  }).eq("id", dispatch.id);
 
   return {
-    vendors: top3.map((v) => ({
-      vendor_id: v.vendor_id,
-      business_name: v.business_name,
-      distance_km: v.distance_km,
-    })),
+    vendors: [{
+      vendor_id: vendor.vendor_id,
+      business_name: vendor.business_name,
+      distance_km: vendor.distance_km,
+    }],
+    current_vendor_rank: vendorRank,
+    offer_mode: dispatchMode,
   };
 }
 
@@ -645,7 +882,6 @@ Deno.serve(async (req: Request) => {
     if (action === "respond") {
       const code = String(body.accept_code || "").toUpperCase();
       const respAction = String(body.response || body.action_type || "accept").toLowerCase();
-      const mobile = normalizeMobile(String(body.mobile || ""));
       const { data: disp } = await supabase
         .from("booking_dispatch")
         .select("*")
@@ -654,18 +890,46 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (!disp) return json({ error: "Dispatch not found or already assigned" }, 404);
 
-      if (respAction === "accept" && mobile) {
-        const { data: vendor } = await supabase
-          .from("vendor_partners")
-          .select("id")
-          .eq("phone", mobile)
-          .eq("status", "active")
-          .maybeSingle();
-        if (!vendor) return json({ error: "Vendor not found" }, 404);
-        await assignVendor(supabase, disp.id, disp.booking_id, vendor.id);
-        return json({ success: true, assigned: vendor.id });
+      const vendor = await resolveVendorFromRequest(supabase, supabaseUrl, req, body);
+      if (!vendor) return json({ error: "Partner not found or inactive" }, 404);
+
+      const { data: openOffer } = await supabase
+        .from("booking_dispatch_attempts")
+        .select("id")
+        .eq("dispatch_id", disp.id)
+        .eq("vendor_id", vendor.id)
+        .eq("channel", "app")
+        .eq("status", "offered")
+        .maybeSingle();
+      if (!openOffer) {
+        return json({ error: "No active job offer for this partner" }, 409);
       }
-      return json({ error: "Invalid response" }, 400);
+
+      if (respAction === "accept") {
+        const assigned = await assignVendor(supabase, disp.id, disp.booking_id, vendor.id);
+        if (!assigned) {
+          return json({ error: "Job already taken or partner unavailable" }, 409);
+        }
+        return json({ success: true, assigned: vendor.id, booking_id: disp.booking_id });
+      }
+
+      if (respAction === "reject" || respAction === "decline") {
+        await markOfferEnded(supabase, disp.id, vendor.id, "rejected");
+        const lat = disp.customer_lat as number | null;
+        const lng = disp.customer_lng as number | null;
+        const { queue } = await getVendorQueue(
+          supabase,
+          String(disp.service_id || ""),
+          lat,
+          lng,
+          [],
+          String(disp.category_id || ""),
+        );
+        await advanceToNextVendor(supabase, disp, queue.slice(0, MAX_VENDORS));
+        return json({ success: true, rejected: true });
+      }
+
+      return json({ error: "Invalid response — use accept or reject" }, 400);
     }
 
     if (action === "start") {
@@ -673,6 +937,16 @@ Deno.serve(async (req: Request) => {
       const serviceId = String(body.service_id || "");
       const serviceName = String(body.service_name || "Service");
       if (!bookingId) return json({ error: "booking_id required" }, 400);
+
+      const dispatchModeAtStart = await getDispatchMode(supabase);
+      if (dispatchModeAtStart === "disabled") {
+        return json({
+          success: true,
+          dispatch_skipped: true,
+          dispatch_mode: dispatchModeAtStart,
+          message: "Partner dispatch is disabled in admin settings",
+        });
+      }
 
       if (!dispatchSecretOk(req)) {
         const authorized = await bookingPartyAuthorized(
@@ -756,9 +1030,12 @@ Deno.serve(async (req: Request) => {
         dispatch_id: dispatch.id,
         accept_code: acceptCode,
         status: vendorsNotified.length ? "dispatching" : "exhausted",
+        dispatch_mode: await getDispatchMode(supabase),
         customer_gps: custLat && custLng ? { lat: custLat, lng: custLng } : null,
         vendors_notified: vendorsNotified,
         nearest_count: vendorsNotified.length,
+        current_vendor_rank: tickResult.current_vendor_rank,
+        offer_mode: tickResult.offer_mode,
         ...(tickResult.empty_diagnostics
           ? { empty_queue: tickResult.empty_diagnostics }
           : {}),

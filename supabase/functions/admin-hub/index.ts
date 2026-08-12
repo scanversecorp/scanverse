@@ -13,6 +13,8 @@
  *   otp_delivery_reports — { today_only?, failed_only?, limit? }
  *   exec_stats       — executive dashboard KPIs + chart data (owner PIN only)
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
+ *   get_platform_settings — { keys? } dispatch_mode etc.
+ *   update_platform_setting — { key, value, updated_by? }
  *
  * Auth: x-admin-pin header
  *   ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN
@@ -644,6 +646,56 @@ async function otpDeliveryReports(sb: ReturnType<typeof adminSb>, body: Record<s
   return json({ reports: rows, stats });
 }
 
+const DISPATCH_MODES = new Set(["both", "in_app", "external", "disabled"]);
+
+async function getPlatformSettings(
+  sb: ReturnType<typeof adminSb>,
+  keys?: string[],
+): Promise<Response> {
+  let q = sb.from("platform_settings").select("key, value, description, updated_at, updated_by");
+  if (keys?.length) q = q.in("key", keys);
+  const { data, error } = await q.order("key");
+  if (error) return json({ error: error.message }, 500);
+  const settings: Record<string, string> = {};
+  for (const row of data || []) {
+    settings[String((row as { key: string }).key)] = String((row as { value: string }).value);
+  }
+  return json({
+    settings,
+    rows: data || [],
+    dispatch_mode: settings.dispatch_mode || "both",
+    dispatch_mode_options: [
+      { value: "both", label: "In-app + SMS/call/WhatsApp backup", description: "Uber-style in-app offers to nearest partners one-by-one, plus SMS/call/WhatsApp backup for each offer." },
+      { value: "in_app", label: "In-app only", description: "Partners accept/reject inside ScanV app only — no SMS/call/WhatsApp." },
+      { value: "external", label: "External only (legacy)", description: "SMS, outbound call, and WhatsApp only — no in-app job cards." },
+      { value: "disabled", label: "Dispatch disabled", description: "No automatic partner alerts after payment." },
+    ],
+  });
+}
+
+async function updatePlatformSetting(
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const key = String(body.key || "").trim();
+  const value = String(body.value || "").trim().toLowerCase();
+  if (!key) return json({ error: "key required" }, 400);
+  if (key === "dispatch_mode" && !DISPATCH_MODES.has(value)) {
+    return json({ error: "Invalid dispatch_mode — use both, in_app, external, or disabled" }, 400);
+  }
+  const { data, error } = await sb
+    .from("platform_settings")
+    .upsert({
+      key,
+      value,
+      updated_by: body.updated_by ? String(body.updated_by) : "admin-hub",
+    }, { onConflict: "key" })
+    .select("key, value, description, updated_at, updated_by")
+    .single();
+  if (error) return json({ error: error.message }, 500);
+  return json({ success: true, setting: data });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -702,6 +754,17 @@ Deno.serve(async (req) => {
 
   if (action === "otp_delivery_reports") {
     return otpDeliveryReports(sb, body);
+  }
+
+  if (action === "get_platform_settings") {
+    const keys = Array.isArray(body.keys)
+      ? body.keys.map((k) => String(k))
+      : undefined;
+    return getPlatformSettings(sb, keys);
+  }
+
+  if (action === "update_platform_setting") {
+    return updatePlatformSetting(sb, body);
   }
 
   if (action === "exec_stats" || action === "exec_charts") {
