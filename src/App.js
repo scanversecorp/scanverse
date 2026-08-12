@@ -774,6 +774,34 @@ function subSvcCount(svc) {
   return id ? SUB_CATEGORIES[id].svcs.length : 0;
 }
 
+const LIVE_TRACK_PARENTS = new Set(['delivery', 'food', 'two-wheeler', 'four-wheeler']);
+
+function svcSupportsLiveTrack(svc) {
+  if (!svc) return false;
+  return LIVE_TRACK_PARENTS.has(subCatId(svc) || svc.id || '');
+}
+
+function findSvcByName(name) {
+  if (!name) return null;
+  return ALL_SUB_SVCS.find(s => s.name === name) || SVCS.find(s => s.name === name) || null;
+}
+
+function bookingSupportsLiveTrack(booking) {
+  if (!booking) return false;
+  if (booking.service_id) {
+    const svc = findSvcById(booking.service_id);
+    if (svc) return svcSupportsLiveTrack(svc);
+  }
+  return svcSupportsLiveTrack(findSvcByName(booking.service_name));
+}
+
+function resolveBookingCoords(booking, dispatch) {
+  return {
+    lat: booking?.customer_lat ?? dispatch?.customer_lat ?? null,
+    lng: booking?.customer_lng ?? dispatch?.customer_lng ?? null,
+  };
+}
+
 /* --- LIVE PRICING (Supabase overrides) ----------------------------- */
 const PRICING_ADMIN_HASH = 'pricing-admin';
 const VENDOR_ONBOARD_HASH = 'vendor-onboard';
@@ -1175,6 +1203,7 @@ async function invokeBookingDispatch({ bookingId, serviceId, serviceName, lat, l
       },
     });
     if (r.error) console.warn('[Dispatch]', r.error.message);
+    if (r.data?.error) console.warn('[Dispatch]', r.data.error);
     return r.data;
   } catch (e) {
     console.warn('[Dispatch]', e.message);
@@ -3556,7 +3585,7 @@ function ServicesScreen() {
 }
 
 function BookScreen() {
-  const {activeSvc,user,setUser,addToast,setScreen,setTrackBookingId}=useApp();
+  const {activeSvc,user,setUser,addToast,setScreen,setTrackBookingId,silentGeo}=useApp();
   const skipVerify=!!(user?.mobile_verified&&user?.first_name);
   const [step,setStep]=useState(1);
   const [date,setDate]=useState('');
@@ -3578,11 +3607,13 @@ function BookScreen() {
   const [bookAddress,setBookAddress]=useState(user?.address||'');
   const [bookCity,setBookCity]=useState(user?.city||'');
   const [bookPincode,setBookPincode]=useState(user?.pincode||'');
+  const [bookLat,setBookLat]=useState(user?.last_lat||silentGeo?.lat||null);
+  const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
   const svc=activeSvc;
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
   const bookPay=usePaymentVerification(step===3?txnId:null,step===3?total:0,user?.id,addToast);
   if (!svc) { setScreen('services'); return null; }
-  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
+  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
@@ -3660,10 +3691,13 @@ function BookScreen() {
       });
       setUser(profile);
       const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+      const custLat = bookLat ?? profile.last_lat ?? silentGeo?.lat ?? null;
+      const custLng = bookLng ?? profile.last_lng ?? silentGeo?.lng ?? null;
       const { data, error } = await sb().from('bookings').insert({
-        customer_id: profile.id, service_name: svc.name,
+        customer_id: profile.id, service_name: svc.name, service_id: svc.id || svc.parent || null,
         customer_name: fullName || user.name, customer_email: profile.email || user.email || '',
         date, time, notes, location_text: loc,
+        customer_lat: custLat, customer_lng: custLng,
         price, platform_fee: fee, gst_amt: gst, total,
         status: 'confirmed', txn_id: txnId, paid_at: new Date().toISOString(),
       }).select().single();
@@ -3679,9 +3713,9 @@ function BookScreen() {
         method: payMethod || 'UPI', status: 'success', txn_id: txnId, gateway: 'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
       }).catch(() => {});
-      invokeBookingDispatch({
+      await invokeBookingDispatch({
         bookingId: data.id, serviceId: svc.id || svc.parent || '', serviceName: svc.name,
-        lat: profile.last_lat || user.last_lat || null, lng: profile.last_lng || user.last_lng || null, location: loc, date, time,
+        lat: custLat, lng: custLng, location: loc, date, time,
       });
       setBooking(data);
       addToast('Booking confirmed! Track your partner live 📍', 'success');
@@ -3811,19 +3845,21 @@ function osmEmbedUrl(vLat, vLng, cLat, cLng) {
   return url;
 }
 
-function LiveVendorMap({ live, booking, partnerName, large }) {
+function LiveVendorMap({ live, booking, dispatch, partnerName, large, waitingMessage }) {
   const mapH = large ? 320 : 180;
-  const hasLive = live?.tracking_active && live.lat && live.lng;
+  const coords = resolveBookingCoords(booking, dispatch);
+  const hasLive = live?.tracking_active && live.lat != null && live.lng != null;
+  const hasCustomerPin = coords.lat != null && coords.lng != null;
   const updated = live?.updated_at ? new Date(live.updated_at) : null;
   const minsAgo = updated ? Math.max(0, Math.round((Date.now() - updated.getTime()) / 60000)) : null;
   const mapsLink = hasLive ? `https://www.google.com/maps/dir/?api=1&destination=${live.lat},${live.lng}` : null;
   const embedSrc = hasLive
-    ? osmEmbedUrl(live.lat, live.lng, booking?.customer_lat, booking?.customer_lng)
-    : osmEmbedUrl(booking?.customer_lat, booking?.customer_lng, null, null);
+    ? osmEmbedUrl(live.lat, live.lng, coords.lat, coords.lng)
+    : osmEmbedUrl(coords.lat, coords.lng, null, null);
 
   return (
     <div style={{ marginTop: large ? 0 : 12, borderTop: large ? 'none' : `1px solid ${C.bdr}`, paddingTop: large ? 0 : 12 }}>
-      {hasLive && (
+      {hasLive ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3836,9 +3872,19 @@ function LiveVendorMap({ live, booking, partnerName, large }) {
             {partnerName || 'Your partner'} is en route · tracking until service is closed
           </div>
         </>
-      )}
+      ) : waitingMessage ? (
+        <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5, textAlign: large ? 'center' : 'left' }}>
+          {waitingMessage}
+        </div>
+      ) : null}
       <div style={{ borderRadius: 12, overflow: 'hidden', border: BDR, height: mapH, background: C.deep }}>
-        <iframe title="Live partner map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
+        {hasLive || hasCustomerPin ? (
+          <iframe title="Live partner map" src={embedSrc} style={{ width: '100%', height: '100%', border: 0 }} loading="lazy" />
+        ) : (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+            Map appears once your service location is set · tap 📍 on booking to capture GPS
+          </div>
+        )}
       </div>
       {mapsLink && (
         <a href={mapsLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 11, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>
@@ -3869,7 +3915,7 @@ function useLiveBookingTrack(bookingId) {
       }
     }
     const { data: loc } = await sb().from('vendor_live_locations').select('*').eq('booking_id', bookingId).maybeSingle();
-    setLive(loc?.tracking_active ? loc : null);
+    setLive(loc?.tracking_active && loc.lat != null && loc.lng != null ? loc : null);
     try {
       const r = await sb().functions.invoke('booking-dispatch', { body: { action: 'status', booking_id: bookingId } });
       setDispatch(r.data?.dispatch || null);
@@ -3880,7 +3926,8 @@ function useLiveBookingTrack(bookingId) {
   useEffect(() => {
     refresh();
     if (!bookingId) return undefined;
-    const poll = setInterval(refresh, 5000);
+    const pollMs = bookingSupportsLiveTrack(booking) ? 3000 : 5000;
+    const poll = setInterval(refresh, pollMs);
     let channel;
     try {
       channel = sb().channel(`track-${bookingId}`)
@@ -3889,7 +3936,7 @@ function useLiveBookingTrack(bookingId) {
         .subscribe();
     } catch { /* ignore */ }
     return () => { clearInterval(poll); if (channel) sb().removeChannel(channel); };
-  }, [bookingId, refresh]);
+  }, [bookingId, refresh, booking?.service_id, booking?.service_name]);
 
   return { booking, live, dispatch, partnerName, loading, refresh };
 }
@@ -4023,17 +4070,25 @@ function TrackServiceScreen() {
 
           {!booking?.partner_id && booking?.status === 'confirmed' && (
             <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
-              <strong style={{ color: C.txt }}>Notifying nearest partners</strong> — SMS, phone call & WhatsApp. Map updates when a partner accepts and shares GPS.
+              <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — SMS, phone call & WhatsApp. Partner will appear on the map once assigned.
             </div>
           )}
 
           <div style={{ ...S.card(), padding: 12, marginBottom: 12 }}>
-            <LiveVendorMap live={live} booking={booking} partnerName={partnerName} large />
-            {!live?.tracking_active && booking?.partner_id && (
-              <div style={{ marginTop: 12, fontSize: 12, color: C.sub, textAlign: 'center' }}>
-                Waiting for {partnerName || 'partner'} to share live location…
-              </div>
-            )}
+            <LiveVendorMap
+              live={live}
+              booking={booking}
+              dispatch={dispatch}
+              partnerName={partnerName}
+              large
+              waitingMessage={
+                live?.tracking_active
+                  ? null
+                  : booking?.partner_id
+                    ? `Partner assigned — waiting for ${partnerName || 'partner'} to share live GPS…`
+                    : 'Partner will appear on map once assigned · map shows your service location'
+              }
+            />
           </div>
 
           {dispatch?.accept_code && !booking?.partner_id && (
@@ -4156,7 +4211,7 @@ function BookingsScreen() {
   useEffect(()=>{load();},[load]);
 
   useEffect(()=>{
-    const openIds=bookings.filter(b=>b.status==='confirmed'&&b.partner_id).map(b=>b.id);
+    const openIds=bookings.filter(b=>b.status==='confirmed'&&bookingSupportsLiveTrack(b)).map(b=>b.id);
     if(!openIds.length) return undefined;
     let channel;
     try{
@@ -4177,11 +4232,17 @@ function BookingsScreen() {
       const{data}=await sb().from('vendor_live_locations').select('*').in('booking_id',openIds).eq('tracking_active',true);
       const map={}; (data||[]).forEach(l=>{ map[l.booking_id]=l; });
       setLiveLocs(prev=>({...prev,...map}));
-    },20000);
+    },10000);
     return ()=>{ if(channel) sb().removeChannel(channel); clearInterval(poll); };
   },[bookings]);
 
-  const showLive=(b)=>user.role==='customer'&&b.status==='confirmed'&&b.partner_id&&liveLocs[b.id]?.tracking_active;
+  const showTrackMap=(b)=>user.role==='customer'&&b.status==='confirmed'&&bookingSupportsLiveTrack(b);
+  const trackWaitingMessage=(b)=>{
+    const live=liveLocs[b.id];
+    if(live?.tracking_active) return null;
+    if(b.partner_id) return `Waiting for ${partners[b.partner_id]||'partner'} to share live GPS…`;
+    return 'Searching for nearby partner · map shows your service location';
+  };
   const activeBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='In-progress');
   const doneBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='Completed');
 
@@ -4195,9 +4256,9 @@ function BookingsScreen() {
           <div style={{fontSize:10,color:C.dim,marginTop:4,textTransform:'capitalize'}}>{b.status?.replace(/_/g,' ')}</div>
         </div>
       </div>
-      {showLive(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]}/>}
+      {showTrackMap(b)&&<LiveVendorMap live={liveLocs[b.id]} booking={b} partnerName={partners[b.partner_id]} waitingMessage={trackWaitingMessage(b)}/>}
       {user.role==='customer'&&b.status==='confirmed'&&<WaitEngagementPanel compact />}
-      {user.role==='customer'&&bookingStatusGroup(b.status).label==='In-progress'&&b.partner_id&&(
+      {user.role==='customer'&&bookingStatusGroup(b.status).label==='In-progress'&&bookingSupportsLiveTrack(b)&&(
         <Btn sm v="outline" onClick={()=>goToTrack(setTrackBookingId,setScreen,b.id)} style={{marginTop:8}}>📍 Track my service</Btn>
       )}
       {user.role==='partner'&&b.status==='confirmed'&&<Btn sm onClick={()=>markComplete(b)}>✓ Mark complete</Btn>}

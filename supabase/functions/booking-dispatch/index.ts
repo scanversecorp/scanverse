@@ -452,12 +452,29 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "start") {
-      if (!dispatchSecretOk(req)) return json({ error: "Unauthorized" }, 401);
-
       const bookingId = String(body.booking_id || "");
       const serviceId = String(body.service_id || "");
       const serviceName = String(body.service_name || "Service");
       if (!bookingId) return json({ error: "booking_id required" }, 400);
+
+      if (!dispatchSecretOk(req)) {
+        const authHeader = req.headers.get("Authorization") || "";
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: authData, error: authErr } = await userClient.auth.getUser();
+        const uid = authData?.user?.id;
+        if (authErr || !uid) return json({ error: "Unauthorized" }, 401);
+        const { data: owned } = await supabase
+          .from("bookings")
+          .select("customer_id")
+          .eq("id", bookingId)
+          .maybeSingle();
+        if (!owned || String(owned.customer_id) !== String(uid)) {
+          return json({ error: "Unauthorized" }, 401);
+        }
+      }
 
       const { data: existing } = await supabase
         .from("booking_dispatch")
