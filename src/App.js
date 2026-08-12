@@ -599,13 +599,35 @@ function serviceImgWebp(src) {
 
 function ServiceImg({ src, alt = '', loading = 'lazy', style, ...rest }) {
   const webp = serviceImgWebp(src);
-  const imgStyle = { display: 'block', ...style };
+  const imgStyle = { display: 'block', maxWidth: '100%', ...style };
   if (!webp) return <img src={src} alt={alt} loading={loading} style={imgStyle} {...rest} />;
   return (
-    <picture style={{ display: 'block', width: imgStyle.width || '100%', height: imgStyle.height, margin: 0 }}>
+    <picture style={{ display: 'block', width: imgStyle.width || '100%', height: imgStyle.height, minWidth: 0, margin: 0, lineHeight: 0 }}>
       <source srcSet={webp} type="image/webp" />
       <img src={src} alt={alt} loading={loading} style={imgStyle} {...rest} />
     </picture>
+  );
+}
+
+/** iOS-safe 2-column grid + odd last tile centered */
+const MOBILE_GRID_2 = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, width: '100%' };
+
+function SvcGrid2({ items, renderItem }) {
+  const oddLast = items.length % 2 === 1;
+  return (
+    <div style={MOBILE_GRID_2}>
+      {items.map((item, i) => (
+        <div
+          key={item.id || i}
+          style={{
+            minWidth: 0,
+            ...(oddLast && i === items.length - 1 ? { gridColumn: '1 / -1', maxWidth: 'calc(50% - 5px)', marginLeft: 'auto', marginRight: 'auto', width: '100%' } : null),
+          }}
+        >
+          {renderItem(item, i)}
+        </div>
+      ))}
+    </div>
   );
 }
 const FF = "'Inter',system-ui,sans-serif";
@@ -985,6 +1007,53 @@ function svcSupportsLiveTrack(svc) {
 function findSvcByName(name) {
   if (!name) return null;
   return ALL_SUB_SVCS.find(s => s.name === name) || SVCS.find(s => s.name === name) || null;
+}
+
+/** Sub-services that must not show misleading stock photos (md5 duplicates / wrong category art) */
+const PHOTOLESS_SVC_IDS = new Set([
+  'tw-mechanic', 'tw-pickup', 'tw-fix', 'tw-wash', 'tw-deep', 'tw-battery',
+  'fw-mechanic', 'fw-pickup', 'fw-fix', 'fw-wash', 'fw-deep', 'fw-detail',
+  'dl-sameday', 'dl-doc', 'dl-parcel', 'dl-intercity', 'dl-bulk',
+  'pr-site',
+]);
+
+function svcParentId(svc) {
+  if (!svc) return null;
+  if (svc.parent) return svc.parent;
+  return subCatId(svc);
+}
+
+function resolveSvcImage(svc) {
+  if (!svc?.img || PHOTOLESS_SVC_IDS.has(svc.id)) return null;
+  return svc.img;
+}
+
+function effectiveSvcPrices(svc) {
+  let mrp = Number(svc?.mrp) || 0;
+  let price = Number(svc?.price) || 0;
+  if (!mrp && price) mrp = Math.round(price / (1 - DISC_PCT));
+  if (mrp > 0 && price > 0 && price < mrp * 0.15) price = discPaise(mrp);
+  if (mrp > 0 && !price) price = discPaise(mrp);
+  return { mrp, price };
+}
+
+function IconThumb({ svc, categoryId, height = 100, fullBleed = false }) {
+  const cfg = SUB_CATEGORIES[categoryId || svcParentId(svc)];
+  const t = cfg?.themes?.[svc?.theme] || Object.values(cfg?.themes || {})[0] || {};
+  const from = t.gradFrom || t.bg || C.deep;
+  const to = t.gradTo || t.color || C.acc;
+  return (
+    <div style={{
+      width: '100%', height, minWidth: 0,
+      borderRadius: fullBleed ? 0 : 10,
+      background: `linear-gradient(145deg, ${from} 0%, ${to} 100%)`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: Math.round(height * 0.36),
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
+    }}>
+      {svc?.icon || '✨'}
+    </div>
+  );
 }
 
 function bookingSupportsLiveTrack(booking) {
@@ -1987,7 +2056,7 @@ const S = {
 const APP_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px}
+  body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;min-height:100dvh;overflow-x:hidden}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -2194,41 +2263,36 @@ function HhCategoryPill({ theme, sm }) { return <CategoryPill categoryId="househ
 function CloudCategoryPill({ theme, sm }) { return <CategoryPill categoryId="cloud" theme={theme} sm={sm} />; }
 
 function PriceTag({ svc, sm }) {
-  const mrp = svc.mrp || Math.round((svc.price || 0) / (1 - DISC_PCT));
+  const { mrp, price } = effectiveSvcPrices(svc);
   const unit = svc.unit === 'hour' ? '/hr' : svc.unit === 'month' ? '/mo' : svc.unit === 'project' ? '/project' : svc.unit === 'course' ? '/course' : '';
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
       <span style={{ color: C.dim, fontSize: sm ? 10 : 11, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>
-      <span style={{ color: C.acc, fontSize: sm ? 13 : 15, fontWeight: 800 }}>₹{fmtRs(svc.price || 0)}{unit}</span>
+      <span style={{ color: C.acc, fontSize: sm ? 13 : 15, fontWeight: 800 }}>₹{fmtRs(price)}{unit}</span>
       <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>25% OFF</span>
     </div>
   );
 }
 
-function ServiceThumb({ svc, height = 100, fullBleed = false }) {
-  if (svc.img) {
+function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
+  const src = resolveSvcImage(svc);
+  if (src) {
     return (
       <ServiceImg
-        src={svc.img}
+        src={src}
         alt=""
         loading="lazy"
         style={{ width: '100%', height, objectFit: 'cover', objectPosition: 'center 15%', borderRadius: fullBleed ? 0 : 10, filter: IG_TILE.imgFilter }}
       />
     );
   }
-  return (
-    <div style={{ width: '100%', height, borderRadius: fullBleed ? 0 : 10, background: C.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: height * 0.4 }}>
-      {svc.icon}
-    </div>
-  );
+  return <IconThumb svc={svc} categoryId={categoryId} height={height} fullBleed={fullBleed} />;
 }
 
 function CategorySvcCard({ categoryId, svc, onClick, compact }) {
-  const cfg = SUB_CATEGORIES[categoryId];
-  const t = cfg?.themes?.[svc.theme] || Object.values(cfg?.themes || {})[0] || { bg: C.surf, border: C.bdr };
   return (
-    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow }}>
-      <ServiceThumb svc={svc} height={compact ? 104 : 120} fullBleed />
+    <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow, minWidth: 0 }}>
+      <ServiceThumb svc={svc} categoryId={categoryId} height={compact ? 104 : 120} fullBleed />
       <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: '#fff' }}>
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
@@ -2271,9 +2335,10 @@ function CategoryListBody({ categoryId, onSelect }) {
               <CategoryPill categoryId={categoryId} theme={theme} />
               <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {items.map(svc => <CategorySvcCard key={svc.id} categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact />)}
-            </div>
+            <SvcGrid2
+              items={items}
+              renderItem={(svc) => <CategorySvcCard categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact />}
+            />
           </div>
         );
       })}
@@ -2309,9 +2374,10 @@ function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderC
       {subBlocks.map(({ id, title, items }) => (
         <div key={id} style={{ marginBottom: 16 }}>
           <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>{title} · {items.length}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {items.map(svc => <CategorySvcCard key={svc.id} categoryId={id} svc={svc} onClick={() => onSubSvc(id, svc)} compact />)}
-          </div>
+          <SvcGrid2
+            items={items}
+            renderItem={(svc) => <CategorySvcCard categoryId={id} svc={svc} onClick={() => onSubSvc(id, svc)} compact />}
+          />
         </div>
       ))}
       {categories.length > 0 && (
@@ -3394,7 +3460,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
   })();
 
   const browseWrap = (content, sticky=null) => (
-    <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:72}}>
+    <div style={{minHeight:'100dvh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:'calc(68px + env(safe-area-inset-bottom, 0px))',width:'100%',overflowX:'hidden'}}>
       {content}
       {sticky}
       <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
@@ -3492,7 +3558,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
               <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
             </div>
             {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:12}}>
               {svcList.map((s,i)=>(
                 <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />
               ))}
@@ -3522,15 +3588,16 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                 Services, offerings, and courses marked Top Rated by our team — verified quality and great value.
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {topRatedItems.map((svc, i) => {
+            <SvcGrid2
+              items={topRatedItems}
+              renderItem={(svc, i) => {
                 const catId = svc.parent && SUB_CATEGORIES[svc.parent] ? svc.parent : null;
                 if (catId) {
-                  return <CategorySvcCard key={svc.id} categoryId={catId} svc={svc} onClick={() => openBrowseTopRatedSvc(svc)} compact index={i} />;
+                  return <CategorySvcCard categoryId={catId} svc={svc} onClick={() => openBrowseTopRatedSvc(svc)} compact />;
                 }
-                return <HomeModelCard key={svc.id} svc={svc} onClick={() => openBrowseTopRatedSvc(svc)} index={i} />;
-              })}
-            </div>
+                return <HomeModelCard svc={svc} onClick={() => openBrowseTopRatedSvc(svc)} index={i} />;
+              }}
+            />
           </>
         ) : (
           <div style={{ ...S.card(), padding: 32, textAlign: 'center' }}>
@@ -3560,7 +3627,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{activeSvc.name}</div>
         </div>
         <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
-          {isSubSvc && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} height={140} /></div>}
+          {isSubSvc && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} categoryId={subCatId(activeSvc)} height={140} /></div>}
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
             {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={activeSvc.theme} /></div>}
             {!isSubSvc && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
@@ -4518,7 +4585,7 @@ function ServicesScreen() {
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
         </div>
         <div style={{padding:16}}>
-          {isSubSvc && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} height={160} /></div>}
+          {isSubSvc && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} categoryId={subCatId(detail)} height={160} /></div>}
           <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
             {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={detail.theme} /></div>}
             {!isSubSvc && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
@@ -4871,7 +4938,7 @@ function BookScreen() {
       <div style={{padding:'8px 16px 40px'}}>
         {step===1&&<>
           <div style={{...S.card(),marginBottom:20,padding:0,overflow:'hidden'}}>
-            {svc.img && <ServiceThumb svc={svc} height={120} />}
+            <ServiceThumb svc={svc} categoryId={subCatId(svc)} height={120} />
             <div style={{padding:16}}>
               {svc.theme && <div style={{marginBottom:8}}><HhCategoryPill theme={svc.theme} /></div>}
               {!svc.img && <div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div>}
@@ -10818,7 +10885,7 @@ export default function App() {
         <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
         <PartnerGpsTracker />
-        <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.bg}}>
+        <div style={{display:'flex',flexDirection:'column',minHeight:'100dvh',maxWidth:480,margin:'0 auto',background:C.bg,width:'100%',overflowX:'hidden'}}>
           <Boundary>{renderScreen()}</Boundary>
           <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />
           {!['book','track'].includes(screen)&&<BottomNav/>}
