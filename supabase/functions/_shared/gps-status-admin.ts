@@ -16,7 +16,10 @@ export type GpsStatusRow = {
   gps_at: string | null;
   lat: number | null;
   lng: number | null;
+  source: string | null;
 };
+
+type Ping = { lat: number; lng: number; at: string; source: string };
 
 function parseYmd(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
@@ -25,6 +28,15 @@ function parseYmd(s: string): Date {
 
 function formatYmd(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+function todayIstYmd(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function dayRange(from: string, to: string): string[] {
@@ -42,13 +54,16 @@ function dayRange(from: string, to: string): string[] {
 
 function istDayKey(iso: string): string {
   const d = new Date(iso);
-  const fmt = new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: IST,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  });
-  return fmt.format(d);
+  }).format(d);
+}
+
+function hasCoords(lat: unknown, lng: unknown): boolean {
+  return lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
 }
 
 function displayName(first?: string | null, last?: string | null, fallback?: string | null): string {
@@ -62,39 +77,12 @@ function matchesSearch(row: { name: string; phone: string }, q: string): boolean
   return hay.includes(q);
 }
 
-export async function gpsStatusReport(
+async function loadHistoryPings(
   sb: SupabaseClient,
-  body: Record<string, unknown>,
-): Promise<{
-  rows: GpsStatusRow[];
-  days: string[];
-  summary: { shared: number; unshared: number; total: number };
-}> {
-  const audience = String(body.audience || "all").toLowerCase() as Audience;
-  const statusFilter = String(body.status_filter || "all").toLowerCase() as StatusFilter;
-  const search = String(body.search || body.q || "").trim().toLowerCase();
-
-  const todayIst = new Intl.DateTimeFormat("en-CA", {
-    timeZone: IST,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-
-  const defaultFrom = parseYmd(todayIst);
-  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 6);
-
-  const dateFrom = String(body.date_from || formatYmd(defaultFrom)).slice(0, 10);
-  const dateTo = String(body.date_to || todayIst).slice(0, 10);
-  const days = dayRange(dateFrom, dateTo);
-  if (!days.length) {
-    return { rows: [], days: [], summary: { shared: 0, unshared: 0, total: 0 } };
-  }
-
-  const rangeStart = `${dateFrom}T00:00:00+05:30`;
-  const rangeEnd = `${dateTo}T23:59:59.999+05:30`;
-
-  type Ping = { lat: number; lng: number; at: string };
+  audience: Audience,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<{ userPings: Map<string, Ping>; vendorPings: Map<string, Ping> }> {
   const userPings = new Map<string, Ping>();
   const vendorPings = new Map<string, Ping>();
 
@@ -110,7 +98,12 @@ export async function gpsStatusReport(
       const key = `${uid}:${istDayKey(at)}`;
       const existing = userPings.get(key);
       if (!existing || at > existing.at) {
-        userPings.set(key, { lat: Number(row.lat), lng: Number(row.lng), at });
+        userPings.set(key, {
+          lat: Number(row.lat),
+          lng: Number(row.lng),
+          at,
+          source: "user_locations",
+        });
       }
     }
   }
@@ -127,39 +120,78 @@ export async function gpsStatusReport(
       const key = `${vid}:${istDayKey(at)}`;
       const existing = vendorPings.get(key);
       if (!existing || at > existing.at) {
-        vendorPings.set(key, { lat: Number(row.lat), lng: Number(row.lng), at });
+        vendorPings.set(key, {
+          lat: Number(row.lat),
+          lng: Number(row.lng),
+          at,
+          source: "vendor_gps_history",
+        });
       }
     }
   }
 
-  const rows: GpsStatusRow[] = [];
+  return { userPings, vendorPings };
+}
+
+/** Run daily GPS status check for each entity × day and persist to gps_daily_status. */
+export async function runDailyGpsCheck(
+  sb: SupabaseClient,
+  body: Record<string, unknown>,
+): Promise<{ checks_written: number; users_checked: number; vendors_checked: number; days: string[] }> {
+  const audience = String(body.audience || "all").toLowerCase() as Audience;
+  const todayIst = todayIstYmd();
+  const defaultFrom = parseYmd(todayIst);
+  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 6);
+
+  const dateFrom = String(body.date_from || formatYmd(defaultFrom)).slice(0, 10);
+  const dateTo = String(body.date_to || todayIst).slice(0, 10);
+  const days = dayRange(dateFrom, dateTo);
+  if (!days.length) {
+    return { checks_written: 0, users_checked: 0, vendors_checked: 0, days: [] };
+  }
+
+  const rangeStart = `${dateFrom}T00:00:00+05:30`;
+  const rangeEnd = `${dateTo}T23:59:59.999+05:30`;
+  const { userPings, vendorPings } = await loadHistoryPings(sb, audience, rangeStart, rangeEnd);
+  const now = new Date().toISOString();
+  const upserts: Array<Record<string, unknown>> = [];
+  let usersChecked = 0;
+  let vendorsChecked = 0;
 
   if (audience === "all" || audience === "users") {
     const { data: profiles } = await sb
       .from("profiles")
-      .select("id, first_name, last_name, phone, role")
+      .select("id, last_lat, last_lng, updated_at")
       .in("role", ["customer", "candidate"])
-      .order("created_at", { ascending: false })
       .limit(500);
 
     for (const p of profiles || []) {
-      const name = displayName(p.first_name, p.last_name);
-      const phone = p.phone || "—";
-      if (!matchesSearch({ name, phone }, search)) continue;
+      usersChecked += 1;
+      const currentPing = hasCoords(p.last_lat, p.last_lng)
+        ? {
+          lat: Number(p.last_lat),
+          lng: Number(p.last_lng),
+          at: String(p.updated_at || now),
+          source: "profile_snapshot",
+        }
+        : null;
+
       for (const day of days) {
-        const ping = userPings.get(`${p.id}:${day}`);
-        const status: "shared" | "unshared" = ping ? "shared" : "unshared";
-        if (statusFilter !== "all" && statusFilter !== status) continue;
-        rows.push({
-          date: day,
-          type: "user",
-          id: p.id,
-          name,
-          phone,
-          status,
-          gps_at: ping?.at ?? null,
+        const hist = userPings.get(`${p.id}:${day}`);
+        let ping: Ping | null = hist || null;
+        if (!ping && day === todayIst && currentPing) {
+          ping = currentPing;
+        }
+        upserts.push({
+          entity_type: "user",
+          entity_id: p.id,
+          check_date: day,
+          status: ping ? "shared" : "unshared",
           lat: ping?.lat ?? null,
           lng: ping?.lng ?? null,
+          gps_at: ping?.at ?? null,
+          source: ping?.source ?? "daily_check",
+          checked_at: now,
         });
       }
     }
@@ -168,33 +200,153 @@ export async function gpsStatusReport(
   if (audience === "all" || audience === "vendors") {
     const { data: vendors } = await sb
       .from("vendor_partners")
-      .select("id, first_name, last_name, contact_name, business_name, phone, status")
-      .order("created_at", { ascending: false })
+      .select("id, gps_lat, gps_lng, address_lat, address_lng, updated_at, status")
+      .neq("status", "offboarded")
       .limit(500);
 
     for (const v of vendors || []) {
-      const name = displayName(v.first_name, v.last_name, v.contact_name)
-        || v.business_name
-        || "—";
-      const phone = v.phone || "—";
-      if (!matchesSearch({ name, phone }, search)) continue;
+      vendorsChecked += 1;
+      const lat = v.gps_lat ?? v.address_lat;
+      const lng = v.gps_lng ?? v.address_lng;
+      const currentPing = hasCoords(lat, lng)
+        ? {
+          lat: Number(lat),
+          lng: Number(lng),
+          at: String(v.updated_at || now),
+          source: "vendor_snapshot",
+        }
+        : null;
+
       for (const day of days) {
-        const ping = vendorPings.get(`${v.id}:${day}`);
-        const status: "shared" | "unshared" = ping ? "shared" : "unshared";
-        if (statusFilter !== "all" && statusFilter !== status) continue;
-        rows.push({
-          date: day,
-          type: "vendor",
-          id: v.id,
-          name,
-          phone,
-          status,
-          gps_at: ping?.at ?? null,
+        const hist = vendorPings.get(`${v.id}:${day}`);
+        let ping: Ping | null = hist || null;
+        if (!ping && day === todayIst && currentPing) {
+          ping = currentPing;
+        }
+        upserts.push({
+          entity_type: "vendor",
+          entity_id: v.id,
+          check_date: day,
+          status: ping ? "shared" : "unshared",
           lat: ping?.lat ?? null,
           lng: ping?.lng ?? null,
+          gps_at: ping?.at ?? null,
+          source: ping?.source ?? "daily_check",
+          checked_at: now,
         });
       }
     }
+  }
+
+  let checksWritten = 0;
+  for (let i = 0; i < upserts.length; i += 100) {
+    const chunk = upserts.slice(i, i + 100);
+    const { error } = await sb.from("gps_daily_status").upsert(chunk, {
+      onConflict: "entity_type,entity_id,check_date",
+    });
+    if (error) throw error;
+    checksWritten += chunk.length;
+  }
+
+  return { checks_written: checksWritten, users_checked: usersChecked, vendors_checked: vendorsChecked, days };
+}
+
+export async function gpsStatusReport(
+  sb: SupabaseClient,
+  body: Record<string, unknown>,
+): Promise<{
+  rows: GpsStatusRow[];
+  days: string[];
+  summary: { shared: number; unshared: number; total: number };
+  check: { checks_written: number; users_checked: number; vendors_checked: number };
+}> {
+  const audience = String(body.audience || "all").toLowerCase() as Audience;
+  const statusFilter = String(body.status_filter || "all").toLowerCase() as StatusFilter;
+  const search = String(body.search || body.q || "").trim().toLowerCase();
+  const skipCheck = body.skip_check === true;
+
+  const todayIst = todayIstYmd();
+  const defaultFrom = parseYmd(todayIst);
+  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 6);
+
+  const dateFrom = String(body.date_from || formatYmd(defaultFrom)).slice(0, 10);
+  const dateTo = String(body.date_to || todayIst).slice(0, 10);
+  const days = dayRange(dateFrom, dateTo);
+
+  const check = skipCheck
+    ? { checks_written: 0, users_checked: 0, vendors_checked: 0, days }
+    : await runDailyGpsCheck(sb, { audience, date_from: dateFrom, date_to: dateTo });
+
+  if (!days.length) {
+    return {
+      rows: [],
+      days: [],
+      summary: { shared: 0, unshared: 0, total: 0 },
+      check: { checks_written: check.checks_written, users_checked: check.users_checked, vendors_checked: check.vendors_checked },
+    };
+  }
+
+  let statusQuery = sb
+    .from("gps_daily_status")
+    .select("entity_type, entity_id, check_date, status, lat, lng, gps_at, source")
+    .gte("check_date", dateFrom)
+    .lte("check_date", dateTo);
+
+  if (audience === "users") statusQuery = statusQuery.eq("entity_type", "user");
+  if (audience === "vendors") statusQuery = statusQuery.eq("entity_type", "vendor");
+
+  const { data: statuses, error: statusErr } = await statusQuery;
+  if (statusErr) throw statusErr;
+
+  const nameMap = new Map<string, { name: string; phone: string }>();
+
+  if (audience === "all" || audience === "users") {
+    const { data: profiles } = await sb
+      .from("profiles")
+      .select("id, first_name, last_name, phone")
+      .in("role", ["customer", "candidate"]);
+    for (const p of profiles || []) {
+      nameMap.set(`user:${p.id}`, {
+        name: displayName(p.first_name, p.last_name),
+        phone: p.phone || "—",
+      });
+    }
+  }
+
+  if (audience === "all" || audience === "vendors") {
+    const { data: vendors } = await sb
+      .from("vendor_partners")
+      .select("id, first_name, last_name, contact_name, business_name, phone");
+    for (const v of vendors || []) {
+      nameMap.set(`vendor:${v.id}`, {
+        name: displayName(v.first_name, v.last_name, v.contact_name) || v.business_name || "—",
+        phone: v.phone || "—",
+      });
+    }
+  }
+
+  const rows: GpsStatusRow[] = [];
+
+  for (const s of statuses || []) {
+    const type = s.entity_type as "user" | "vendor";
+    const meta = nameMap.get(`${type}:${s.entity_id}`);
+    if (!meta) continue;
+    if (!matchesSearch(meta, search)) continue;
+    const status = s.status as "shared" | "unshared";
+    if (statusFilter !== "all" && statusFilter !== status) continue;
+
+    rows.push({
+      date: String(s.check_date),
+      type,
+      id: String(s.entity_id),
+      name: meta.name,
+      phone: meta.phone,
+      status,
+      gps_at: s.gps_at ? String(s.gps_at) : null,
+      lat: s.lat != null ? Number(s.lat) : null,
+      lng: s.lng != null ? Number(s.lng) : null,
+      source: s.source ? String(s.source) : null,
+    });
   }
 
   rows.sort((a, b) => {
@@ -210,5 +362,10 @@ export async function gpsStatusReport(
     rows,
     days,
     summary: { shared, unshared, total: rows.length },
+    check: {
+      checks_written: check.checks_written,
+      users_checked: check.users_checked,
+      vendors_checked: check.vendors_checked,
+    },
   };
 }

@@ -36,7 +36,7 @@ import {
   listInvestmentRequests,
   respondInvestmentRequest,
 } from "../_shared/investments-admin.ts";
-import { gpsStatusReport } from "../_shared/gps-status-admin.ts";
+import { gpsStatusReport, runDailyGpsCheck } from "../_shared/gps-status-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -959,6 +959,16 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "GPS report failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "run_daily_gps_check") {
+    try {
+      const result = await runDailyGpsCheck(sb, body);
+      return json({ success: true, ...result });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Daily GPS check failed";
       return json({ error: msg }, 500);
     }
   }

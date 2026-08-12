@@ -9492,13 +9492,16 @@ function AdminGpsStatusTab({ pin }) {
   });
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [checkInfo, setCheckInfo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState('');
   const [err, setErr] = useState('');
 
   const load = useCallback(async () => {
     if (!pin) return;
     setLoading(true);
     setErr('');
+    setPhase('Running daily GPS check for all users & vendors…');
     try {
       const data = await adminHubFetch('gps_status_report', {
         audience,
@@ -9507,12 +9510,16 @@ function AdminGpsStatusTab({ pin }) {
         status_filter: statusFilter,
         search: search.trim() || undefined,
       }, pin);
+      setPhase('');
       setRows(data.rows || []);
       setSummary(data.summary || null);
+      setCheckInfo(data.check || null);
     } catch (e) {
       setErr(e.message);
       setRows([]);
       setSummary(null);
+      setCheckInfo(null);
+      setPhase('');
     } finally {
       setLoading(false);
     }
@@ -9540,9 +9547,9 @@ function AdminGpsStatusTab({ pin }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>GPS Status Report</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Day-wise Shared / Unshared for customers and partners (IST calendar days, last GPS ping per day).</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Runs a daily GPS check first, then shows day-wise Shared / Unshared (IST).</div>
         </div>
-        <Btn v="outline" sm onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Btn>
+        <Btn v="outline" sm onClick={load} disabled={loading}>{loading ? 'Checking…' : 'Run check & refresh'}</Btn>
       </div>
 
       <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
@@ -9566,6 +9573,19 @@ function AdminGpsStatusTab({ pin }) {
         </div>
       </div>
 
+      {checkInfo && (
+        <div style={{ ...S.card(), padding: 12, marginBottom: 14, fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
+          <strong style={{ color: C.txt }}>Daily check complete:</strong>{' '}
+          {checkInfo.users_checked} users · {checkInfo.vendors_checked} vendors · {checkInfo.checks_written} day-records written
+        </div>
+      )}
+
+      {phase && (
+        <div style={{ ...S.card(), padding: 12, marginBottom: 14, fontSize: 12, color: C.cyan, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Spin size={16} /> {phase}
+        </div>
+      )}
+
       {summary && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
           <AdminStatCard label="Shared" value={summary.shared} color={C.grn} />
@@ -9581,7 +9601,7 @@ function AdminGpsStatusTab({ pin }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
             <thead>
               <tr style={{ position: 'sticky', top: 0, background: C.surf, zIndex: 1 }}>
-                {['Date', 'Type', 'Name', 'Phone', 'Status', 'GPS time', 'Coordinates'].map((h) => (
+                {['Date', 'Type', 'Name', 'Phone', 'Status', 'GPS time', 'Source', 'Coordinates'].map((h) => (
                   <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
@@ -9604,6 +9624,7 @@ function AdminGpsStatusTab({ pin }) {
                     </span>
                   </td>
                   <td style={{ ...td, color: C.dim }}>{r.gps_at ? fmtDt(r.gps_at) : '—'}</td>
+                  <td style={{ ...td, color: C.dim, fontSize: 10 }}>{r.source || '—'}</td>
                   <td style={{ ...td, color: C.dim, fontFamily: 'monospace', fontSize: 10 }}>
                     {r.lat != null ? `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}` : '—'}
                   </td>
