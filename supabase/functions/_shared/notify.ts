@@ -356,6 +356,28 @@ export function generateAcceptCode(): string {
   return code;
 }
 
+/** Forward geocode address text → lat/lng (India-biased) */
+export async function geocodeAddress(
+  location: string,
+): Promise<{ lat: number; lng: number } | null> {
+  const q = location.trim();
+  if (!q) return null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=in`,
+      { headers: { "User-Agent": "ScanV/5.5 booking-dispatch", "Accept-Language": "en" } },
+    );
+    const data = await res.json();
+    const hit = Array.isArray(data) ? data[0] : null;
+    if (hit?.lat && hit?.lon) {
+      return { lat: parseFloat(String(hit.lat)), lng: parseFloat(String(hit.lon)) };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 /** Reverse geocode country via Nominatim */
 export async function geoCountryFromLatLng(
   lat: number,

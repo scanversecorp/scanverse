@@ -20,6 +20,7 @@ import {
   generateAcceptCode,
   bookingAcceptMessage,
   callFailedStatuses,
+  geocodeAddress,
 } from "../_shared/notify.ts";
 
 const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes
@@ -257,68 +258,38 @@ async function assignVendor(
 async function processDispatchTick(
   supabase: ReturnType<typeof createClient>,
   dispatch: Record<string, unknown>,
-) {
-  if (dispatch.status === "assigned" || dispatch.status === "exhausted") return;
+): Promise<Array<{ vendor_id: string; business_name: string; distance_km: number }>> {
+  if (dispatch.status === "assigned" || dispatch.status === "exhausted") return [];
 
   const lat = dispatch.customer_lat as number | null;
   const lng = dispatch.customer_lng as number | null;
   const serviceId = String(dispatch.service_id || "");
   const categoryId = String(dispatch.category_id || "");
-  const rank = Number(dispatch.vendor_rank || 1);
   const attemptNum = Number(dispatch.attempt_num || 1);
 
-  const triedVendorIds: string[] = [];
-  const { data: prevAttempts } = await supabase
-    .from("booking_dispatch_attempts")
-    .select("vendor_id")
-    .eq("dispatch_id", dispatch.id);
-  for (const a of prevAttempts || []) {
-    if (!triedVendorIds.includes(a.vendor_id)) triedVendorIds.push(a.vendor_id);
-  }
+  const queue = await getVendorQueue(supabase, serviceId, lat, lng, [], categoryId);
+  const top3 = queue.slice(0, MAX_VENDORS);
 
-  const queue = await getVendorQueue(
-    supabase,
-    serviceId,
-    lat,
-    lng,
-    triedVendorIds.slice(0, rank - 1),
-    categoryId,
-  );
-  const vendor = queue[rank - 1];
-  if (!vendor) {
-    if (rank >= MAX_VENDORS) {
-      await supabase.from("booking_dispatch").update({
-        status: "exhausted",
-        exhausted_at: new Date().toISOString(),
-        next_action_at: null,
-      }).eq("id", dispatch.id);
-      return;
-    }
+  if (!top3.length) {
     await supabase.from("booking_dispatch").update({
-      vendor_rank: rank + 1,
-      attempt_num: 1,
-      next_action_at: new Date().toISOString(),
+      status: "exhausted",
+      exhausted_at: new Date().toISOString(),
+      next_action_at: null,
     }).eq("id", dispatch.id);
-    return processDispatchTick(supabase, {
-      ...dispatch,
-      vendor_rank: rank + 1,
-      attempt_num: 1,
-    });
+    return [];
   }
 
   await supabase.from("booking_dispatch").update({ status: "dispatching" }).eq("id", dispatch.id);
 
-  await notifyVendor(supabase, dispatch, vendor, attemptNum);
+  // Alert nearest 3 GPS-matched partners in parallel (first accept wins)
+  for (const vendor of top3) {
+    await notifyVendor(supabase, dispatch, vendor, attemptNum);
+  }
 
   if (attemptNum < MAX_ATTEMPTS_PER_VENDOR) {
     await supabase.from("booking_dispatch").update({
       attempt_num: attemptNum + 1,
-      next_action_at: new Date(Date.now() + RETRY_GAP_MS).toISOString(),
-    }).eq("id", dispatch.id);
-  } else if (rank < MAX_VENDORS) {
-    await supabase.from("booking_dispatch").update({
-      vendor_rank: rank + 1,
-      attempt_num: 1,
+      vendor_rank: MAX_VENDORS,
       next_action_at: new Date(Date.now() + RETRY_GAP_MS).toISOString(),
     }).eq("id", dispatch.id);
   } else {
@@ -328,6 +299,12 @@ async function processDispatchTick(
       next_action_at: null,
     }).eq("id", dispatch.id);
   }
+
+  return top3.map((v) => ({
+    vendor_id: v.vendor_id,
+    business_name: v.business_name,
+    distance_km: v.distance_km,
+  }));
 }
 
 Deno.serve(async (req: Request) => {
@@ -524,6 +501,23 @@ Deno.serve(async (req: Request) => {
         return json({ success: true, dispatch_id: existing.id, duplicate: true, retried: true });
       }
 
+      let custLat = body.lat != null ? Number(body.lat) : null;
+      let custLng = body.lng != null ? Number(body.lng) : null;
+      const customerLocation = String(body.location || "");
+      if ((!custLat || !custLng) && customerLocation) {
+        const geo = await geocodeAddress(customerLocation);
+        if (geo) {
+          custLat = geo.lat;
+          custLng = geo.lng;
+        }
+      }
+      if (custLat && custLng) {
+        await supabase.from("bookings").update({
+          customer_lat: custLat,
+          customer_lng: custLng,
+        }).eq("id", bookingId).catch(() => {});
+      }
+
       const acceptCode = generateAcceptCode();
       const { data: dispatch, error } = await supabase
         .from("booking_dispatch")
@@ -532,9 +526,9 @@ Deno.serve(async (req: Request) => {
           service_id: serviceId,
           category_id: String(body.category_id || body.parent_id || ""),
           service_name: serviceName,
-          customer_lat: body.lat != null ? Number(body.lat) : null,
-          customer_lng: body.lng != null ? Number(body.lng) : null,
-          customer_location: String(body.location || ""),
+          customer_lat: custLat,
+          customer_lng: custLng,
+          customer_location: customerLocation,
           scheduled_date: body.date || null,
           scheduled_time: body.time || null,
           accept_code: acceptCode,
@@ -547,14 +541,18 @@ Deno.serve(async (req: Request) => {
         .single();
       if (error) throw error;
 
-      // Process first vendor immediately
-      await processDispatchTick(supabase, dispatch);
+      // Alert nearest 3 GPS-matched partners immediately
+      const dispatchRow = { ...dispatch, customer_lat: custLat, customer_lng: custLng };
+      const vendorsNotified = await processDispatchTick(supabase, dispatchRow);
 
       return json({
         success: true,
         dispatch_id: dispatch.id,
         accept_code: acceptCode,
-        status: dispatch.status,
+        status: "dispatching",
+        customer_gps: custLat && custLng ? { lat: custLat, lng: custLng } : null,
+        vendors_notified: vendorsNotified,
+        nearest_count: vendorsNotified.length,
       });
     }
 

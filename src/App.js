@@ -1413,29 +1413,63 @@ function serviceCategoryId(serviceId) {
   return serviceId;
 }
 
-async function invokeBookingDispatch({ bookingId, serviceId, serviceName, categoryId, customerId, lat, lng, location, date, time }) {
+async function forwardGeocode(address) {
+  if (!address?.trim()) return null;
   try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address.trim())}&format=json&limit=1&countrycodes=in`,
+      { headers: { Accept: 'application/json', 'Accept-Language': 'en', 'User-Agent': 'ScanV/5.5' } },
+    );
+    const data = await r.json();
+    if (data?.[0]?.lat && data?.[0]?.lon) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
+async function resolveDispatchCoords({ lat, lng, location }) {
+  if (lat != null && lng != null) return { lat, lng };
+  const geo = await forwardGeocode(location);
+  return geo || { lat: null, lng: null };
+}
+
+async function invokeBookingDispatch(opts, addToast) {
+  try {
+    const coords = await resolveDispatchCoords(opts);
     const r = await sb().functions.invoke('booking-dispatch', {
       body: {
         action: 'start',
-        booking_id: bookingId,
-        service_id: serviceId || '',
-        category_id: categoryId || '',
-        customer_id: customerId || null,
-        service_name: serviceName,
-        lat: lat ?? null,
-        lng: lng ?? null,
-        location: location || '',
-        date: date || null,
-        time: time || null,
+        booking_id: opts.bookingId,
+        service_id: opts.serviceId || '',
+        category_id: opts.categoryId || '',
+        customer_id: opts.customerId || null,
+        service_name: opts.serviceName,
+        lat: coords.lat,
+        lng: coords.lng,
+        location: opts.location || '',
+        date: opts.date || null,
+        time: opts.time || null,
       },
     });
-    if (r.error) console.warn('[Dispatch]', r.error.message);
-    if (r.data?.error) console.warn('[Dispatch]', r.data.error);
+    if (r.error) {
+      addToast?.(r.error.message || 'Partner alerts failed', 'error');
+      return { error: r.error.message };
+    }
+    if (r.data?.error) {
+      addToast?.(r.data.error, 'error');
+      return r.data;
+    }
+    const n = r.data?.nearest_count ?? r.data?.vendors_notified?.length ?? 0;
+    if (n > 0) {
+      addToast?.(`Alerting ${n} nearest partner${n > 1 ? 's' : ''} via SMS, call & WhatsApp 📲`, 'success');
+    } else if (r.data?.success) {
+      addToast?.('Searching for partners — alerts will retry shortly', 'success');
+    }
     return r.data;
   } catch (e) {
-    console.warn('[Dispatch]', e.message);
-    return null;
+    addToast?.(e.message || 'Partner alerts failed', 'error');
+    return { error: e.message };
   }
 }
 
@@ -2689,12 +2723,15 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       const gst   = Math.round((price+fee)*GST_RATE);
       const total = price+fee+gst;
       const loc   = bookingDetail.loc||`${village}, ${city} ${pincode}`.trim();
+      const custLat = silentGeo?.lat || bookingDetail.lat || null;
+      const custLng = silentGeo?.lng || bookingDetail.lng || null;
       const {data:bk,error} = await sb().from('bookings').insert({
-        customer_id:userId, service_name:svc.name,
+        customer_id:userId, service_name:svc.name, service_id: svc.id || svc.parent || null,
         customer_name:`${firstName} ${lastName}`.trim(),
         customer_email:`${mobile}@scanv.app`,
         date:bookingDetail.date, time:bookingDetail.time||'10:00',
         notes:bookingDetail.notes||'', location_text:loc,
+        customer_lat: custLat, customer_lng: custLng,
         price, platform_fee:fee, gst_amt:gst, total,
         status:'confirmed', txn_id:txnId,
         paid_at:new Date().toISOString(),
@@ -2712,18 +2749,18 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         method:paymentMethod||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
       }).catch(()=>{});
-      invokeBookingDispatch({
+      await invokeBookingDispatch({
         bookingId: bk.id,
         serviceId: svc.id || svc.parent || activeSvc?.id || '',
         categoryId: svc.parent || activeSvc?.parent || '',
         customerId: userId,
         serviceName: svc.name,
-        lat: silentGeo?.lat || bookingDetail.lat || null,
-        lng: silentGeo?.lng || bookingDetail.lng || null,
+        lat: custLat,
+        lng: custLng,
         location: loc,
         date: bookingDetail.date,
         time: bookingDetail.time || '10:00',
-      });
+      }, addToast);
       const profile = await upsertCustomerProfile({
         id: userId,
         mob: normalizeMobileE164(mobile),
@@ -4075,7 +4112,7 @@ function BookScreen() {
         bookingId: data.id, serviceId: svc.id || svc.parent || '', categoryId: svc.parent || '',
         customerId: profile.id, serviceName: svc.name,
         lat: custLat, lng: custLng, location: loc, date, time,
-      });
+      }, addToast);
       setBooking(data);
       clearBookingDraft();
       addToast('Booking confirmed! Track your partner live 📍', 'success');
@@ -4419,7 +4456,7 @@ function TrackServiceScreen() {
         location: booking.location_text || '',
         date: booking.date,
         time: booking.time,
-      });
+      }, addToast);
       if (r?.error) throw new Error(r.error);
       addToast(r?.duplicate ? 'Partner alerts re-sent 📲' : 'Partner alerts started 📲', 'success');
       refresh?.();
@@ -4482,7 +4519,7 @@ function TrackServiceScreen() {
 
           {!booking?.partner_id && booking?.status === 'confirmed' && (
             <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
-              <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — SMS, phone call & WhatsApp. Partner will appear on the map once assigned.
+              <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — we alert the <strong>3 nearest active partners</strong> by GPS (SMS, call & WhatsApp). First to accept gets the job.
               {!dispatch && (
                 <div style={{ marginTop: 10 }}>
                   <Btn sm v="ghost" onClick={retryPartnerAlerts} disabled={retryDispatch}>
@@ -4773,7 +4810,7 @@ function BookingsScreen() {
         location: loc,
         date: recoverDate,
         time: recoverTime || '10:00',
-      });
+      }, addToast);
       clearBookingDraft();
       setRecovering(null);
       addToast('Booking created from your payment ✓', 'success');
