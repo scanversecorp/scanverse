@@ -6349,6 +6349,14 @@ function useDebouncedValue(value, delay = 300) {
   return debounced;
 }
 
+function vendorStatusNorm(v) {
+  return String(v?.status || '').trim().toLowerCase();
+}
+
+function vendorCanActivate(v) {
+  return vendorStatusNorm(v) === 'pending';
+}
+
 function vendorFirstName(v) {
   if (v?.first_name) return v.first_name;
   const parts = String(v?.contact_name || '').trim().split(/\s+/);
@@ -6515,7 +6523,7 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, o
                 <th style={{ ...thStyle, minWidth: 70, width: 70, cursor: 'default' }}>Photo</th>
                 <th style={{ ...thStyle, minWidth: 130, width: 130, cursor: 'default' }}>GPS</th>
                 <th style={{ ...thStyle, minWidth: 160, width: 160, cursor: 'default' }}>Services</th>
-                <th style={{ ...thStyle, minWidth: 120, width: 120, cursor: 'default', right: 0, position: 'sticky' }}>Actions</th>
+                <th style={{ ...thStyle, minWidth: 140, width: 140, cursor: 'default', right: 0, position: 'sticky' }}>Actions</th>
               </tr>
               <tr>
                 {VENDOR_ADMIN_COLUMNS.map((col) => (
@@ -6559,24 +6567,26 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, o
                       ))}
                       {activeSvcs.length > 3 && <span style={{ fontSize: 9, color: C.dim }}>+{activeSvcs.length - 3}</span>}
                     </td>
-                    <td style={{ ...tdStyle, position: 'sticky', right: 0, background: C.card, maxWidth: 120 }}>
+                    <td style={{ ...tdStyle, position: 'sticky', right: 0, background: C.card, minWidth: 140, maxWidth: 140, whiteSpace: 'normal', overflow: 'visible' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {canEdit && vendorCanActivate(v) && (
+                          <Btn sm onClick={() => onAction('activate', v.id)} disabled={loading}>Activate</Btn>
+                        )}
                         {canEdit && (
                           <Btn v="outline" sm onClick={() => onEdit?.(v)} disabled={loading}>Edit</Btn>
                         )}
-                        {canEdit && v.status === 'pending' && <>
-                          <Btn sm onClick={() => onAction('activate', v.id)} disabled={loading}>Activate</Btn>
+                        {canEdit && vendorCanActivate(v) && (
                           <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
-                        </>}
-                        {canEdit && v.status === 'active' && <>
+                        )}
+                        {canEdit && vendorStatusNorm(v) === 'active' && <>
                           <Btn v="outline" sm onClick={() => onAction('pause', v.id)} disabled={loading}>Pause</Btn>
                           <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
                         </>}
-                        {canEdit && v.status === 'paused' && <>
+                        {canEdit && vendorStatusNorm(v) === 'paused' && <>
                           <Btn sm onClick={() => onAction('unpause', v.id)} disabled={loading}>Unpause</Btn>
                           <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
                         </>}
-                        {canEdit && v.status === 'offboarded' && (
+                        {canEdit && vendorStatusNorm(v) === 'offboarded' && (
                           <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
                         )}
                       </div>
@@ -7151,10 +7161,12 @@ function vendorEditFormFromVendor(v) {
   };
 }
 
-function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved }) {
+function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate }) {
   const [form, setForm] = useState(() => vendorEditFormFromVendor(vendor));
   const [saving, setSaving] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [err, setErr] = useState('');
+  const pending = vendorCanActivate(vendor);
 
   const f = (key, val) => setForm((st) => ({ ...st, [key]: val }));
 
@@ -7205,6 +7217,20 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved }) {
       setErr(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const activate = async () => {
+    if (!window.confirm('Activate this partner? They will start receiving booking alerts.')) return;
+    setActivating(true);
+    setErr('');
+    try {
+      await onActivate?.(vendor.id);
+      onClose?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setActivating(false);
     }
   };
 
@@ -7263,9 +7289,12 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved }) {
             maxHeight={220}
           />
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Btn>
-          <Btn v="outline" onClick={onClose} disabled={saving}>Cancel</Btn>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+          {pending && (
+            <Btn onClick={activate} disabled={saving || activating}>{activating ? 'Activating…' : 'Activate partner'}</Btn>
+          )}
+          <Btn v={pending ? 'outline' : undefined} onClick={save} disabled={saving || activating}>{saving ? 'Saving…' : 'Save changes'}</Btn>
+          <Btn v="outline" onClick={onClose} disabled={saving || activating}>Cancel</Btn>
         </div>
       </div>
     </div>
@@ -7487,6 +7516,11 @@ function VendorAdminPage() {
             onSaved={async () => {
               await load(pin);
               setMsg('Partner updated');
+            }}
+            onActivate={async (id) => {
+              await vendorOnboardFetch('activate', { vendor_id: id }, pin);
+              await load(pin);
+              setMsg('Partner activated');
             }}
           />
         )}
