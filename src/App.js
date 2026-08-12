@@ -1478,6 +1478,90 @@ function allVendorSelectableServices() {
   return list;
 }
 
+function vendorServiceNameMap(allSvcs) {
+  return Object.fromEntries(allSvcs.map(s => [s.service_id, s]));
+}
+
+function VendorServicePicker({ allSvcs, selected, onToggle, searchPlaceholder = 'Search services…', maxHeight = 420 }) {
+  const [q, setQ] = useState('');
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return allSvcs;
+    return allSvcs.filter(s =>
+      s.name.toLowerCase().includes(term) || s.cat.toLowerCase().includes(term),
+    );
+  }, [allSvcs, q]);
+
+  const serving = filtered.filter(s => selected[s.service_id]);
+  const availableByCat = useMemo(() => {
+    const acc = {};
+    for (const s of filtered) {
+      if (selected[s.service_id]) continue;
+      if (!acc[s.cat]) acc[s.cat] = [];
+      acc[s.cat].push(s);
+    }
+    return acc;
+  }, [filtered, selected]);
+
+  const selectedCount = allSvcs.filter(s => selected[s.service_id]).length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.grn }}>
+          Your services ({selectedCount})
+        </div>
+        <div style={{ fontSize: 11, color: C.dim }}>{allSvcs.length} total in catalog</div>
+      </div>
+      {selectedCount > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14, padding: 10, background: `${C.grn}12`, border: `1px solid ${C.grn}44`, borderRadius: 10 }}>
+          {allSvcs.filter(s => selected[s.service_id]).map(s => (
+            <button key={s.service_id} type="button" onClick={() => onToggle(s.service_id)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 16, border: `1px solid ${C.grn}`, background: C.surf, color: C.txt, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
+              {s.name} <span style={{ color: C.red, fontWeight: 800 }}>×</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: C.dim, marginBottom: 14, padding: 10, background: C.deep, borderRadius: 8 }}>
+          No services selected yet — pick from the categories below.
+        </div>
+      )}
+
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder={searchPlaceholder}
+        style={{ ...S.inp(), marginBottom: 12, fontSize: 13 }} />
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.acc, marginBottom: 8 }}>
+        Available to add ({filtered.length - serving.length})
+      </div>
+      <div style={{ maxHeight, overflowY: 'auto', border: BDR, borderRadius: 10, padding: '4px 10px' }}>
+        {Object.entries(availableByCat).map(([cat, svcs]) => (
+          <div key={cat} style={{ marginBottom: 10, paddingTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.acc }}>{cat} ({svcs.length})</div>
+              <button type="button" onClick={() => svcs.forEach(s => { if (!selected[s.service_id]) onToggle(s.service_id); })}
+                style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>
+                Add all
+              </button>
+            </div>
+            {svcs.map(s => (
+              <label key={s.service_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: `1px solid ${C.bdr}`, cursor: 'pointer', fontSize: 13 }}>
+                <input type="checkbox" checked={false} onChange={() => onToggle(s.service_id)} />
+                <span style={{ color: C.txt }}>{s.name}</span>
+              </label>
+            ))}
+          </div>
+        ))}
+        {!Object.keys(availableByCat).length && (
+          <div style={{ textAlign: 'center', color: C.dim, fontSize: 12, padding: 20 }}>
+            {q ? 'No matching services' : 'All services selected ✓'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 async function vendorOnboardFetch(action, payload = {}, pin) {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
   if (pin) headers['x-vendor-admin-pin'] = pin;
@@ -5927,6 +6011,7 @@ function VendorOnboardPage() {
   const [ekycMode, setEkycMode] = useState('');
   const [pan, setPan] = useState('');
   const [panOk, setPanOk] = useState(null);
+  const [vehicleNumber, setVehicleNumber] = useState('');
   const [selectedSvcs, setSelectedSvcs] = useState({});
   const allSvcs = allVendorSelectableServices();
   const mobileE164 = () => '+91' + phone.replace(/\D/g, '');
@@ -6113,6 +6198,7 @@ function VendorOnboardPage() {
         ekyc_ref: ekycRef || undefined,
         pan_number: pan || null,
         pan_verified: !!pan && panOk,
+        vehicle_number: vehicleNumber.trim() || null,
         services,
       });
       setMsg(r.message || 'Registration submitted!');
@@ -6199,6 +6285,9 @@ function VendorOnboardPage() {
             </div>
             {gpsCheck?.vpn_suspected && <div style={{ color: C.red, fontSize: 11, marginTop: 6 }}>⚠ VPN/proxy detected — disable VPN for accurate location</div>}
           </Field>
+          <Field label="Vehicle number (optional)" note="For delivery, two-wheeler, or four-wheeler partners — e.g. MH12AB1234">
+            <input value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value.toUpperCase().slice(0, 15))} style={S.inp()} placeholder="MH12AB1234" />
+          </Field>
           <Btn full onClick={() => { if (!businessName || !contactName || !shopOrFlat || !streetName || !city || !pincode || !gps) return setErr('Complete all required fields + GPS'); setStep(3); setErr(''); }}>Continue →</Btn>
         </>}
 
@@ -6238,28 +6327,20 @@ function VendorOnboardPage() {
             <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
               Signed in as <strong style={{ color: C.txt }}>{existingPartner.business_name}</strong>
               {' '}({existingPartner.status === 'active' ? 'active partner' : 'pending activation'}).
-              Check additional services below — existing selections stay active.
+              Update your service list below — uncheck chips in &quot;Your services&quot; to remove a category.
             </div>
           )}
           <div style={{ fontSize: 13, fontWeight: 700, color: C.txt, marginBottom: 10 }}>
             {addServicesMode ? 'Add or update your services' : 'Select services you can provide'}
           </div>
-          <div style={{ maxHeight: 360, overflowY: 'auto', marginBottom: 16 }}>
-            {Object.entries(
-              allSvcs.reduce((acc, s) => { (acc[s.cat] = acc[s.cat] || []).push(s); return acc; }, {})
-            ).map(([cat, svcs]) => (
-              <div key={cat} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.acc, marginBottom: 6 }}>{cat}</div>
-                {svcs.map(s => (
-                  <label key={s.service_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.bdr}`, cursor: 'pointer', fontSize: 13 }}>
-                    <input type="checkbox" checked={!!selectedSvcs[s.service_id]} onChange={() => toggleSvc(s.service_id)} />
-                    <span>{s.name}</span>
-                  </label>
-                ))}
-              </div>
-            ))}
-          </div>
-          <Btn full onClick={submit} disabled={loading}>{loading ? <><Spin size={16} /> Submitting…</> : addServicesMode ? 'Save service updates →' : 'Submit partner application →'}</Btn>
+          <VendorServicePicker
+            allSvcs={allSvcs}
+            selected={selectedSvcs}
+            onToggle={toggleSvc}
+            searchPlaceholder="Search by service or category…"
+            maxHeight={400}
+          />
+          <Btn full onClick={submit} disabled={loading} style={{ marginTop: 16 }}>{loading ? <><Spin size={16} /> Submitting…</> : addServicesMode ? 'Save service updates →' : 'Submit partner application →'}</Btn>
         </>}
 
         {step === 6 && (
@@ -6301,18 +6382,35 @@ function VendorAdminPage() {
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [filter, setFilter] = useState('all');
+  const [searchName, setSearchName] = useState('');
+  const [searchCity, setSearchCity] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterService, setFilterService] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
   const [showEnroll, setShowEnroll] = useState(false);
   const [enroll, setEnroll] = useState({
     business_name: '', contact_name: '', phone: '', email: '',
     shop_or_flat: '', street_name: '', city: '', pincode: '', state: 'Maharashtra',
-    activate_immediately: false, services: {},
+    vehicle_number: '', activate_immediately: false, services: {},
   });
   const enrollSvcs = allVendorSelectableServices();
+  const svcNameMap = useMemo(() => vendorServiceNameMap(enrollSvcs), [enrollSvcs]);
+  const categoryOptions = useMemo(() => {
+    const cats = new Map();
+    for (const s of enrollSvcs) cats.set(s.category_id, s.cat);
+    return [...cats.entries()].map(([id, label]) => ({ id, label }));
+  }, [enrollSvcs]);
 
-  const load = useCallback(async (usePin) => {
+  const load = useCallback(async (usePin, filters = {}) => {
     setLoading(true); setErr('');
     try {
-      const { vendors: data } = await vendorOnboardFetch('list', {}, usePin);
+      const { vendors: data } = await vendorOnboardFetch('list', {
+        status: filters.status && filters.status !== 'all' ? filters.status : undefined,
+        city: filters.city || undefined,
+        search: filters.search || undefined,
+        category_id: filters.category_id || undefined,
+        service_id: filters.service_id || undefined,
+      }, usePin);
       setVendors(data || []);
       setAuthed(true);
       sessionStorage.setItem(VENDOR_PIN_KEY, usePin);
@@ -6324,6 +6422,14 @@ function VendorAdminPage() {
   }, []);
 
   const login = () => load(pin);
+
+  const applyFilters = () => load(pin, {
+    status: filter,
+    city: searchCity.trim(),
+    search: searchName.trim(),
+    category_id: filterCategory,
+    service_id: filterService,
+  });
 
   const runAction = async (action, id, confirmMsg) => {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -6369,6 +6475,7 @@ function VendorAdminPage() {
         city: enroll.city.trim(),
         pincode: enroll.pincode.trim(),
         state: enroll.state.trim(),
+        vehicle_number: enroll.vehicle_number.trim() || undefined,
         activate_immediately: enroll.activate_immediately,
         services,
       }, pin);
@@ -6378,13 +6485,45 @@ function VendorAdminPage() {
       setEnroll({
         business_name: '', contact_name: '', phone: '', email: '',
         shop_or_flat: '', street_name: '', city: '', pincode: '', state: 'Maharashtra',
-        activate_immediately: false, services: {},
+        vehicle_number: '', activate_immediately: false, services: {},
       });
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
-  const shown = filter === 'all' ? vendors : vendors.filter(v => v.status === filter);
+  const shown = useMemo(() => {
+    let list = filter === 'all' ? vendors : vendors.filter(v => v.status === filter);
+    const term = searchName.trim().toLowerCase();
+    if (term) {
+      list = list.filter(v => {
+        const hay = [v.business_name, v.contact_name, v.phone, v.email, v.vehicle_number].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(term);
+      });
+    }
+    const cityTerm = searchCity.trim().toLowerCase();
+    if (cityTerm) {
+      list = list.filter(v =>
+        [v.city, v.village, v.pincode, v.state].filter(Boolean).join(' ').toLowerCase().includes(cityTerm),
+      );
+    }
+    if (filterCategory) {
+      list = list.filter(v =>
+        (v.vendor_partner_services || []).some(s => s.is_active && s.category_id === filterCategory),
+      );
+    }
+    if (filterService) {
+      list = list.filter(v =>
+        (v.vendor_partner_services || []).some(s => s.is_active && s.service_id === filterService),
+      );
+    }
+    return list;
+  }, [vendors, filter, searchName, searchCity, filterCategory, filterService]);
+
+  const serviceOptionsForCategory = useMemo(() => {
+    if (!filterCategory) return enrollSvcs;
+    return enrollSvcs.filter(s => s.category_id === filterCategory);
+  }, [enrollSvcs, filterCategory]);
+
   const statusColor = { pending: C.cyan, active: C.grn, paused: C.gold, suspended: C.red, offboarded: C.dim };
 
   if (!authed) {
@@ -6433,6 +6572,34 @@ function VendorAdminPage() {
             </button>
           ))}
         </div>
+        <div style={{ ...S.card(), marginBottom: 14, padding: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.txt, marginBottom: 10 }}>Filters</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+            <Field label="Name / phone / email">
+              <input value={searchName} onChange={e => setSearchName(e.target.value)} style={S.inp()} placeholder="Search partners…" />
+            </Field>
+            <Field label="City / location">
+              <input value={searchCity} onChange={e => setSearchCity(e.target.value)} style={S.inp()} placeholder="Pune, Wakad…" />
+            </Field>
+            <Field label="Category">
+              <select value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setFilterService(''); }} style={S.inp()}>
+                <option value="">All categories</option>
+                {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Service">
+              <select value={filterService} onChange={e => setFilterService(e.target.value)} style={S.inp()}>
+                <option value="">All services</option>
+                {serviceOptionsForCategory.map(s => <option key={s.service_id} value={s.service_id}>{s.name}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <Btn sm onClick={applyFilters} disabled={loading}>Apply server filters</Btn>
+            <Btn v="outline" sm onClick={() => { setSearchName(''); setSearchCity(''); setFilterCategory(''); setFilterService(''); setFilter('all'); load(pin); }} disabled={loading}>Clear</Btn>
+            <span style={{ fontSize: 11, color: C.dim, alignSelf: 'center' }}>Showing {shown.length} of {vendors.length}</span>
+          </div>
+        </div>
         {showEnroll && (
           <div style={{ ...S.card(), marginBottom: 16, padding: 16 }}>
             <div style={{ fontWeight: 800, color: C.txt, marginBottom: 12 }}>Enroll new partner</div>
@@ -6446,14 +6613,16 @@ function VendorAdminPage() {
               <Field label="City"><input value={enroll.city} onChange={e => setEnroll(s => ({ ...s, city: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Pincode"><input value={enroll.pincode} onChange={e => setEnroll(s => ({ ...s, pincode: e.target.value }))} style={S.inp()} /></Field>
               <Field label="State"><input value={enroll.state} onChange={e => setEnroll(s => ({ ...s, state: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Vehicle # (optional)"><input value={enroll.vehicle_number} onChange={e => setEnroll(s => ({ ...s, vehicle_number: e.target.value.toUpperCase() }))} style={S.inp()} placeholder="MH12AB1234" /></Field>
             </div>
-            <div style={{ marginTop: 12, maxHeight: 160, overflowY: 'auto', border: BDR, borderRadius: 8, padding: 10 }}>
-              <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services (optional)</div>
-              {enrollSvcs.slice(0, 40).map(s => (
-                <label key={s.service_id} style={{ display: 'block', fontSize: 11, color: C.sub, marginBottom: 4, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!enroll.services[s.service_id]} onChange={e => setEnroll(st => ({ ...st, services: { ...st.services, [s.service_id]: e.target.checked } }))} /> {s.cat} · {s.name}
-                </label>
-              ))}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services (optional — full catalog)</div>
+              <VendorServicePicker
+                allSvcs={enrollSvcs}
+                selected={enroll.services}
+                onToggle={(id) => setEnroll(st => ({ ...st, services: { ...st.services, [id]: !st.services[id] } }))}
+                maxHeight={240}
+              />
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, color: C.sub, cursor: 'pointer' }}>
               <input type="checkbox" checked={enroll.activate_immediately} onChange={e => setEnroll(s => ({ ...s, activate_immediately: e.target.checked }))} />
@@ -6462,20 +6631,63 @@ function VendorAdminPage() {
             <Btn onClick={submitEnroll} disabled={loading} style={{ marginTop: 12 }}>Enroll partner</Btn>
           </div>
         )}
-        {shown.map(v => (
+        {shown.map(v => {
+          const activeSvcs = (v.vendor_partner_services || []).filter(s => s.is_active);
+          const isOpen = expandedId === v.id;
+          return (
           <div key={v.id} style={{ ...S.card(), marginBottom: 10, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-              <div>
+              <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{v.business_name}</div>
-                <div style={{ fontSize: 12, color: C.sub }}>{v.contact_name} · {v.phone}</div>
-                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{v.shop_or_flat}, {v.street_name}, {v.city} {v.pincode}, {v.state}</div>
-                <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
-                  {v.aadhaar_verified && '✓ Aadhaar '}{v.pan_verified && '✓ PAN '}{v.phone_verified && '✓ Phone '}
-                  · {(v.vendor_partner_services || []).filter(s => s.is_active).length} services
+                <div style={{ fontSize: 12, color: C.sub }}>{v.contact_name} · {v.phone}{v.email ? ` · ${v.email}` : ''}</div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                  {v.shop_or_flat}{v.building_name ? `, ${v.building_name}` : ''}, {v.street_name}{v.village ? `, ${v.village}` : ''}, {v.city} {v.pincode}, {v.state}
                 </div>
+                <div style={{ fontSize: 10, color: C.dim, marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {v.phone_verified && <span style={{ color: C.grn }}>✓ Phone</span>}
+                  {v.aadhaar_verified && <span style={{ color: C.grn }}>✓ Aadhaar{ v.aadhaar_last4 ? ` ···${v.aadhaar_last4}` : ''}</span>}
+                  {v.pan_verified && <span style={{ color: C.grn }}>✓ PAN</span>}
+                  {v.pan_number && !v.pan_verified && <span>PAN: {v.pan_number}</span>}
+                  {v.vehicle_number && <span>🚗 {v.vehicle_number}</span>}
+                  {v.address_lat != null && <span>📍 {Number(v.address_lat).toFixed(4)}, {Number(v.address_lng).toFixed(4)}</span>}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                  {activeSvcs.slice(0, isOpen ? activeSvcs.length : 8).map(s => (
+                    <span key={s.service_id} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 12, background: `${C.acc}18`, color: C.acc, fontWeight: 600 }}>
+                      {svcNameMap[s.service_id]?.name || s.service_id}
+                    </span>
+                  ))}
+                  {!isOpen && activeSvcs.length > 8 && (
+                    <span style={{ fontSize: 10, color: C.dim }}>+{activeSvcs.length - 8} more</span>
+                  )}
+                  {!activeSvcs.length && <span style={{ fontSize: 10, color: C.dim }}>No services</span>}
+                </div>
+                <button type="button" onClick={() => setExpandedId(isOpen ? null : v.id)}
+                  style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 11, fontWeight: 700, cursor: 'pointer', marginTop: 8, fontFamily: FF }}>
+                  {isOpen ? 'Hide details ↑' : 'Full details ↓'}
+                </button>
+                {isOpen && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: C.sub, lineHeight: 1.7, background: C.deep, borderRadius: 8, padding: 10 }}>
+                    <div><strong>ID:</strong> {v.id}</div>
+                    <div><strong>Status:</strong> {v.status} · <strong>Country:</strong> {v.country || 'India'} ({v.country_code || 'IN'})</div>
+                    <div><strong>Created:</strong> {fmtDt(v.created_at)} · <strong>Onboarded:</strong> {v.onboarded_at ? fmtDt(v.onboarded_at) : '—'}</div>
+                    {v.offboarded_at && <div><strong>Offboarded:</strong> {fmtDt(v.offboarded_at)}</div>}
+                    {v.notes && <div><strong>Notes:</strong> {v.notes}</div>}
+                    {v.is_vpn_suspected && <div style={{ color: C.gold }}>⚠ VPN suspected at registration</div>}
+                    <div style={{ marginTop: 6 }}><strong>All services ({activeSvcs.length}):</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      {activeSvcs.map(s => (
+                        <span key={s.service_id} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 8, background: C.card, border: BDR }}>
+                          {svcNameMap[s.service_id]?.cat || s.category_id}: {svcNameMap[s.service_id]?.name || s.service_id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                 <Badge label={v.status} color={statusColor[v.status] || C.sub} />
+                <div style={{ fontSize: 10, color: C.dim }}>{activeSvcs.length} services</div>
                 {v.status === 'pending' && (
                   <>
                     <Btn sm onClick={() => activate(v.id)} disabled={loading}>Activate</Btn>
@@ -6500,7 +6712,8 @@ function VendorAdminPage() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {!shown.length && !loading && <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>}
       </div>
       <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
@@ -8366,14 +8579,17 @@ function AdminControlCenter({ onPricesUpdated }) {
           <div>
             <AdminDispatchModePanel pin={usePin} onSaved={(m) => setMsg(m)} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-              <div style={{ fontSize: 13, color: C.sub }}>Activate/offboard partners. Pending dispatches: {stats?.pending_dispatches ?? '—'}</div>
+              <div style={{ fontSize: 13, color: C.sub }}>
+                Partner portal: list all vendors with services, filters by name/city/category. Pending dispatches: {stats?.pending_dispatches ?? '—'}
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
+                <AdminDeepLinkBtn hash="vendor-admin" label="Vendor portal →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Onboarding →" />
               </div>
             </div>
             <div style={{ ...S.card(), padding: 16, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
               <p style={{ margin: '0 0 8px' }}><strong>Active vendors:</strong> {stats?.active_vendors ?? '—'}</p>
+              <p style={{ margin: '0 0 8px' }}><strong>Vendor portal:</strong> <code style={{ color: C.acc }}>{APP_URL}/#vendor-admin</code> — PIN-gated list with full partner details, service badges, and filters (name, city, category, service).</p>
               <p style={{ margin: 0 }}><strong>Pending dispatches:</strong> {stats?.pending_dispatches ?? '—'} — booking-dispatch cron runs every minute via pg_cron.</p>
             </div>
           </div>

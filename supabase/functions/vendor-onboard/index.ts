@@ -324,10 +324,26 @@ async function upsertPartnerServices(
   services: Array<{ service_id: string; category_id: string }>,
   replace = false,
 ): Promise<void> {
-  if (!services.length) return;
+  if (!services.length && !replace) return;
+
+  const selectedIds = new Set(services.map((s) => s.service_id));
+
   if (replace) {
-    await supabase.from("vendor_partner_services").delete().eq("vendor_id", vendorId);
+    const { data: existing } = await supabase
+      .from("vendor_partner_services")
+      .select("service_id")
+      .eq("vendor_id", vendorId);
+    for (const row of existing || []) {
+      if (!selectedIds.has(row.service_id)) {
+        await supabase
+          .from("vendor_partner_services")
+          .update({ is_active: false })
+          .eq("vendor_id", vendorId)
+          .eq("service_id", row.service_id);
+      }
+    }
   }
+
   for (const s of services) {
     const { error } = await supabase.from("vendor_partner_services").upsert({
       vendor_id: vendorId,
@@ -652,14 +668,14 @@ Deno.serve(async (req: Request) => {
         Array.isArray(body.services) ? body.services : [];
       if (!services.length) return json({ error: "Select at least one service" }, 400);
 
-      await upsertPartnerServices(supabase, partner.id, services, false);
+      await upsertPartnerServices(supabase, partner.id, services, true);
 
       return json({
         success: true,
         vendor_id: partner.id,
         status: partner.status,
         message: partner.status === "active"
-          ? `Services updated for ${partner.business_name}. New categories are live on your profile.`
+          ? `Services updated for ${partner.business_name}. Your service list is now live.`
           : `Services saved for ${partner.business_name}. Pending ScanV activation.`,
       });
     }
@@ -722,6 +738,7 @@ Deno.serve(async (req: Request) => {
         gps_country: gpsCheck.gpsCountry,
         ip_country: gpsCheck.ipC,
         is_vpn_suspected: gpsCheck.vpn,
+        vehicle_number: body.vehicle_number ? String(body.vehicle_number).trim().toUpperCase() : null,
         status: "pending",
       };
 
@@ -783,12 +800,62 @@ Deno.serve(async (req: Request) => {
 
     if (action === "list") {
       if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
-      const { data, error } = await supabase
+
+      const statusFilter = body.status ? String(body.status).toLowerCase() : "";
+      const search = String(body.search || body.q || "").trim().toLowerCase();
+      const city = String(body.city || "").trim().toLowerCase();
+      const serviceId = String(body.service_id || "").trim();
+      const categoryId = String(body.category_id || "").trim();
+
+      let query = supabase
         .from("vendor_partners")
         .select("*, vendor_partner_services(service_id, category_id, is_active)")
         .order("created_at", { ascending: false });
+
+      if (statusFilter && statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+      if (city) {
+        query = query.ilike("city", `%${city}%`);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return json({ vendors: data });
+
+      let vendors = data || [];
+      if (search) {
+        vendors = vendors.filter((v) => {
+          const hay = [
+            v.business_name,
+            v.contact_name,
+            v.phone,
+            v.email,
+            v.city,
+            v.village,
+            v.street_name,
+            v.vehicle_number,
+          ].filter(Boolean).join(" ").toLowerCase();
+          return hay.includes(search);
+        });
+      }
+      if (serviceId) {
+        vendors = vendors.filter((v) =>
+          (v.vendor_partner_services || []).some(
+            (s: { service_id: string; is_active: boolean }) =>
+              s.is_active && s.service_id === serviceId,
+          ),
+        );
+      }
+      if (categoryId) {
+        vendors = vendors.filter((v) =>
+          (v.vendor_partner_services || []).some(
+            (s: { category_id: string; is_active: boolean }) =>
+              s.is_active && s.category_id === categoryId,
+          ),
+        );
+      }
+
+      return json({ vendors, count: vendors.length });
     }
 
     if (action === "offboard") {
@@ -960,6 +1027,7 @@ Deno.serve(async (req: Request) => {
         status: activateNow ? "active" : "pending",
         onboarded_at: activateNow ? new Date().toISOString() : null,
         notes: body.notes ? String(body.notes).trim() : "Admin enrolled",
+        vehicle_number: body.vehicle_number ? String(body.vehicle_number).trim().toUpperCase() : null,
       };
 
       const { data: existing } = await supabase
