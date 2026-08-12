@@ -134,12 +134,25 @@ async function assertRecentOtpVerified(
 }
 
 async function findAuthUserByEmail(
+  supabase: SupabaseClient,
   supabaseUrl: string,
   serviceKey: string,
   email: string,
-) {
+): Promise<{ id: string; email?: string } | null> {
+  const target = email.toLowerCase();
+
+  const { data, error } = await supabase.auth.admin.listUsers({
+    filter: email,
+    page: 1,
+    perPage: 1,
+  });
+  if (!error) {
+    const match = data.users?.find((u) => u.email?.toLowerCase() === target);
+    if (match) return match;
+  }
+
   const res = await fetch(
-    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(`email.eq.${email}`)}`,
+    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=1`,
     {
       headers: {
         Authorization: `Bearer ${serviceKey}`,
@@ -148,9 +161,9 @@ async function findAuthUserByEmail(
     },
   );
   if (!res.ok) return null;
-  const data = await res.json().catch(() => ({}));
-  const users = (data as { users?: Array<{ id: string; email?: string }> }).users;
-  return users?.[0] || null;
+  const payload = await res.json().catch(() => ({}));
+  const users = (payload as { users?: Array<{ id: string; email?: string }> }).users;
+  return users?.find((u) => u.email?.toLowerCase() === target) || null;
 }
 
 async function ensureProfileAuthUser(
@@ -165,7 +178,7 @@ async function ensureProfileAuthUser(
 
   let existing: { id: string; email?: string } | null = null;
   for (const email of emails) {
-    existing = await findAuthUserByEmail(supabaseUrl, serviceKey, email);
+    existing = await findAuthUserByEmail(supabase, supabaseUrl, serviceKey, email);
     if (existing) break;
   }
 
@@ -186,7 +199,18 @@ async function ensureProfileAuthUser(
     password,
     email_confirm: true,
   });
-  if (createErr) throw new Error(createErr.message);
+  if (createErr) {
+    const msg = createErr.message || "";
+    if (/already registered|already exists|duplicate/i.test(msg)) {
+      const retry = await findAuthUserByEmail(supabase, supabaseUrl, serviceKey, canonicalEmail);
+      if (retry) {
+        const { error: pwErr } = await supabase.auth.admin.updateUserById(retry.id, { password });
+        if (pwErr) throw new Error(pwErr.message);
+        return { email: canonicalEmail, password };
+      }
+    }
+    throw new Error(createErr.message);
+  }
   if (!created.user) throw new Error("Could not create auth user");
   return { email: canonicalEmail, password };
 }
@@ -243,7 +267,7 @@ Deno.serve(async (req: Request) => {
         verified = check.ok;
       }
       if (!verified) {
-        return json({ success: false, error: "Verification required" }, 403);
+        return json({ success: false, error: "Verification required" });
       }
 
       const { email } = await ensureProfileAuthUser(
@@ -277,7 +301,7 @@ Deno.serve(async (req: Request) => {
       else return json({ success: false, error: "OTP or WhatsApp token required" }, 400);
 
       if (!verified) {
-        return json({ success: false, error: "Invalid or expired verification" }, 401);
+        return json({ success: false, error: "Invalid or expired verification" });
       }
 
       const { email, password } = await ensureProfileAuthUser(

@@ -2256,9 +2256,9 @@ function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
 async function invokeSendOtp(mobile) {
   const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
   const r = await sb().functions.invoke('send-otp', { body: { mobile: norm } });
-  const bodyErr = r.data?.error || r.data?.message;
-  if (r.error) {
-    throw new Error(bodyErr || r.error.message || 'OTP service unavailable');
+  const bodyErr = edgeFnErrorMessage(r);
+  if (r.error || r.data?.success === false) {
+    throw new Error(bodyErr || 'OTP service unavailable');
   }
   if (r.data?.success || r.data?.provider) return { ...r.data, mobile: norm };
   throw new Error(bodyErr || 'OTP send failed — check number and try again');
@@ -2271,6 +2271,31 @@ async function verifyOtpCode(mobile, code) {
     if (r.data?.success) return true;
   } catch (_) {}
   return false;
+}
+
+/** Parse edge function error body even when HTTP status is non-2xx */
+function edgeFnErrorMessage(r) {
+  if (r.data?.error) return r.data.error;
+  const ctx = r.error?.context;
+  if (typeof ctx === 'string') {
+    try {
+      const parsed = JSON.parse(ctx);
+      if (parsed?.error) return parsed.error;
+    } catch (_) {}
+  }
+  if (ctx && typeof ctx === 'object') {
+    if (ctx.error) return ctx.error;
+    if (ctx.body?.error) return ctx.body.error;
+    try {
+      const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+      if (parsed?.error) return parsed.error;
+    } catch (_) {}
+  }
+  const msg = r.error?.message || '';
+  if (/^Edge Function returned a non-2xx status code$/i.test(msg)) {
+    return r.data?.error || 'Request failed — try again';
+  }
+  return msg || r.data?.error || '';
 }
 
 function profileAuthEmail(mob) {
@@ -2289,30 +2314,22 @@ function phoneFromProfileId(id) {
 /** Server-side profile auth after OTP/WA verify (resets legacy random passwords) */
 async function invokeProfileAuthSession(mob, { otp, waToken } = {}) {
   const norm = normalizeMobileE164(mob);
-  const body = { mobile: norm, action: 'establish_session' };
+  const body = { mobile: norm, action: 'session' };
   if (otp) body.otp = otp;
   else if (waToken) body.wa_token = waToken;
   else throw new Error('Verification required to establish session');
   const r = await sb().functions.invoke('send-otp', { body });
-  const errMsg = r.data?.error || r.error?.message;
+  const errMsg = edgeFnErrorMessage(r);
   if (r.error || r.data?.success === false) throw new Error(errMsg || 'Auth session failed');
-  const password = profileAuthPassword(norm);
-  const emails = [
-    r.data?.email,
-    profileAuthEmail(norm),
-    `${String(norm).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
-  ].filter(Boolean);
-  let lastErr;
-  for (const email of [...new Set(emails)]) {
-    try {
-      const { data: si, error } = await sb().auth.signInWithPassword({ email, password });
-      if (si?.session) return si.session;
-      if (error) lastErr = error;
-    } catch (e) {
-      lastErr = e;
-    }
+  const { access_token, refresh_token } = r.data || {};
+  if (!access_token || !refresh_token) {
+    throw new Error(errMsg || 'Auth session missing tokens');
   }
-  throw new Error(lastErr?.message || 'Could not sign in after verification');
+  const { data, error } = await sb().auth.setSession({ access_token, refresh_token });
+  if (error || !data.session) {
+    throw new Error(error?.message || errMsg || 'Could not sign in after verification');
+  }
+  return data.session;
 }
 
 /** Establish Supabase auth session so profiles RLS (auth_matches_profile) allows own-row access */
@@ -2328,6 +2345,7 @@ async function ensureProfileAuthSession(mob, { otp, waToken } = {}) {
     const { data: { session } } = await sb().auth.getSession();
     if (session?.user?.email && emailMatches(session.user.email)) return session;
   } catch (_) {}
+  if (otp || waToken) return invokeProfileAuthSession(mob, { otp, waToken });
   let lastErr;
   for (const email of emails) {
     try {
@@ -2341,7 +2359,6 @@ async function ensureProfileAuthSession(mob, { otp, waToken } = {}) {
       lastErr = e;
     }
   }
-  if (otp || waToken) return invokeProfileAuthSession(mob, { otp, waToken });
   throw new Error(lastErr?.message || 'Could not establish sign-in session. Try again.');
 }
 
