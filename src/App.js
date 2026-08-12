@@ -4695,6 +4695,8 @@ function VendorOnboardPage() {
   const [ekycRef, setEkycRef] = useState('');
   const [aadhaarOtp, setAadhaarOtp] = useState('');
   const [aadhaarOtpRequired, setAadhaarOtpRequired] = useState(false);
+  const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false);
+  const [ekycMode, setEkycMode] = useState('');
   const [pan, setPan] = useState('');
   const [panOk, setPanOk] = useState(null);
   const [selectedSvcs, setSelectedSvcs] = useState({});
@@ -4774,7 +4776,7 @@ function VendorOnboardPage() {
   const verifyAadhaar = async () => {
     if (aadhaar.replace(/\s/g, '').length !== 12) return setErr('Enter 12-digit Aadhaar');
     if (aadhaarOtpRequired && aadhaarOtp.replace(/\D/g, '').length !== 6) {
-      return setErr('Enter 6-digit OTP sent to Aadhaar-linked mobile');
+      return setErr('Enter the 6-digit OTP from your Aadhaar-linked mobile');
     }
     setLoading(true); setErr('');
     try {
@@ -4784,17 +4786,26 @@ function VendorOnboardPage() {
         payload.ekyc_ref = ekycRef;
       }
       const r = await vendorOnboardFetch('ekyc-aadhaar', payload);
-      if (r.requires_otp && !r.verified) {
+      if (r.error && !r.verified && !r.otp_sent) throw new Error(r.error);
+      if ((r.requires_otp || r.otp_sent) && !r.verified) {
+        if (!r.otp_sent) throw new Error(r.error || 'Could not send Aadhaar OTP — try again or contact ScanV support');
         setAadhaarOtpRequired(true);
+        setAadhaarOtpSent(true);
         setEkycRef(r.ekyc_ref || r.ref || '');
-        setMsg(r.error || 'OTP sent to your Aadhaar-linked mobile — enter it below');
+        setEkycMode(r.mode || r.provider || 'digio');
+        setMsg(r.message || 'OTP sent to your Aadhaar-linked mobile — enter it below');
         return;
       }
       if (!r.verified) throw new Error(r.error || 'Aadhaar eKYC failed');
       setAadhaarOk(true);
       setAadhaarOtpRequired(false);
+      setAadhaarOtpSent(false);
       setEkycRef(r.ekyc_ref || r.ref || '');
-      setMsg('Aadhaar verified ✓ (last 4: ' + (r.last4 || '****') + ')');
+      setEkycMode(r.mode || r.provider || '');
+      const stubNote = (r.mode === 'stub' || r.provider === 'stub')
+        ? ' (test mode — format only; ScanV may manually review)'
+        : '';
+      setMsg(r.message || ('Aadhaar verified ✓ (last 4: ' + (r.last4 || '****') + ')' + stubNote));
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
@@ -4945,15 +4956,20 @@ function VendorOnboardPage() {
 
         {step === 3 && <>
           <div style={{ ...S.card(), marginBottom: 16, padding: 14, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
-            Aadhaar eKYC is mandatory. Your full Aadhaar is never stored — only last 4 digits after verification via UIDAI-approved provider.
+            Aadhaar eKYC is mandatory. Your full Aadhaar is never stored — only last 4 digits after verification via UIDAI-approved provider (Digio when configured).
           </div>
-          <Field label="Aadhaar number" req note="12 digits — OTP sent to Aadhaar-linked mobile">
+          <Field label="Aadhaar number" req note={aadhaarOtpSent
+            ? 'OTP sent — check Aadhaar-linked mobile'
+            : '12 digits — we validate format & checksum before any OTP step'}>
             <input type="tel" maxLength={14} value={aadhaar} onChange={e => setAadhaar(e.target.value.replace(/\D/g, '').slice(0, 12))} style={S.inp()} placeholder="XXXX XXXX XXXX" disabled={aadhaarOk || aadhaarOtpRequired} />
           </Field>
           {aadhaarOtpRequired && !aadhaarOk && (
-            <Field label="Aadhaar OTP" req note="6-digit OTP from UIDAI / Aadhaar-linked mobile">
+            <Field label="Aadhaar OTP" req note="6-digit OTP from UIDAI / your Aadhaar-linked mobile">
               <input type="tel" maxLength={6} value={aadhaarOtp} onChange={e => setAadhaarOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} style={S.inp()} placeholder="123456" />
             </Field>
+          )}
+          {ekycMode === 'stub' && aadhaarOk && (
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>Verified in test mode (Digio not configured) — ScanV may manually review before activation.</div>
           )}
           {!aadhaarOk ? <Btn full onClick={verifyAadhaar} disabled={loading}>{loading ? <><Spin size={16} /> Verifying…</> : aadhaarOtpRequired ? 'Submit Aadhaar OTP →' : 'Verify Aadhaar (eKYC) →'}</Btn>
             : <Btn full onClick={() => setStep(4)}>Continue →</Btn>}

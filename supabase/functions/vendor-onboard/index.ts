@@ -107,21 +107,36 @@ function digioAuthHeaders(apiKey?: string): Record<string, string> {
   return headers;
 }
 
+function digioApiError(data: unknown, fallback: string): string {
+  if (typeof data !== "object" || data === null) return fallback;
+  const obj = data as Record<string, unknown>;
+  for (const key of ["message", "error_message", "error", "detail", "description"]) {
+    const val = obj[key];
+    if (typeof val === "string" && val.trim()) return val.trim();
+  }
+  return fallback;
+}
+
+type EkycResult = {
+  verified: boolean;
+  pending?: boolean;
+  requires_otp?: boolean;
+  otp_sent?: boolean;
+  mode?: "digio" | "stub" | "disabled";
+  ref?: string;
+  ekyc_ref?: string;
+  last4?: string;
+  provider?: string;
+  message?: string;
+  error?: string;
+};
+
 async function digioEkyc(
   aadhaar: string,
   name: string,
   otp?: string,
   ekycRef?: string,
-): Promise<{
-  verified: boolean;
-  pending?: boolean;
-  requires_otp?: boolean;
-  ref?: string;
-  ekyc_ref?: string;
-  last4?: string;
-  provider?: string;
-  error?: string;
-}> {
+): Promise<EkycResult> {
   const digits = aadhaar.replace(/\s/g, "");
   const last4 = digits.slice(-4);
   const apiKey = Deno.env.get("DIGIO_API_KEY");
@@ -129,8 +144,15 @@ async function digioEkyc(
   const clientSecret = Deno.env.get("DIGIO_CLIENT_SECRET");
   const hasDigio = !!(apiKey || (clientId && clientSecret));
 
+  if (!/^\d{12}$/.test(digits)) {
+    return { verified: false, mode: hasDigio ? "digio" : "stub", error: "Enter a valid 12-digit Aadhaar number" };
+  }
   if (!validateAadhaar(aadhaar)) {
-    return { verified: false, error: "Invalid Aadhaar number (check digits)" };
+    return {
+      verified: false,
+      mode: hasDigio ? "digio" : "stub",
+      error: "Invalid Aadhaar number — please re-check all 12 digits (checksum failed)",
+    };
   }
 
   // Step 2: complete Digio OTP verification
@@ -145,9 +167,8 @@ async function digioEkyc(
       if (!res.ok) {
         return {
           verified: false,
-          error: typeof data === "object" && data !== null && "message" in data
-            ? String((data as { message: string }).message)
-            : "Aadhaar OTP verification failed",
+          mode: "digio",
+          error: digioApiError(data, `Aadhaar OTP verification failed (${res.status})`),
         };
       }
       const status = typeof data === "object" && data !== null && "status" in data
@@ -156,14 +177,17 @@ async function digioEkyc(
       const verified = status === "verified" || status === "success" || status === "completed";
       return {
         verified,
+        mode: "digio",
         ref: ekycRef,
         ekyc_ref: ekycRef,
         last4,
         provider: "digio",
-        ...(verified ? {} : { error: "Aadhaar OTP verification incomplete" }),
+        ...(verified
+          ? { message: "Aadhaar verified via UIDAI-approved provider" }
+          : { error: digioApiError(data, "Aadhaar OTP verification incomplete") }),
       };
     } catch (e) {
-      return { verified: false, error: e instanceof Error ? e.message : "eKYC verify error" };
+      return { verified: false, mode: "digio", error: e instanceof Error ? e.message : "eKYC verify error" };
     }
   }
 
@@ -171,11 +195,20 @@ async function digioEkyc(
     if (Deno.env.get("EKYC_STRICT") === "1") {
       return {
         verified: false,
-        error: "eKYC provider not configured (set DIGIO_CLIENT_ID/SECRET or DIGIO_API_KEY)",
+        mode: "disabled",
+        error: "eKYC provider not configured — contact ScanV support (Digio credentials missing)",
       };
     }
     const ref = `stub-${Date.now()}`;
-    return { verified: true, ref, ekyc_ref: ref, last4, provider: "stub" };
+    return {
+      verified: true,
+      ref,
+      ekyc_ref: ref,
+      last4,
+      provider: "stub",
+      mode: "stub",
+      message: "Format validated (test mode — UIDAI OTP skipped; ScanV may manually review)",
+    };
   }
 
   // Step 1: initiate Digio Aadhaar eKYC (OTP sent to Aadhaar-linked mobile)
@@ -185,7 +218,7 @@ async function digioEkyc(
       headers: digioAuthHeaders(apiKey),
       body: JSON.stringify({
         aadhaar_number: digits,
-        name,
+        name: name || undefined,
         consent: true,
       }),
     });
@@ -193,32 +226,48 @@ async function digioEkyc(
     if (!res.ok) {
       return {
         verified: false,
-        error: typeof data === "object" && data !== null && "message" in data
-          ? String((data as { message: string }).message)
-          : "eKYC initiation failed",
+        mode: "digio",
+        error: digioApiError(data, `eKYC initiation failed (${res.status}) — check Aadhaar number or try again`),
       };
     }
     const ref = typeof data === "object" && data !== null && "id" in data
       ? String((data as { id: string }).id)
-      : `digio-${Date.now()}`;
+      : "";
+    if (!ref) {
+      return {
+        verified: false,
+        mode: "digio",
+        error: digioApiError(data, "eKYC initiation failed — no session ID from provider"),
+      };
+    }
     const status = typeof data === "object" && data !== null && "status" in data
       ? String((data as { status: string }).status)
       : "pending";
     if (status === "verified" || status === "success" || status === "completed") {
-      return { verified: true, ref, ekyc_ref: ref, last4, provider: "digio" };
+      return {
+        verified: true,
+        ref,
+        ekyc_ref: ref,
+        last4,
+        provider: "digio",
+        mode: "digio",
+        message: "Aadhaar verified via UIDAI-approved provider",
+      };
     }
     return {
       verified: false,
       pending: true,
       requires_otp: true,
+      otp_sent: true,
       ref,
       ekyc_ref: ref,
       last4,
       provider: "digio",
-      error: "Enter OTP sent to your Aadhaar-linked mobile",
+      mode: "digio",
+      message: "OTP sent to your Aadhaar-linked mobile — enter it below",
     };
   } catch (e) {
-    return { verified: false, error: e instanceof Error ? e.message : "eKYC error" };
+    return { verified: false, mode: "digio", error: e instanceof Error ? e.message : "eKYC error" };
   }
 }
 
@@ -474,9 +523,12 @@ Deno.serve(async (req: Request) => {
         verified: result.verified,
         pending: result.pending,
         requires_otp: result.requires_otp,
+        otp_sent: result.otp_sent,
+        mode: result.mode,
         ekyc_ref: result.ekyc_ref || result.ref,
         last4: result.last4,
         provider: result.provider,
+        message: result.message,
         error: result.error,
       });
     }
