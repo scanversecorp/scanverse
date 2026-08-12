@@ -6354,7 +6354,8 @@ function vendorStatusNorm(v) {
 }
 
 function vendorCanActivate(v) {
-  return vendorStatusNorm(v) === 'pending';
+  const s = vendorStatusNorm(v);
+  return s === 'pending' || s === 'offboarded' || s === 'paused' || s === 'suspended';
 }
 
 function vendorFirstName(v) {
@@ -6575,15 +6576,11 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, o
                         {canEdit && (
                           <Btn v="outline" sm onClick={() => onEdit?.(v)} disabled={loading}>Edit</Btn>
                         )}
-                        {canEdit && vendorCanActivate(v) && (
+                        {canEdit && vendorStatusNorm(v) === 'pending' && (
                           <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
                         )}
                         {canEdit && vendorStatusNorm(v) === 'active' && <>
                           <Btn v="outline" sm onClick={() => onAction('pause', v.id)} disabled={loading}>Pause</Btn>
-                          <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
-                        </>}
-                        {canEdit && vendorStatusNorm(v) === 'paused' && <>
-                          <Btn sm onClick={() => onAction('unpause', v.id)} disabled={loading}>Unpause</Btn>
                           <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
                         </>}
                         {canEdit && vendorStatusNorm(v) === 'offboarded' && (
@@ -7221,7 +7218,7 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
   };
 
   const activate = async () => {
-    if (!window.confirm('Activate this partner? They will start receiving booking alerts.')) return;
+    if (!window.confirm('Activate this partner? They will rejoin dispatch and start receiving bookings.')) return;
     setActivating(true);
     setErr('');
     try {
@@ -7347,7 +7344,8 @@ function VendorAdminPage() {
 
   const handleTableAction = async (action, id) => {
     const confirms = {
-      pause: 'Pause this partner? They will stop receiving new bookings until unpaused.',
+      activate: 'Activate this partner? They will rejoin dispatch and start receiving bookings.',
+      pause: 'Pause this partner? They will stop receiving new bookings until activated again.',
       offboard: 'Offboard this partner? They will stop receiving bookings permanently until re-activated.',
       delete: 'Delete this partner record? Only works if they have no dispatch history.',
     };

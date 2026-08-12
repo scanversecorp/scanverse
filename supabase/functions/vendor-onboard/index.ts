@@ -1186,8 +1186,12 @@ Deno.serve(async (req: Request) => {
         .eq("id", vendorId)
         .single();
       if (!vendor) return json({ error: "Vendor not found" }, 404);
-      if (vendor.status === "offboarded") {
-        return json({ error: "Offboarded partner must re-register via onboarding before activation" }, 400);
+      const st = String(vendor.status || "").toLowerCase();
+      if (st === "active") {
+        return json({ error: "Partner is already active" }, 400);
+      }
+      if (!["pending", "paused", "suspended", "offboarded"].includes(st)) {
+        return json({ error: `Cannot activate partner with status ${vendor.status}` }, 400);
       }
 
       const profileId = vendor.profile_id || await ensurePartnerProfile(supabase, vendor);
