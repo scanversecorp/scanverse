@@ -5,6 +5,7 @@
  *   register — { txn_id, amount_paise, user_id? } → { success, txn_id, payment_link_url? }
  *              user_id is profiles.id TEXT (e.g. cust_919270194842), not auth UUID
  *   check    — { txn_id, amount_paise? } → { verified, status, amount_ok?, paid_at?, mode? }
+ *   cancel   — { booking_id } (auth required) → cancel booking, queue manual refund (refund_pending)
  *   webhook  — Razorpay webhook payload (no action field) OR manual test
  */
 
@@ -18,6 +19,9 @@ const corsHeaders: Record<string, string> = {
 
 const INTENT_TTL_MS = 30 * 60 * 1000;
 const APP_URL = Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app";
+const CANCEL_FEE_GST_PCT = 0.18;
+const CANCEL_FEE_PLATFORM_PCT = 0.12;
+const CANCELLABLE_STATUSES = new Set(["confirmed", "in_progress", "in-progress"]);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -573,6 +577,205 @@ async function handleCheck(
   });
 }
 
+type CancellationBreakdown = {
+  totalPaidPaise: number;
+  cancelFeePaise: number;
+  cancelFeeGstPaise: number;
+  cancelFeePlatformPaise: number;
+  refundPaise: number;
+};
+
+function calcCancellationBreakdown(totalPaidPaise: number): CancellationBreakdown {
+  const totalPaid = Math.max(0, Math.round(Number(totalPaidPaise) || 0));
+  const cancelFeeGstPaise = Math.round(totalPaid * CANCEL_FEE_GST_PCT);
+  const cancelFeePlatformPaise = Math.round(totalPaid * CANCEL_FEE_PLATFORM_PCT);
+  const cancelFeePaise = cancelFeeGstPaise + cancelFeePlatformPaise;
+  const refundPaise = Math.max(0, totalPaid - cancelFeePaise);
+  return {
+    totalPaidPaise: totalPaid,
+    cancelFeePaise,
+    cancelFeeGstPaise,
+    cancelFeePlatformPaise,
+    refundPaise,
+  };
+}
+
+async function resolveCustomerProfileId(
+  supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  req: Request,
+): Promise<string | null> {
+  const authHeader = req.headers.get("Authorization") || "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (!authHeader || !anonKey) return null;
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: authData } = await userClient.auth.getUser();
+  const uid = authData?.user?.id;
+  if (uid) {
+    const { data: byUid } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", String(uid))
+      .maybeSingle();
+    if (byUid?.id) return String(byUid.id);
+  }
+  const email = authData?.user?.email;
+  if (!email) return null;
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  return prof?.id ? String(prof.id) : null;
+}
+
+function addBusinessDays(from: Date, days: number): Date {
+  const d = new Date(from);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d;
+}
+
+async function handleCancel(
+  supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const bookingId = String(body.booking_id || "").trim();
+  if (!bookingId) return json({ error: "booking_id required" }, 400);
+
+  const profileId = await resolveCustomerProfileId(supabase, supabaseUrl, req);
+  if (!profileId) return json({ error: "Authentication required" }, 401);
+
+  const { data: existingCancel } = await supabase
+    .from("booking_cancellations")
+    .select("*")
+    .eq("booking_id", bookingId)
+    .maybeSingle();
+  if (existingCancel) {
+    return json({
+      success: true,
+      already_cancelled: true,
+      booking_id: bookingId,
+      breakdown: {
+        total_paid_paise: existingCancel.total_paid_paise,
+        cancel_fee_paise: existingCancel.cancel_fee_paise,
+        cancel_fee_gst_paise: existingCancel.cancel_fee_gst_paise,
+        cancel_fee_platform_paise: existingCancel.cancel_fee_platform_paise,
+        refund_paise: existingCancel.refund_paise,
+      },
+      refund_status: existingCancel.refund_status,
+      refund_due_by: existingCancel.refund_due_by,
+    });
+  }
+
+  const { data: booking, error: bkErr } = await supabase
+    .from("bookings")
+    .select("id, customer_id, status, total, txn_id, partner_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (bkErr || !booking) return json({ error: "Booking not found" }, 404);
+  if (String(booking.customer_id) !== profileId) {
+    return json({ error: "You can only cancel your own booking" }, 403);
+  }
+
+  const status = String(booking.status || "").toLowerCase();
+  if (!CANCELLABLE_STATUSES.has(status)) {
+    return json({
+      error: `Booking cannot be cancelled (status: ${booking.status})`,
+    }, 400);
+  }
+
+  const breakdown = calcCancellationBreakdown(Number(booking.total) || 0);
+  if (breakdown.totalPaidPaise <= 0) {
+    return json({ error: "Booking has no paid amount on record" }, 400);
+  }
+
+  const now = new Date();
+  const refundDueBy = addBusinessDays(now, 7).toISOString();
+
+  const { error: cancelInsertErr } = await supabase
+    .from("booking_cancellations")
+    .insert({
+      booking_id: bookingId,
+      customer_id: profileId,
+      txn_id: booking.txn_id || null,
+      total_paid_paise: breakdown.totalPaidPaise,
+      cancel_fee_paise: breakdown.cancelFeePaise,
+      cancel_fee_gst_paise: breakdown.cancelFeeGstPaise,
+      cancel_fee_platform_paise: breakdown.cancelFeePlatformPaise,
+      refund_paise: breakdown.refundPaise,
+      refund_status: "refund_pending",
+      refund_due_by: refundDueBy,
+      cancelled_by: profileId,
+    });
+
+  if (cancelInsertErr) {
+    console.error("booking_cancellations insert:", cancelInsertErr.message);
+    return json({ error: "Could not record cancellation" }, 500);
+  }
+
+  await supabase
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      cancelled_at: now.toISOString(),
+      cancel_reason: "customer_cancelled",
+    })
+    .eq("id", bookingId)
+    .in("status", [...CANCELLABLE_STATUSES]);
+
+  await supabase
+    .from("booking_dispatch")
+    .update({ status: "cancelled" })
+    .eq("booking_id", bookingId)
+    .in("status", ["pending", "dispatching"]);
+
+  await supabase
+    .from("vendor_live_locations")
+    .update({ tracking_active: false })
+    .eq("booking_id", bookingId);
+
+  if (booking.txn_id) {
+    await supabase
+      .from("service_requests")
+      .update({ status: "cancelled" })
+      .eq("txn_id", booking.txn_id);
+  }
+
+  if (booking.partner_id) {
+    await supabase
+      .from("bookings")
+      .update({ partner_id: null })
+      .eq("id", bookingId);
+  }
+
+  return json({
+    success: true,
+    booking_id: bookingId,
+    breakdown: {
+      total_paid_paise: breakdown.totalPaidPaise,
+      cancel_fee_paise: breakdown.cancelFeePaise,
+      cancel_fee_gst_paise: breakdown.cancelFeeGstPaise,
+      cancel_fee_platform_paise: breakdown.cancelFeePlatformPaise,
+      refund_paise: breakdown.refundPaise,
+    },
+    refund_status: "refund_pending",
+    refund_due_by: refundDueBy,
+    message:
+      "Refund will be processed manually by our support team within 7 business days.",
+  });
+}
+
 async function handleWebhook(
   supabase: ReturnType<typeof createClient>,
   rawBody: string,
@@ -675,9 +878,12 @@ Deno.serve(async (req) => {
 
   if (action === "register") return handleRegister(supabase, body);
   if (action === "check") return handleCheck(supabase, body);
+  if (action === "cancel") {
+    return handleCancel(supabase, supabaseUrl, req, body);
+  }
   if (action === "webhook") {
     return handleWebhook(supabase, rawBody, body, signature);
   }
 
-  return json({ error: "Unknown action. Use register, check, or webhook." }, 400);
+  return json({ error: "Unknown action. Use register, check, cancel, or webhook." }, 400);
 });

@@ -7743,6 +7743,113 @@ function TicketDeskPanel({ pin, useAdminPin = false, readOnly = false }) {
 }
 
 /* ================================================================
+   REFUND DESK — pending cancellation refunds (support + admin)
+================================================================ */
+function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
+  const [rows, setRows] = useState([]);
+  const [filter, setFilter] = useState('open');
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const [notes, setNotes] = useState({});
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true); setErr('');
+    try {
+      const data = await fetchFn('list_pending_refunds', { status: filter }, pin);
+      setRows(data.cancellations || []);
+    } catch (e) { setErr(e.message); setRows([]); }
+    finally { setLoading(false); }
+  }, [fetchFn, pin, filter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const act = async (row, refundStatus) => {
+    const note = (notes[row.id] || '').trim();
+    if ((refundStatus === 'completed' || refundStatus === 'rejected') && !note) {
+      setErr('Add a process note before completing or rejecting');
+      return;
+    }
+    setBusyId(row.id); setErr('');
+    try {
+      await fetchFn('update_refund', {
+        cancellation_id: row.id,
+        refund_status: refundStatus,
+        ...(note ? { process_note: note } : {}),
+      }, pin);
+      setMsg(`Refund → ${refundStatus.replace(/_/g, ' ')}`);
+      setNotes(n => ({ ...n, [row.id]: '' }));
+      load();
+    } catch (e) { setErr(e.message); }
+    finally { setBusyId(null); }
+  };
+
+  const refundStatusColor = {
+    refund_pending: C.gold,
+    processing: C.cyan,
+    completed: C.grn,
+    rejected: C.red,
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{title}</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[['open', 'Open queue'], ['refund_pending', 'Pending'], ['processing', 'Processing'], ['completed', 'Completed'], ['all', 'All']].map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setFilter(k)} style={{ padding: '4px 10px', borderRadius: 14, border: `1.5px solid ${filter === k ? C.acc : C.bdr}`, background: filter === k ? `${C.acc}18` : C.surf, color: filter === k ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
+          ))}
+          <Btn sm v="outline" onClick={load} disabled={loading}>Refresh</Btn>
+        </div>
+      </div>
+      {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {loading ? <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div> : !rows.length ? (
+        <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>No refunds in this queue</div>
+      ) : rows.map(row => {
+        const cust = row.customer || {};
+        const bk = row.booking || {};
+        const custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || bk.customer_name || row.customer_id;
+        return (
+          <div key={row.id} style={{ ...S.card(), marginBottom: 10, padding: 14, border: row.overdue ? `1.5px solid ${C.red}55` : undefined }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 800, color: C.txt }}>{bk.service_name || 'Booking'} · {row.txn_id || '—'}</div>
+                <div style={{ fontSize: 12, color: C.sub }}>{custName} · {cust.phone || '—'}</div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Cancelled {fmtDt(row.created_at)} · Due {fmtDt(row.refund_due_by)}{row.overdue ? ' · OVERDUE' : ''}</div>
+              </div>
+              <Badge label={row.refund_status.replace(/_/g, ' ')} color={refundStatusColor[row.refund_status] || C.dim} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8, fontSize: 11, marginBottom: 10 }}>
+              <div><span style={{ color: C.dim }}>Paid </span><strong>₹{fmtRs(row.total_paid_paise)}</strong></div>
+              <div><span style={{ color: C.dim }}>Fee (30%) </span><strong style={{ color: C.red }}>₹{fmtRs(row.cancel_fee_paise)}</strong></div>
+              <div><span style={{ color: C.dim }}>GST </span>₹{fmtRs(row.cancel_fee_gst_paise)}</div>
+              <div><span style={{ color: C.dim }}>Platform </span>₹{fmtRs(row.cancel_fee_platform_paise)}</div>
+              <div><span style={{ color: C.dim }}>Refund </span><strong style={{ color: C.grn }}>₹{fmtRs(row.refund_paise)}</strong></div>
+            </div>
+            {row.process_note && <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Note: {row.process_note}{row.processed_at ? ` · ${fmtDt(row.processed_at)}` : ''}</div>}
+            {(row.refund_status === 'refund_pending' || row.refund_status === 'processing') && (
+              <>
+                <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Process note (required for complete/reject) — e.g. UPI ref, Razorpay refund ID" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {row.refund_status === 'refund_pending' && (
+                    <Btn sm v="outline" disabled={busyId === row.id} onClick={() => act(row, 'processing')}>Mark processing</Btn>
+                  )}
+                  <Btn sm disabled={busyId === row.id} onClick={() => act(row, 'completed')}>{busyId === row.id ? 'Saving…' : 'Mark refund complete'}</Btn>
+                  <Btn sm v="danger" disabled={busyId === row.id} onClick={() => act(row, 'rejected')}>Reject</Btn>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ================================================================
    CUSTOMER SUPPORT — #customer-support (read-only agents, admin update)
 ================================================================ */
 function fmtDt(iso) {
@@ -7897,7 +8004,7 @@ function CustomerSupportPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 10, maxWidth: 1100, margin: '10px auto 0' }}>
-          {[['customers', 'Customers'], ['tickets', 'Tickets']].map(([k, l]) => (
+          {[['customers', 'Customers'], ['refunds', 'Refunds'], ['tickets', 'Tickets']].map(([k, l]) => (
             <button key={k} onClick={() => { setDeskTab(k); setDetail(null); setResults([]); setMsg(''); setErr(''); }} style={{ padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${deskTab === k ? C.acc : C.bdr}`, background: deskTab === k ? `${C.acc}18` : C.surf, color: deskTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
           ))}
         </div>
@@ -7908,6 +8015,12 @@ function CustomerSupportPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
         {deskTab === 'tickets' ? (
           <TicketDeskPanel pin={pin || getSupportAuth()?.pin} readOnly={false} />
+        ) : deskTab === 'refunds' ? (
+          <RefundDeskPanel
+            pin={pin || getSupportAuth()?.pin}
+            fetchFn={customerSupportFetch}
+            title="Cancellation refund queue"
+          />
         ) : !detail ? (
           <>
             <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
@@ -8576,6 +8689,7 @@ const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'pricing', label: 'Pricing', icon: '💰' },
   { id: 'support', label: 'Customer Support', icon: '🎧' },
+  { id: 'refunds', label: 'Refunds', icon: '💸' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'agents', label: 'Support Agents', icon: '👥' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
@@ -9077,6 +9191,14 @@ function AdminControlCenter({ onPricesUpdated }) {
         )}
 
         {tab === 'bookings' && <AdminBookingsTab pin={usePin} />}
+
+        {tab === 'refunds' && (
+          <RefundDeskPanel
+            pin={usePin}
+            fetchFn={adminHubFetch}
+            title="Cancellation refunds (manual processing)"
+          />
+        )}
 
         {tab === 'otp' && (
           <div>
