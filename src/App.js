@@ -2583,8 +2583,15 @@ function profileAuthPassword(mob) {
 }
 
 function phoneFromProfileId(id) {
-  const m = /^cust_(\d{10})$/.exec(String(id || ''));
-  return m ? `+91${m[1]}` : null;
+  const s = String(id || '');
+  const m10 = /^cust_(\d{10})$/.exec(s);
+  if (m10) return `+91${m10[1]}`;
+  const mLegacy = /^cust_(\d+)$/.exec(s);
+  if (mLegacy) {
+    const d = mLegacy[1].slice(-10);
+    if (d.length === 10) return `+91${d}`;
+  }
+  return null;
 }
 
 /** Server-side profile auth after OTP/WA verify (resets legacy random passwords) */
@@ -2735,16 +2742,18 @@ function normalizeMobileE164(mobile) {
   return `+91${d}`;
 }
 
-/** Stable TEXT profile id from mobile — profiles.id is TEXT, not UUID */
+/** Stable TEXT profile id from mobile — profiles.id is TEXT, not UUID (10-digit suffix only) */
 function customerProfileId(mob) {
-  return `cust_${mob.replace(/\D/g, '')}`;
+  const d = String(mob || '').replace(/\D/g, '').slice(-10);
+  if (d.length !== 10) throw new Error('Invalid mobile number');
+  return `cust_${d}`;
 }
 
-/** Resolve profile id: deterministic mobile id, with legacy stored-uid fallback (requires auth session) */
+/** Resolve profile id: canonical cust_<10digits>, with legacy stored-uid fallback when valid */
 async function resolveCustomerProfileId(mob) {
   const profileId = customerProfileId(mob);
   const stored = localStorage.getItem('scanv_uid');
-  if (stored && stored !== profileId) {
+  if (stored && stored !== profileId && /^cust_[0-9]{10}$/.test(stored)) {
     const { data: p } = await sb().from('profiles').select('id,phone').eq('id', stored).maybeSingle();
     const norm = normalizeMobileE164(mob);
     if (p?.phone === mob || p?.phone === norm) return p.id;
@@ -3101,7 +3110,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         if (code.length < 6) throw new Error('Enter 6-digit OTP');
       }
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
-      const profileId = customerProfileId(mob);
+      const profileId = await resolveCustomerProfileId(mob);
       const {data:existing} = await sb().from('profiles').select('*').eq('id', profileId).maybeSingle();
       if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
       const {data:prof} = await sb().from('profiles').update({
