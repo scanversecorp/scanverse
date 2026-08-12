@@ -4815,7 +4815,7 @@ function trackStatusLabel(booking, dispatch, live) {
   if (dispatch?.status === 'exhausted') return { label: 'Finding partner — trying more vendors', color: C.gold, step: 1 };
   if (live?.tracking_active && !live?.is_base) return { label: 'Partner en route — live GPS', color: C.grn, step: 3 };
   if (live?.lat != null || booking.partner_id) return { label: live?.is_base ? 'Partner assigned — base location' : 'Partner assigned — awaiting GPS', color: C.cyan, step: 2 };
-  if (dispatch?.status === 'dispatching') return { label: 'Contacting nearest partner…', color: C.cyan, step: 1 };
+  if (dispatch?.status === 'dispatching') return { label: 'Offering nearest partner (app + backup alerts)…', color: C.cyan, step: 1 };
   return { label: 'Booking confirmed — finding partner', color: C.acc, step: 1 };
 }
 
