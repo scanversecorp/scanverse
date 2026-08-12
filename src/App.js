@@ -279,9 +279,16 @@ function UpiVpaCopy({ addToast }) {
     </div>
   );
 }
-async function registerPaymentIntent(txnId, amountPaise, userId) {
+async function registerPaymentIntent(txnId, amountPaise, userId, meta = {}) {
   if (!txnId || !amountPaise) return { error: 'Missing transaction or amount' };
-  const body = { action: 'register', txn_id: txnId, amount_paise: amountPaise, user_id: userId || null };
+  const body = {
+    action: 'register',
+    txn_id: txnId,
+    amount_paise: amountPaise,
+    user_id: userId || null,
+    ...(meta.serviceId ? { service_id: meta.serviceId } : {}),
+    ...(meta.serviceName ? { service_name: meta.serviceName } : {}),
+  };
   try {
     if (!(await waitForSupabase())) {
       return { error: 'Payment service still loading — wait a moment and retry' };
@@ -355,7 +362,8 @@ async function checkPaymentVerified(txnId, expectedAmountPaise) {
   const r = await fetchPaymentVerification(txnId, expectedAmountPaise);
   return r.verified;
 }
-function usePaymentVerification(txnId, amountPaise, userId, addToast) {
+function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {}) {
+  const { serviceId = null, serviceName = null } = meta;
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [upiOpened, setUpiOpened] = useState(false);
   const [checkingPay, setCheckingPay] = useState(false);
@@ -368,7 +376,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     if (!txnId || !amountPaise) return;
     setRazorpayLinkLoading(true);
     setRazorpayError(null);
-    const data = await registerPaymentIntent(txnId, amountPaise, userId);
+    const data = await registerPaymentIntent(txnId, amountPaise, userId, { serviceId, serviceName });
     if (cancelledRef?.current) return;
     if (data?.payment_link_url) {
       setRazorpayLinkUrl(data.payment_link_url);
@@ -386,7 +394,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
       }
     }
     setRazorpayLinkLoading(false);
-  }, [txnId, amountPaise, userId, addToast]);
+  }, [txnId, amountPaise, userId, serviceId, serviceName, addToast]);
   useEffect(() => {
     if (!txnId || !amountPaise) return;
     const cancelled = { current: false };
@@ -394,6 +402,9 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast) {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === txnId && params.get('razorpay_payment_link_status') === 'paid') {
       setUpiOpened(true);
+      checkPaymentVerified(txnId, amountPaise).then((ok) => {
+        if (ok) setPaymentVerified(true);
+      });
     }
     return () => { cancelled.current = true; };
   }, [txnId, amountPaise, userId, registerGen, loadRazorpayLink]);
@@ -876,6 +887,49 @@ const VENDOR_ONBOARD_HASH = 'vendor-onboard';
 const VENDOR_ADMIN_HASH = 'vendor-admin';
 const TRACK_HASH = 'track';
 const TRACK_BOOKING_KEY = 'scanv_track_booking';
+const BOOKING_DRAFT_KEY = 'scanv_booking_draft';
+const BOOKING_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
+function saveBookingDraft(draft) {
+  try {
+    sessionStorage.setItem(BOOKING_DRAFT_KEY, JSON.stringify({ ...draft, savedAt: Date.now() }));
+  } catch (_) {}
+}
+
+function loadBookingDraft() {
+  try {
+    const raw = sessionStorage.getItem(BOOKING_DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (Date.now() - (draft.savedAt || 0) > BOOKING_DRAFT_TTL_MS) {
+      sessionStorage.removeItem(BOOKING_DRAFT_KEY);
+      return null;
+    }
+    return draft;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearBookingDraft() {
+  try { sessionStorage.removeItem(BOOKING_DRAFT_KEY); } catch (_) {}
+}
+
+function parsePaymentReturnTxn() {
+  const params = new URLSearchParams(window.location.search);
+  const txnId = params.get('payment');
+  if (txnId?.startsWith('TXN-') && params.get('razorpay_payment_link_status') === 'paid') return txnId;
+  return null;
+}
+
+function clearPaymentReturnUrl() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('payment') && !url.searchParams.has('razorpay_payment_link_status')) return;
+  url.searchParams.delete('payment');
+  url.searchParams.delete('razorpay_payment_link_status');
+  const next = url.pathname + (url.search || '') + url.hash;
+  window.history.replaceState({}, '', next);
+}
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const VENDOR_PIN_KEY = 'scanv_vendor_pin';
@@ -890,6 +944,54 @@ const RAZORPAY_FN = `${SB_URL}/functions/v1/razorpay-payment`;
 
 function findSvcById(id) {
   return SVCS.find(s => s.id === id) || SUB_BY_ID[id] || null;
+}
+
+function bookingTotalsForSvc(svc) {
+  const price = svc?.price || 50000;
+  const fee = Math.round(price * FEE_PCT);
+  const gst = Math.round((price + fee) * GST_RATE);
+  return { price, fee, gst, total: price + fee + gst };
+}
+
+function inferServiceFromTotalPaise(totalPaise) {
+  for (const svc of ALL_SUB_SVCS) {
+    if (bookingTotalsForSvc(svc).total === totalPaise) return svc;
+  }
+  for (const svc of SVCS) {
+    if (bookingTotalsForSvc(svc).total === totalPaise) return svc;
+  }
+  return null;
+}
+
+async function findOrphanPaidIntents(userId) {
+  if (!userId) return [];
+  try {
+    const { data: intents } = await sb().from('payment_intents')
+      .select('txn_id, amount_paise, paid_at, service_id, service_name')
+      .eq('user_id', userId)
+      .eq('status', 'paid')
+      .order('paid_at', { ascending: false })
+      .limit(10);
+    if (!intents?.length) return [];
+    const txnIds = intents.map((i) => i.txn_id);
+    const { data: bks } = await sb().from('bookings').select('txn_id').in('txn_id', txnIds);
+    const booked = new Set((bks || []).map((b) => b.txn_id));
+    return intents.filter((i) => !booked.has(i.txn_id));
+  } catch (_) {
+    return [];
+  }
+}
+
+async function resumePaidBookingDraft(addToast) {
+  const returnTxn = parsePaymentReturnTxn();
+  if (!returnTxn) return null;
+  const draft = loadBookingDraft();
+  if (!draft || draft.txnId !== returnTxn) return null;
+  const payCheck = await fetchPaymentVerification(returnTxn, draft.amountPaise);
+  if (!payCheck.verified) return null;
+  clearPaymentReturnUrl();
+  addToast?.('Payment confirmed — pick date & time to finish your booking', 'success');
+  return { draft, payCheck };
 }
 
 function applyLivePricingRows(rows) {
@@ -2314,7 +2416,37 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     screen === 'payment' ? (paymentAmountPaise ?? browseTotal) : 0,
     userId,
     addToast,
+    { serviceId: activeSvc?.id, serviceName: activeSvc?.name },
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const resumed = await resumePaidBookingDraft(addToast);
+      if (cancelled || !resumed || resumed.draft.flow !== 'browse') return;
+      const { draft } = resumed;
+      const svc = findSvcById(draft.serviceId);
+      if (!svc) return;
+      setActiveSvc(svc);
+      setTxnId(draft.txnId);
+      setUserId(draft.userId);
+      setPaymentAmountPaise(draft.amountPaise);
+      setPaymentMethod(draft.paymentMethod || 'Razorpay');
+      setFirstName(draft.firstName || '');
+      setLastName(draft.lastName || '');
+      setMobile(draft.mobile || '');
+      setAddress(draft.address || '');
+      setVillage(draft.village || '');
+      setCity(draft.city || '');
+      setPincode(draft.pincode || '');
+      if (draft.pendingProfile) setPendingProfile(draft.pendingProfile);
+      browsePay.setPaymentVerified(true);
+      browsePay.setUpiOpened(true);
+      setScreen('schedule');
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update address fields when GPS arrives
   useEffect(()=>{
@@ -2376,8 +2508,25 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
       setUserId(profile.id);
       setPendingProfile(profile);
+      const newTxnId = 'TXN-' + Date.now();
       setPaymentAmountPaise(browseTotal);
-      setTxnId('TXN-'+Date.now());
+      setTxnId(newTxnId);
+      saveBookingDraft({
+        flow: 'browse',
+        txnId: newTxnId,
+        amountPaise: browseTotal,
+        userId: profile.id,
+        serviceId: activeSvc?.id,
+        serviceName: activeSvc?.name,
+        firstName,
+        lastName,
+        mobile,
+        address,
+        village,
+        city,
+        pincode,
+        pendingProfile: profile,
+      });
       browsePay.setUpiOpened(false);
       browsePay.setPaymentVerified(false);
       setPaymentMethod(null);
@@ -2525,6 +2674,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         lastLng: silentGeo?.lng || bookingDetail.lng || null,
       });
       sessionStorage.setItem(TRACK_BOOKING_KEY, bk.id);
+      clearBookingDraft();
       onRegistered(profile, bk.id);
     } catch(e) { setErr(e.message||'Booking failed.'); }
     finally { setLoading(false); }
@@ -3715,8 +3865,34 @@ function BookScreen() {
   const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
   const svc=activeSvc;
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
-  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast);
+  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name});
   if (!svc) { setScreen('services'); return null; }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const resumed = await resumePaidBookingDraft(addToast);
+      if (cancelled || !resumed || resumed.draft.flow !== 'book') return;
+      const { draft } = resumed;
+      setTxnId(draft.txnId);
+      setPaymentAmountPaise(draft.amountPaise);
+      setPayMethod(draft.paymentMethod || 'Razorpay');
+      if (draft.bookFirstName) setBookFirstName(draft.bookFirstName);
+      if (draft.bookLastName) setBookLastName(draft.bookLastName);
+      if (draft.bookPhone) setBookPhone(draft.bookPhone);
+      if (draft.bookAddress) setBookAddress(draft.bookAddress);
+      if (draft.bookCity) setBookCity(draft.bookCity);
+      if (draft.bookPincode) setBookPincode(draft.bookPincode);
+      if (draft.loc) setLoc(draft.loc);
+      if (draft.bookLat != null) setBookLat(draft.bookLat);
+      if (draft.bookLng != null) setBookLng(draft.bookLng);
+      bookPay.setPaymentVerified(true);
+      bookPay.setUpiOpened(true);
+      setStep(4);
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
@@ -3757,8 +3933,26 @@ function BookScreen() {
       setUser(profile);
       setBookOtpVerified(true);
       setLoc([bookAddress,bookCity,bookPincode].filter(Boolean).join(', '));
+      const newTxnId = 'TXN-' + Date.now();
       setPaymentAmountPaise(total);
-      setTxnId('TXN-'+Date.now());
+      setTxnId(newTxnId);
+      saveBookingDraft({
+        flow: 'book',
+        txnId: newTxnId,
+        amountPaise: total,
+        userId: profile.id,
+        serviceId: svc?.id,
+        serviceName: svc?.name,
+        bookFirstName,
+        bookLastName,
+        bookPhone,
+        bookAddress,
+        bookCity,
+        bookPincode,
+        bookLat: user?.last_lat,
+        bookLng: user?.last_lng,
+        loc: [bookAddress, bookCity, bookPincode].filter(Boolean).join(', '),
+      });
       bookPay.setUpiOpened(false);
       bookPay.setPaymentVerified(false);
       setPayMethod(null);
@@ -3823,6 +4017,7 @@ function BookScreen() {
         lat: custLat, lng: custLng, location: loc, date, time,
       });
       setBooking(data);
+      clearBookingDraft();
       addToast('Booking confirmed! Track your partner live 📍', 'success');
       goToTrack(setTrackBookingId, setScreen, data.id);
     } catch (e) { addToast(e.message || 'Booking failed', 'error'); }
@@ -3843,7 +4038,32 @@ function BookScreen() {
     addToast('Payment confirmed — pick date & time', 'success');
   };
   const goFromService=()=>{
-    if(skipVerify){ setTxnId('TXN-'+Date.now()); bookPay.setUpiOpened(false); bookPay.setPaymentVerified(false); setPayMethod(null); setStep(3); }
+    if(skipVerify){
+      const newTxnId = 'TXN-' + Date.now();
+      setTxnId(newTxnId);
+      setPaymentAmountPaise(total);
+      saveBookingDraft({
+        flow: 'book',
+        txnId: newTxnId,
+        amountPaise: total,
+        userId: user?.id,
+        serviceId: svc?.id,
+        serviceName: svc?.name,
+        bookFirstName,
+        bookLastName,
+        bookPhone,
+        bookAddress,
+        bookCity,
+        bookPincode,
+        bookLat,
+        bookLng,
+        loc,
+      });
+      bookPay.setUpiOpened(false);
+      bookPay.setPaymentVerified(false);
+      setPayMethod(null);
+      setStep(3);
+    }
     else setStep(2);
   };
   const progressTotal=skipVerify?3:4;
@@ -4280,7 +4500,7 @@ function bookingStatusGroup(status) {
 }
 
 function BookingsScreen() {
-  const {user,addToast,setScreen,setTrackBookingId}=useApp();
+  const {user,addToast,setScreen,setTrackBookingId,setActiveSvc}=useApp();
   const [bookings,setBookings]=useState([]);
   const [loading,setLoading]=useState(true);
   const [stars,setStars]=useState({});
@@ -4288,11 +4508,22 @@ function BookingsScreen() {
   const [reason,setReason]=useState('');
   const [liveLocs,setLiveLocs]=useState({});
   const [partners,setPartners]=useState({});
+  const [orphans,setOrphans]=useState([]);
+  const [recovering,setRecovering]=useState(null);
+  const [recoverDate,setRecoverDate]=useState('');
+  const [recoverTime,setRecoverTime]=useState('10:00');
+  const [recoverBusy,setRecoverBusy]=useState(false);
 
   const load=useCallback(async()=>{
     const col=user.role==='partner'?'partner_id':'customer_id';
     const{data}=await sb().from('bookings').select('*').eq(col,user.id).order('created_at',{ascending:false});
     setBookings(data||[]);
+    if (user.role === 'customer') {
+      const pending = await findOrphanPaidIntents(user.id);
+      setOrphans(pending);
+    } else {
+      setOrphans([]);
+    }
     const ids=(data||[]).map(b=>b.id);
     if(ids.length){
       const{data:lives}=await sb().from('vendor_live_locations').select('*').in('booking_id',ids);
@@ -4385,6 +4616,80 @@ function BookingsScreen() {
     load();
   };
 
+  const completeOrphanBooking = async (intent) => {
+    if (!recoverDate) return addToast('Select a date', 'error');
+    setRecoverBusy(true);
+    try {
+      const svc = findSvcById(intent.service_id) || inferServiceFromTotalPaise(intent.amount_paise);
+      if (!svc) throw new Error('Could not match service — contact support with ref ' + intent.txn_id);
+      const { price, fee, gst, total } = bookingTotalsForSvc(svc);
+      const loc = [user.address, user.city, user.pincode].filter(Boolean).join(', ') || user.last_address || '';
+      const payCheck = await fetchPaymentVerification(intent.txn_id, intent.amount_paise);
+      if (!payCheck.verified) throw new Error('Payment no longer verified — contact support');
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Customer';
+      const { data: bk, error } = await sb().from('bookings').insert({
+        customer_id: user.id,
+        service_name: intent.service_name || svc.name,
+        service_id: svc.id || svc.parent || null,
+        customer_name: fullName,
+        customer_email: user.email || '',
+        date: recoverDate,
+        time: recoverTime || '10:00',
+        notes: 'Recovered after Razorpay payment',
+        location_text: loc,
+        customer_lat: user.last_lat ?? null,
+        customer_lng: user.last_lng ?? null,
+        price, platform_fee: fee, gst_amt: gst, total,
+        status: 'confirmed',
+        txn_id: intent.txn_id,
+        paid_at: intent.paid_at || new Date().toISOString(),
+      }).select().single();
+      if (error) throw error;
+      await sb().from('service_requests').insert({
+        customer_id: user.id,
+        service_name: intent.service_name || svc.name,
+        service_type: svc.cat || svc.parent || 'Delivery',
+        preferred_date: recoverDate,
+        preferred_time: recoverTime || '10:00',
+        notes: 'Recovered after Razorpay payment',
+        location_text: loc,
+        price, platform_fee: fee, gst_amount: gst, total,
+        status: 'new',
+        txn_id: intent.txn_id,
+        added_by: user.id,
+      });
+      await sb().from('payments').insert({
+        booking_id: bk.id,
+        user_id: user.id,
+        amount: total,
+        method: 'Razorpay',
+        status: 'success',
+        txn_id: intent.txn_id,
+        gateway: 'Razorpay',
+        payer_vpa: payCheck.payer_vpa || null,
+      }).catch(() => {});
+      await invokeBookingDispatch({
+        bookingId: bk.id,
+        serviceId: svc.id || svc.parent || '',
+        serviceName: intent.service_name || svc.name,
+        lat: user.last_lat ?? null,
+        lng: user.last_lng ?? null,
+        location: loc,
+        date: recoverDate,
+        time: recoverTime || '10:00',
+      });
+      clearBookingDraft();
+      setRecovering(null);
+      addToast('Booking created from your payment ✓', 'success');
+      goToTrack(setTrackBookingId, setScreen, bk.id);
+      load();
+    } catch (e) {
+      addToast(e.message || 'Could not complete booking', 'error');
+    } finally {
+      setRecoverBusy(false);
+    }
+  };
+
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title="Bookings"/>
@@ -4394,6 +4699,36 @@ function BookingsScreen() {
         </div>
       )}
       <div style={{padding:16}}>
+        {!!orphans.length && user.role === 'customer' && (
+          <div style={{ ...S.card(), marginBottom: 14, padding: 14, border: `1.5px solid rgba(0,122,77,0.35)`, background: '#e6f4ee' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Payment received — finish booking</div>
+            <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>
+              We found {orphans.length} paid order{orphans.length > 1 ? 's' : ''} without a booking. Pick date & time to confirm.
+            </div>
+            {orphans.map((intent) => (
+              <div key={intent.txn_id} style={{ marginBottom: recovering === intent.txn_id ? 10 : 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 12, color: C.txt }}>
+                    <div style={{ fontWeight: 700 }}>{intent.service_name || inferServiceFromTotalPaise(intent.amount_paise)?.name || 'Service'}</div>
+                    <div style={{ color: C.dim }}>{intent.txn_id} · ₹{((intent.amount_paise || 0) / 100).toLocaleString('en-IN')}</div>
+                  </div>
+                  <Btn sm onClick={() => { setRecovering(intent.txn_id); setRecoverDate(''); setRecoverTime('10:00'); }}>
+                    Complete →
+                  </Btn>
+                </div>
+                {recovering === intent.txn_id && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.bdr}` }}>
+                    <Field label="Date" req><input type="date" value={recoverDate} onChange={(e) => setRecoverDate(e.target.value)} style={S.inp()} /></Field>
+                    <Field label="Time"><input type="time" value={recoverTime} onChange={(e) => setRecoverTime(e.target.value)} style={S.inp()} /></Field>
+                    <Btn full onClick={() => completeOrphanBooking(intent)} disabled={recoverBusy}>
+                      {recoverBusy ? <><Spin size={16} /> Creating booking…</> : 'Confirm booking →'}
+                    </Btn>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {loading?<div style={{textAlign:'center',padding:40}}><Spin/></div>
         :bookings.length?(<>
           {activeBookings.length>0&&<>
@@ -7384,15 +7719,33 @@ export default function App() {
         },()=>{}, {timeout:8000,enableHighAccuracy:true,maximumAge:0});
       } catch(e){}
 
+      const returnTxn = parsePaymentReturnTxn();
+      const pendingDraft = loadBookingDraft();
+      const resumeBrowseDraft = returnTxn && pendingDraft?.txnId === returnTxn && pendingDraft.flow === 'browse';
+
+      const finishAppBoot = (profile) => {
+        setUser(profile);
+        setState('app');
+        const tid = trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
+        if (isTrackRoute() && tid) {
+          setTrackBookingId(tid);
+          setScreen('track');
+          return;
+        }
+        if (returnTxn && pendingDraft?.txnId === returnTxn && pendingDraft.flow === 'book') {
+          const svc = findSvcById(pendingDraft.serviceId);
+          if (svc) setActiveSvc(svc);
+          setScreen('book');
+        }
+      };
+
       // Try restoring existing session
       try {
         const {data:{session}}=await sb().auth.getSession();
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
-            setUser(p); setState('app');
-            const tid = trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
-            if (isTrackRoute() && tid) { setTrackBookingId(tid); setScreen('track'); }
+            finishAppBoot(p);
             return;
           }
         }
@@ -7400,13 +7753,16 @@ export default function App() {
         if (uid) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
           if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
-            setUser(p); setState('app');
-            const tid = trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY);
-            if (isTrackRoute() && tid) { setTrackBookingId(tid); setScreen('track'); }
+            finishAppBoot(p);
             return;
           }
         }
       } catch(e){ console.warn('[ScanV]',e.message); }
+      // Paid browse booking in progress — finish in guest browse flow even if profile exists locally
+      if (resumeBrowseDraft) {
+        setState('browse');
+        return;
+      }
       // Always show services first -- no registration wall
       setState(isQRScan?'qr':'browse');
     })();

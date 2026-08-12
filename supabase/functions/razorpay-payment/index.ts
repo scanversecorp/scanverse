@@ -409,6 +409,8 @@ async function handleRegister(
   const txnId = String(body.txn_id || "");
   const amountPaise = Number(body.amount_paise);
   const userId = body.user_id ? String(body.user_id).trim() || null : null;
+  const serviceId = body.service_id ? String(body.service_id).trim() || null : null;
+  const serviceName = body.service_name ? String(body.service_name).trim() || null : null;
 
   if (!txnId.startsWith("TXN-") || !Number.isFinite(amountPaise) || amountPaise <= 0) {
     return json({ error: "Invalid txn_id or amount_paise" }, 400);
@@ -431,6 +433,8 @@ async function handleRegister(
       txn_id: txnId,
       amount_paise: amountPaise,
       user_id: userId,
+      service_id: serviceId,
+      service_name: serviceName,
       status: "pending",
       expires_at: expiresAt,
     },
