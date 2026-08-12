@@ -5394,6 +5394,302 @@ function gpsDistanceM(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+const GPS_PROMPT_PREFIX = 'scanv_gps_prompt_';
+
+function gpsPromptDayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function gpsPromptStorageKey(role, userId) {
+  return `${GPS_PROMPT_PREFIX}${role || 'guest'}_${userId || 'guest'}_${gpsPromptDayKey()}`;
+}
+
+function wasGpsPromptedToday(role, userId) {
+  try { return localStorage.getItem(gpsPromptStorageKey(role, userId)) === '1'; } catch { return false; }
+}
+
+function markGpsPromptedToday(role, userId) {
+  try { localStorage.setItem(gpsPromptStorageKey(role, userId), '1'); } catch { /* ignore */ }
+}
+
+function hasStoredCustomerGps(user, silentGeo) {
+  const lat = user?.last_lat ?? silentGeo?.lat;
+  const lng = user?.last_lng ?? silentGeo?.lng;
+  return lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+}
+
+function hasStoredPartnerGps(vendor) {
+  if (!vendor) return false;
+  const lat = vendor.gps_lat ?? vendor.address_lat;
+  const lng = vendor.gps_lng ?? vendor.address_lng;
+  return lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+}
+
+function isGpsPortalRoute() {
+  return isAdminHubRoute() || isVendorAdminRoute() || isCustomerSupportRoute()
+    || isPricingAdminRoute() || isExecDashboardRoute() || isVendorOnboardRoute();
+}
+
+async function persistCustomerGps(user, lat, lng, geo, setUser, setSilentGeo) {
+  const payload = {
+    lat, lng,
+    address: geo?.address || '',
+    village: geo?.village || '',
+    city: geo?.city || '',
+    pincode: geo?.pincode || '',
+  };
+  setSilentGeo?.((prev) => ({ ...prev, ...payload }));
+  if (!user?.id) return;
+  const updates = {
+    last_lat: lat,
+    last_lng: lng,
+    address: geo?.address || user.address,
+    village: geo?.village || user.village,
+    city: geo?.city || user.city,
+    pincode: geo?.pincode || user.pincode,
+  };
+  const { data } = await sb().from('profiles').update(updates).eq('id', user.id).select().single();
+  setUser?.(data);
+  await sb().from('user_locations').insert({
+    user_id: user.id,
+    lat,
+    lng,
+    address: geo?.address || null,
+    village: geo?.village || null,
+    city: geo?.city || null,
+    pincode: geo?.pincode || null,
+    source: 'gps',
+    consent_given: true,
+    consent_at: new Date().toISOString(),
+  });
+}
+
+async function persistPartnerGps(user, vendor, lat, lng) {
+  await vendorOnboardFetch('update-location', {
+    profile_id: user.id,
+    mobile: vendor?.phone || user.phone,
+    lat,
+    lng,
+  });
+}
+
+function GpsPermissionPrompt({
+  open,
+  busy,
+  manual,
+  manualAddr,
+  onManualAddr,
+  onEnable,
+  onManual,
+  onManualBack,
+  onManualSave,
+  onDismiss,
+  audienceLabel,
+}) {
+  if (!open) return null;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }}>
+      <div style={{ ...S.card(), maxWidth: 340, width: '100%', padding: '28px 24px', textAlign: 'center' }}>
+        {!manual ? (
+          <>
+            <div style={{ fontSize: 44, lineHeight: 1, marginBottom: 16, opacity: 0.85 }}>📍</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Location permission not enabled</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 22 }}>
+              Please enable location permission for a better delivery experience{audienceLabel ? ` — ${audienceLabel}` : ''}.
+            </div>
+            <button type="button" onClick={onEnable} disabled={busy} style={{
+              background: 'none', border: 'none', color: C.grn, fontWeight: 700, fontSize: 15,
+              cursor: busy ? 'wait' : 'pointer', fontFamily: FF, marginBottom: 14,
+            }}>
+              {busy ? 'Getting location…' : 'Enable location'}
+            </button>
+            <div>
+              <button type="button" onClick={onManual} disabled={busy} style={{
+                background: 'none', border: 'none', color: C.grn, fontWeight: 700, fontSize: 15,
+                cursor: 'pointer', fontFamily: FF,
+              }}>
+                Select location manually
+              </button>
+            </div>
+            <button type="button" onClick={onDismiss} disabled={busy} style={{
+              marginTop: 18, background: 'none', border: 'none', color: C.dim, fontSize: 12, cursor: 'pointer', fontFamily: FF,
+            }}>
+              Not now
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, marginBottom: 8, textAlign: 'left' }}>Enter your location</div>
+            <div style={{ fontSize: 12, color: C.sub, marginBottom: 12, textAlign: 'left', lineHeight: 1.5 }}>
+              Type your address or area — we will save coordinates for nearby matching.
+            </div>
+            <textarea
+              value={manualAddr}
+              onChange={(e) => onManualAddr(e.target.value)}
+              rows={3}
+              placeholder="e.g. Shop 12, Wakad Main Road, Pune 411057"
+              style={{ ...S.inp(), resize: 'vertical', width: '100%', marginBottom: 12, textAlign: 'left' }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn v="outline" full onClick={onManualBack} disabled={busy}>Back</Btn>
+              <Btn full onClick={onManualSave} disabled={busy || !manualAddr.trim()}>
+                {busy ? 'Saving…' : 'Save location'}
+              </Btn>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DailyGpsPrompt({ user, silentGeo, setSilentGeo, setUser, addToast, setScreen }) {
+  const [open, setOpen] = useState(false);
+  const [manual, setManual] = useState(false);
+  const [manualAddr, setManualAddr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [partnerVendor, setPartnerVendor] = useState(null);
+  const role = user?.role || 'guest';
+  const userId = user?.id || 'guest';
+
+  useVendorLocationTracker(user, { enabled: user?.role === 'partner' && !open });
+
+  useEffect(() => {
+    if (isGpsPortalRoute()) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      if (wasGpsPromptedToday(role, userId)) return;
+
+      if (role === 'partner') {
+        const { data: vendor } = await sb().from('vendor_partners')
+          .select('id, phone, status, gps_lat, gps_lng, address_lat, address_lng')
+          .eq('profile_id', user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (!vendor || vendor.status === 'offboarded') {
+          markGpsPromptedToday(role, userId);
+          return;
+        }
+        setPartnerVendor(vendor);
+        if (hasStoredPartnerGps(vendor)) {
+          markGpsPromptedToday(role, userId);
+          return;
+        }
+        setManualAddr([user?.address, user?.village, user?.city, user?.pincode].filter(Boolean).join(', '));
+        setOpen(true);
+        return;
+      }
+
+      if (hasStoredCustomerGps(user, silentGeo)) {
+        markGpsPromptedToday(role, userId);
+        return;
+      }
+
+      setManualAddr([user?.address, user?.village, user?.city, user?.pincode].filter(Boolean).join(', '));
+      if (!cancelled) setOpen(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [role, userId, user?.last_lat, user?.last_lng, silentGeo?.lat, silentGeo?.lng]);
+
+  const closePrompt = (markToday = true) => {
+    if (markToday) markGpsPromptedToday(role, userId);
+    setOpen(false);
+    setManual(false);
+  };
+
+  const enableGps = () => {
+    if (!navigator.geolocation) {
+      addToast?.('GPS not supported on this device', 'error');
+      setManual(true);
+      return;
+    }
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const geo = await reverseGeo(lat, lng);
+        if (role === 'partner') {
+          await persistPartnerGps(user, partnerVendor, lat, lng);
+          addToast?.('Partner GPS shared — you can receive nearby jobs', 'success');
+        } else {
+          await persistCustomerGps(user, lat, lng, geo, setUser, setSilentGeo);
+          addToast?.('Location saved — better service matching', 'success');
+        }
+        closePrompt(true);
+      } catch (e) {
+        addToast?.(e.message || 'Could not save location', 'error');
+      } finally {
+        setBusy(false);
+      }
+    }, () => {
+      setBusy(false);
+      addToast?.('Location blocked — enter address manually', 'error');
+      setManual(true);
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  };
+
+  const saveManual = async () => {
+    const q = manualAddr.trim();
+    if (!q) return;
+    setBusy(true);
+    try {
+      const coords = await forwardGeocode(q);
+      if (!coords) throw new Error('Could not find that address — try area + PIN code');
+      const geo = await reverseGeo(coords.lat, coords.lng);
+      if (role === 'partner') {
+        await persistPartnerGps(user, partnerVendor, coords.lat, coords.lng);
+        addToast?.('Partner location saved', 'success');
+      } else {
+        await persistCustomerGps(user, coords.lat, coords.lng, { ...geo, address: q }, setUser, setSilentGeo);
+        addToast?.('Location saved', 'success');
+      }
+      closePrompt(true);
+    } catch (e) {
+      addToast?.(e.message || 'Save failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const audienceLabel = role === 'partner' ? 'required for job offers & dispatch' : 'required to match nearby services';
+
+  return (
+    <GpsPermissionPrompt
+      open={open}
+      busy={busy}
+      manual={manual}
+      manualAddr={manualAddr}
+      onManualAddr={setManualAddr}
+      onEnable={enableGps}
+      onManual={() => setManual(true)}
+      onManualBack={() => setManual(false)}
+      onManualSave={saveManual}
+      onDismiss={() => closePrompt(true)}
+      audienceLabel={audienceLabel}
+    />
+  );
+}
+
+function PartnerGpsTracker() {
+  const ctx = useApp();
+  return (
+    <DailyGpsPrompt
+      user={ctx.user}
+      silentGeo={ctx.silentGeo}
+      setSilentGeo={ctx.setSilentGeo}
+      setUser={ctx.setUser}
+      addToast={ctx.addToast}
+      setScreen={ctx.setScreen}
+    />
+  );
+}
+
 /** Continuous GPS for partners — updates vendor_partners for dispatch nearest-match */
 function useVendorLocationTracker(user, { enabled = true, mobile = null, onPosition = null } = {}) {
   const watchRef = useRef(null);
@@ -5486,12 +5782,6 @@ function formatBookingRef(booking) {
   if (!booking?.id) return '';
   const shortId = String(booking.id).slice(0, 8).toUpperCase();
   return booking.txn_id ? `${booking.txn_id} · #${shortId}` : `#${shortId}`;
-}
-
-function PartnerGpsTracker() {
-  const { user } = useApp();
-  useVendorLocationTracker(user, { enabled: user?.role === 'partner' });
-  return null;
 }
 
 function usePartnerJobOffers(user) {
@@ -10321,6 +10611,12 @@ export default function App() {
   // BROWSE: Show services without registration wall
   if (state==='browse') return (
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
+    <DailyGpsPrompt
+      user={null}
+      silentGeo={silentGeo}
+      setSilentGeo={setSilentGeo}
+      addToast={addToast}
+    />
     <BrowseFlow
       silentGeo={silentGeo}
       onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='investments')setScreen('investments');else setScreen('services');}}
