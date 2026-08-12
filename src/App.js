@@ -9464,11 +9464,164 @@ const ADMIN_TABS = [
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'agents', label: 'Support Agents', icon: '👥' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
+  { id: 'gps', label: 'GPS Status', icon: '📍' },
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
+
+function istDateYmd(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+function AdminGpsStatusTab({ pin }) {
+  const [audience, setAudience] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [dateTo, setDateTo] = useState(() => istDateYmd());
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return istDateYmd(d);
+  });
+  const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true);
+    setErr('');
+    try {
+      const data = await adminHubFetch('gps_status_report', {
+        audience,
+        date_from: dateFrom,
+        date_to: dateTo,
+        status_filter: statusFilter,
+        search: search.trim() || undefined,
+      }, pin);
+      setRows(data.rows || []);
+      setSummary(data.summary || null);
+    } catch (e) {
+      setErr(e.message);
+      setRows([]);
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [pin, audience, dateFrom, dateTo, statusFilter, search]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filterPill = (active) => ({
+    padding: '6px 12px',
+    borderRadius: 20,
+    border: `1.5px solid ${active ? C.acc : C.bdr}`,
+    background: active ? `${C.acc}18` : C.surf,
+    color: active ? C.acc : C.sub,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: FF,
+  });
+
+  const th = { padding: '8px 10px', fontSize: 10, fontWeight: 700, color: C.sub, textAlign: 'left', borderBottom: BDR, whiteSpace: 'nowrap' };
+  const td = { padding: '8px 10px', fontSize: 11, color: C.txt, borderBottom: `1px solid ${C.bdr}`, whiteSpace: 'nowrap' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>GPS Status Report</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Day-wise Shared / Unshared for customers and partners (IST calendar days, last GPS ping per day).</div>
+        </div>
+        <Btn v="outline" sm onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Btn>
+      </div>
+
+      <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 8 }}>AUDIENCE</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          {[['all', 'All'], ['users', 'Users'], ['vendors', 'Vendors']].map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setAudience(id)} style={filterPill(audience === id)}>{label}</button>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+          <Field label="From (IST)"><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={S.inp()} /></Field>
+          <Field label="To (IST)"><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={S.inp()} /></Field>
+          <Field label="Status">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={S.inp()}>
+              <option value="all">All</option>
+              <option value="shared">Shared only</option>
+              <option value="unshared">Unshared only</option>
+            </select>
+          </Field>
+          <Field label="Search name / phone"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filter…" style={S.inp()} /></Field>
+        </div>
+      </div>
+
+      {summary && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+          <AdminStatCard label="Shared" value={summary.shared} color={C.grn} />
+          <AdminStatCard label="Unshared" value={summary.unshared} color={C.red} />
+          <AdminStatCard label="Rows" value={summary.total} />
+        </div>
+      )}
+
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+
+      <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+            <thead>
+              <tr style={{ position: 'sticky', top: 0, background: C.surf, zIndex: 1 }}>
+                {['Date', 'Type', 'Name', 'Phone', 'Status', 'GPS time', 'Coordinates'].map((h) => (
+                  <th key={h} style={th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.date}-${r.type}-${r.id}`}>
+                  <td style={td}>{r.date}</td>
+                  <td style={{ ...td, color: r.type === 'vendor' ? C.cyan : C.sub }}>{r.type === 'vendor' ? 'Vendor' : 'User'}</td>
+                  <td style={{ ...td, fontWeight: 600 }}>{r.name}</td>
+                  <td style={td}>{r.phone}</td>
+                  <td style={td}>
+                    <span style={{
+                      color: r.status === 'shared' ? C.grn : C.red,
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      fontSize: 10,
+                    }}>
+                      {r.status === 'shared' ? 'Shared' : 'Unshared'}
+                    </span>
+                  </td>
+                  <td style={{ ...td, color: C.dim }}>{r.gps_at ? fmtDt(r.gps_at) : '—'}</td>
+                  <td style={{ ...td, color: C.dim, fontFamily: 'monospace', fontSize: 10 }}>
+                    {r.lat != null ? `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!rows.length && !loading && (
+            <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No rows for this filter / date range</div>
+          )}
+          {loading && (
+            <div style={{ textAlign: 'center', padding: 24 }}><Spin size={24} /></div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AdminDeepLinkBtn({ hash, label }) {
   return (
@@ -10111,6 +10264,8 @@ function AdminControlCenter({ onPricesUpdated }) {
             </div>
           </div>
         )}
+
+        {tab === 'gps' && <AdminGpsStatusTab pin={usePin} />}
 
         {tab === 'bookings' && <AdminBookingsTab pin={usePin} />}
 

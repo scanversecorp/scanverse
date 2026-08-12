@@ -18,6 +18,7 @@
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
  *   get_platform_settings — { keys? } dispatch_mode etc.
  *   update_platform_setting — { key, value, updated_by? }
+ *   gps_status_report — { audience?, date_from?, date_to?, search?, status_filter? }
  *
  * Auth: x-admin-pin header
  *   ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN
@@ -35,6 +36,7 @@ import {
   listInvestmentRequests,
   respondInvestmentRequest,
 } from "../_shared/investments-admin.ts";
+import { gpsStatusReport } from "../_shared/gps-status-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -949,6 +951,16 @@ Deno.serve(async (req) => {
 
   if (action === "update_platform_setting") {
     return updatePlatformSetting(sb, body);
+  }
+
+  if (action === "gps_status_report") {
+    try {
+      const result = await gpsStatusReport(sb, body);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "GPS report failed";
+      return json({ error: msg }, 500);
+    }
   }
 
   if (action === "exec_stats" || action === "exec_charts") {
