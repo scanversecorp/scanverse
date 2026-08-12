@@ -40,10 +40,38 @@ import {
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
-function adminPinOk(req: Request): boolean {
+type VendorAdminRole = "admin" | "readonly" | null;
+
+function resolveVendorAdminRole(req: Request): VendorAdminRole {
   const pin = req.headers.get("x-vendor-admin-pin") || "";
-  const expected = Deno.env.get("VENDOR_ADMIN_PIN") || Deno.env.get("PRICING_ADMIN_PIN") || "";
-  return !!expected && pin === expected;
+  if (!pin) return null;
+
+  const adminPins = [
+    Deno.env.get("VENDOR_ADMIN_PIN"),
+    Deno.env.get("PRICING_ADMIN_PIN"),
+    Deno.env.get("ADMIN_HUB_PIN"),
+    Deno.env.get("SUPPORT_ADMIN_PIN"),
+  ].filter((p): p is string => !!p && p.length >= 6);
+
+  if (adminPins.some((p) => pin === p)) return "admin";
+
+  const agentPin = Deno.env.get("SUPPORT_AGENT_PIN");
+  if (agentPin && pin === agentPin) return "readonly";
+
+  return null;
+}
+
+function vendorAdminAuthorized(req: Request): boolean {
+  return resolveVendorAdminRole(req) !== null;
+}
+
+function vendorAdminCanWrite(req: Request): boolean {
+  return resolveVendorAdminRole(req) === "admin";
+}
+
+/** @deprecated use vendorAdminAuthorized / vendorAdminCanWrite */
+function adminPinOk(req: Request): boolean {
+  return vendorAdminCanWrite(req);
 }
 
 async function assertRecentOtpVerified(
@@ -774,7 +802,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "photo-view-url") {
-      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      if (!vendorAdminAuthorized(req)) return json({ error: "Unauthorized" }, 401);
       const vendorId = String(body.vendor_id || "");
       if (!vendorId) return json({ error: "vendor_id required" }, 400);
       const { data: vendor } = await supabase
@@ -791,7 +819,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "gps-history") {
-      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      if (!vendorAdminAuthorized(req)) return json({ error: "Unauthorized" }, 401);
       const vendorId = String(body.vendor_id || "");
       if (!vendorId) return json({ error: "vendor_id required" }, 400);
       const limit = Math.min(Math.max(Number(body.limit) || 50, 1), 200);
@@ -977,8 +1005,93 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (action === "whoami") {
+      const role = resolveVendorAdminRole(req);
+      if (!role) return json({ error: "Unauthorized" }, 401);
+      return json({
+        role,
+        can_edit: role === "admin",
+        read_only: role === "readonly",
+      });
+    }
+
+    if (action === "update") {
+      if (!vendorAdminCanWrite(req)) {
+        return json({ error: "Admin PIN required — support agents have read-only access" }, 403);
+      }
+
+      const vendorId = String(body.vendor_id || "").trim();
+      if (!vendorId) return json({ error: "vendor_id required" }, 400);
+
+      const { data: existing } = await supabase
+        .from("vendor_partners")
+        .select("id, first_name, last_name")
+        .eq("id", vendorId)
+        .maybeSingle();
+      if (!existing) return json({ error: "Vendor not found" }, 404);
+
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      const strFields = [
+        "first_name", "last_name", "business_name", "email", "mobile2",
+        "pan_number", "shop_or_flat", "building_name", "street_name", "village",
+        "city", "pincode", "state", "country", "vehicle_number", "license_number",
+        "highest_education", "notes",
+      ] as const;
+      for (const k of strFields) {
+        if (body[k] !== undefined) {
+          patch[k] = body[k] ? String(body[k]).trim() : null;
+        }
+      }
+      if (body.phone !== undefined) {
+        const mob = normalizeMobile(String(body.phone));
+        if (!mob) return json({ error: "Invalid phone" }, 400);
+        patch.phone = mob;
+      }
+      if (body.vehicle_type !== undefined) {
+        const vt = String(body.vehicle_type || "").trim();
+        patch.vehicle_type = vt === "2W" || vt === "4W" ? vt : null;
+      }
+      if (body.pan_number !== undefined && patch.pan_number) {
+        patch.pan_number = String(patch.pan_number).trim().toUpperCase();
+      }
+      if (body.app_installed_confirmed !== undefined) {
+        patch.app_installed_confirmed = !!body.app_installed_confirmed;
+      }
+      if (body.gps_allowed_confirmed !== undefined) {
+        patch.gps_allowed_confirmed = !!body.gps_allowed_confirmed;
+      }
+
+      const fn = String(patch.first_name ?? existing.first_name ?? "").trim();
+      const ln = String(patch.last_name ?? existing.last_name ?? "").trim();
+      if (body.first_name !== undefined || body.last_name !== undefined) {
+        patch.contact_name = `${fn} ${ln}`.trim() || fn || ln;
+      }
+
+      const { data: updated, error } = await supabase
+        .from("vendor_partners")
+        .update(patch)
+        .eq("id", vendorId)
+        .select("*, vendor_partner_services(service_id, category_id, is_active)")
+        .single();
+      if (error) throw error;
+
+      if (Array.isArray(body.services)) {
+        const services = (body.services as Array<{ service_id?: string; category_id?: string }>)
+          .filter((s) => s?.service_id && s?.category_id)
+          .map((s) => ({
+            service_id: String(s.service_id),
+            category_id: String(s.category_id),
+          }));
+        if (services.length) {
+          await upsertPartnerServices(supabase, vendorId, services, true);
+        }
+      }
+
+      return json({ success: true, vendor: updated });
+    }
+
     if (action === "list") {
-      if (!adminPinOk(req)) return json({ error: "Unauthorized" }, 401);
+      if (!vendorAdminAuthorized(req)) return json({ error: "Unauthorized" }, 401);
 
       const statusFilter = body.status ? String(body.status).toLowerCase() : "";
       const search = String(body.search || body.q || "").trim().toLowerCase();

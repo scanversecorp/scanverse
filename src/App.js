@@ -6410,7 +6410,7 @@ const VENDOR_ADMIN_COLUMNS = [
   { key: 'status', label: 'Status', width: 80, get: (v) => v.status || '—' },
 ];
 
-function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap }) {
+function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, onEdit }) {
   const [globalSearch, setGlobalSearch] = useState('');
   const [colFilters, setColFilters] = useState({});
   const [sortKey, setSortKey] = useState('business_name');
@@ -6561,19 +6561,22 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap }) {
                     </td>
                     <td style={{ ...tdStyle, position: 'sticky', right: 0, background: C.card, maxWidth: 120 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {v.status === 'pending' && <>
+                        {canEdit && (
+                          <Btn v="outline" sm onClick={() => onEdit?.(v)} disabled={loading}>Edit</Btn>
+                        )}
+                        {canEdit && v.status === 'pending' && <>
                           <Btn sm onClick={() => onAction('activate', v.id)} disabled={loading}>Activate</Btn>
                           <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
                         </>}
-                        {v.status === 'active' && <>
+                        {canEdit && v.status === 'active' && <>
                           <Btn v="outline" sm onClick={() => onAction('pause', v.id)} disabled={loading}>Pause</Btn>
                           <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
                         </>}
-                        {v.status === 'paused' && <>
+                        {canEdit && v.status === 'paused' && <>
                           <Btn sm onClick={() => onAction('unpause', v.id)} disabled={loading}>Unpause</Btn>
                           <Btn v="danger" sm onClick={() => onAction('offboard', v.id)} disabled={loading}>Offboard</Btn>
                         </>}
-                        {v.status === 'offboarded' && (
+                        {canEdit && v.status === 'offboarded' && (
                           <Btn v="ghost" sm onClick={() => onAction('delete', v.id)} disabled={loading}>Delete</Btn>
                         )}
                       </div>
@@ -7114,12 +7117,170 @@ function VendorOnboardPage() {
   );
 }
 
+function vendorEditFormFromVendor(v) {
+  const phoneDigits = String(v?.phone || '').replace(/\D/g, '').slice(-10);
+  const mobile2Digits = String(v?.mobile2 || '').replace(/\D/g, '').slice(-10);
+  const svcMap = {};
+  (v?.vendor_partner_services || []).filter((s) => s.is_active).forEach((s) => {
+    svcMap[s.service_id] = true;
+  });
+  return {
+    first_name: vendorFirstName(v) === '—' ? '' : vendorFirstName(v),
+    last_name: vendorLastName(v) === '—' ? '' : vendorLastName(v),
+    business_name: v?.business_name || '',
+    phone: phoneDigits,
+    mobile2: mobile2Digits,
+    email: v?.email || '',
+    pan_number: v?.pan_number || '',
+    shop_or_flat: v?.shop_or_flat || '',
+    building_name: v?.building_name || '',
+    street_name: v?.street_name || '',
+    village: v?.village || '',
+    city: v?.city || '',
+    pincode: v?.pincode || '',
+    state: v?.state || 'Maharashtra',
+    country: v?.country || 'India',
+    vehicle_number: v?.vehicle_number || '',
+    vehicle_type: v?.vehicle_type || '',
+    license_number: v?.license_number || '',
+    highest_education: v?.highest_education || '',
+    notes: v?.notes || '',
+    app_installed_confirmed: !!v?.app_installed_confirmed,
+    gps_allowed_confirmed: !!v?.gps_allowed_confirmed,
+    services: svcMap,
+  };
+}
+
+function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved }) {
+  const [form, setForm] = useState(() => vendorEditFormFromVendor(vendor));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const f = (key, val) => setForm((st) => ({ ...st, [key]: val }));
+
+  const save = async () => {
+    if (!form.first_name.trim() || !form.last_name.trim() || !form.business_name.trim()) {
+      return setErr('First name, last name, and business name are required');
+    }
+    if (form.phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
+    const services = Object.entries(form.services)
+      .filter(([, on]) => on)
+      .map(([service_id]) => {
+        const s = allSvcs.find((x) => x.service_id === service_id);
+        return s ? { service_id: s.service_id, category_id: s.category_id } : null;
+      })
+      .filter(Boolean);
+    setSaving(true);
+    setErr('');
+    try {
+      await vendorOnboardFetch('update', {
+        vendor_id: vendor.id,
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        business_name: form.business_name.trim(),
+        phone: '+91' + form.phone.replace(/\D/g, ''),
+        mobile2: form.mobile2.replace(/\D/g, '').length === 10 ? '+91' + form.mobile2.replace(/\D/g, '') : null,
+        email: form.email.trim() || null,
+        pan_number: form.pan_number.trim().toUpperCase() || null,
+        shop_or_flat: form.shop_or_flat.trim() || null,
+        building_name: form.building_name.trim() || null,
+        street_name: form.street_name.trim() || null,
+        village: form.village.trim() || null,
+        city: form.city.trim() || null,
+        pincode: form.pincode.trim() || null,
+        state: form.state.trim() || null,
+        country: form.country.trim() || null,
+        vehicle_number: form.vehicle_number.trim().toUpperCase() || null,
+        vehicle_type: form.vehicle_type || null,
+        license_number: form.license_number.trim().toUpperCase() || null,
+        highest_education: form.highest_education.trim() || null,
+        notes: form.notes.trim() || null,
+        app_installed_confirmed: form.app_installed_confirmed,
+        gps_allowed_confirmed: form.gps_allowed_confirmed,
+        services,
+      }, pin);
+      onSaved?.();
+      onClose?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ ...S.card(), maxWidth: 560, width: '100%', padding: 16, maxHeight: '90vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontWeight: 800, fontSize: 16, color: C.txt, marginBottom: 4 }}>Edit partner</div>
+        <div style={{ fontSize: 12, color: C.sub, marginBottom: 14 }}>
+          {vendorFirstName(vendor)} {vendorLastName(vendor)} · {vendor.status} · Aadhaar {maskAadhaarLast4(vendor.aadhaar_last4)} (read-only)
+        </div>
+        {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          <Field label="First name"><input value={form.first_name} onChange={(e) => f('first_name', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Last name"><input value={form.last_name} onChange={(e) => f('last_name', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Business name"><input value={form.business_name} onChange={(e) => f('business_name', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Mobile (+91)"><input value={form.phone} onChange={(e) => f('phone', e.target.value.replace(/\D/g, '').slice(0, 10))} style={S.inp()} placeholder="10 digits" /></Field>
+          <Field label="Mobile 2 (+91)"><input value={form.mobile2} onChange={(e) => f('mobile2', e.target.value.replace(/\D/g, '').slice(0, 10))} style={S.inp()} placeholder="Optional" /></Field>
+          <Field label="Email"><input value={form.email} onChange={(e) => f('email', e.target.value)} style={S.inp()} /></Field>
+          <Field label="PAN"><input value={form.pan_number} onChange={(e) => f('pan_number', e.target.value.toUpperCase())} style={S.inp()} /></Field>
+          <Field label="Shop / flat"><input value={form.shop_or_flat} onChange={(e) => f('shop_or_flat', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Building"><input value={form.building_name} onChange={(e) => f('building_name', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Street"><input value={form.street_name} onChange={(e) => f('street_name', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Village"><input value={form.village} onChange={(e) => f('village', e.target.value)} style={S.inp()} /></Field>
+          <Field label="City"><input value={form.city} onChange={(e) => f('city', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Pincode"><input value={form.pincode} onChange={(e) => f('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} style={S.inp()} /></Field>
+          <Field label="State"><input value={form.state} onChange={(e) => f('state', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Country"><input value={form.country} onChange={(e) => f('country', e.target.value)} style={S.inp()} /></Field>
+          <Field label="Vehicle #"><input value={form.vehicle_number} onChange={(e) => f('vehicle_number', e.target.value.toUpperCase())} style={S.inp()} /></Field>
+          <Field label="Vehicle type">
+            <select value={form.vehicle_type} onChange={(e) => f('vehicle_type', e.target.value)} style={S.inp()}>
+              <option value="">—</option>
+              <option value="2W">2 Wheeler</option>
+              <option value="4W">4 Wheeler</option>
+            </select>
+          </Field>
+          <Field label="License #"><input value={form.license_number} onChange={(e) => f('license_number', e.target.value.toUpperCase())} style={S.inp()} /></Field>
+          <Field label="Education"><input value={form.highest_education} onChange={(e) => f('highest_education', e.target.value)} style={S.inp()} /></Field>
+        </div>
+        <Field label="Internal notes">
+          <textarea value={form.notes} onChange={(e) => f('notes', e.target.value)} rows={2} style={{ ...S.inp(), resize: 'vertical' }} placeholder="Admin-only notes…" />
+        </Field>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: C.sub, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.app_installed_confirmed} onChange={(e) => f('app_installed_confirmed', e.target.checked)} />
+          App installed confirmed
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12, color: C.sub, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.gps_allowed_confirmed} onChange={(e) => f('gps_allowed_confirmed', e.target.checked)} />
+          GPS allowed confirmed
+        </label>
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Services</div>
+          <VendorServicePicker
+            allSvcs={allSvcs}
+            selected={form.services}
+            onToggle={(id) => setForm((st) => ({ ...st, services: { ...st.services, [id]: !st.services[id] } }))}
+            maxHeight={220}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Btn>
+          <Btn v="outline" onClick={onClose} disabled={saving}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ================================================================
    VENDOR ADMIN — #vendor-admin (Activate / pause / offboard / enroll)
 ================================================================ */
 function VendorAdminPage() {
   const [pin, setPin] = useState(() => sessionStorage.getItem(VENDOR_PIN_KEY) || '');
   const [authed, setAuthed] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
+  const [editVendor, setEditVendor] = useState(null);
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -7137,14 +7298,19 @@ function VendorAdminPage() {
   const load = useCallback(async (usePin) => {
     setLoading(true); setErr('');
     try {
+      const who = await vendorOnboardFetch('whoami', {}, usePin);
+      setCanEdit(!!who.can_edit);
+      setReadOnly(!!who.read_only);
       const { vendors: data } = await vendorOnboardFetch('list', {}, usePin);
       setVendors(data || []);
       setAuthed(true);
       sessionStorage.setItem(VENDOR_PIN_KEY, usePin);
-      setMsg(`Loaded ${data?.length || 0} partners`);
+      setMsg(`Loaded ${data?.length || 0} partners${who.read_only ? ' · read-only' : ''}`);
     } catch (e) {
       setErr(e.message);
       setAuthed(false);
+      setCanEdit(false);
+      setReadOnly(false);
     } finally { setLoading(false); }
   }, []);
 
@@ -7221,10 +7387,10 @@ function VendorAdminPage() {
     return (
       <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         <div style={{ ...S.card(), maxWidth: 360, width: '100%', padding: 24 }}>
-          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER ONLY</div>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER / SUPPORT</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Partner Admin</div>
-          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20 }}>Activate, pause, offboard, or enroll ScanV partners. Not linked in public nav.</div>
-          <Field label="Admin PIN">
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20 }}>Admin PIN: full edit, activate, enroll. Support agent PIN: read-only partner lookup.</div>
+          <Field label="Admin or support PIN">
             <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" />
           </Field>
           {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
@@ -7243,13 +7409,14 @@ function VendorAdminPage() {
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 10, color: C.red, fontWeight: 700 }}>PARTNER ADMIN</div>
+            <div style={{ fontSize: 10, color: C.red, fontWeight: 700 }}>PARTNER ADMIN{readOnly ? ' · READ-ONLY' : ''}</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: C.txt }}>ScanV Partners ({vendors.length})</div>
+            {readOnly && <div style={{ fontSize: 11, color: C.gold, marginTop: 4 }}>Customer support view — no edits or status changes</div>}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn sm onClick={() => setShowEnroll(s => !s)} disabled={loading}>{showEnroll ? 'Cancel enroll' : '+ Enroll vendor'}</Btn>
+            {canEdit && <Btn sm onClick={() => setShowEnroll(s => !s)} disabled={loading}>{showEnroll ? 'Cancel enroll' : '+ Enroll vendor'}</Btn>}
             <Btn v="outline" sm onClick={() => load(pin)} disabled={loading}>Reload</Btn>
-            <Btn v="ghost" sm onClick={() => { setAuthed(false); sessionStorage.removeItem(VENDOR_PIN_KEY); }}>Lock</Btn>
+            <Btn v="ghost" sm onClick={() => { setAuthed(false); setCanEdit(false); setReadOnly(false); sessionStorage.removeItem(VENDOR_PIN_KEY); }}>Lock</Btn>
           </div>
         </div>
         {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8 }}>{msg}</div>}
@@ -7263,7 +7430,7 @@ function VendorAdminPage() {
             </button>
           ))}
         </div>
-        {showEnroll && (
+        {showEnroll && canEdit && (
           <div style={{ ...S.card(), marginBottom: 16, padding: 16 }}>
             <div style={{ fontWeight: 800, color: C.txt, marginBottom: 12 }}>Enroll new partner</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
@@ -7308,7 +7475,21 @@ function VendorAdminPage() {
           loading={loading}
           onAction={handleTableAction}
           svcNameMap={svcNameMap}
+          canEdit={canEdit}
+          onEdit={setEditVendor}
         />
+        {editVendor && canEdit && (
+          <VendorEditModal
+            vendor={editVendor}
+            pin={pin}
+            allSvcs={enrollSvcs}
+            onClose={() => setEditVendor(null)}
+            onSaved={async () => {
+              await load(pin);
+              setMsg('Partner updated');
+            }}
+          />
+        )}
         {!statusFiltered.length && !loading && (
           <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>
         )}
