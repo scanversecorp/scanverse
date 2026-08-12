@@ -3,6 +3,7 @@
  *
  * Actions (JSON body):
  *   register — { txn_id, amount_paise, user_id? } → { success, txn_id, payment_link_url? }
+ *              user_id is profiles.id TEXT (e.g. cust_919270194842), not auth UUID
  *   check    — { txn_id, amount_paise? } → { verified, status, amount_ok?, paid_at?, mode? }
  *   webhook  — Razorpay webhook payload (no action field) OR manual test
  */
@@ -407,7 +408,7 @@ async function handleRegister(
 ): Promise<Response> {
   const txnId = String(body.txn_id || "");
   const amountPaise = Number(body.amount_paise);
-  const userId = body.user_id ? String(body.user_id) : null;
+  const userId = body.user_id ? String(body.user_id).trim() || null : null;
 
   if (!txnId.startsWith("TXN-") || !Number.isFinite(amountPaise) || amountPaise <= 0) {
     return json({ error: "Invalid txn_id or amount_paise" }, 400);
