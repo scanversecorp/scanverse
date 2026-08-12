@@ -7974,7 +7974,7 @@ function CustomerSupportPage() {
           <div style={{ fontSize: 11, color: C.cyan, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>INTERNAL</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Customer Support</div>
           <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
-            Search customers, bookings, and payments. Support agents have read-only access. Admins can update records.
+            Search customers, bookings, and payments. Support agents can search, view, and cancel bookings. Admins can update records.
           </div>
           <Field label="Support PIN">
             <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
@@ -8004,7 +8004,7 @@ function CustomerSupportPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 10, maxWidth: 1100, margin: '10px auto 0' }}>
-          {[['customers', 'Customers'], ['refunds', 'Refunds'], ['tickets', 'Tickets']].map(([k, l]) => (
+          {[['customers', 'Customers'], ['bookings', 'Bookings'], ['refunds', 'Refunds'], ['tickets', 'Tickets']].map(([k, l]) => (
             <button key={k} onClick={() => { setDeskTab(k); setDetail(null); setResults([]); setMsg(''); setErr(''); }} style={{ padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${deskTab === k ? C.acc : C.bdr}`, background: deskTab === k ? `${C.acc}18` : C.surf, color: deskTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
           ))}
         </div>
@@ -8015,6 +8015,13 @@ function CustomerSupportPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
         {deskTab === 'tickets' ? (
           <TicketDeskPanel pin={pin || getSupportAuth()?.pin} readOnly={false} />
+        ) : deskTab === 'bookings' ? (
+          <BookingsDeskPanel
+            pin={pin || getSupportAuth()?.pin}
+            fetchFn={customerSupportFetch}
+            canEdit={isAdmin}
+            title="All bookings"
+          />
         ) : deskTab === 'refunds' ? (
           <RefundDeskPanel
             pin={pin || getSupportAuth()?.pin}
@@ -8909,95 +8916,245 @@ function AdminAgentsTab({ pin }) {
   );
 }
 
-function AdminBookingsTab({ pin }) {
+function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings management' }) {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [bookings, setBookings] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [editPatch, setEditPatch] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  const bookingStatusColor = { confirmed: C.acc, in_progress: C.gold, completed: C.grn, cancelled: C.red, pending: C.dim };
+
+  const search = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true); setErr(''); setMsg('');
+    try {
+      const { bookings: data } = await fetchFn('search_bookings', {
+        q: q.trim() || undefined,
+        status,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        limit: 80,
+      }, pin);
+      setBookings(data || []);
+    } catch (e) { setErr(e.message); setBookings([]); }
+    finally { setLoading(false); }
+  }, [fetchFn, pin, q, status, dateFrom, dateTo]);
+
+  const loadDetail = useCallback(async (bookingId) => {
+    if (!pin || !bookingId) return;
+    setLoading(true); setErr('');
+    try {
+      const data = await fetchFn('booking_detail', { booking_id: bookingId }, pin);
+      setDetail(data);
+      setSelectedId(bookingId);
+      const b = data.booking || {};
+      setEditPatch({
+        status: b.status || 'confirmed',
+        notes: b.notes || '',
+        partner_id: b.partner_id || '',
+        date: b.date ? String(b.date).slice(0, 10) : '',
+        time: b.time || '',
+        location_text: b.location_text || '',
+      });
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [fetchFn, pin]);
+
+  useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveBooking = async () => {
+    if (!canEdit || !selectedId) return;
+    setSaving(true); setErr('');
+    try {
+      await fetchFn('update_booking', { booking_id: selectedId, patch: editPatch }, pin);
+      setMsg('Booking updated');
+      await loadDetail(selectedId);
+      await search();
+    } catch (e) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const confirmDeskCancel = async () => {
+    if (!cancelTarget?.id) return;
+    setCancelling(true); setErr('');
+    try {
+      const r = await fetchFn('cancel_booking', { booking_id: cancelTarget.id, cancel_reason: 'support_cancelled' }, pin);
+      setMsg(r?.already_cancelled ? 'Already cancelled' : 'Booking cancelled · refund queued');
+      setCancelTarget(null);
+      if (selectedId === cancelTarget.id) await loadDetail(cancelTarget.id);
+      await search();
+    } catch (e) { setErr(e.message); }
+    finally { setCancelling(false); }
+  };
+
+  const bk = detail?.booking;
+  const cust = detail?.customer;
+  const disp = detail?.dispatch;
+  const cancelRec = detail?.cancellation;
+
+  return (
+    <div>
+      <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 12 }}>{title}</div>
+      {!selectedId ? (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {['all', 'confirmed', 'in_progress', 'completed', 'cancelled', 'pending'].map(s => (
+              <button key={s} type="button" onClick={() => setStatus(s)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${status === s ? C.acc : C.bdr}`, background: status === s ? `${C.acc}18` : C.surf, color: status === s ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{s}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="TXN, service, customer, location…" style={{ ...S.inp(), flex: '1 1 180px' }} />
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...S.inp(), flex: '0 1 130px' }} title="From date" />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...S.inp(), flex: '0 1 130px' }} title="To date" />
+            <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+          </div>
+          {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {loading && !bookings.length ? <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div> : bookings.map(b => (
+            <div key={b.id} onClick={() => loadDetail(b.id)} style={{ ...S.card(), marginBottom: 8, padding: 12, cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.txt }}>{b.service_name}</div>
+                  <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text || '—'}</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{b.customer_name || b.customer_id} · TXN {b.txn_id || '—'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} />
+                  <div style={{ fontSize: 11, color: C.txt, marginTop: 4 }}>₹{fmtRs(b.total)}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {!loading && !bookings.length && <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>No bookings match filters</div>}
+        </>
+      ) : (
+        <>
+          <Btn v="outline" sm onClick={() => { setSelectedId(null); setDetail(null); setMsg(''); }} style={{ marginBottom: 12 }}>← All bookings</Btn>
+          {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {loading && !bk ? <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div> : bk && (
+            <>
+              <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>{bk.service_name}</div>
+                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
+                  <div>ID: <code style={{ fontSize: 11 }}>{bk.id}</code></div>
+                  <div>Customer: {cust?.name || `${cust?.first_name || ''} ${cust?.last_name || ''}`.trim() || bk.customer_name || bk.customer_id} · {cust?.phone || '—'}</div>
+                  <div>Scheduled: {fmtDt(bk.date)} {bk.time}</div>
+                  <div>Location: {bk.location_text || '—'}</div>
+                  <div>Status: <Badge label={bk.status} color={bookingStatusColor[bk.status] || C.sub} /></div>
+                  <div>Total paid: ₹{fmtRs(bk.total)} · TXN {bk.txn_id || '—'}</div>
+                  {bk.partner_id && <div>Partner: {detail?.partner?.name || bk.partner_id}</div>}
+                  {disp && <div>Dispatch: {disp.status}{disp.assigned_vendor_id ? ` · vendor ${disp.assigned_vendor_id.slice(0, 8)}…` : ''}</div>}
+                  {detail?.live_location?.tracking_active && <div style={{ color: C.gold }}>GPS tracking active</div>}
+                  {cancelRec && (
+                    <div style={{ marginTop: 8, padding: 10, background: `${C.gold}12`, borderRadius: 8, fontSize: 11 }}>
+                      Cancelled · refund ₹{fmtRs(cancelRec.refund_paise)} ({cancelRec.refund_status}) · due {fmtDt(cancelRec.refund_due_by)}
+                    </div>
+                  )}
+                </div>
+                {isCancellableBooking(bk) && (
+                  <Btn v="danger" sm onClick={() => setCancelTarget(bk)} disabled={cancelling} style={{ marginTop: 12 }}>
+                    Cancel booking (30% fee)
+                  </Btn>
+                )}
+              </div>
+              {canEdit ? (
+                <div style={{ ...S.card(), padding: 14 }}>
+                  <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Update booking</div>
+                  <Field label="Status">
+                    <select value={editPatch.status || ''} onChange={e => setEditPatch(p => ({ ...p, status: e.target.value }))} style={S.inp()}>
+                      {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'disputed'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Partner ID override">
+                    <input value={editPatch.partner_id || ''} onChange={e => setEditPatch(p => ({ ...p, partner_id: e.target.value }))} placeholder="profiles.id or empty" style={S.inp()} />
+                  </Field>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <Field label="Date"><input type="date" value={editPatch.date || ''} onChange={e => setEditPatch(p => ({ ...p, date: e.target.value }))} style={S.inp()} /></Field>
+                    <Field label="Time"><input value={editPatch.time || ''} onChange={e => setEditPatch(p => ({ ...p, time: e.target.value }))} style={S.inp()} placeholder="10:00" /></Field>
+                  </div>
+                  <Field label="Location">
+                    <input value={editPatch.location_text || ''} onChange={e => setEditPatch(p => ({ ...p, location_text: e.target.value }))} style={S.inp()} />
+                  </Field>
+                  <Field label="Notes">
+                    <textarea value={editPatch.notes || ''} onChange={e => setEditPatch(p => ({ ...p, notes: e.target.value }))} rows={3} style={{ ...S.inp(), resize: 'vertical' }} />
+                  </Field>
+                  <Btn onClick={saveBooking} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Btn>
+                </div>
+              ) : (
+                <div style={{ ...S.card(), padding: 14, fontSize: 12, color: C.dim }}>Read-only — use Support Admin PIN to edit status, partner, schedule, and notes.</div>
+              )}
+            </>
+          )}
+        </>
+      )}
+      {cancelTarget && (
+        <CancelBookingModal
+          booking={cancelTarget}
+          busy={cancelling}
+          onClose={() => !cancelling && setCancelTarget(null)}
+          onConfirm={confirmDeskCancel}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminBookingsTab({ pin }) {
+  const [subTab, setSubTab] = useState('bookings');
+  const [q, setQ] = useState('');
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
-  const [subTab, setSubTab] = useState('bookings');
-  const [cancellingTxn, setCancellingTxn] = useState(null);
 
-  const txnCounts = useMemo(() => {
-    const m = {};
-    for (const b of bookings) {
-      if (!b.txn_id || b.status === 'cancelled') continue;
-      m[b.txn_id] = (m[b.txn_id] || 0) + 1;
-    }
-    return m;
-  }, [bookings]);
-
-  const cancelDuplicateBookings = async (txnId) => {
-    setCancellingTxn(txnId);
-    setErr('');
-    try {
-      const active = bookings
-        .filter((b) => b.txn_id === txnId && b.status !== 'cancelled')
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      const [, ...dupes] = active;
-      for (const b of dupes) {
-        await sb().from('bookings').update({ status: 'cancelled' }).eq('id', b.id);
-      }
-      await search();
-    } catch (e) { setErr(e.message); }
-    finally { setCancellingTxn(null); }
-  };
-
-  const search = async () => {
+  const searchPayments = async () => {
     setLoading(true); setErr('');
     try {
-      if (subTab === 'bookings') {
-        const { bookings: data } = await adminHubFetch('search_bookings', { q: q.trim() || undefined, status }, pin);
-        setBookings(data || []);
-      } else {
-        const { payment_intents: data } = await adminHubFetch('list_payments', { q: q.trim() || undefined }, pin);
-        setPayments(data || []);
-      }
+      const { payment_intents: data } = await adminHubFetch('list_payments', { q: q.trim() || undefined }, pin);
+      setPayments(data || []);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { search(); }, [subTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (subTab === 'payments') searchPayments();
+  }, [subTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (subTab === 'bookings') {
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          {[['bookings', 'Bookings'], ['payments', 'Payment intents']].map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setSubTab(k)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${subTab === k ? C.acc : C.bdr}`, background: subTab === k ? `${C.acc}18` : C.surf, color: subTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
+          ))}
+        </div>
+        <BookingsDeskPanel fetchFn={adminHubFetch} pin={pin} canEdit title="All bookings" />
+      </div>
+    );
+  }
 
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {[['bookings', 'Bookings'], ['payments', 'Payment intents']].map(([k, l]) => (
-          <button key={k} onClick={() => setSubTab(k)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${subTab === k ? C.acc : C.bdr}`, background: subTab === k ? `${C.acc}18` : C.surf, color: subTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
+          <button key={k} type="button" onClick={() => setSubTab(k)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${subTab === k ? C.acc : C.bdr}`, background: subTab === k ? `${C.acc}18` : C.surf, color: subTab === k ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
         ))}
       </div>
-      {subTab === 'bookings' && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          {['all', 'confirmed', 'in_progress', 'completed', 'cancelled', 'pending'].map(s => (
-            <button key={s} onClick={() => setStatus(s)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${status === s ? C.acc : C.bdr}`, background: status === s ? `${C.acc}18` : C.surf, color: status === s ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{s}</button>
-          ))}
-        </div>
-      )}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder={subTab === 'bookings' ? 'TXN, service, customer ID…' : 'TXN ID…'} style={{ ...S.inp(), flex: 1 }} />
-        <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchPayments()} placeholder="TXN ID…" style={{ ...S.inp(), flex: 1 }} />
+        <Btn onClick={searchPayments} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
       </div>
       {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
-      {subTab === 'bookings' && bookings.map(b => (
-        <div key={b.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
-          <div style={{ fontWeight: 700, color: C.txt }}>{b.service_name}</div>
-          <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text || '—'}</div>
-          <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
-            <Badge label={b.status} color={C.acc} /> · ₹{fmtRs(b.total)} · TXN {b.txn_id || '—'}
-          </div>
-          {b.txn_id && txnCounts[b.txn_id] > 1 && b.status !== 'cancelled' && (
-            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: C.gold, fontWeight: 600 }}>
-                ⚠ {txnCounts[b.txn_id]} bookings share this TXN
-              </span>
-              <Btn sm v="outline" disabled={cancellingTxn === b.txn_id} onClick={() => cancelDuplicateBookings(b.txn_id)}>
-                {cancellingTxn === b.txn_id ? 'Cancelling…' : 'Cancel duplicates'}
-              </Btn>
-            </div>
-          )}
-        </div>
-      ))}
       {subTab === 'payments' && payments.map(pi => (
         <div key={pi.id} style={{ ...S.card(), marginBottom: 8, padding: 12 }}>
           <Badge label={pi.status} color={pi.status === 'paid' ? C.grn : C.gold} />
@@ -9128,6 +9285,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <AdminDeepLinkBtn hash="exec" label="Executive Dashboard →" />
                 <AdminDeepLinkBtn hash="pricing-admin" label="Pricing admin →" />
                 <AdminDeepLinkBtn hash="customer-support" label="Support desk →" />
+                <button type="button" onClick={() => setTab('bookings')} style={{ ...tabBtn({ id: 'bookings' }), border: `1.5px solid ${C.bdr}` }}>Bookings →</button>
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
                 <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />

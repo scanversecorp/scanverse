@@ -488,6 +488,13 @@ async function assignVendor(
 
   if (!vendor || vendor.status !== "active") return false;
 
+  const { data: bkStatus } = await supabase
+    .from("bookings")
+    .select("status")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (String(bkStatus?.status || "").toLowerCase() === "cancelled") return false;
+
   const unavailable = await getUnavailableVendorIds(supabase);
   if (unavailable.has(String(vendorId))) {
     console.warn("[dispatch] vendor busy — active booking not completed", vendorId);
@@ -649,8 +656,28 @@ async function processDispatchTick(
   supabase: ReturnType<typeof createClient>,
   dispatch: Record<string, unknown>,
 ): Promise<DispatchTickResult> {
-  if (dispatch.status === "assigned" || dispatch.status === "exhausted") {
+  if (
+    dispatch.status === "assigned" ||
+    dispatch.status === "exhausted" ||
+    dispatch.status === "cancelled"
+  ) {
     return { vendors: [] };
+  }
+
+  const bookingId = String(dispatch.booking_id || "");
+  if (bookingId) {
+    const { data: bk } = await supabase
+      .from("bookings")
+      .select("status")
+      .eq("id", bookingId)
+      .maybeSingle();
+    if (String(bk?.status || "").toLowerCase() === "cancelled") {
+      await supabase.from("booking_dispatch").update({
+        status: "cancelled",
+        next_action_at: null,
+      }).eq("id", dispatch.id);
+      return { vendors: [] };
+    }
   }
 
   const dispatchMode = await getDispatchMode(supabase);

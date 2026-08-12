@@ -8,7 +8,10 @@
  *   create_agent     — { name, email?, phone?, role?, notes? }
  *   update_agent     — { id, name?, email?, phone?, role?, notes?, active? }
  *   deactivate_agent — { id }  sets active=false
- *   search_bookings  — { q?, status?, limit? }
+ *   search_bookings  — { q?, status?, customer_id?, date_from?, date_to?, limit? }
+ *   booking_detail   — { booking_id }
+ *   update_booking   — { booking_id, patch: { status?, notes?, partner_id?, date?, time?, location_text? } }
+ *   cancel_booking   — { booking_id, cancel_reason? }
  *   list_payments    — { q?, limit? }
  *   otp_delivery_reports — { today_only?, failed_only?, limit? }
  *   exec_stats       — executive dashboard KPIs + chart data (owner PIN only)
@@ -22,6 +25,12 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  bookingDetailAdmin,
+  cancelBookingAdmin,
+  searchBookingsAdmin,
+  updateBookingAdmin,
+} from "../_shared/bookings-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -570,27 +579,45 @@ async function deactivateAgent(sb: ReturnType<typeof adminSb>, body: Record<stri
 }
 
 async function searchBookings(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
-  const q = String(body.q || "").trim();
-  const status = body.status ? String(body.status) : null;
-  const limit = Math.min(Number(body.limit) || 50, 100);
-
-  let query = sb
-    .from("bookings")
-    .select("id,customer_id,service_name,date,time,status,total,txn_id,paid_at,location_text,created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (status && status !== "all") query = query.eq("status", status);
-  if (q) {
-    const like = `%${escIlike(q)}%`;
-    query = query.or(
-      `id.ilike.${like},customer_id.ilike.${like},service_name.ilike.${like},txn_id.ilike.${like},location_text.ilike.${like}`,
-    );
+  try {
+    const bookings = await searchBookingsAdmin(sb, body);
+    return json({ bookings });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Search failed";
+    return json({ error: msg }, 500);
   }
+}
 
-  const { data, error } = await query;
-  if (error) return json({ error: error.message }, 500);
-  return json({ bookings: data || [] });
+async function bookingDetail(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  const bookingId = String(body.booking_id || "").trim();
+  if (!bookingId) return json({ error: "booking_id required" }, 400);
+  try {
+    const detail = await bookingDetailAdmin(sb, bookingId);
+    return json(detail);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Not found";
+    return json({ error: msg }, msg === "Booking not found" ? 404 : 500);
+  }
+}
+
+async function updateBooking(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  try {
+    const booking = await updateBookingAdmin(sb, body);
+    return json({ success: true, booking });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Update failed";
+    return json({ error: msg }, 400);
+  }
+}
+
+async function cancelBooking(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  try {
+    const result = await cancelBookingAdmin(sb, body, "admin-hub");
+    return json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Cancel failed";
+    return json({ error: msg }, 400);
+  }
 }
 
 async function listPayments(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
@@ -859,6 +886,18 @@ Deno.serve(async (req) => {
 
   if (action === "search_bookings") {
     return searchBookings(sb, body);
+  }
+
+  if (action === "booking_detail") {
+    return bookingDetail(sb, body);
+  }
+
+  if (action === "update_booking") {
+    return updateBooking(sb, body);
+  }
+
+  if (action === "cancel_booking") {
+    return cancelBooking(sb, body);
   }
 
   if (action === "list_payments") {

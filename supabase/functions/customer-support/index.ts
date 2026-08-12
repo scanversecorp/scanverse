@@ -5,6 +5,10 @@
  *   search  — { q, field? }  search profiles by mobile/name/address/city/email
  *   detail  — { profile_id } full customer view
  *   update  — { profile_id, profile?, booking? }  admin only
+ *   search_bookings — { q?, status?, customer_id?, date_from?, date_to?, limit? }
+ *   booking_detail  — { booking_id }
+ *   update_booking  — { booking_id, patch }  admin only
+ *   cancel_booking  — { booking_id, cancel_reason? }  agent or admin
  *   list_pending_refunds — queue of refund_pending / processing cancellations
  *   update_refund — { cancellation_id, refund_status, process_note? } agent or admin
  *
@@ -14,6 +18,12 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  bookingDetailAdmin,
+  cancelBookingAdmin,
+  searchBookingsAdmin,
+  updateBookingAdmin,
+} from "../_shared/bookings-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -407,6 +417,52 @@ Deno.serve(async (req) => {
 
   if (action === "update_refund") {
     return updateRefund(sb, body, role);
+  }
+
+  if (action === "search_bookings") {
+    try {
+      const bookings = await searchBookingsAdmin(sb, body);
+      return json({ bookings, count: bookings.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Search failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "booking_detail") {
+    const bookingId = String(body.booking_id || "").trim();
+    if (!bookingId) return json({ error: "booking_id required" }, 400);
+    try {
+      const detail = await bookingDetailAdmin(sb, bookingId);
+      return json(detail);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Not found";
+      return json({ error: msg }, msg === "Booking not found" ? 404 : 500);
+    }
+  }
+
+  if (action === "update_booking") {
+    if (role !== "support_admin") {
+      return json({ error: "Admin PIN required for booking updates" }, 403);
+    }
+    try {
+      const booking = await updateBookingAdmin(sb, body);
+      return json({ success: true, booking });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "cancel_booking") {
+    try {
+      const actor = role === "support_admin" ? "support_admin" : "support_agent";
+      const result = await cancelBookingAdmin(sb, body, actor);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Cancel failed";
+      return json({ error: msg }, 400);
+    }
   }
 
   if (action === "whoami") {

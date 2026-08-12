@@ -10,6 +10,9 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  executeBookingCancellation,
+} from "../_shared/booking-cancel.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -19,9 +22,6 @@ const corsHeaders: Record<string, string> = {
 
 const INTENT_TTL_MS = 30 * 60 * 1000;
 const APP_URL = Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app";
-const CANCEL_FEE_GST_PCT = 0.18;
-const CANCEL_FEE_PLATFORM_PCT = 0.12;
-const CANCELLABLE_STATUSES = new Set(["confirmed", "in_progress", "in-progress"]);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -577,29 +577,6 @@ async function handleCheck(
   });
 }
 
-type CancellationBreakdown = {
-  totalPaidPaise: number;
-  cancelFeePaise: number;
-  cancelFeeGstPaise: number;
-  cancelFeePlatformPaise: number;
-  refundPaise: number;
-};
-
-function calcCancellationBreakdown(totalPaidPaise: number): CancellationBreakdown {
-  const totalPaid = Math.max(0, Math.round(Number(totalPaidPaise) || 0));
-  const cancelFeeGstPaise = Math.round(totalPaid * CANCEL_FEE_GST_PCT);
-  const cancelFeePlatformPaise = Math.round(totalPaid * CANCEL_FEE_PLATFORM_PCT);
-  const cancelFeePaise = cancelFeeGstPaise + cancelFeePlatformPaise;
-  const refundPaise = Math.max(0, totalPaid - cancelFeePaise);
-  return {
-    totalPaidPaise: totalPaid,
-    cancelFeePaise,
-    cancelFeeGstPaise,
-    cancelFeePlatformPaise,
-    refundPaise,
-  };
-}
-
 async function resolveCustomerProfileId(
   supabase: ReturnType<typeof createClient>,
   supabaseUrl: string,
@@ -632,17 +609,6 @@ async function resolveCustomerProfileId(
   return prof?.id ? String(prof.id) : null;
 }
 
-function addBusinessDays(from: Date, days: number): Date {
-  const d = new Date(from);
-  let added = 0;
-  while (added < days) {
-    d.setDate(d.getDate() + 1);
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) added++;
-  }
-  return d;
-}
-
 async function handleCancel(
   supabase: ReturnType<typeof createClient>,
   supabaseUrl: string,
@@ -655,122 +621,42 @@ async function handleCancel(
   const profileId = await resolveCustomerProfileId(supabase, supabaseUrl, req);
   if (!profileId) return json({ error: "Authentication required" }, 401);
 
-  const { data: existingCancel } = await supabase
-    .from("booking_cancellations")
-    .select("*")
-    .eq("booking_id", bookingId)
-    .maybeSingle();
-  if (existingCancel) {
-    return json({
-      success: true,
-      already_cancelled: true,
-      booking_id: bookingId,
-      breakdown: {
-        total_paid_paise: existingCancel.total_paid_paise,
-        cancel_fee_paise: existingCancel.cancel_fee_paise,
-        cancel_fee_gst_paise: existingCancel.cancel_fee_gst_paise,
-        cancel_fee_platform_paise: existingCancel.cancel_fee_platform_paise,
-        refund_paise: existingCancel.refund_paise,
-      },
-      refund_status: existingCancel.refund_status,
-      refund_due_by: existingCancel.refund_due_by,
-    });
-  }
-
-  const { data: booking, error: bkErr } = await supabase
+  const { data: booking } = await supabase
     .from("bookings")
-    .select("id, customer_id, status, total, txn_id, partner_id")
+    .select("customer_id")
     .eq("id", bookingId)
     .maybeSingle();
 
-  if (bkErr || !booking) return json({ error: "Booking not found" }, 404);
+  if (!booking) return json({ error: "Booking not found" }, 404);
   if (String(booking.customer_id) !== profileId) {
     return json({ error: "You can only cancel your own booking" }, 403);
   }
 
-  const status = String(booking.status || "").toLowerCase();
-  if (!CANCELLABLE_STATUSES.has(status)) {
-    return json({
-      error: `Booking cannot be cancelled (status: ${booking.status})`,
-    }, 400);
+  const result = await executeBookingCancellation(supabase, {
+    bookingId,
+    cancelledBy: profileId,
+    cancelReason: "customer_cancelled",
+  });
+
+  if (!result.success) {
+    const status = result.error?.includes("cannot be cancelled") ? 400 : 500;
+    return json({ error: result.error || "Cancellation failed" }, status);
   }
 
-  const breakdown = calcCancellationBreakdown(Number(booking.total) || 0);
-  if (breakdown.totalPaidPaise <= 0) {
-    return json({ error: "Booking has no paid amount on record" }, 400);
-  }
-
-  const now = new Date();
-  const refundDueBy = addBusinessDays(now, 7).toISOString();
-
-  const { error: cancelInsertErr } = await supabase
-    .from("booking_cancellations")
-    .insert({
-      booking_id: bookingId,
-      customer_id: profileId,
-      txn_id: booking.txn_id || null,
-      total_paid_paise: breakdown.totalPaidPaise,
-      cancel_fee_paise: breakdown.cancelFeePaise,
-      cancel_fee_gst_paise: breakdown.cancelFeeGstPaise,
-      cancel_fee_platform_paise: breakdown.cancelFeePlatformPaise,
-      refund_paise: breakdown.refundPaise,
-      refund_status: "refund_pending",
-      refund_due_by: refundDueBy,
-      cancelled_by: profileId,
-    });
-
-  if (cancelInsertErr) {
-    console.error("booking_cancellations insert:", cancelInsertErr.message);
-    return json({ error: "Could not record cancellation" }, 500);
-  }
-
-  await supabase
-    .from("bookings")
-    .update({
-      status: "cancelled",
-      cancelled_at: now.toISOString(),
-      cancel_reason: "customer_cancelled",
-    })
-    .eq("id", bookingId)
-    .in("status", [...CANCELLABLE_STATUSES]);
-
-  await supabase
-    .from("booking_dispatch")
-    .update({ status: "cancelled" })
-    .eq("booking_id", bookingId)
-    .in("status", ["pending", "dispatching"]);
-
-  await supabase
-    .from("vendor_live_locations")
-    .update({ tracking_active: false })
-    .eq("booking_id", bookingId);
-
-  if (booking.txn_id) {
-    await supabase
-      .from("service_requests")
-      .update({ status: "cancelled" })
-      .eq("txn_id", booking.txn_id);
-  }
-
-  if (booking.partner_id) {
-    await supabase
-      .from("bookings")
-      .update({ partner_id: null })
-      .eq("id", bookingId);
-  }
-
+  const bd = result.breakdown!;
   return json({
     success: true,
+    already_cancelled: result.already_cancelled || false,
     booking_id: bookingId,
     breakdown: {
-      total_paid_paise: breakdown.totalPaidPaise,
-      cancel_fee_paise: breakdown.cancelFeePaise,
-      cancel_fee_gst_paise: breakdown.cancelFeeGstPaise,
-      cancel_fee_platform_paise: breakdown.cancelFeePlatformPaise,
-      refund_paise: breakdown.refundPaise,
+      total_paid_paise: bd.totalPaidPaise,
+      cancel_fee_paise: bd.cancelFeePaise,
+      cancel_fee_gst_paise: bd.cancelFeeGstPaise,
+      cancel_fee_platform_paise: bd.cancelFeePlatformPaise,
+      refund_paise: bd.refundPaise,
     },
-    refund_status: "refund_pending",
-    refund_due_by: refundDueBy,
+    refund_status: result.refund_status,
+    refund_due_by: result.refund_due_by,
     message:
       "Refund will be processed manually by our support team within 7 business days.",
   });
