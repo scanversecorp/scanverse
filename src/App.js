@@ -2293,21 +2293,26 @@ async function ensureProfileAuthSession(mob) {
     profileAuthEmail(mob),
     `${String(mob).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
   ];
+  const emailMatches = (sessionEmail) =>
+    sessionEmail && emails.some((e) => e.toLowerCase() === String(sessionEmail).toLowerCase());
   try {
     const { data: { session } } = await sb().auth.getSession();
-    if (session?.user?.email && emails.includes(session.user.email)) return session;
+    if (session?.user?.email && emailMatches(session.user.email)) return session;
   } catch (_) {}
+  let lastErr;
   for (const email of emails) {
     try {
       const { data: su, error: se } = await sb().auth.signUp({ email, password });
-      if (!se && su?.session) return su.session;
-      if (se?.message?.includes('already registered')) {
-        const { data: si } = await sb().auth.signInWithPassword({ email, password });
-        if (si?.session) return si.session;
-      }
-    } catch (_) {}
+      if (su?.session) return su.session;
+      if (se && !/already registered|already been registered/i.test(se.message || '')) lastErr = se;
+      const { data: si, error: sie } = await sb().auth.signInWithPassword({ email, password });
+      if (si?.session) return si.session;
+      if (sie) lastErr = sie;
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  return null;
+  throw new Error(lastErr?.message || 'Could not establish sign-in session. Try again.');
 }
 
 /* --- WHATSAPP VERIFICATION (outbound message → user replies) --- */
@@ -2396,15 +2401,14 @@ function customerProfileId(mob) {
   return `cust_${mob.replace(/\D/g, '')}`;
 }
 
-/** Resolve profile id: deterministic mobile id → stored uid → new mobile-based id */
+/** Resolve profile id: deterministic mobile id, with legacy stored-uid fallback (requires auth session) */
 async function resolveCustomerProfileId(mob) {
   const profileId = customerProfileId(mob);
-  const { data: byId } = await sb().from('profiles').select('id,phone').eq('id', profileId).maybeSingle();
-  if (byId?.id) return byId.id;
   const stored = localStorage.getItem('scanv_uid');
-  if (stored) {
+  if (stored && stored !== profileId) {
     const { data: p } = await sb().from('profiles').select('id,phone').eq('id', stored).maybeSingle();
-    if (p?.phone === mob) return p.id;
+    const norm = normalizeMobileE164(mob);
+    if (p?.phone === mob || p?.phone === norm) return p.id;
   }
   return profileId;
 }
@@ -2414,7 +2418,7 @@ async function upsertCustomerProfile({
   id, mob, firstName, lastName, address, village, city, pincode, email,
   lastLat, lastLng, silentGeo, ip, dev, mobileVerified = true,
 }) {
-  const fakeEmail = email || `${mob.replace(/\D/g, '').slice(-10)}@scanv.app`;
+  const fakeEmail = email || profileAuthEmail(mob);
   const device = dev || detectDevice();
   const ipAddr = ip || await getIP();
   const row = {
@@ -2623,6 +2627,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         sessionStorage.setItem(TRACK_BOOKING_KEY, resumed.existingBooking.id);
         const uid = localStorage.getItem('scanv_uid') || resumed.existingBooking.customer_id;
         if (uid) {
+          const mob = phoneFromProfileId(uid);
+          if (mob) await ensureProfileAuthSession(mob);
           const { data: p } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
           if (p) onRegistered(p, resumed.existingBooking.id);
         }
@@ -2704,10 +2710,12 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         if (!ok) throw new Error('Invalid OTP. Try again.');
       }
 
+      await ensureProfileAuthSession(mob);
       const uid = await resolveCustomerProfileId(mob);
       const dev = detectDevice();
       const profile = await upsertCustomerProfile({
         id: uid, mob, firstName, lastName, address, village, city, pincode,
+        email: profileAuthEmail(mob),
         silentGeo, dev,
       });
 
@@ -2835,6 +2843,8 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         return setErr('Payment not verified. Complete payment before booking.');
       }
       const payCheck = await fetchPaymentVerification(txnId, paymentAmountPaise ?? browseTotal);
+      const mobNorm = normalizeMobileE164(mobile);
+      await ensureProfileAuthSession(mobNorm);
       const svc = activeSvc;
       const price = svc.price||50000;
       const fee   = Math.round(price*FEE_PCT);
@@ -3491,18 +3501,9 @@ function RegistrationFlow({ onComplete, prefill }) {
   const verifyOTP_direct = async (mob) => {
     setLoading(true); setErr('');
     try {
-      const fakeEmail = profileAuthEmail(mob);
-      const fakePass  = profileAuthPassword(mob);
-      let userId;
-      try {
-        const { data:su, error:se } = await sb().auth.signUp({ email:fakeEmail, password:fakePass });
-        if (se && se.message?.includes('already registered')) {
-          const { data:si } = await sb().auth.signInWithPassword({ email:fakeEmail, password:fakePass });
-          userId = si?.user?.id;
-        } else { userId = su?.user?.id; }
-      } catch(e) {}
-      if (!userId) { userId = localStorage.getItem('scanv_uid') || crypto.randomUUID(); localStorage.setItem('scanv_uid', userId); }
-      await finalise(userId, fakeEmail, mob);
+      await ensureProfileAuthSession(mob);
+      setPhase('completing');
+      await finalise(null, profileAuthEmail(mob), mob);
     } catch(e) { setErr(e.message||'Verification failed.'); setPhase('form'); }
     finally { setLoading(false); }
   };
@@ -3521,38 +3522,19 @@ function RegistrationFlow({ onComplete, prefill }) {
       } catch(e) { console.warn('[Verify]', e.message); }
       if (!ok) throw new Error('Invalid or expired OTP. Request a new one.');
 
-      // Create Supabase auth user via email (phone auth needs SMS provider)
-      const fakeEmail = profileAuthEmail(mob);
-      const fakePass  = profileAuthPassword(mob);
-      let userId;
-      try {
-        const { data:su, error:se } = await sb().auth.signUp({ email:fakeEmail, password:fakePass });
-        if (se && se.message?.includes('already registered')) {
-          // User exists -- sign them in
-          const { data:si } = await sb().auth.signInWithPassword({ email:fakeEmail, password:fakePass });
-          userId = si?.user?.id;
-        } else {
-          userId = su?.user?.id;
-        }
-      } catch(authErr) { console.warn('Auth:', authErr); }
-
-      if (!userId) {
-        // Fallback -- use anonymous UUID stored in localStorage
-        userId = localStorage.getItem('scanv_uid') || crypto.randomUUID();
-        localStorage.setItem('scanv_uid', userId);
-      }
-
+      await ensureProfileAuthSession(mob);
       setPhase('completing');
-      await finalise(userId, fakeEmail, mob);
+      await finalise(null, profileAuthEmail(mob), mob);
     } catch(e) { setErr(e.message||'Verification failed.'); }
     finally { setLoading(false); }
   };
 
-  const finalise = async (userId, userEmail, mob) => {
+  const finalise = async (_userId, _userEmail, mob) => {
     try {
+      await ensureProfileAuthSession(mob);
       const resolvedId = await resolveCustomerProfileId(mob);
       const profile = await upsertCustomerProfile({
-        id: resolvedId || userId,
+        id: resolvedId,
         mob,
         firstName: form.firstName,
         lastName: form.lastName,
@@ -3560,7 +3542,7 @@ function RegistrationFlow({ onComplete, prefill }) {
         village: form.village,
         city: form.city,
         pincode: form.pincode,
-        email: userEmail,
+        email: profileAuthEmail(mob),
         lastLat: geo?.lat,
         lastLng: geo?.lng,
         dev,
@@ -4179,9 +4161,11 @@ function BookScreen() {
       const mob=normalizeMobileE164(bookPhone);
       const ok=await verifyOtpCode(mob,code);
       if(!ok) throw new Error('Invalid OTP');
+      await ensureProfileAuthSession(mob);
       const uid=await resolveCustomerProfileId(mob);
       const profile=await upsertCustomerProfile({
         id:uid, mob,
+        email: profileAuthEmail(mob),
         firstName:bookFirstName, lastName:bookLastName,
         address:bookAddress, village:user?.village||'', city:bookCity, pincode:bookPincode,
         lastLat:user?.last_lat, lastLng:user?.last_lng,
@@ -4235,9 +4219,11 @@ function BookScreen() {
       }
       const payCheck = await fetchPaymentVerification(txnId, total);
       const mob = normalizeMobileE164(bookPhone || user?.phone || '');
+      await ensureProfileAuthSession(mob);
       const custId = user?.id || await resolveCustomerProfileId(mob);
       const profile = await upsertCustomerProfile({
         id: custId, mob,
+        email: profileAuthEmail(mob),
         firstName: bookFirstName || user?.first_name || '',
         lastName: bookLastName || user?.last_name || '',
         address: bookAddress || user?.address || '',
