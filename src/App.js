@@ -1558,6 +1558,16 @@ function sb() {
   return _sb;
 }
 
+/** Await optional Supabase write; ignore errors (builders are thenable, not full Promises). */
+async function sbIgnore(query) {
+  try {
+    const { error } = await query;
+    if (error) console.warn('[ScanV]', error.message);
+  } catch (e) {
+    console.warn('[ScanV]', e?.message || e);
+  }
+}
+
 /* --- CONTEXT ------------------------------------------------------ */
 const Ctx = createContext(null);
 const useApp = () => useContext(Ctx);
@@ -2179,10 +2189,10 @@ async function verifyOtpCode(mobile, code) {
 
 async function sendSMSViaSB(mobile, otp) {
   // Store OTP in DB first
-  await sb().from('custom_otp').insert({
+  await sbIgnore(sb().from('custom_otp').insert({
     mobile, otp,
     expires_at: new Date(Date.now() + 10*60*1000).toISOString(),
-  }).then(()=>{}).catch(e=>console.warn('[OTP DB]',e.message));
+  }));
 }
 
 // SMS sent via Supabase Edge Function send-otp (server-side, no CORS)
@@ -2744,11 +2754,11 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         price, platform_fee:fee, gst_amount:gst, total,
         status:'new', txn_id:txnId, added_by:userId,
       });
-      await sb().from('payments').insert({
+      await sbIgnore(sb().from('payments').insert({
         booking_id:bk.id, user_id:userId, amount:total,
         method:paymentMethod||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
-      }).catch(()=>{});
+      }));
       await invokeBookingDispatch({
         bookingId: bk.id,
         serviceId: svc.id || svc.parent || activeSvc?.id || '',
@@ -4103,11 +4113,11 @@ function BookScreen() {
         price, platform_fee: fee, gst_amount: gst, total,
         status: 'new', txn_id: txnId, added_by: profile.id,
       });
-      await sb().from('payments').insert({
+      await sbIgnore(sb().from('payments').insert({
         booking_id: data.id, user_id: profile.id, amount: total,
         method: payMethod || 'UPI', status: 'success', txn_id: txnId, gateway: 'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
-      }).catch(() => {});
+      }));
       await invokeBookingDispatch({
         bookingId: data.id, serviceId: svc.id || svc.parent || '', categoryId: svc.parent || '',
         customerId: profile.id, serviceName: svc.name,
@@ -4655,7 +4665,7 @@ function usePartnerLocationShare(user, bookings, addToast) {
       if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
       watchRef.current = navigator.geolocation.watchPosition(async (pos) => {
         for (const b of active) {
-          await sb().from('vendor_live_locations').upsert({
+          await sbIgnore(sb().from('vendor_live_locations').upsert({
             booking_id: b.id,
             vendor_id: vendor.id,
             partner_id: user.id,
@@ -4665,7 +4675,7 @@ function usePartnerLocationShare(user, bookings, addToast) {
             speed_kmh: pos.coords.speed != null ? Math.round(pos.coords.speed * 3.6 * 10) / 10 : null,
             tracking_active: true,
             updated_at: new Date().toISOString(),
-          }, { onConflict: 'booking_id' }).catch(() => {});
+          }, { onConflict: 'booking_id' }));
         }
       }, () => addToast?.('Enable GPS to share live location with customer', 'error'),
       { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
@@ -4792,14 +4802,14 @@ function BookingsScreen() {
           <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:FF,marginTop:8,display:'block'}}>Raise a dispute</button>
         </div>
       )}
-      {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id).catch(()=>{});addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
+      {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sbIgnore(sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id));addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
     </div>
   );
 
   const markComplete=async(b)=>{
     await sb().from('bookings').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',b.id);
-    await sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id).catch(()=>{});
-    await sb().from('service_requests').update({status:'completed'}).eq('txn_id',b.txn_id).catch(()=>{});
+    await sbIgnore(sb().from('vendor_live_locations').update({ tracking_active: false }).eq('booking_id', b.id));
+    await sbIgnore(sb().from('service_requests').update({ status: 'completed' }).eq('txn_id', b.txn_id));
     addToast('Complete ✅ — live tracking stopped','success');
     load();
   };
@@ -4846,7 +4856,7 @@ function BookingsScreen() {
         txn_id: intent.txn_id,
         added_by: user.id,
       });
-      await sb().from('payments').insert({
+      await sbIgnore(sb().from('payments').insert({
         booking_id: bk.id,
         user_id: user.id,
         amount: total,
@@ -4855,7 +4865,7 @@ function BookingsScreen() {
         txn_id: intent.txn_id,
         gateway: 'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
-      }).catch(() => {});
+      }));
       await invokeBookingDispatch({
         bookingId: bk.id,
         serviceId: svc.id || svc.parent || '',
