@@ -4588,6 +4588,57 @@ function TrackServiceScreen() {
   );
 }
 
+function gpsDistanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Continuous GPS for partners — updates vendor_partners for dispatch nearest-match */
+function useVendorLocationTracker(user, { enabled = true, mobile = null, onPosition = null } = {}) {
+  const watchRef = useRef(null);
+  const lastSyncRef = useRef({ t: 0, lat: null, lng: null });
+
+  useEffect(() => {
+    if (!enabled || !navigator.geolocation) return undefined;
+    const profileId = user?.role === 'partner' ? user.id : null;
+    const phone = mobile || user?.phone;
+    if (!profileId && !phone) return undefined;
+
+    watchRef.current = navigator.geolocation.watchPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      onPosition?.({ lat, lng, accuracy: pos.coords.accuracy });
+
+      const now = Date.now();
+      const last = lastSyncRef.current;
+      const moved = last.lat != null ? gpsDistanceM(last.lat, last.lng, lat, lng) : 9999;
+      if (now - last.t < 30000 && moved < 80) return;
+      lastSyncRef.current = { t: now, lat, lng };
+
+      try {
+        await vendorOnboardFetch('update-location', {
+          mobile: phone || undefined,
+          profile_id: profileId || undefined,
+          lat,
+          lng,
+        });
+      } catch (_) { /* vendor row may not exist yet during early onboarding */ }
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 15000, timeout: 30000 });
+
+    return () => {
+      if (watchRef.current != null) {
+        navigator.geolocation.clearWatch(watchRef.current);
+        watchRef.current = null;
+      }
+    };
+  }, [enabled, user?.id, user?.role, user?.phone, mobile, onPosition]);
+}
+
 function usePartnerLocationShare(user, bookings, addToast) {
   const watchRef = useRef(null);
   useEffect(() => {
@@ -4628,6 +4679,12 @@ function bookingStatusGroup(status) {
   const s = (status || '').toLowerCase();
   if (BOOKING_COMPLETED.has(s)) return { label: 'Completed', color: C.grn };
   return { label: 'In-progress', color: C.gold };
+}
+
+function PartnerGpsTracker() {
+  const { user } = useApp();
+  useVendorLocationTracker(user, { enabled: user?.role === 'partner' });
+  return null;
 }
 
 function BookingsScreen() {
@@ -4826,9 +4883,12 @@ function BookingsScreen() {
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title="Bookings"/>
-      {user.role==='partner'&&bookings.some(b=>b.status==='confirmed')&&(
-        <div style={{margin:'0 16px 8px',background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',fontSize:11,color:C.grn,fontWeight:700}}>
-          📍 Sharing live GPS with customers on active bookings
+      {user.role==='partner'&&(
+        <div style={{margin:'0 16px 8px',background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',fontSize:11,color:C.grn,fontWeight:700,lineHeight:1.5}}>
+          📍 Live GPS active — your location is used for nearby job dispatch alerts
+          {bookings.some(b=>b.status==='confirmed'&&b.partner_id)&&(
+            <span style={{ display: 'block', fontWeight: 600, marginTop: 4 }}>Also sharing live GPS with customers on assigned bookings</span>
+          )}
         </div>
       )}
       <div style={{padding:16}}>
@@ -5255,8 +5315,8 @@ function VendorOnboardPage() {
   const allSvcs = allVendorSelectableServices();
   const mobileE164 = () => '+91' + phone.replace(/\D/g, '');
 
-  const captureGps = () => {
-    setLoading(true);
+  const captureGps = (auto = false) => {
+    if (!auto) setLoading(true);
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
       setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, ...geo });
@@ -5273,12 +5333,28 @@ function VendorOnboardPage() {
         if (!check.country_allowed && countryCode !== 'IN') {
           setErr(check.message || 'Country not allowed for your GPS location');
           setCountryCode('IN');
+        } else if (auto) {
+          setMsg('Live GPS active — we use your location for nearby job alerts 📍');
         }
-      } catch (e) { setErr(e.message); }
-      setLoading(false);
-    }, () => { setErr('GPS required for partner onboarding'); setLoading(false); },
-    { enableHighAccuracy: true, maximumAge: 0 });
+      } catch (e) { if (!auto) setErr(e.message); }
+      if (!auto) setLoading(false);
+    }, () => {
+      if (!auto) { setErr('GPS required for partner onboarding'); setLoading(false); }
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
   };
+
+  useEffect(() => {
+    if (step === 2 && phoneVerified && !addServicesMode && !gps) {
+      captureGps(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, phoneVerified, addServicesMode]);
+
+  useVendorLocationTracker(null, {
+    enabled: phoneVerified && step >= 2 && step <= 5,
+    mobile: phoneVerified ? mobileE164() : null,
+    onPosition: ({ lat, lng }) => setGps((prev) => ({ ...(prev || {}), lat, lng })),
+  });
 
   const sendOtp = async (resend = false) => {
     if (phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
@@ -5501,7 +5577,10 @@ function VendorOnboardPage() {
             </select>
           </Field>
           <Field label="GPS location" req note="Required — used to match you with nearby bookings">
-            <Btn v="outline" full onClick={captureGps} disabled={loading}>{gps ? `✓ GPS: ${gps.lat?.toFixed(4)}, ${gps.lng?.toFixed(4)}` : loading ? 'Getting GPS…' : '📍 Capture GPS location'}</Btn>
+            <Btn v="outline" full onClick={() => captureGps(false)} disabled={loading}>{gps ? `✓ Live GPS: ${gps.lat?.toFixed(4)}, ${gps.lng?.toFixed(4)}` : loading ? 'Getting GPS…' : '📍 Capture GPS location'}</Btn>
+            <div style={{ fontSize: 11, color: C.dim, marginTop: 8, lineHeight: 1.5 }}>
+              GPS starts automatically on this step and stays active during registration — used to match you with nearby customer bookings.
+            </div>
             {gpsCheck?.vpn_suspected && <div style={{ color: C.red, fontSize: 11, marginTop: 6 }}>⚠ VPN/proxy detected — disable VPN for accurate location</div>}
           </Field>
           <Btn full onClick={() => { if (!businessName || !contactName || !shopOrFlat || !streetName || !city || !pincode || !gps) return setErr('Complete all required fields + GPS'); setStep(3); setErr(''); }}>Continue →</Btn>
@@ -8080,6 +8159,7 @@ export default function App() {
       <Ctx.Provider value={ctx}>
         <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
+        <PartnerGpsTracker />
         <div style={{display:'flex',flexDirection:'column',height:'100vh',maxWidth:480,margin:'0 auto',background:C.bg}}>
           <Boundary>{renderScreen()}</Boundary>
           <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />

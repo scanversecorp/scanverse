@@ -10,6 +10,7 @@
  *   check-gps       — { lat, lng, ip? }
  *   register        — full vendor payload (+ ekyc_ref)
  *   update-services — { mobile, services[] }  (existing partner)
+ *   update-location — { mobile?, profile_id?, lat, lng }  (continuous partner GPS)
  *   list            — admin list (PIN header)
  *   offboard        — { vendor_id } (PIN header)
  *   activate        — { vendor_id } (PIN header)
@@ -566,6 +567,64 @@ Deno.serve(async (req: Request) => {
         message: countryMessage,
         default_country: "IN",
       });
+    }
+
+    if (action === "update-location") {
+      const mobile = normalizeMobile(String(body.phone || body.mobile || ""));
+      const profileId = String(body.profile_id || "").trim();
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return json({ error: "lat/lng required" }, 400);
+      }
+
+      let vendor: { id: string; phone: string; profile_id: string | null; status: string } | null = null;
+      if (profileId) {
+        const { data } = await supabase
+          .from("vendor_partners")
+          .select("id, phone, profile_id, status")
+          .eq("profile_id", profileId)
+          .maybeSingle();
+        vendor = data;
+      }
+      if (!vendor && mobile) {
+        const { data } = await supabase
+          .from("vendor_partners")
+          .select("id, phone, profile_id, status")
+          .eq("phone", mobile)
+          .maybeSingle();
+        vendor = data;
+      }
+      if (!vendor) return json({ error: "Partner not found — complete registration first" }, 404);
+      if (vendor.status === "offboarded") return json({ error: "Partner offboarded" }, 403);
+
+      if (profileId && vendor.profile_id && vendor.profile_id !== profileId) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+      if (!profileId || !vendor.profile_id) {
+        const otpCheck = await assertRecentOtpVerified(supabase, vendor.phone);
+        if (!otpCheck.ok) return json({ error: otpCheck.error || "Verify OTP to share location" }, 401);
+      }
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("vendor_partners")
+        .update({
+          address_lat: lat,
+          address_lng: lng,
+          gps_lat: lat,
+          gps_lng: lng,
+          updated_at: now,
+        })
+        .eq("id", vendor.id);
+      if (error) throw error;
+
+      const pid = vendor.profile_id || profileId;
+      if (pid) {
+        await supabase.from("profiles").update({ last_lat: lat, last_lng: lng }).eq("id", pid);
+      }
+
+      return json({ success: true, vendor_id: vendor.id, lat, lng });
     }
 
     if (action === "update-services") {
