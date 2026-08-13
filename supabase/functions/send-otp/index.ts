@@ -476,7 +476,7 @@ Deno.serve(async (req: Request) => {
           return json({
             success: false,
             code: "already_registered",
-            error: "This number is already registered. Log in instead?",
+            error: "This number is already registered. Please try login.",
           });
         }
 
@@ -540,7 +540,7 @@ Deno.serve(async (req: Request) => {
             return json({
               success: false,
               code: "already_registered",
-              error: "This number is already registered. Log in instead?",
+              error: "This number is already registered. Please try login.",
             });
           }
           return json({
@@ -572,7 +572,7 @@ Deno.serve(async (req: Request) => {
           return json({
             success: false,
             code: "already_registered",
-            error: "This number is already registered. Log in instead?",
+            error: "This number is already registered. Please try login.",
           });
         }
         return json({ success: false, error: "Could not save profile. Try again." }, 500);

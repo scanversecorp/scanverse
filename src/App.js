@@ -1370,13 +1370,15 @@ function profileLooksRegistered(p) {
   return !!(p?.first_name?.trim() || p?.name?.trim());
 }
 
+const DUPLICATE_PHONE_MSG = 'This number is already registered. Please try login.';
+
 function friendlySignupError(error) {
   const msg = error?.message || '';
   if (error?.code === 'PHONE_EXISTS' || isProfilesPhoneConflict(error)) {
-    return { type: 'phone_exists', message: 'This number is already registered. Log in instead?' };
+    return { type: 'phone_exists', message: DUPLICATE_PHONE_MSG };
   }
   if (/already registered/i.test(msg)) {
-    return { type: 'phone_exists', message: msg };
+    return { type: 'phone_exists', message: DUPLICATE_PHONE_MSG };
   }
   if (/row-level security|RLS policy/i.test(msg)) {
     return { type: 'rls', message: 'Could not save profile. Try again or log in with this number.' };
@@ -3113,7 +3115,7 @@ async function upsertCustomerProfile({
 
   const existingByPhone = await findCustomerProfileByMobile(mob);
   if (existingByPhone && profileLooksRegistered(existingByPhone) && !allowRegistered) {
-    const err = new Error('This number is already registered. Log in instead?');
+    const err = new Error(DUPLICATE_PHONE_MSG);
     err.code = 'PHONE_EXISTS';
     throw err;
   }
@@ -3157,7 +3159,7 @@ async function upsertCustomerProfile({
   }
   if (error) {
     if (isProfilesPhoneConflict(error)) {
-      const err = new Error('This number is already registered. Log in instead?');
+      const err = new Error(DUPLICATE_PHONE_MSG);
       err.code = 'PHONE_EXISTS';
       throw err;
     }
@@ -3178,8 +3180,8 @@ async function saveCustomerProfileViaEdge(mob, profileFields, location) {
     },
   });
   const errMsg = await edgeFnErrorMessageAsync(r);
-  if (r.data?.code === 'already_registered') {
-    const err = new Error('This number is already registered. Log in instead?');
+  if (r.data?.code === 'already_registered' || /already registered/i.test(errMsg || '')) {
+    const err = new Error(DUPLICATE_PHONE_MSG);
     err.code = 'PHONE_EXISTS';
     throw err;
   }
@@ -4395,7 +4397,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         const check = await sb().functions.invoke('send-otp', { body: { mobile: mob, action: 'check_mobile' } });
         if (check.data?.registered) {
           setLoginPrompt(true);
-          setErr('This number is already registered. Log in instead?');
+          setErr(DUPLICATE_PHONE_MSG);
           setLoading(false);
           return;
         }
@@ -4627,15 +4629,31 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{width:'100%',maxWidth:420}}>
         {logo}{stepBar}
         <div style={S.card({padding:24})}>
-          {err&&<div style={S.err}>{err}</div>}
-          {loginPrompt&&(
-            <div style={{marginBottom:14,padding:'12px 14px',background:C.gls,border:`1px solid ${C.acc}55`,borderRadius:10}}>
-              <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:10}}>
-                An account with <strong style={{color:C.txt}}>+91 {form.mobile.replace(/\D/g,'').slice(0,10)}</strong> already exists.
-              </div>
-              <Btn full onClick={goToLogin}>Log in with this number →</Btn>
+          {loginPrompt ? (
+            <div style={S.err}>
+              This number is already registered. Please try{' '}
+              <button
+                type="button"
+                onClick={goToLogin}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: C.acc,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Login
+              </button>
+              .
             </div>
-          )}
+          ) : err ? (
+            <div style={S.err}>{err}</div>
+          ) : null}
           {content}
         </div>
         <CopyrightLine style={{ marginTop: 12 }} />
