@@ -2564,8 +2564,9 @@ const APP_CSS = `
   body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
   @media (min-width:481px){html,body{background:#e8e6e1}}
-  .scanv-shell{width:100%;height:100dvh;max-height:100dvh;min-height:100dvh}
-  @media (min-width:481px){.scanv-shell{max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
+  .scanv-shell{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;height:100%;min-height:100svh;min-height:-webkit-fill-available;max-height:100svh;background:${C.bg}}
+  @media (min-width:481px){.scanv-shell{height:100dvh;max-height:100dvh;min-height:100dvh;max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
+  #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -3000,12 +3001,12 @@ function captureFreshGps(fallbackGeo = null) {
 
 /** Fixed browse header — sticky breaks on mobile when inner panels scroll */
 const BROWSE_HDR_PAD = 'calc(12px + env(safe-area-inset-top, 0px))';
-const BROWSE_HOME_PAD = 16;
+const BROWSE_HOME_INSET = 12;
 const BROWSE_HOME_STACK = {
   display: 'grid',
   gridTemplateColumns: '1fr',
-  padding: `0 ${BROWSE_HOME_PAD}px`,
-  gap: 12,
+  padding: 0,
+  gap: 0,
   boxSizing: 'border-box',
   width: '100%',
 };
@@ -3047,33 +3048,31 @@ const BROWSE_SCROLL_BODY = {
 };
 const BROWSE_WRAP_SHELL = { ...APP_SHELL };
 const TRUST_PILLS_ROW = {
-  display: 'flex',
-  flexWrap: 'nowrap',
-  alignItems: 'center',
-  gap: 4,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+  gap: 3,
   width: '100%',
   boxSizing: 'border-box',
   margin: 0,
-  padding: '8px 10px 10px',
+  padding: '8px 8px 10px',
   borderTop: BDR,
-  overflowX: 'auto',
-  WebkitOverflowScrolling: 'touch',
-  scrollbarWidth: 'none',
-  msOverflowStyle: 'none',
 };
 const TRUST_PILL = {
-  fontSize: 8,
+  fontSize: 7,
   fontWeight: 800,
   color: C.grn,
   background: '#e6f4ee',
   border: '1.5px solid rgba(0,122,77,0.35)',
-  padding: '3px 5px',
+  padding: '4px 2px',
   borderRadius: 99,
   boxSizing: 'border-box',
   margin: 0,
   whiteSpace: 'nowrap',
-  flexShrink: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  minWidth: 0,
   lineHeight: 1.2,
+  textAlign: 'center',
 };
 const TRUST_PILL_BTN = {
   ...TRUST_PILL,
@@ -3085,11 +3084,11 @@ const TRUST_PILL_BTN = {
   alignItems: 'center',
 };
 const BROWSE_TRUST_PILLS = [
-  { key: 'dpdp', label: '✓ DPDP 2023', screen: 'trust-dpdp' },
-  { key: 'verified', label: '✓ Verified partners', screen: 'trust-verified' },
-  { key: 'discount', label: '✓ 25% off', screen: 'trust-discount' },
-  { key: 'human', label: '✓ Human-First', screen: 'trust-human' },
-  { key: 'trusted', label: '✓ Trusted', screen: 'trust-trusted' },
+  { key: 'dpdp', label: '✓ DPDP', screen: 'trust-dpdp', aria: 'DPDP 2023' },
+  { key: 'verified', label: '✓ Verified', screen: 'trust-verified', aria: 'Verified partners' },
+  { key: 'discount', label: '✓ 25% off', screen: 'trust-discount', aria: '25% off' },
+  { key: 'human', label: '✓ Human', screen: 'trust-human', aria: 'Human-First' },
+  { key: 'trusted', label: '✓ Trusted', screen: 'trust-trusted', aria: 'Trusted' },
 ];
 const TRUST_COMMITMENT_PAGES = {
   dpdp: {
@@ -3204,7 +3203,7 @@ function TrustPillsRow({ onSelect }) {
   return (
     <div className="trust-pills-row" style={TRUST_PILLS_ROW}>
       {BROWSE_TRUST_PILLS.map((p) => (
-        <button key={p.key} type="button" onClick={() => onSelect(p)} style={TRUST_PILL_BTN} aria-label={p.label.replace(/^✓\s*/, '')}>
+        <button key={p.key} type="button" onClick={() => onSelect(p)} style={TRUST_PILL_BTN} aria-label={p.aria || p.label.replace(/^✓\s*/, '')}>
           {p.label}
         </button>
       ))}
@@ -4653,24 +4652,24 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)',flexShrink:0}}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:`12px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
-      <div style={{ ...BROWSE_HOME_STACK, marginTop: 12, flexShrink: 0 }}>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
+      <div style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: `18px ${BROWSE_HOME_INSET}px`, color: '#fff' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
           <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
           <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.94, lineHeight: 1.45 }}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: 0 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: `10px ${BROWSE_HOME_INSET}px`, background: C.bg }}>
           <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
           <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0 }}>
-          <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, borderTop: BDR, borderBottom: BDR, padding: 0 }}>
+          <div style={{ padding: `12px ${BROWSE_HOME_INSET}px`, display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
             <span>🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
@@ -4678,7 +4677,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
       </div>
-      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
+      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`14px ${BROWSE_HOME_INSET}px 24px`}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -5921,7 +5920,7 @@ function ServicesScreen() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
           {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
         </div>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12, background: C.surf, border: BDR, borderRadius: 12, overflow: 'hidden' }}>
           <TrustPillsRow onSelect={(pill) => {
             if (pill.screen === 'top-rated') setScreen('top-rated');
             else setScreen(pill.screen);
@@ -12758,12 +12757,14 @@ export default function App() {
   // BROWSE: Show services without registration wall
   if (state==='browse') return (
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
+    <div className="scanv-root">
     <BrowseFlow
       silentGeo={silentGeo}
       onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='top-rated')setScreen('top-rated');else setScreen('services');}}
       onSignUp={()=>{ setQrPrefill({ geo: silentGeo, dev: silentGeo?.device }); setState('register'); }}
       addToast={addToast}
     />
+    </div>
     </Boundary>
   );
 
@@ -12799,12 +12800,14 @@ export default function App() {
         <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
         <PartnerGpsTracker />
+        <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>
           <div style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <Boundary>{renderScreen()}</Boundary>
             <CopyrightLine style={{ padding: '6px 16px 24px' }} />
           </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
+        </div>
         </div>
       </Ctx.Provider>
     </Boundary>

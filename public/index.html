@@ -62,9 +62,12 @@
     @media (min-width: 481px) { html, body, #root { background: #e8e6e1; } }
     #root {
       min-height: 100dvh;
-      height: 100dvh;
+      min-height: 100svh;
+      min-height: -webkit-fill-available;
+      height: 100svh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
     ::-webkit-scrollbar { width: 0; background: transparent; }
     #root-loader {
