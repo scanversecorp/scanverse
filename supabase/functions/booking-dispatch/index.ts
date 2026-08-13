@@ -22,6 +22,7 @@ import {
   callFailedStatuses,
   geocodeAddress,
 } from "../_shared/notify.ts";
+import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
 
 const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes between retry rounds
 const OFFER_TIMEOUT_MS = 60 * 1000; // 60s per partner before moving to next nearest
@@ -75,12 +76,13 @@ async function getUnavailableVendorIds(
   return new Set((vendors || []).map((v) => String(v.id)));
 }
 
-function dispatchSecretOk(req: Request): boolean {
+async function dispatchSecretOk(
+  req: Request,
+  supabase: ReturnType<typeof createClient>,
+): Promise<boolean> {
   const secret = Deno.env.get("DISPATCH_SECRET") || "";
   if (!secret) {
-    // Fail closed in production; allow only explicit dev bypass
-    return Deno.env.get("OTP_DEV_MODE") === "1" ||
-      Deno.env.get("DISPATCH_OPEN") === "1";
+    return await isPlatformFlagOn(supabase, "dispatch_open", { envFallbackKey: "DISPATCH_OPEN" });
   }
   return req.headers.get("x-dispatch-secret") === secret;
 }
@@ -191,8 +193,11 @@ async function resolveVendorFromRequest(
 }
 
 /** pg_cron may call tick with service role bearer (stored in Vault) */
-function tickAuthOk(req: Request): boolean {
-  if (dispatchSecretOk(req)) return true;
+async function tickAuthOk(
+  req: Request,
+  supabase: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  if (await dispatchSecretOk(req, supabase)) return true;
   const auth = req.headers.get("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -975,7 +980,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      if (!dispatchSecretOk(req)) {
+      if (!(await dispatchSecretOk(req, supabase))) {
         const authorized = await bookingPartyAuthorized(
           supabase, supabaseUrl, req, bookingId, body,
         );
@@ -1070,7 +1075,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "tick") {
-      if (!tickAuthOk(req)) return json({ error: "Unauthorized" }, 401);
+      if (!(await tickAuthOk(req, supabase))) return json({ error: "Unauthorized" }, 401);
 
       const { data: due } = await supabase
         .from("booking_dispatch")
@@ -1091,7 +1096,7 @@ Deno.serve(async (req: Request) => {
       const bookingId = String(body.booking_id || url.searchParams.get("booking_id") || "");
       if (!bookingId) return json({ error: "booking_id required" }, 400);
 
-      if (!dispatchSecretOk(req)) {
+      if (!(await dispatchSecretOk(req, supabase))) {
         const authorized = await bookingPartyAuthorized(
           supabase, supabaseUrl, req, bookingId, body,
         );

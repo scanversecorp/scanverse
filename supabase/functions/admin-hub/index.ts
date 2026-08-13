@@ -17,7 +17,9 @@
  *   exec_stats       — executive dashboard KPIs + chart data (owner PIN only)
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
  *   get_platform_settings — { keys? } dispatch_mode etc.
- *   update_platform_setting — { key, value, updated_by? }
+ *   get_go_live_config — switches + secret status (no values)
+ *   update_go_live_switch — { key, enabled } owner PIN only
+ *   update_go_live_check — { key, checked } manual checklist tick
  *   gps_status_report — { audience?, date_from?, date_to?, search?, status_filter? }
  *   pricing_2fa_status — { enrolled, owner_configured, owner_mobile_masked }
  *   pricing_2fa_reset_send — SMS/voice OTP to PRICING_2FA_RESET_MOBILE (exec PIN only)
@@ -46,6 +48,17 @@ import {
   generateOtp,
   sendOtpDelivery,
 } from "../_shared/notify.ts";
+import {
+  GO_LIVE_SWITCH_KEYS,
+} from "../_shared/platform-settings.ts";
+import {
+  buildGoLiveConfig,
+  updateGoLiveCheck,
+} from "../_shared/go-live-config.ts";
+import {
+  EXEC_ONLY_SWITCH_KEYS,
+  otpDeliveryVendorOpts,
+} from "../_shared/vendor-providers.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -789,8 +802,10 @@ async function pricing2faResetSend(sb: ReturnType<typeof adminSb>): Promise<Resp
   });
   if (insertErr) return json({ error: insertErr.message }, 500);
 
+  const allowVoice = await isPlatformFlagOn(sb, "voice_otp_fallback", { defaultValue: true });
   const message = `ScanV Admin: pricing 2FA reset code ${otp}. Valid 10 min. Do not share.`;
-  const delivery = await sendOtpDelivery(owner, otp, message);
+  const vendorOpts = await otpDeliveryVendorOpts(sb, allowVoice);
+  const delivery = await sendOtpDelivery(owner, otp, message, vendorOpts);
 
   if (delivery.ref) {
     await sb.from("vendor_otp")
@@ -801,7 +816,7 @@ async function pricing2faResetSend(sb: ReturnType<typeof adminSb>): Promise<Resp
       .eq("verified", false);
   }
 
-  const devMode = !delivery.ok && Deno.env.get("OTP_DEV_MODE") === "1";
+  const devMode = !delivery.ok && await isPlatformFlagOn(sb, "otp_dev_mode", { envFallbackKey: "OTP_DEV_MODE" });
   if (!delivery.ok && !devMode) {
     return json({ success: false, error: delivery.error || "Could not send reset OTP" }, 502);
   }
@@ -971,6 +986,42 @@ async function updateRefund(
   return json({ success: true, cancellation: data });
 }
 
+async function getGoLiveConfig(sb: ReturnType<typeof adminSb>): Promise<Response> {
+  const payload = await buildGoLiveConfig(sb);
+  return json(payload);
+}
+
+async function updateGoLiveSwitch(
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<Response> {
+  const key = String(body.key || "").trim();
+  if (!GO_LIVE_SWITCH_KEYS.has(key)) {
+    return json({ error: "Invalid switch key" }, 400);
+  }
+  if (EXEC_ONLY_SWITCH_KEYS.has(key) && !resolveExecRole(req)) {
+    return json({ error: "Owner PIN (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN) required for this switch" }, 403);
+  }
+  const enabled = body.enabled === true || body.enabled === 1 || body.enabled === "1";
+  return updatePlatformSetting(sb, {
+    key,
+    value: enabled ? "1" : "0",
+    updated_by: "admin-go-live-ui",
+  });
+}
+
+async function updateGoLiveCheckAction(
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const key = String(body.key || "").trim();
+  const checked = body.checked === true || body.checked === 1 || body.checked === "1";
+  const result = await updateGoLiveCheck(sb, key, checked);
+  if (result.error) return json({ error: result.error }, 400);
+  return json({ success: true, key, checked });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -1080,6 +1131,18 @@ Deno.serve(async (req) => {
 
   if (action === "update_platform_setting") {
     return updatePlatformSetting(sb, body);
+  }
+
+  if (action === "get_go_live_config") {
+    return getGoLiveConfig(sb);
+  }
+
+  if (action === "update_go_live_switch") {
+    return updateGoLiveSwitch(sb, body, req);
+  }
+
+  if (action === "update_go_live_check") {
+    return updateGoLiveCheckAction(sb, body);
   }
 
   if (action === "gps_status_report") {

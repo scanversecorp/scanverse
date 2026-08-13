@@ -13,6 +13,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
   executeBookingCancellation,
 } from "../_shared/booking-cancel.ts";
+import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
+import { isVendorEnabled } from "../_shared/vendor-providers.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -420,6 +422,8 @@ async function handleRegister(
     return json({ error: "Invalid txn_id or amount_paise" }, 400);
   }
 
+  const razorpayEnabled = await isVendorEnabled(supabase, "vendor_enable_razorpay");
+
   const expiresAt = new Date(Date.now() + INTENT_TTL_MS).toISOString();
 
   const { data: existing } = await supabase
@@ -453,7 +457,7 @@ async function handleRegister(
   let paymentLinkId: string | null = existing?.razorpay_payment_link_id || null;
   let razorpayError: string | null = null;
 
-  const link = await createPaymentLink(txnId, amountPaise);
+  const link = razorpayEnabled ? await createPaymentLink(txnId, amountPaise) : { ok: false, error: "Razorpay disabled in admin Go-Live settings" };
   if (link.ok) {
     paymentLinkUrl = link.url;
     paymentLinkId = link.id;
@@ -472,7 +476,8 @@ async function handleRegister(
     amount_paise: amountPaise,
     payment_link_url: paymentLinkUrl,
     payment_link_id: paymentLinkId,
-    razorpay_configured: Boolean(razorpayAuth()),
+    razorpay_configured: razorpayEnabled && Boolean(razorpayAuth()),
+    razorpay_enabled: razorpayEnabled,
     ...(razorpayError ? { razorpay_error: razorpayError } : {}),
     ...(existing && existing.amount_paise !== amountPaise
       ? { amount_updated: true, previous_amount_paise: existing.amount_paise }
@@ -672,7 +677,7 @@ async function handleWebhook(
   const sigOk = await verifyRazorpaySignature(rawBody, signature);
   if (webhookSecret) {
     if (!sigOk) return json({ error: "Invalid signature" }, 401);
-  } else if (Deno.env.get("OTP_DEV_MODE") !== "1") {
+  } else if (!(await isPlatformFlagOn(supabase, "otp_dev_mode", { envFallbackKey: "OTP_DEV_MODE" }))) {
     console.warn("RAZORPAY_WEBHOOK_SECRET not set — rejecting unsigned webhook");
     return json({ error: "Webhook secret not configured" }, 503);
   }
@@ -771,13 +776,17 @@ async function handleVyaparNotify(
   supabase: ReturnType<typeof createClient>,
   body: Record<string, unknown>,
 ): Promise<Response> {
+  const vyaparEnabled = await isVendorEnabled(supabase, "vendor_enable_vyapar_upi");
+  if (!vyaparEnabled) {
+    return json({ error: "Vyapar UPI disabled in admin Go-Live settings" }, 503);
+  }
   const secret = Deno.env.get("VYAPAR_WEBHOOK_SECRET");
   const provided = String(
     body.secret || body.webhook_secret || body.token || "",
   ).trim();
   if (secret) {
     if (provided !== secret) return json({ error: "Unauthorized" }, 401);
-  } else if (Deno.env.get("OTP_DEV_MODE") !== "1") {
+  } else if (!(await isPlatformFlagOn(supabase, "otp_dev_mode", { envFallbackKey: "OTP_DEV_MODE" }))) {
     return json({ error: "Vyapar webhook secret not configured" }, 503);
   }
 

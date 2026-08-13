@@ -37,6 +37,8 @@ import {
   geoCountryFromLatLng,
   ipCountry,
 } from "../_shared/notify.ts";
+import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
+import { otpDeliveryVendorOpts } from "../_shared/vendor-providers.ts";
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -591,8 +593,10 @@ Deno.serve(async (req: Request) => {
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       });
 
-      const sms = await sendOtpDelivery(mobile, otp, `ScanV Partner OTP: ${otp}. Valid 10 min.`);
-      const devMode = !sms.ok && Deno.env.get("OTP_DEV_MODE") === "1";
+      const allowVoice = await isPlatformFlagOn(supabase, "voice_otp_fallback", { defaultValue: true });
+      const vendorOpts = await otpDeliveryVendorOpts(supabase, allowVoice);
+      const sms = await sendOtpDelivery(mobile, otp, `ScanV Partner OTP: ${otp}. Valid 10 min.`, vendorOpts);
+      const devMode = !sms.ok && await isPlatformFlagOn(supabase, "otp_dev_mode", { envFallbackKey: "OTP_DEV_MODE" });
       if (!sms.ok && !devMode) {
         return json({ success: false, error: sms.error }, 502);
       }

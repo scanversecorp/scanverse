@@ -11,6 +11,8 @@ import {
   hashOtp,
   generateOtp,
 } from "../_shared/notify.ts";
+import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
+import { otpDeliveryVendorOpts } from "../_shared/vendor-providers.ts";
 
 function profileAuthEmail(mobile: string): string {
   const digits = mobile.replace(/\D/g, "").slice(-10);
@@ -629,7 +631,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const message = `ScanV OTP: ${otp}. Valid 10 min. Do not share.`;
-    const sms = await sendOtpDelivery(mobile, otp, message);
+    const allowVoice = await isPlatformFlagOn(supabase, "voice_otp_fallback", { defaultValue: true });
+    const vendorOpts = await otpDeliveryVendorOpts(supabase, allowVoice);
+    const sms = await sendOtpDelivery(mobile, otp, message, vendorOpts);
 
     if (sms.ref && otpRow?.id) {
       await supabase
@@ -638,7 +642,7 @@ Deno.serve(async (req: Request) => {
         .eq("id", otpRow.id);
     }
 
-    const devMode = !sms.ok && Deno.env.get("OTP_DEV_MODE") === "1";
+    const devMode = !sms.ok && await isPlatformFlagOn(supabase, "otp_dev_mode", { envFallbackKey: "OTP_DEV_MODE" });
 
     if (!sms.ok && !devMode) {
       return json({ success: false, error: sms.error || "SMS send failed" }, 502);

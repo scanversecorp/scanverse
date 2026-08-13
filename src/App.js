@@ -46,6 +46,39 @@ const UPI_APPS = [
   ['⚡', 'Any UPI'],
 ];
 
+const DEFAULT_PLATFORM_VENDORS = {
+  twofactor: true, msg91: true, twilio: true, whatsapp: true,
+  razorpay: true, vyapar_upi: true,
+  upi: { gpay: true, phonepe: true, paytm: true, navi: true, bhim: true, any: true },
+};
+const UPI_LABEL_TO_VENDOR_KEY = { GPay: 'gpay', PhonePe: 'phonepe', Paytm: 'paytm', Navi: 'navi', BHIM: 'bhim', 'Any UPI': 'any' };
+const PLATFORM_CONFIG_FN = `${SB_URL}/functions/v1/platform-config`;
+let platformVendors = null;
+async function loadPlatformVendors() {
+  try {
+    const r = await fetch(PLATFORM_CONFIG_FN, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+    const d = await r.json();
+    if (d?.vendors) platformVendors = d.vendors;
+  } catch (_) { /* keep defaults */ }
+  return getPlatformVendors();
+}
+function getPlatformVendors() {
+  return platformVendors || DEFAULT_PLATFORM_VENDORS;
+}
+function filterUpiApps(vendors) {
+  const v = vendors || getPlatformVendors();
+  return UPI_APPS.filter(([, lbl]) => {
+    const k = UPI_LABEL_TO_VENDOR_KEY[lbl];
+    if (!k) return true;
+    return v.upi?.[k] !== false;
+  });
+}
+function isUpiAppEnabled(appLabel, vendors) {
+  const k = UPI_LABEL_TO_VENDOR_KEY[appLabel];
+  if (!k) return true;
+  return (vendors || getPlatformVendors()).upi?.[k] !== false;
+}
+
 /** @wahdfcbank / @wa* handles are WhatsApp Pay only — GPay/PhonePe always route to WhatsApp */
 function isWhatsAppOnlyVpa(vpa = UPI_PA) {
   return /@wa/i.test(vpa);
@@ -145,13 +178,14 @@ function InAppBrowserBanner({ addToast }) {
     </div>
   );
 }
-function UpiPickerModal({ onPick, onClose }) {
+function UpiPickerModal({ onPick, onClose, apps }) {
+  const list = apps || filterUpiApps();
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
       <div style={{ background: C.surf, borderRadius: '16px 16px 0 0', padding: '20px 16px 32px', width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, textAlign: 'center', marginBottom: 6 }}>Pick your UPI app</div>
         <div style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginBottom: 16 }}>Opens the app directly on your phone</div>
-        {UPI_APPS.filter(([, lbl]) => lbl !== 'Any UPI').map(([ic, lbl]) => (
+        {list.filter(([, lbl]) => lbl !== 'Any UPI').map(([ic, lbl]) => (
           <button key={lbl} type="button" onClick={() => onPick(lbl)} style={{ display: 'flex', alignItems: 'center', gap: 14, ...S.card(), padding: '16px 18px', cursor: 'pointer', background: C.card, border: BDR, width: '100%', textAlign: 'left', marginBottom: 10 }}>
             <span style={{ fontSize: 28 }}>{ic}</span>
             <span style={{ color: C.txt, fontSize: 16, fontWeight: 700 }}>{lbl}</span>
@@ -265,8 +299,14 @@ function VyaparQrSection({ amountPaise, txnId, onScannedPaid, paymentVerified, c
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
   const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, setPaymentVerified, amountPaise, txnId } = pay;
   const [confirming, setConfirming] = useState(false);
+  const [vendors, setVendors] = useState(() => getPlatformVendors());
   const inApp = isInAppBrowser();
   const amountRu = amountPaise ? (amountPaise / 100).toLocaleString('en-IN') : '0';
+  useEffect(() => { loadPlatformVendors().then(setVendors); }, []);
+  const upiApps = filterUpiApps(vendors);
+  const showVyapar = vendors.vyapar_upi !== false;
+  const showRazorpay = vendors.razorpay !== false;
+  const showAnyUpi = vendors.upi?.any !== false;
   const handleContinue = async () => {
     if (loading || disabled || confirming) return;
     if (!paymentVerified) {
@@ -297,6 +337,7 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
         <div style={{ fontSize: 36, fontWeight: 900, color: C.acc, fontFamily: FF }}>₹{amountRu}</div>
         {txnId && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Ref: {txnId}</div>}
       </div>
+      {showVyapar && (
       <VyaparQrSection
         amountPaise={amountPaise}
         txnId={txnId}
@@ -304,22 +345,32 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
         paymentVerified={paymentVerified}
         checkingPay={checkingPay}
       />
+      )}
+      {(showAnyUpi || upiApps.length > 0) && (
+        <>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, textAlign: 'center', marginBottom: 10 }}>Or pay via UPI app</div>
       <UpiVpaCopy addToast={addToast} />
+      {showAnyUpi && (
       <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
         💳 Pay via UPI →
       </Btn>
+      )}
+      {upiApps.length > 0 && (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-        {UPI_APPS.map(([ic, lbl]) => (
+        {upiApps.filter(([, lbl]) => lbl !== 'Any UPI').map(([ic, lbl]) => (
           <button key={lbl} type="button" onClick={() => launchUpi(lbl)} disabled={inApp} style={{ display: 'flex', alignItems: 'center', gap: 10, ...S.card(), padding: '12px 14px', cursor: inApp ? 'not-allowed' : 'pointer', background: C.card, border: BDR, width: '100%', textAlign: 'left', opacity: inApp ? 0.5 : 1 }}>
             <span style={{ fontSize: 22 }}>{ic}</span>
             <span style={{ color: C.txt, fontSize: 13, fontWeight: 700 }}>{lbl}</span>
           </button>
         ))}
       </div>
-      {inApp && (
+      )}
+        </>
+      )}
+      {inApp && (showAnyUpi || upiApps.length > 0) && (
         <div style={{ fontSize: 11, color: C.dim, textAlign: 'center', marginBottom: 14 }}>Open in Chrome/Safari to launch UPI apps</div>
       )}
+      {showRazorpay && (
       <RazorpayPayButton
         linkUrl={pay.razorpayLinkUrl}
         loading={pay.razorpayLinkLoading}
@@ -328,6 +379,7 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
         onRetry={pay.retryRazorpay}
         onPay={() => pay.openRazorpay?.()}
       />
+      )}
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
           {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app — we confirm automatically (no manual “I\'ve paid” needed)'}
@@ -342,7 +394,7 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
         {confirming ? <><Spin size={16} /> Verifying payment…</> : paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'Waiting for payment confirmation…' : 'Pay via UPI or Razorpay first'}
       </Btn>
       {showUpiPicker && (
-        <UpiPickerModal onPick={launchUpiDirect} onClose={() => setShowUpiPicker(false)} />
+        <UpiPickerModal onPick={launchUpiDirect} onClose={() => setShowUpiPicker(false)} apps={upiApps} />
       )}
     </>
   );
@@ -471,6 +523,12 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
   const [registerGen, setRegisterGen] = useState(0);
   const loadRazorpayLink = useCallback(async (cancelledRef) => {
     if (!txnId || !amountPaise) return;
+    if (getPlatformVendors().razorpay === false) {
+      setRazorpayLinkUrl(null);
+      setRazorpayError('Razorpay disabled — use UPI');
+      setRazorpayLinkLoading(false);
+      return;
+    }
     setRazorpayLinkLoading(true);
     setRazorpayError(null);
     const data = await registerPaymentIntent(txnId, amountPaise, userId, { serviceId, serviceName });
@@ -535,6 +593,10 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
     addToast?.('Complete payment in Razorpay — we confirm automatically', 'info');
   };
   const triggerUpi = (app) => {
+    if (!isUpiAppEnabled(app, getPlatformVendors())) {
+      addToast?.(`${app} payments are temporarily unavailable`, 'error');
+      return;
+    }
     if (isInAppBrowser()) {
       addToast?.('Open in Chrome or Safari to pay via UPI', 'error');
       return;
@@ -11280,6 +11342,7 @@ const ADMIN_TABS = [
   { id: 'gps', label: 'GPS Status', icon: '📍' },
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
+  { id: 'go-live', label: 'Go-Live', icon: '🚀' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -11471,6 +11534,290 @@ function AdminStatCard({ label, value, sub, color }) {
       <div style={{ fontSize: 10, color: C.sub, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color: color || C.acc, marginTop: 6 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function AdminToggleSwitch({ on, disabled, onChange, dangerous }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!on)}
+      style={{
+        width: 46, height: 26, borderRadius: 13, border: 'none', flexShrink: 0,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        background: on ? (dangerous ? C.red : C.grn) : '#cbd5e1',
+        position: 'relative', transition: 'background 0.2s', opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 3, left: on ? 23 : 3, width: 20, height: 20,
+        borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+      }} />
+    </button>
+  );
+}
+
+function AdminGoLiveTab({ pin, onMsg, onErr, onGoVendors }) {
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busyKey, setBusyKey] = useState('');
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true);
+    setErr('');
+    try {
+      const data = await adminHubFetch('get_go_live_config', {}, pin);
+      setCfg(data);
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [pin, onErr]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleSwitch = async (item, next) => {
+    if (item.dangerous && next) {
+      const ok = window.confirm(`Turn ON "${item.setting}"?\n\nDevelopment only — weakens production security.`);
+      if (!ok) return;
+    }
+    if (item.setting?.startsWith('vendor_enable_') && !next) {
+      const ok = window.confirm(`Turn OFF "${item.setting}"?\n\nCustomers will not see or use this provider until you turn it back ON.`);
+      if (!ok) return;
+    }
+    setBusyKey(item.setting);
+    setErr('');
+    try {
+      await adminHubFetch('update_go_live_switch', { key: item.setting, enabled: next }, pin);
+      onMsg?.(`${item.setting} ${next ? 'ON' : 'OFF'}`);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const toggleCheck = async (item, next) => {
+    setBusyKey(item.setting);
+    setErr('');
+    try {
+      await adminHubFetch('update_go_live_check', { key: item.setting, checked: next }, pin);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const copyText = (text, label) => {
+    navigator.clipboard?.writeText(text).then(() => onMsg?.(`Copied ${label || 'URL'}`)).catch(() => {});
+  };
+
+  if (loading) return <div style={{ ...S.card(), padding: 24 }}><Spin size={24} /></div>;
+  if (!cfg) return <div style={{ ...S.card(), padding: 16, color: C.red }}>{err || 'Could not load go-live config'}</div>;
+
+  const rowHead = { fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: 0.5, textTransform: 'uppercase' };
+  const gridCols = 'minmax(88px,0.9fr) minmax(100px,0.85fr) minmax(0,2.2fr) minmax(56px,0.45fr) 52px';
+
+  const renderLiveCol = (item) => {
+    const rec = item.production_recommendation;
+    if (item.type === 'switch') {
+      const ok = item.dangerous ? !item.enabled : (rec === 'on' ? item.enabled : rec === 'off' ? !item.enabled : true);
+      return <span style={{ fontSize: 10, fontWeight: 700, color: ok ? C.grn : C.red }}>{rec === 'off' ? 'OFF' : rec === 'on' ? 'ON' : String(rec).toUpperCase()}</span>;
+    }
+    if (item.type === 'secret') {
+      return <span style={{ fontSize: 10, fontWeight: 700, color: item.configured ? C.grn : (item.required ? C.red : C.dim) }}>{item.configured ? 'SET' : item.required ? 'MISS' : '—'}</span>;
+    }
+    if (item.type === 'auto') {
+      return <span style={{ fontSize: 10, fontWeight: 700, color: item.passed ? C.grn : C.red }}>{item.passed ? 'PASS' : 'FAIL'}</span>;
+    }
+    if (item.type === 'check') {
+      return <span style={{ fontSize: 10, fontWeight: 700, color: item.checked ? C.grn : (item.required ? C.gold : C.dim) }}>{item.checked ? 'DONE' : item.required ? 'TODO' : '—'}</span>;
+    }
+    return <span style={{ fontSize: 10, color: C.dim }}>—</span>;
+  };
+
+  const renderControl = (item) => {
+    if (item.type === 'switch') {
+      return (
+        <AdminToggleSwitch
+          on={!!item.enabled}
+          dangerous={!!item.dangerous}
+          disabled={busyKey === item.setting}
+          onChange={(v) => toggleSwitch(item, v)}
+        />
+      );
+    }
+    if (item.type === 'check') {
+      return (
+        <AdminToggleSwitch
+          on={!!item.checked}
+          dangerous={false}
+          disabled={busyKey === item.setting}
+          onChange={(v) => toggleCheck(item, v)}
+        />
+      );
+    }
+    if (item.type === 'reference') {
+      return (
+        <button type="button" title="Copy" onClick={() => copyText(item.value, item.setting)}
+          style={{ background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 8, padding: '4px 8px', fontSize: 10, color: C.acc, cursor: 'pointer', fontWeight: 700 }}>
+          Copy
+        </button>
+      );
+    }
+    if (item.type === 'secret') {
+      return (
+        <div style={{
+          fontSize: 9, fontWeight: 700, textAlign: 'center', padding: '4px 4px', borderRadius: 8,
+          background: item.configured ? `${C.grn}22` : `${item.required ? C.red : C.dim}22`,
+          color: item.configured ? C.grn : (item.required ? C.red : C.dim),
+        }}>
+          {item.configured ? 'OK' : item.required ? '!' : '—'}
+        </div>
+      );
+    }
+    if (item.type === 'auto') {
+      return (
+        <div style={{
+          fontSize: 9, fontWeight: 700, textAlign: 'center', padding: '4px 4px', borderRadius: 8,
+          background: item.passed ? `${C.grn}22` : `${C.red}22`, color: item.passed ? C.grn : C.red,
+        }}>
+          {item.passed ? '✓' : '✗'}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const renderSection = (section) => {
+    let items = section.items || [];
+    if (section.id === 'manual') {
+      const byCat = {};
+      items.forEach((it) => {
+        const c = it.category || 'Checklist';
+        if (!byCat[c]) byCat[c] = [];
+        byCat[c].push(it);
+      });
+      items = Object.entries(byCat).flatMap(([cat, list]) => [
+        { type: 'category_header', category: cat },
+        ...list,
+      ]);
+    }
+
+    return (
+      <div key={section.id} style={{ ...S.card(), padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: BDR }}>
+          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{section.title}</div>
+          {section.subtitle ? <div style={{ fontSize: 11, color: C.dim, marginTop: 4, lineHeight: 1.45 }}>{section.subtitle}</div> : null}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 8, padding: '10px 16px', borderBottom: BDR, alignItems: 'center' }}>
+          <div style={rowHead}>Function</div>
+          <div style={rowHead}>Setting</div>
+          <div style={rowHead}>Description</div>
+          <div style={rowHead}>Live</div>
+          <div style={rowHead}>{section.id === 'references' ? 'Copy' : 'On'}</div>
+        </div>
+        {items.map((item, idx) => {
+          if (item.type === 'category_header') {
+            return (
+              <div key={`cat-${item.category}`} style={{ padding: '10px 16px 4px', background: `${C.acc}08`, borderBottom: BDR }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.acc }}>{item.category}</div>
+              </div>
+            );
+          }
+          return (
+            <div key={item.setting || idx} style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 8, padding: '11px 16px', borderBottom: BDR, alignItems: 'center' }}>
+              <div style={{ fontSize: 10, color: C.sub, lineHeight: 1.35 }}>{item.function}</div>
+              <code style={{ fontSize: 9, color: C.acc, wordBreak: 'break-all', lineHeight: 1.3 }}>{item.setting}</code>
+              <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.45 }}>
+                {item.description}
+                {item.type === 'reference' && item.value ? (
+                  <div style={{ fontSize: 9, color: C.dim, marginTop: 4, wordBreak: 'break-all', fontFamily: 'monospace' }}>{item.value}</div>
+                ) : null}
+              </div>
+              {renderLiveCol(item)}
+              {renderControl(item)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const p = cfg.progress || {};
+
+  return (
+    <div>
+      <div style={{
+        ...S.card(), padding: 16, marginBottom: 14,
+        border: `1.5px solid ${cfg.production_ready ? C.grn : C.gold}`,
+        background: cfg.production_ready ? `${C.grn}12` : `${C.gold}12`,
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, marginBottom: 4 }}>
+          {cfg.production_ready ? '✓ All critical items complete — ready for go-live' : '⚠ Complete all critical items before real customers'}
+        </div>
+        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>
+          Runtime switches · Supabase secrets · auto checks · manual verification (bank, DLT, tests). v{cfg.app_version || '—'}
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          {[
+            ['Secrets', p.secrets],
+            ['Switches', p.switches],
+            ['Vendors', p.vendors],
+            ['Auto', p.auto],
+            ['Manual', p.manual],
+          ].map(([label, block]) => block ? (
+            <div key={label} style={{ ...S.card({ padding: '8px 12px' }), minWidth: 100 }}>
+              <div style={{ fontSize: 10, color: C.dim, fontWeight: 700 }}>{label}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: block.done >= block.total ? C.grn : C.txt }}>{block.done}/{block.total}</div>
+            </div>
+          ) : null)}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn v="outline" sm onClick={load}>Refresh</Btn>
+          <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP reports →" />
+          <button type="button" onClick={() => window.open(`${APP_URL}/scanv-qr.png`, '_blank')} style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.bdr}`, background: C.surf, color: C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>Print QR ↗</button>
+        </div>
+      </div>
+
+      {(cfg.sections || []).map(renderSection)}
+
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>Operations notes</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
+          Dispatch mode: <strong style={{ color: C.txt }}>{cfg.dispatch_mode}</strong> — change in{' '}
+          {onGoVendors ? (
+            <button type="button" onClick={onGoVendors} style={{ background: 'none', border: 'none', color: C.acc, cursor: 'pointer', fontWeight: 700, padding: 0, fontSize: 11 }}>Vendors tab</button>
+          ) : 'Vendors tab'}
+          · Support: <strong>+91-9270194842</strong>
+          · No AWS server required (Vercel + Supabase)
+        </div>
+        {(cfg.not_required || []).map((n) => (
+          <div key={n.item} style={{ fontSize: 10, color: C.dim, padding: '3px 0' }}>Not required: {n.item} — {n.reason}</div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 8 }}>Deploy / push process</div>
+        <pre style={{ fontSize: 11, color: C.acc, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.6, margin: 0 }}>{(cfg.deploy_commands || []).join('\n')}</pre>
+        <div style={{ fontSize: 11, color: C.dim, marginTop: 10 }}>Repo docs: docs/GO-LIVE-CHECKLIST.md · docs/SECRETS-AND-PINS-INVENTORY.md</div>
+      </div>
+
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{err}</div>}
     </div>
   );
 }
@@ -12193,6 +12540,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
                 <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />
+                <button type="button" onClick={() => setTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
               </div>
             </div>
           </div>
@@ -12281,6 +12629,10 @@ function AdminControlCenter({ onPricesUpdated }) {
             </div>
             <AdminOtpDeliveryTab pin={usePin} showCallbackUrl />
           </div>
+        )}
+
+        {tab === 'go-live' && (
+          <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => setTab('vendors')} />
         )}
 
         {tab === 'database' && (
@@ -12558,6 +12910,8 @@ export default function App() {
 
   useEffect(()=>{
     (async()=>{
+      // Load vendor toggles (payment buttons, OTP routes) before customer flows
+      await loadPlatformVendors();
       // Load catalog (prices + names) from Supabase before showing services
       await fetchCatalogFromDb(refreshPricing);
 

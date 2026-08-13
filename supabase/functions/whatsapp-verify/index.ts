@@ -10,6 +10,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { isVendorEnabled } from "../_shared/vendor-providers.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -479,6 +480,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "generate") {
+      const whatsappEnabled = await isVendorEnabled(supabase, "vendor_enable_whatsapp");
+      if (!whatsappEnabled) {
+        return json({ error: "WhatsApp verification is temporarily unavailable" }, 503);
+      }
+
       const mobile = normalizeMobile(String(body.mobile || ""));
       if (!mobile) {
         return json({ error: "Invalid mobile number" }, 400);

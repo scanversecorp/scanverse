@@ -90,26 +90,41 @@ export async function sendOtpDelivery(
   mobile: string,
   otpCode: string,
   message: string,
+  opts?: {
+    allowVoiceFallback?: boolean;
+    skip2Factor?: boolean;
+    skipMsg91?: boolean;
+    skipTwilio?: boolean;
+  },
 ): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string; channel?: "sms" | "voice" }> {
+  const allowVoice = opts?.allowVoiceFallback !== false;
   const norm = normalizeMobile(mobile);
   if (!norm) return { ok: false, error: "Invalid mobile" };
 
   const twoFactorKey = Deno.env.get("TWOFACTOR_API_KEY");
-  if (twoFactorKey && norm.startsWith("+91")) {
+  if (!opts?.skip2Factor && twoFactorKey && norm.startsWith("+91")) {
     const sms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
     if (sms.ok) return { ...sms, channel: "sms" };
-    const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
-    if (voice.ok) return { ...voice, channel: "voice" };
+    if (allowVoice) {
+      const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
+      if (voice.ok) return { ...voice, channel: "voice" };
+    }
   }
 
-  const sms = await sendSms(mobile, message, otpCode);
+  const sms = await sendSms(mobile, message, otpCode, {
+    skipMsg91: opts?.skipMsg91,
+    skipTwilio: opts?.skipTwilio,
+    skip2Factor: opts?.skip2Factor,
+  });
   if (sms.ok) return { ...sms, channel: "sms" };
 
-  if (twoFactorKey && !norm.startsWith("+91")) {
+  if (!opts?.skip2Factor && twoFactorKey && !norm.startsWith("+91")) {
     const tfSms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
     if (tfSms.ok) return { ...tfSms, channel: "sms" };
-    const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
-    if (voice.ok) return { ...voice, channel: "voice" };
+    if (allowVoice) {
+      const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
+      if (voice.ok) return { ...voice, channel: "voice" };
+    }
   }
 
   return { ok: false, error: sms.error || "OTP delivery failed — try Resend or WhatsApp verify" };
@@ -119,6 +134,7 @@ export async function sendSms(
   mobile: string,
   message: string,
   otpCode?: string,
+  opts?: { skipMsg91?: boolean; skipTwilio?: boolean; skip2Factor?: boolean },
 ): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
   const norm = normalizeMobile(mobile);
   if (!norm) return { ok: false, error: "Invalid mobile" };
@@ -130,7 +146,7 @@ export async function sendSms(
   const twoFactorKey = Deno.env.get("TWOFACTOR_API_KEY");
 
   // MSG91 SMS
-  if (msg91Key) {
+  if (!opts?.skipMsg91 && msg91Key) {
     const sender = Deno.env.get("MSG91_SMS_SENDER") || "SCANV";
     const res = await fetch("https://control.msg91.com/api/v5/flow/", {
       method: "POST",
@@ -165,7 +181,7 @@ export async function sendSms(
   }
 
   // Twilio SMS
-  if (twilioSid && twilioToken && twilioFrom) {
+  if (!opts?.skipTwilio && twilioSid && twilioToken && twilioFrom) {
     const params = new URLSearchParams({
       From: twilioFrom,
       To: norm,
@@ -202,7 +218,7 @@ export async function sendSms(
   }
 
   // 2Factor.in (India) — OTP route when otpCode set; transactional SMS for dispatch alerts
-  if (twoFactorKey) {
+  if (!opts?.skip2Factor && twoFactorKey) {
     const phone10 = mobileDigitsE164(norm).slice(-10);
     const otp = otpCode || message.match(/\b(\d{6})\b/)?.[1];
     if (otp) {
