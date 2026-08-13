@@ -124,18 +124,36 @@ async function deleteSetting(sb: ReturnType<typeof adminSb>, key: string) {
 }
 
 async function getEnrolledTotpSecret(sb: ReturnType<typeof adminSb>): Promise<string | null> {
+  const dbSecret = await getSetting(sb, TOTP_SECRET_KEY);
+  if (dbSecret?.trim()) return dbSecret.trim();
   const envSecret = Deno.env.get("PRICING_TOTP_SECRET")?.trim();
-  if (envSecret) return envSecret;
-  return await getSetting(sb, TOTP_SECRET_KEY);
+  return envSecret || null;
 }
 
-async function checkTotp(req: Request, sb: ReturnType<typeof adminSb>): Promise<{ ok: boolean; enrolled: boolean; error?: string }> {
+function totpCodeFrom(req: Request, body: Record<string, unknown>): string {
+  return String(body.code || req.headers.get("x-pricing-totp") || "").replace(/\D/g, "");
+}
+
+async function checkTotpCode(
+  secret: string,
+  code: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!code || code.length !== 6) return { ok: false, error: "Authenticator code required" };
+  const valid = await verifyTotp(secret.trim(), code, 2);
+  if (!valid) return { ok: false, error: "Invalid authenticator code — try the next code" };
+  return { ok: true };
+}
+
+async function checkTotp(
+  req: Request,
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown> = {},
+): Promise<{ ok: boolean; enrolled: boolean; error?: string }> {
   const secret = await getEnrolledTotpSecret(sb);
   if (!secret) return { ok: true, enrolled: false };
-  const code = req.headers.get("x-pricing-totp") || "";
-  if (!code) return { ok: false, enrolled: true, error: "Authenticator code required" };
-  const valid = await verifyTotp(secret, code);
-  if (!valid) return { ok: false, enrolled: true, error: "Invalid authenticator code" };
+  const code = totpCodeFrom(req, body);
+  const result = await checkTotpCode(secret, code);
+  if (!result.ok) return { ok: false, enrolled: true, error: result.error };
   return { ok: true, enrolled: true };
 }
 
@@ -248,18 +266,20 @@ async function handleTotpAction(
   if (action === "totp_confirm") {
     const pending = await getSetting(sb, TOTP_PENDING_KEY);
     if (!pending) return json({ error: "No pending enrollment — start again" }, 400);
-    const code = String(body.code || req.headers.get("x-pricing-totp") || "");
-    const valid = await verifyTotp(pending, code);
-    if (!valid) return json({ error: "Invalid code — check Microsoft Authenticator and try again" }, 401);
+    const code = totpCodeFrom(req, body);
+    const result = await checkTotpCode(pending, code);
+    if (!result.ok) return json({ error: result.error || "Invalid code — check Microsoft Authenticator and try again" }, 401);
     await setSetting(sb, TOTP_SECRET_KEY, pending, "TOTP secret for pricing admin 2FA");
     await deleteSetting(sb, TOTP_PENDING_KEY);
     return issueSessionResponse({ success: true, enrolled: true });
   }
 
   if (action === "totp_verify") {
-    const totp = await checkTotp(req, sb);
-    if (!totp.enrolled) return json({ success: true, enrolled: false });
-    if (!totp.ok) return json({ error: totp.error }, 401);
+    const enrolledSecret = await getEnrolledTotpSecret(sb);
+    if (!enrolledSecret) return json({ success: true, enrolled: false });
+    const code = totpCodeFrom(req, body);
+    const result = await checkTotpCode(enrolledSecret, code);
+    if (!result.ok) return json({ error: result.error }, 401);
     return issueSessionResponse({ success: true, enrolled: true });
   }
 

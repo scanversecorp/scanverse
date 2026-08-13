@@ -1759,11 +1759,13 @@ function setPricingAuth(pin, totpOk = false, sessionToken = null) {
 
 function pricingAdminHeaders(pin, { totp } = {}) {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'x-pricing-pin': pin };
+  if (totp) {
+    headers['x-pricing-totp'] = String(totp).replace(/\D/g, '');
+    return headers;
+  }
   const auth = getPricingAuth();
   if (auth?.sessionToken && auth.pin === pin) {
     headers['x-pricing-session'] = auth.sessionToken;
-  } else if (totp) {
-    headers['x-pricing-totp'] = String(totp).replace(/\D/g, '');
   }
   return headers;
 }
@@ -1771,8 +1773,8 @@ function pricingAdminHeaders(pin, { totp } = {}) {
 async function pricingAdminTotp(pin, action, extra = {}, totp) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...extra }),
+    headers: { ...pricingAdminHeaders(pin, { totp }), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, code: totp ? String(totp).replace(/\D/g, '') : undefined, ...extra }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
@@ -7405,7 +7407,8 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
       const status = await pricingAdminTotp(pin, 'totp_status');
       setTotpEnrolled(!!status.enrolled);
       sessionStorage.setItem(PRICING_PIN_KEY, pin);
-      setPricingAuth(pin, false);
+      sessionStorage.removeItem(PRICING_AUTH_KEY);
+      setPricingAuth(pin, false, null);
       if (!status.enrolled) {
         await startEnroll(pin);
         setMsg('Set up two-factor authentication to continue');

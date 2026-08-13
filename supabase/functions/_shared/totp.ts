@@ -78,7 +78,7 @@ async function totpAt(secret: Uint8Array, counter: number): Promise<string> {
 export async function verifyTotp(
   secretB32: string,
   code: string,
-  window = 1,
+  window = 2,
 ): Promise<boolean> {
   const digits = String(code || "").replace(/\D/g, "");
   if (digits.length !== 6) return false;
