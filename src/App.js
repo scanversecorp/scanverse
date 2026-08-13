@@ -3817,7 +3817,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
             {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
           </div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:'0 0 12px',width:'100%',boxSizing:'border-box',margin:0}}>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:'0 14px 12px',width:'100%',boxSizing:'border-box',margin:0}}>
             {['✓ DPDP 2023','✓ Verified partners','✓ 25% off','✓ Human-first'].map(p=>(
               <span key={p} style={{fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99,boxSizing:'border-box',margin:0}}>{p}</span>
             ))}
