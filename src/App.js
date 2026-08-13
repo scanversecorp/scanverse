@@ -11362,6 +11362,7 @@ const ADMIN_TABS = [
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
+  { id: 'diagrams', label: 'Architecture', icon: '📐' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -11535,6 +11536,93 @@ function AdminGpsStatusTab({ pin }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const ADMIN_MERMAID_ARCH = `flowchart TB
+    C[Customer] --> PWA[ScanV PWA]
+    PART[Service partner] --> PWA
+    ADM[Leader Admin PIN] --> PWA
+    PWA --> SB[Supabase DB Auth Edge Functions]
+    SB --> OTP[2Factor MSG91 Twilio toggles]
+    SB --> PAY[Vyapar UPI Razorpay toggles]
+    PWA --> UPI[Google Pay PhonePe Paytm Navi BHIM]`;
+
+const ADMIN_MERMAID_DATAFLOW = `sequenceDiagram
+    actor C as Customer
+    participant PWA as ScanV PWA
+    participant OTP as send-otp
+    participant PAY as razorpay-payment
+    participant DISP as booking-dispatch
+    participant P as Partner
+    C->>PWA: Browse book verify OTP
+    C->>PWA: Pay UPI or Razorpay
+    PWA->>PAY: check amount_ok
+    PWA->>DISP: start dispatch
+    DISP->>P: In-app offer plus SMS backup
+    P->>DISP: accept
+    C->>PWA: Track booking`;
+
+function AdminDiagramsTab() {
+  const [view, setView] = useState('architecture');
+  const hostRef = useRef(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setErr('');
+    const run = async () => {
+      try {
+        if (!window.mermaid) {
+          await new Promise((resolve, reject) => {
+            const existing = document.querySelector('script[data-scanv-mermaid]');
+            if (existing) { existing.addEventListener('load', resolve); return; }
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+            s.dataset.scanvMermaid = '1';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+          window.mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+        }
+        if (cancelled || !hostRef.current) return;
+        const src = view === 'architecture' ? ADMIN_MERMAID_ARCH : ADMIN_MERMAID_DATAFLOW;
+        hostRef.current.innerHTML = '';
+        const el = document.createElement('div');
+        el.className = 'mermaid';
+        el.textContent = src;
+        hostRef.current.appendChild(el);
+        await window.mermaid.run({ nodes: [el] });
+      } catch (e) {
+        if (!cancelled) setErr(e.message || 'Could not render diagram');
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [view]);
+
+  const tabBtn = (id, label) => ({
+    padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${view === id ? C.acc : C.bdr}`,
+    background: view === id ? `${C.acc}18` : C.surf, color: view === id ? C.acc : C.sub,
+    fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF,
+  });
+
+  return (
+    <div>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
+        <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Confidential — Admin only</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
+          Architecture and data-flow diagrams are not published on the public site. Provider boundaries may change as integrations are added — use Go-Live vendor toggles. Repo: <code style={{ color: C.acc }}>docs/ARCHITECTURE.md</code> · <code style={{ color: C.acc }}>docs/APP-DATA-FLOW.md</code> · <code style={{ color: C.acc }}>docs/REGULATORY-APPROVALS-INDIA.md</code>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <button type="button" style={tabBtn('architecture', '')} onClick={() => setView('architecture')}>System architecture</button>
+        <button type="button" style={tabBtn('dataflow', '')} onClick={() => setView('dataflow')}>Application data flow</button>
+      </div>
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{err}</div>}
+      <div ref={hostRef} style={{ ...S.card(), padding: 16, overflowX: 'auto', minHeight: 280 }} />
     </div>
   );
 }
@@ -12571,8 +12659,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 System diagrams v5.5.3 — updated for Vyapar UPI, Go-Live vendor toggles, and service-provider integrations. Diagrams may change as providers are onboarded.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <a href={`${APP_URL}/docs/architecture.html`} target="_blank" rel="noreferrer" style={{ ...S.card({ padding: '10px 14px' }), textDecoration: 'none', fontSize: 12, fontWeight: 700, color: C.acc }}>System architecture ↗</a>
-                <a href={`${APP_URL}/docs/data-flow.html`} target="_blank" rel="noreferrer" style={{ ...S.card({ padding: '10px 14px' }), textDecoration: 'none', fontSize: 12, fontWeight: 700, color: C.acc }}>Data flow ↗</a>
+                <button type="button" onClick={() => setTab('diagrams')} style={{ ...tabBtn({ id: 'diagrams' }), border: `1.5px solid ${C.acc}` }}>📐 Architecture diagrams →</button>
                 <button type="button" onClick={() => setTab('database')} style={{ ...tabBtn({ id: 'database' }), border: `1.5px solid ${C.bdr}` }}>Database tab →</button>
               </div>
             </div>
@@ -12668,6 +12755,8 @@ function AdminControlCenter({ onPricesUpdated }) {
           <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => setTab('vendors')} />
         )}
 
+        {tab === 'diagrams' && <AdminDiagramsTab />}
+
         {tab === 'database' && (
           <div>
             <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>External dashboards, architecture diagrams, and key tables.</div>
@@ -12677,8 +12766,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 Mermaid diagrams — system context, deployment, payments (Vyapar UPI · GPay · PhonePe · Razorpay), OTP, dispatch. Provider boundaries may change; live toggles in Go-Live tab.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <a href={`${APP_URL}/docs/architecture.html`} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>System architecture ↗</a>
-                <a href={`${APP_URL}/docs/data-flow.html`} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Application data flow ↗</a>
+                <button type="button" onClick={() => setTab('diagrams')} style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>📐 Architecture diagrams</button>
               </div>
             </div>
             <div style={{ display: 'grid', gap: 10 }}>

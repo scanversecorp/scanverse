@@ -3,7 +3,7 @@
 **Version:** v5.5.3 · **Updated:** 14 Aug 2026
 
 > This file is kept for legacy links. **Canonical architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md)  
-> **Data flows:** [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) · **HTML:** [/docs/architecture.html](/docs/architecture.html)
+> **Data flows:** [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) · **Access:** `#admin` → Architecture tab (not public)
 
 The full system context, deployment, edge-function, vendor-toggle, and security diagrams live in **ARCHITECTURE.md** (single source of truth).
 

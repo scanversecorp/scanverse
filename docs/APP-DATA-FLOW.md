@@ -4,7 +4,7 @@
 
 > **Integration note:** Provider order and availability depend on Admin Go-Life vendor toggles and Supabase secrets. Diagrams show the current default path; alternate routes activate when primary providers are disabled or fail.
 
-**View in browser:** [Data flow diagram](/docs/data-flow.html) · [Architecture](/docs/architecture.html)
+> **Access:** Admin hub only — `#admin` → **Architecture** tab. Not on the public site.
 
 ---
 

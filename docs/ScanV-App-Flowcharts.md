@@ -4,7 +4,7 @@
 **Live:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)
 
 > Canonical data-flow sequences: [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) · System context: [ARCHITECTURE.md](./ARCHITECTURE.md)  
-> **Browser view:** [/docs/data-flow.html](/docs/data-flow.html)
+> **Browser view:** Admin hub → **Architecture** tab (PIN required)
 
 Provider integrations may change — see Admin → Go-Live vendor toggles.
 

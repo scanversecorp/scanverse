@@ -52,17 +52,16 @@ SPA rewrites to `index.html`; rendered by `LegalPage` component.
 
 ---
 
-## Documentation & diagrams
+## Documentation & diagrams (Admin PIN only)
 
-| Document | URL |
-|----------|-----|
-| **Architecture (HTML)** | https://scanv-tau.vercel.app/docs/architecture.html |
-| **Data flow (HTML)** | https://scanv-tau.vercel.app/docs/data-flow.html |
-| Architecture (markdown) | `docs/ARCHITECTURE.md` |
-| Data flow (markdown) | `docs/APP-DATA-FLOW.md` |
-| Docs index | `docs/README.md` |
+| Document | Access |
+|----------|--------|
+| Architecture diagrams | `#admin` → **Architecture** tab only |
+| Data flow diagrams | `#admin` → **Architecture** tab only |
+| Markdown source | `docs/ARCHITECTURE.md`, `docs/APP-DATA-FLOW.md` (private repo) |
+| Regulatory roadmap | `docs/REGULATORY-APPROVALS-INDIA.md` (Admin / leadership) |
 
-Diagrams reflect v5.5.3. Provider integrations may change — see **Go-Live** vendor toggles.
+Public URLs `/docs/architecture.html` and `/docs/data-flow.html` are **removed** — not served on scanv-tau.vercel.app.
 
 ---
 

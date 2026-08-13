@@ -1,5 +1,5 @@
 /**
- * ScanV booking dispatch — nearest vendor match + in-app Uber-style offers
+ * ScanV booking dispatch — nearest vendor match + sequential in-app job offers
  *
  * Actions:
  *   start        — { booking_id, service_id, service_name, lat, lng, location, date, time }

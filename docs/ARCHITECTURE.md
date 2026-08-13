@@ -3,9 +3,9 @@
 **Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCORE Global Corporation  
 **Production:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)
 
-> **Integration note:** External service providers (OTP, UPI, payments) are pluggable. Boundaries in these diagrams may change as new providers are onboarded. Live on/off controls: Admin Hub → **Go-Live** → *Dependent vendors & payment providers*.
+> **Integration note:** External service providers are pluggable via Admin Go-Live toggles. Diagrams may change as integrations are added.
 
-**View in browser (admin):** [Architecture diagram](/docs/architecture.html) · [Data flow diagram](/docs/data-flow.html)
+> **Access:** Admin hub only — `#admin` → **Architecture** tab. Not published on the public website.
 
 ---
 
@@ -105,8 +105,7 @@ flowchart TB
 | Production PWA | https://scanv-tau.vercel.app |
 | QR landing | https://scanv-tau.vercel.app/?qr=1 |
 | Printable QR | https://scanv-tau.vercel.app/scanv-qr.png |
-| Architecture HTML | https://scanv-tau.vercel.app/docs/architecture.html |
-| Data flow HTML | https://scanv-tau.vercel.app/docs/data-flow.html |
+| Architecture diagrams | Admin only → `#admin` → Architecture tab |
 
 ---
 
