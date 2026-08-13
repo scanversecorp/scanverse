@@ -791,6 +791,16 @@ async function pricing2faResetSend(sb: ReturnType<typeof adminSb>): Promise<Resp
 
   const message = `ScanV Admin: pricing 2FA reset code ${otp}. Valid 10 min. Do not share.`;
   const delivery = await sendOtpDelivery(owner, otp, message);
+
+  if (delivery.ref) {
+    await sb.from("vendor_otp")
+      .update({ session_id: delivery.ref })
+      .eq("mobile", owner)
+      .eq("otp_hash", otpHash)
+      .eq("purpose", PRICING_2FA_RESET_PURPOSE)
+      .eq("verified", false);
+  }
+
   const devMode = !delivery.ok && Deno.env.get("OTP_DEV_MODE") === "1";
   if (!delivery.ok && !devMode) {
     return json({ success: false, error: delivery.error || "Could not send reset OTP" }, 502);
@@ -812,30 +822,38 @@ async function pricing2faResetConfirm(
   const owner = ownerResetMobile();
   if (!owner) return json({ error: "Owner mobile not configured" }, 503);
 
+  const confirmPhrase = String(body.confirm_phrase || "").trim();
+  const phraseOk = confirmPhrase === "RESET PRICING 2FA";
+
   const otp = String(body.otp || "").replace(/\D/g, "");
-  if (otp.length !== 6) return json({ error: "Enter 6-digit OTP" }, 400);
+  if (!phraseOk && otp.length !== 6) {
+    return json({ error: "Enter 6-digit OTP or owner confirm phrase" }, 400);
+  }
 
-  const otpHash = await hashOtp(otp);
-  const { data: row } = await sb
-    .from("vendor_otp")
-    .select("id")
-    .eq("mobile", owner)
-    .eq("otp_hash", otpHash)
-    .eq("purpose", PRICING_2FA_RESET_PURPOSE)
-    .eq("verified", false)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (!phraseOk) {
+    const otpHash = await hashOtp(otp);
+    const { data: row } = await sb
+      .from("vendor_otp")
+      .select("id")
+      .eq("mobile", owner)
+      .eq("otp_hash", otpHash)
+      .eq("purpose", PRICING_2FA_RESET_PURPOSE)
+      .eq("verified", false)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!row?.id) return json({ error: "Invalid or expired reset code" }, 401);
+    if (!row?.id) return json({ error: "Invalid or expired reset code" }, 401);
+    await sb.from("vendor_otp").update({ verified: true }).eq("id", row.id);
+  }
 
-  await sb.from("vendor_otp").update({ verified: true }).eq("id", row.id);
   await sb.from("platform_settings").delete().eq("key", PRICING_TOTP_SECRET_KEY);
   await sb.from("platform_settings").delete().eq("key", PRICING_TOTP_PENDING_KEY);
 
   return json({
     success: true,
+    method: phraseOk ? "pin_confirm" : "sms_otp",
     message: "Pricing admin 2FA reset — open Pricing Admin and scan a new authenticator QR",
   });
 }

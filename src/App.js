@@ -11101,6 +11101,8 @@ function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
   const [status, setStatus] = useState(null);
   const [step, setStep] = useState('idle');
   const [otp, setOtp] = useState('');
+  const [confirmPhrase, setConfirmPhrase] = useState('');
+  const [showPhraseReset, setShowPhraseReset] = useState(false);
   const [channel, setChannel] = useState('sms');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -11132,8 +11134,8 @@ function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
       setStep('otp');
       setOtp('');
       onMsg?.(data.channel === 'voice'
-        ? `Reset code — answer call to ${data.owner_mobile_masked}`
-        : `Reset code sent to ${data.owner_mobile_masked}`);
+        ? `Reset code — answer call to ${data.owner_mobile_masked} (via ${data.provider || '2factor'})`
+        : `Reset code sent to ${data.owner_mobile_masked} via ${data.provider || '2factor'} — check SMS or wait for call`);
     } catch (e) {
       setErr(e.message);
       onErr?.(e.message);
@@ -11142,13 +11144,17 @@ function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
 
   const confirmReset = async () => {
     const code = otp.replace(/\D/g, '');
-    if (code.length !== 6) { setErr('Enter the 6-digit code'); return; }
+    const phrase = confirmPhrase.trim();
+    if (!phrase && code.length !== 6) { setErr('Enter the 6-digit code or owner confirm phrase'); return; }
     setBusy(true); setErr('');
     try {
-      const data = await adminHubFetch('pricing_2fa_reset_confirm', { otp: code }, pin);
+      const payload = phrase ? { confirm_phrase: phrase } : { otp: code };
+      const data = await adminHubFetch('pricing_2fa_reset_confirm', payload, pin);
       sessionStorage.removeItem(PRICING_AUTH_KEY);
       setStep('done');
       setOtp('');
+      setConfirmPhrase('');
+      setShowPhraseReset(false);
       onMsg?.(data.message || 'Pricing 2FA reset — enroll a new authenticator on next login');
       load();
     } catch (e) {
@@ -11157,14 +11163,23 @@ function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
     } finally { setBusy(false); }
   };
 
+  const confirmPhraseReset = async () => {
+    if (confirmPhrase.trim() !== 'RESET PRICING 2FA') {
+      setErr('Type exactly: RESET PRICING 2FA');
+      return;
+    }
+    await confirmReset();
+  };
+
   if (loading) return <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}><Spin size={20} /></div>;
 
   return (
     <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}44` }}>
       <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 4 }}>Pricing admin — reset authenticator (2FA)</div>
       <div style={{ fontSize: 12, color: C.sub, marginBottom: 12, lineHeight: 1.55 }}>
-        Lost Microsoft Authenticator access? Owner-only recovery: hub PIN + SMS/voice OTP to <code style={{ color: C.acc }}>PRICING_2FA_RESET_MOBILE</code>.
-        Requires <strong>ADMIN_HUB_PIN</strong> or <strong>SUPPORT_ADMIN_PIN</strong> (not pricing PIN alone).
+        Lost Microsoft Authenticator access? Owner recovery while logged into this hub (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN):
+        <strong> SMS/voice OTP</strong> to <code style={{ color: C.acc }}>PRICING_2FA_RESET_MOBILE</code> via 2Factor.in,
+        or <strong>confirm phrase</strong> if network blocks SMS (no 2Factor needed).
       </div>
 
       {!status?.owner_configured && (
@@ -11177,9 +11192,27 @@ function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
         <>
           <div style={{ fontSize: 12, color: C.grn, marginBottom: 10, fontWeight: 600 }}>● Authenticator enrolled</div>
           {step === 'idle' && (
-            <Btn v="outline" onClick={sendResetOtp} disabled={busy || !status?.owner_configured}>
-              {busy ? 'Sending…' : `Send reset code${status?.owner_mobile_masked ? ` to ${status.owner_mobile_masked}` : ''}`}
-            </Btn>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Btn v="outline" onClick={sendResetOtp} disabled={busy || !status?.owner_configured}>
+                {busy ? 'Sending…' : `Send reset code${status?.owner_mobile_masked ? ` to ${status.owner_mobile_masked}` : ''}`}
+              </Btn>
+              <Btn v="ghost" sm onClick={() => { setShowPhraseReset(v => !v); setErr(''); setConfirmPhrase(''); }} disabled={busy}>
+                {showPhraseReset ? 'Hide phrase reset' : 'Reset without SMS (phrase)'}
+              </Btn>
+            </div>
+          )}
+          {step === 'idle' && showPhraseReset && (
+            <div style={{ marginTop: 12, padding: 12, background: C.deep, borderRadius: 8, border: BDR }}>
+              <div style={{ fontSize: 11, color: C.dim, marginBottom: 8, lineHeight: 1.5 }}>
+                Hub exec PIN already verified. Type the phrase below — no 2Factor SMS required (use when network blocks OTP).
+              </div>
+              <Field label='Type exactly: RESET PRICING 2FA'>
+                <input value={confirmPhrase} onChange={e => setConfirmPhrase(e.target.value)} style={S.inp()} placeholder="RESET PRICING 2FA" autoComplete="off" />
+              </Field>
+              <Btn onClick={confirmPhraseReset} disabled={busy || confirmPhrase.trim() !== 'RESET PRICING 2FA'} style={{ marginTop: 10 }}>
+                {busy ? 'Resetting…' : 'Confirm reset (no SMS)'}
+              </Btn>
+            </div>
           )}
           {step === 'otp' && (
             <>
@@ -11194,6 +11227,9 @@ function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
                 <Btn v="ghost" onClick={() => { setStep('idle'); setOtp(''); setErr(''); }} disabled={busy}>Cancel</Btn>
                 <Btn v="outline" sm onClick={sendResetOtp} disabled={busy}>Resend code</Btn>
               </div>
+              <button type="button" onClick={() => { setStep('idle'); setShowPhraseReset(true); setOtp(''); }} style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF, marginTop: 10 }}>
+                SMS not received? Use phrase reset instead →
+              </button>
             </>
           )}
           {step === 'done' && (
