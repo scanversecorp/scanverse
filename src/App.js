@@ -584,6 +584,8 @@ const C = {
   grn:'#007a4d', red:'#c62828', vio:'#7c3aed',
   txt:'#121212', sub:'#262626', dim:'#737373',
   bdr:'rgba(0,0,0,0.08)', gls:'rgba(0,0,0,0.04)',
+  /** Very light muted text for GPS / silentGeo / IP pre-filled values */
+  autofill:'#C8CDD6',
 };
 const IG_TILE = {
   shadow:'0 1px 2px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08)',
@@ -2143,6 +2145,42 @@ function Field({label,req,note,children}) {
   );
 }
 
+/** Build auto-fill flags for fields that have non-empty pre-populated values */
+function autoFlagsFromValues(values) {
+  const flags = {};
+  Object.entries(values).forEach(([k, v]) => {
+    if (v != null && String(v).trim() !== '') flags[k] = true;
+  });
+  return flags;
+}
+
+/** Track GPS / silentGeo / IP pre-fills — light text until focus or edit */
+function useAutoFillFields(initialAuto = {}) {
+  const [auto, setAuto] = useState(initialAuto);
+  const [touched, setTouched] = useState({});
+
+  const markAuto = useCallback((fields) => {
+    const patch = typeof fields === 'string' ? { [fields]: true } : fields;
+    setAuto((p) => ({ ...p, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v)) }));
+  }, []);
+
+  const markTouched = useCallback((field) => {
+    setTouched((p) => (p[field] ? p : { ...p, [field]: true }));
+  }, []);
+
+  const inpStyle = useCallback((field, extra = {}) => {
+    const muted = auto[field] && !touched[field];
+    return S.inp({ color: muted ? C.autofill : C.txt, ...extra });
+  }, [auto, touched]);
+
+  const bind = useCallback((field, onChange) => ({
+    onFocus: () => markTouched(field),
+    onChange: (e) => { markTouched(field); onChange(e); },
+  }), [markTouched]);
+
+  return { auto, markAuto, markTouched, inpStyle, bind };
+}
+
 function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
 }
@@ -3145,6 +3183,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const [village, setVillage]     = useState(silentGeo?.village||'');
   const [city, setCity]           = useState(silentGeo?.city||'');
   const [pincode, setPincode]     = useState(silentGeo?.pincode||'');
+  const [scheduleLoc, setScheduleLoc] = useState('');
+  const scheduleLocInit = useRef(false);
+  const browseAuto = useAutoFillFields(autoFlagsFromValues({
+    address: silentGeo?.address,
+    village: silentGeo?.village,
+    city: silentGeo?.city,
+    pincode: silentGeo?.pincode,
+  }));
+  const { markAuto, inpStyle, bind: browseBind } = browseAuto;
   const [otpSent, setOtpSent]     = useState(false);
   const [otpCode, setOtpCode]     = useState(['','','','','','']);
   const [otpTargetMobile, setOtpTargetMobile] = useState('');
@@ -3219,12 +3266,28 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // Update address fields when GPS arrives
   useEffect(()=>{
     if (silentGeo) {
-      setAddress(a=>a||silentGeo.address||'');
-      setVillage(v=>v||silentGeo.village||'');
-      setCity(c=>c||silentGeo.city||'Pune');
-      setPincode(p=>p||silentGeo.pincode||'');
+      const flags = {};
+      if (silentGeo.address) { setAddress(a=>{ if (!a) flags.address = true; return a||silentGeo.address||''; }); }
+      if (silentGeo.village) { setVillage(v=>{ if (!v) flags.village = true; return v||silentGeo.village||''; }); }
+      if (silentGeo.city) { setCity(c=>{ if (!c) flags.city = true; return c||silentGeo.city||'Pune'; }); }
+      if (silentGeo.pincode) { setPincode(p=>{ if (!p) flags.pincode = true; return p||silentGeo.pincode||''; }); }
+      if (Object.keys(flags).length) markAuto(flags);
     }
-  },[silentGeo]);
+  },[silentGeo, markAuto]);
+
+  useEffect(() => {
+    if (screen !== 'schedule') {
+      scheduleLocInit.current = false;
+      return;
+    }
+    if (scheduleLocInit.current) return;
+    const pref = bookingDetail?.loc || [address, village, city, pincode].filter(Boolean).join(', ');
+    if (pref) {
+      setScheduleLoc(pref);
+      markAuto('loc');
+      scheduleLocInit.current = true;
+    }
+  }, [screen, bookingDetail?.loc, address, village, city, pincode, markAuto]);
 
   const resetOtpFlow = () => {
     setOtpSent(false);
@@ -3677,9 +3740,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
         {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
       </div>
-      <div style={{display:'flex',gap:6,padding:'10px 16px 0',overflowX:'auto'}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,margin:'10px 16px 0'}}>
         {['✓ DPDP 2023','✓ Verified partners','✓ 25% off','✓ Human-first'].map(p=>(
-          <span key={p} style={{flexShrink:0,fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99}}>{p}</span>
+          <span key={p} style={{fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99}}>{p}</span>
         ))}
       </div>
       <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
@@ -3793,7 +3856,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   // -- SCHEDULE: Date/Time/Location (after payment) -----------------------
   if (screen==='schedule'&&activeSvc) {
-    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setBookingDetail(b=>({...b,loc:[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ')}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
+    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setScheduleLoc(locStr);markAuto('loc');setBookingDetail(b=>({...b,loc:locStr}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
 
     return browseWrap(
       <>
@@ -3809,7 +3872,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <Field label="Time"><input type="time" defaultValue={bookingDetail?.time||'10:00'} onChange={e=>setBookingDetail(b=>({...b,time:e.target.value}))} style={S.inp()}/></Field>
           <Field label="Service location" note="Auto-filled from your GPS">
             <div style={{display:'flex',gap:8}}>
-              <input defaultValue={bookingDetail?.loc||[village,city,pincode].filter(Boolean).join(', ')} onChange={e=>setBookingDetail(b=>({...b,loc:e.target.value}))} placeholder="Address, city, PIN" style={{...S.inp(),flex:1}}/>
+              <input value={scheduleLoc} {...browseBind('loc', e=>{ setScheduleLoc(e.target.value); setBookingDetail(b=>({...b,loc:e.target.value})); })} placeholder="Address, city, PIN" style={inpStyle('loc',{flex:1})}/>
               <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
             </div>
             {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4,fontWeight:600}}>✅ Location updated</div>}
@@ -3906,11 +3969,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             </div>
           </Field>
           <Field label="Address" req note="House no, street, area">
-            <input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Flat 302, Rose Society, Wakad" style={S.inp()}/>
+            <input value={address} {...browseBind('address', e=>setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
-            <Field label="City" req><input value={city} onChange={e=>setCity(e.target.value)} placeholder="Pune" style={S.inp()}/></Field>
-            <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} onChange={e=>setPincode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="411018" style={S.inp()}/></Field>
+            <Field label="City" req><input value={city} {...browseBind('city', e=>setCity(e.target.value))} placeholder="Pune" style={inpStyle('city')}/></Field>
+            <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e=>setPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={inpStyle('pincode')}/></Field>
           </div>
           {!termsAccepted&&(
             <div style={{background:C.deep,border:BDR,borderRadius:10,padding:14,marginBottom:14}}>
