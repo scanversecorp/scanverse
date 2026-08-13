@@ -1,6 +1,10 @@
 # ScanV — Application Data Flow
 
-**Updated:** 12 Aug 2026
+**Version:** v5.5.3 · **Updated:** 14 Aug 2026
+
+> **Integration note:** Provider order and availability depend on Admin Go-Life vendor toggles and Supabase secrets. Diagrams show the current default path; alternate routes activate when primary providers are disabled or fail.
+
+**View in browser:** [Data flow diagram](/docs/data-flow.html) · [Architecture](/docs/architecture.html)
 
 ---
 
@@ -10,202 +14,231 @@
 sequenceDiagram
     actor C as Customer
     participant PWA as ScanV PWA
-    participant SB as Supabase
+    participant PC as platform-config
+    participant SB as Supabase DB
     participant OTP as send-otp
+    participant TF as 2Factor MSG91 Twilio
     participant PAY as razorpay-payment
-    participant RZ as Razorpay
+    participant UPI as GPay PhonePe Vyapar QR
+    participant RZ as Razorpay optional
     participant DISP as booking-dispatch
-    participant V as Vendor
+    participant P as Service partner
 
-    C->>PWA: Browse services (no login wall)
-    PWA->>SB: fetchLivePricing() + Realtime subscribe
-    C->>PWA: Select service → book
-    PWA->>PWA: GPS / address / schedule
-    C->>PWA: Enter mobile + accept terms
+    C->>PWA: Open app or QR ?qr=1 browse home
+    PWA->>PC: GET vendor flags
+    PC-->>PWA: razorpay vyapar upi toggles
+    PWA->>SB: fetchLivePricing Realtime
+    C->>PWA: Select service book form
+    PWA->>PWA: GPS address schedule
+    C->>PWA: Mobile plus terms
     PWA->>OTP: send OTP
-    OTP-->>PWA: OTP sent (SMS)
+    OTP->>TF: SMS via enabled providers
+    TF-->>C: 6-digit SMS
     C->>PWA: Verify OTP
-    PWA->>OTP: verify OTP
-    OTP-->>PWA: verified
-    PWA->>PWA: Create/update profile (Supabase auth)
+    OTP-->>PWA: verified profile upsert
     C->>PWA: Payment screen
-    PWA->>PAY: register(txn_id, amount_paise)
-    PAY->>RZ: Create payment link
-    PAY-->>PWA: payment_link_url + UPI deep link
-    C->>RZ: Pay via UPI / Razorpay
-    loop Poll every 3s
-        PWA->>PAY: check(txn_id, amount_paise)
-        PAY-->>PWA: verified + amount_ok
+    alt Vyapar UPI enabled
+        PWA->>UPI: QR or deep link txn ref
+        UPI-->>PAY: webhook vyapar_notify
+    else Razorpay enabled
+        PWA->>PAY: register payment link
+        PAY->>RZ: create link
+        C->>RZ: pay
+        RZ->>PAY: webhook
     end
-    RZ->>PAY: webhook payment.captured
-    PAY->>SB: mark payment_intents paid
+    loop Poll every 3s
+        PWA->>PAY: check txn amount_ok
+        PAY-->>PWA: verified
+    end
     PWA->>SB: INSERT booking
-    PWA->>DISP: start(booking_id, lat, lng, service)
-    DISP->>V: SMS/WhatsApp/Call nearest vendor
-    V->>DISP: ACCEPT code
-    DISP->>SB: Update booking_dispatch status
-    C->>PWA: #track?id=BK-… live status
+    PWA->>DISP: start booking_id lat lng
+    DISP->>P: In-app job offer 60s then next partner
+    DISP->>P: SMS call WhatsApp backup
+    P->>DISP: accept in app or reply code
+    DISP->>SB: booking_dispatch accepted
+    C->>PWA: track screen live status
 ```
 
 ---
 
-## 2. Payment Flow with Amount Validation
+## 2. Payment Flow (Vyapar UPI + UPI Apps + Razorpay Backup)
 
 ```mermaid
 flowchart TD
-    A["Customer reaches payment screen"] --> B["Generate TXN-{timestamp}"]
-    B --> C["Calculate amount_paise<br/>price + 10% fee + 18% GST"]
-    C --> D["POST razorpay-payment<br/>action: register"]
-    D --> E{"RAZORPAY_KEY_SECRET<br/>configured?"}
-    E -->|Yes| F["Create Razorpay payment link"]
-    E -->|No| G["UPI deep link only"]
-    F --> H["Show UPI + Razorpay buttons"]
+    A["Payment screen"] --> B["Load platform-config vendors"]
+    B --> C["Generate TXN timestamp ref"]
+    C --> D["amount_paise = price + 10% fee + 18% GST"]
+    D --> E{"vendor_enable_vyapar_upi?"}
+    E -->|ON| F["Vyapar dynamic QR + VPA copy"]
+    E -->|OFF| G["Skip Vyapar section"]
+    F --> H{"UPI app buttons enabled?"}
     G --> H
-    H --> I["Customer pays"]
-    I --> J["Poll check every 3s"]
-    J --> K{"verified AND<br/>amount_ok?"}
-    K -->|No| J
-    K -->|Yes| L["Unlock Confirm booking"]
-    I --> M["Razorpay webhook"]
-    M --> N{"Signature valid?"}
-    N -->|No| O["Reject"]
-    N -->|Yes| P{"paid ≥ expected?"}
-    P -->|No| Q["Stay pending<br/>amount_ok: false"]
-    P -->|Yes| R["Mark payment_intents paid<br/>Store payer_vpa"]
-    R --> J
-    L --> S["Create booking in DB"]
+    H -->|GPay PhonePe etc| I["upi:// or intent deep link"]
+    H --> I2["Generic Pay via UPI if any enabled"]
+    I --> J["Customer pays in UPI app"]
+    I2 --> J
+    F --> J
+    J --> K["Poll razorpay-payment check every 3s"]
+    K --> L{"verified AND amount_ok?"}
+    L -->|No| K
+    L -->|Yes| M["Unlock continue booking"]
+    D --> N{"vendor_enable_razorpay?"}
+    N -->|ON| O["Razorpay payment link register"]
+    O --> P["Customer pays Razorpay"]
+    P --> Q["Webhook signature plus amount check"]
+    Q --> K
+    VyaparWH["Vyapar webhook vyapar_notify"] --> K
 ```
 
-**Security rules:**
-- Client never sets `paymentVerified` without server `check`
-- Underpaid amounts rejected (`amount_ok: false`)
-- Webhook requires HMAC signature when secret configured
+**Security:** Client never sets `paymentVerified` without server `check`. Underpaid amounts rejected `amount_ok false`.
 
 ---
 
-## 3. OTP & Registration Flow
+## 3. OTP & Identity Flow
 
 ```mermaid
 flowchart LR
-    subgraph Browse["Guest Browse"]
-        B1["Home / Services"]
-        B2["Select service"]
+    subgraph Browse["Guest browse"]
+        B1["Home services no login wall"]
+        B2["QR ?qr=1 direct browse"]
     end
 
     subgraph Verify["Identity"]
-        V1["Mobile + terms"]
+        V1["Mobile plus terms"]
         V2["send-otp edge fn"]
-        V3["SMS via 2Factor/MSG91"]
-        V4["Verify OTP"]
-        V5["Supabase signUp/signIn<br/>fake email + password"]
-        V6["profiles table upsert"]
+        V3["2Factor primary India"]
+        V4["MSG91 Twilio fallback if enabled"]
+        V5["Verify OTP"]
+        V6["GoTrue signUp signIn"]
+        V7["profiles upsert"]
     end
 
-    subgraph Alt["WhatsApp Alt"]
-        W1["whatsapp-verify"]
-        W2["Inbound webhook confirm"]
+    subgraph Alt["WhatsApp backup if enabled"]
+        W1["whatsapp-verify generate"]
+        W2["Outbound WA user replies"]
+        W3["check poll verified"]
     end
 
-    B1 --> B2 --> V1 --> V2 --> V3 --> V4 --> V5 --> V6
-    V1 -.-> W1 --> W2 --> V5
+    B1 --> V1
+    B2 --> B1
+    V1 --> V2 --> V3 --> V4 --> V5 --> V6 --> V7
+    V1 -.-> W1 --> W2 --> W3 --> V6
 ```
+
+**Delivery reporting:** 2Factor callback to `otp-delivery-report` when `OTP_REPORT_SECRET` configured.
 
 ---
 
-## 4. Vendor Dispatch Flow
+## 4. Partner Dispatch Flow
+
+Mode set in Admin Vendors tab: `both` in_app external disabled.
 
 ```mermaid
 sequenceDiagram
     participant PWA as ScanV PWA
     participant DISP as booking-dispatch
     participant DB as PostgreSQL
-    participant V1 as Vendor 1
-    participant V2 as Vendor 2
-    participant TW as Twilio/MSG91
+    participant P1 as Partner 1 nearest
+    participant P2 as Partner 2
+    participant N as SMS call WhatsApp
 
-    PWA->>DISP: start(booking_id, service, lat, lng)
-    DISP->>DB: Find nearest active vendors
-    DISP->>DB: Create booking_dispatch row
-    DISP->>TW: SMS/WhatsApp to Vendor 1
-    DISP->>TW: Outbound call (optional)
-    alt Vendor accepts
-        V1->>DISP: respond(accept_code, accept)
-        DISP->>DB: status = accepted
-    else No response (2 min)
-        DISP->>TW: Retry Vendor 1 (max 2)
-        DISP->>TW: Contact Vendor 2
+    PWA->>DISP: start after paid booking
+    DISP->>DB: nearest active vendors GPS match
+    DISP->>DB: booking_dispatch plus partner_job_offers
+    DISP->>P1: In-app offer 60s window
+    DISP->>N: Backup alert to Partner 1
+    alt Accept in app
+        P1->>DISP: accept offer
+        DISP->>DB: status accepted assign partner
+    else Timeout
+        DISP->>P2: Offer next partner plus backup
     end
-    Note over DISP,DB: pg_cron tick every N minutes
-    DISP->>DISP: tick (cron or manual)
+    Note over DISP: pg_cron tick every minute
 ```
 
 ---
 
-## 5. Support Ticket Flow
+## 5. Admin Go-Live & Vendor Config Flow
 
 ```mermaid
 flowchart TD
-    subgraph Public["Customer (no PIN)"]
+    L["Leader #admin Go-Live tab"] --> AH["admin-hub get_go_live_config"]
+    AH --> R["Runtime switches otp_dev_mode voice dispatch_open"]
+    AH --> V["Vendor toggles 12 providers"]
+    AH --> S["Secret status OK MISSING"]
+    AH --> M["Manual checklist ticks"]
+    L --> U1["update_go_live_switch"]
+    L --> U2["update_go_live_check"]
+    U1 --> PS[("platform_settings")]
+    U2 --> PS
+    PS --> EF["Edge functions read flags"]
+    PS --> PC["platform-config public"]
+    PC --> PWA["Customer payment OTP UI"]
+```
+
+---
+
+## 6. Support Ticket Flow
+
+```mermaid
+flowchart TD
+    subgraph Public["Customer no PIN"]
         R1["#report form"]
-        R2["POST support-tickets create"]
-        R3["Ticket TKT-{timestamp}"]
+        R2["support-tickets create"]
+        R3["Ticket TKT id"]
         T1["#track-ticket"]
-        T2["POST support-tickets track"]
     end
 
-    subgraph Agent["Support Agent PIN"]
-        A1["#customer-support or #admin Tickets tab"]
-        A2["search · detail · timeline"]
-        A3["add_comment · update_status"]
-        A4["resolve → SMS + email"]
+    subgraph Agent["Support PIN"]
+        A1["#customer-support or #admin Tickets"]
+        A2["search timeline comments"]
+        A3["resolve optional notify"]
     end
 
     R1 --> R2 --> R3
-    T1 --> T2
-    A1 --> A2 --> A3 --> A4
+    T1 --> R2
     R3 -.-> A2
+    A1 --> A2 --> A3
 ```
 
 ---
 
-## 6. Pricing Admin Flow
+## 7. Pricing Admin Flow
 
 ```mermaid
 flowchart LR
-    A["#pricing-admin"] --> B{"x-pricing-pin valid?"}
-    B -->|No| C["PIN gate UI"]
-    B -->|Yes| D["GET pricing rows"]
-    D --> E["Edit prices in UI"]
+    A["#pricing-admin"] --> B{"PIN plus TOTP 2FA"}
+    B -->|Fail| C["Lock screen"]
+    B -->|OK| D["GET pricing rows"]
+    D --> E["Edit in UI"]
     E --> F["POST pricing-admin save"]
-    F --> G["Update service_pricing"]
-    G --> H["Trigger → service_prices_public view"]
+    F --> G["service_pricing update"]
+    G --> H["service_prices_public view"]
     H --> I["Realtime broadcast"]
-    I --> J["All clients refetch pricing"]
+    I --> J["All PWAs refetch pricing"]
 ```
 
 ---
 
-## 7. Live Tracking Flow
-
-```mermaid
-flowchart LR
-    V["Vendor app / GPS"] --> VL["vendor_live_locations"]
-    C["Customer #track"] --> B["bookings + dispatch status"]
-    B --> UI["Track screen<br/>status · ETA · map placeholder"]
-    VL -.-> UI
-```
-
----
-
-## 8. Data Flow Summary Table
+## 8. Data Flow Summary
 
 | Flow | Entry | Storage | Exit |
 |------|-------|---------|------|
-| Browse | PWA home | `service_prices_public` (read) | Service selection |
-| Register | OTP verify | `profiles`, GoTrue auth | Logged-in state |
+| Browse | PWA home QR | `service_prices_public` | Service selection |
+| Vendor flags | App boot | `platform_settings` via `platform-config` | UI show hide providers |
+| Register | OTP verify | `profiles` GoTrue | Logged-in state |
 | Pay | Payment screen | `payment_intents` | Booking unlock |
-| Book | Confirm | `bookings`, `service_requests` | Dispatch trigger |
-| Dispatch | Edge function | `booking_dispatch`, attempts | Vendor assignment |
-| Track | `#track` | bookings + dispatch join | Customer UI |
-| Support | `#report` | `support_tickets`, comments | Resolution notify |
-| Admin | `#admin` | All tables via service role | Dashboard KPIs |
+| Book | Confirm | `bookings` `service_requests` | Dispatch trigger |
+| Dispatch | Edge fn | `booking_dispatch` `partner_job_offers` | Partner assigned |
+| Track | `#track` | bookings dispatch join | Customer UI |
+| Support | `#report` | `support_tickets` | Resolution |
+| Admin | `#admin` | all tables service role | KPIs go-live |
+| OTP report | `#otp-delivery-report` | `otp_delivery_reports` | Delivery status |
+
+---
+
+## 9. Related Docs
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — system and deployment diagrams  
+- [ScanV-App-Flowcharts.md](./ScanV-App-Flowcharts.md) — app states and roles  
+- [ALL-APIS-AND-WEBHOOKS.md](./ALL-APIS-AND-WEBHOOKS.md) — webhook URLs  

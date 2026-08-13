@@ -720,7 +720,7 @@ async function getPlatformSettings(
     rows: data || [],
     dispatch_mode: settings.dispatch_mode || "both",
     dispatch_mode_options: [
-      { value: "both", label: "In-app + SMS/call/WhatsApp backup", description: "Uber-style in-app offers to nearest partners one-by-one, plus SMS/call/WhatsApp backup for each offer." },
+      { value: "both", label: "In-app + SMS/call/WhatsApp backup", description: "Sequential in-app job offers to nearest partners one-by-one, plus SMS/call/WhatsApp backup for each offer." },
       { value: "in_app", label: "In-app only", description: "Partners accept/reject inside ScanV app only — no SMS/call/WhatsApp." },
       { value: "external", label: "External only (legacy)", description: "SMS, outbound call, and WhatsApp only — no in-app job cards." },
       { value: "disabled", label: "Dispatch disabled", description: "No automatic partner alerts after payment." },

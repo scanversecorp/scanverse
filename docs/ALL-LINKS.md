@@ -52,6 +52,20 @@ SPA rewrites to `index.html`; rendered by `LegalPage` component.
 
 ---
 
+## Documentation & diagrams
+
+| Document | URL |
+|----------|-----|
+| **Architecture (HTML)** | https://scanv-tau.vercel.app/docs/architecture.html |
+| **Data flow (HTML)** | https://scanv-tau.vercel.app/docs/data-flow.html |
+| Architecture (markdown) | `docs/ARCHITECTURE.md` |
+| Data flow (markdown) | `docs/APP-DATA-FLOW.md` |
+| Docs index | `docs/README.md` |
+
+Diagrams reflect v5.5.3. Provider integrations may change — see **Go-Live** vendor toggles.
+
+---
+
 ## Infrastructure Dashboards
 
 | Service | URL |

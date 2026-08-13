@@ -11880,7 +11880,7 @@ function AdminDispatchModePanel({ pin, onSaved }) {
     <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
       <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 4 }}>Vendor dispatch flow</div>
       <div style={{ fontSize: 12, color: C.sub, marginBottom: 14, lineHeight: 1.55 }}>
-        Controls how paid bookings alert the 3 nearest GPS-matched partners (one-by-one, 60s each). Default: in-app Uber-style offers plus SMS/call/WhatsApp backup.
+        Controls how paid bookings alert the 3 nearest GPS-matched partners (one-by-one, 60s each). Default: sequential in-app job offers plus SMS/call/WhatsApp backup.
       </div>
       {options.map((opt) => (
         <label key={opt.value} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: `1px solid ${C.bdr}`, cursor: 'pointer' }}>
@@ -12565,6 +12565,17 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <button type="button" onClick={() => setTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
               </div>
             </div>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Architecture & data flow</div>
+              <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6, marginBottom: 12 }}>
+                System diagrams v5.5.3 — updated for Vyapar UPI, Go-Live vendor toggles, and service-provider integrations. Diagrams may change as providers are onboarded.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <a href={`${APP_URL}/docs/architecture.html`} target="_blank" rel="noreferrer" style={{ ...S.card({ padding: '10px 14px' }), textDecoration: 'none', fontSize: 12, fontWeight: 700, color: C.acc }}>System architecture ↗</a>
+                <a href={`${APP_URL}/docs/data-flow.html`} target="_blank" rel="noreferrer" style={{ ...S.card({ padding: '10px 14px' }), textDecoration: 'none', fontSize: 12, fontWeight: 700, color: C.acc }}>Data flow ↗</a>
+                <button type="button" onClick={() => setTab('database')} style={{ ...tabBtn({ id: 'database' }), border: `1.5px solid ${C.bdr}` }}>Database tab →</button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -12659,7 +12670,17 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'database' && (
           <div>
-            <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>External dashboards and key tables (read-only links).</div>
+            <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>External dashboards, architecture diagrams, and key tables.</div>
+            <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Architecture & data flow (v5.5.3)</div>
+              <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
+                Mermaid diagrams — system context, deployment, payments (Vyapar UPI · GPay · PhonePe · Razorpay), OTP, dispatch. Provider boundaries may change; live toggles in Go-Live tab.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <a href={`${APP_URL}/docs/architecture.html`} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>System architecture ↗</a>
+                <a href={`${APP_URL}/docs/data-flow.html`} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Application data flow ↗</a>
+              </div>
+            </div>
             <div style={{ display: 'grid', gap: 10 }}>
               {[
                 ['Supabase Dashboard', 'https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut', 'DB, auth, edge functions, secrets'],

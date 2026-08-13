@@ -1,8 +1,12 @@
-# ScanV v5.4 — Application Flow Charts
+# ScanV — Application Flow Charts
 
-**DCORE Global Corporation · PCMC, Pune**  
-Stack: React PWA · Supabase · Vercel · Razorpay/UPI  
-Live: https://scanv-tau.vercel.app
+**Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCORE Global Corporation  
+**Live:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)
+
+> Canonical data-flow sequences: [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) · System context: [ARCHITECTURE.md](./ARCHITECTURE.md)  
+> **Browser view:** [/docs/data-flow.html](/docs/data-flow.html)
+
+Provider integrations may change — see Admin → Go-Live vendor toggles.
 
 ---
 
@@ -12,182 +16,125 @@ Live: https://scanv-tau.vercel.app
 stateDiagram-v2
     [*] --> boot: App load
     boot --> legal: /privacy /terms /refund /payment
-    boot --> qr: ?qr=1 in URL
-    boot --> browse: default (no login wall)
+    boot --> browse: default no login wall
+    boot --> qr: ?qr=1 opens browse directly
     boot --> app: session restored
+    boot --> admin: #admin #exec etc
 
-    legal --> [*]: Back / navigate away
-    qr --> register: Continue after scan capture
-    register --> app: Profile complete
-    browse --> app: OTP verify during booking
-    app --> browse: Sign out (optional)
+    legal --> [*]
+    qr --> browse: background visitor_sessions capture
+    browse --> register: booking needs identity
+    register --> app: OTP verified
+    app --> browse: sign out
 ```
 
 ---
 
-## 2. Browse-First Booking Flow (Guest → Customer)
-
-No registration wall. Users browse services first; identity is collected at checkout.
+## 2. Browse-First Booking (Guest → Customer)
 
 ```mermaid
 flowchart TD
-    A[Open ScanV] --> B[Silent GPS + device capture]
-    B --> C[Services list — 8 categories]
+    A[Open ScanV or scan QR] --> B[Silent GPS device IP capture]
+    B --> C[Services grid live pricing]
     C --> D[Service detail]
-    D --> E[Book — date, time, location]
-    E --> F[Verify — name + mobile]
-    F --> G{OTP method}
-    G -->|SMS| H[send-otp edge function]
-    G -->|WhatsApp| I[WhatsApp token verify]
-    H --> J[Enter 6-digit OTP]
+    D --> E[Book date time location]
+    E --> F[Verify name mobile terms]
+    F --> G{OTP path}
+    G -->|SMS| H[send-otp 2Factor then fallback]
+    G -->|WhatsApp| I[whatsapp-verify if enabled]
+    H --> J[Enter OTP verify]
     I --> J
-    J --> K[Create/update profile]
-    K --> L[Insert booking + service_request]
-    L --> M[Payment — platform fee 10% + GST]
-    M --> N[Logged-in app — Home tab]
+    J --> K[Profile upsert GoTrue session]
+    K --> L[Payment Vyapar UPI apps Razorpay backup]
+    L --> M{Server check amount_ok}
+    M -->|OK| N[Create booking trigger dispatch]
+    N --> O[Track screen or app home]
 ```
 
 ---
 
-## 3. OTP Verification Flow
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant App as ScanV PWA
-    participant EF as Supabase send-otp
-    participant MSG as MSG91 / Twilio
-    participant SB as Supabase DB
-
-    U->>App: Enter mobile + accept terms
-    App->>EF: invoke send-otp {mobile}
-    EF->>MSG: Deliver OTP SMS
-    MSG-->>U: 6-digit code
-    U->>App: Enter OTP
-    App->>EF: invoke send-otp {mobile, otp, action: verify}
-    EF-->>App: success
-    App->>SB: auth.signUp + profiles.upsert
-    App->>SB: bookings.insert (if booking in progress)
-```
-
----
-
-## 4. QR Scan Entry Flow
-
-Triggered by `?qr=1` or printed QR linking to scanv-tau.vercel.app/?qr=1
+## 3. QR Entry (v5.5.3)
 
 ```mermaid
 flowchart LR
-    Q[Scan QR code] --> C[Capture device, IP, GPS]
-    C --> S[Store visitor_sessions]
-    S --> R[Registration / browse continue]
-    R --> B[Normal booking flow]
+    Q[Printed QR scanv-qr.png] --> U["/?qr=1"]
+    U --> B[Browse home immediately]
+    U --> C[Background visitor_sessions plus geo]
+    B --> D[Normal booking flow]
 ```
 
-**Leader (admin)** can generate printable QR from Home → ScanV QR Code.
+No “Add to Home Screen” gate — browser-first.
 
 ---
 
-## 5. Logged-In App Navigation
+## 4. Payment Method Selection (Customer UI)
+
+Controlled by `platform-config` vendor flags from Admin Go-Live.
+
+```mermaid
+flowchart TD
+    P[Payment screen] --> V{vendor flags}
+    V --> Vyapar[Vyapar dynamic QR if vyapar_upi ON]
+    V --> Apps[UPI app buttons GPay PhonePe Paytm Navi BHIM]
+    V --> Any[Pay via UPI generic if any ON]
+    V --> RZ[Razorpay link if razorpay ON]
+    Vyapar --> Poll[Poll payment check]
+    Apps --> Poll
+    Any --> Poll
+    RZ --> Poll
+    Poll --> Done[Continue booking]
+```
+
+---
+
+## 5. Logged-In Navigation
 
 ```mermaid
 flowchart TB
-    subgraph Bottom Nav
+    subgraph BottomNav["Bottom nav"]
         H[Home]
         S[Services]
         B[Bookings]
-        C[CRM — partner/admin only]
+        C[CRM partner admin only]
         P[Profile]
     end
-
-    H --> Recent bookings + service grid
-    S --> Search + detail + book
-    B --> Booking history + status
-    C --> CRM dashboard
-    P --> Account, legal links, sign out
+    H --> Recent activity
+    S --> Search book
+    B --> History track
+    C --> Partner CRM
+    P --> Account legal sign out
 ```
 
 ---
 
-## 6. Role-Based Access
+## 6. Roles
 
-```mermaid
-flowchart TD
-    subgraph Roles
-        CU[Customer]
-        CA[Candidate]
-        PA[Partner]
-        LE[Leader / admin]
-    end
-
-    CU --> Browse & book
-    CU --> Own bookings
-    CA --> Badge display only
-    PA --> CRM + assigned jobs
-    LE --> CRM + QR + platform stats
-```
-
-| Role | Sign-up | Bottom nav | CRM | QR generator |
+| Role | Sign-up | Book & pay | CRM | Admin routes |
 |------|---------|------------|-----|--------------|
-| Customer | During first booking | Home, Services, Bookings, Profile | — | — |
-| Candidate | Not implemented | Same as customer | — | — |
-| Partner | Admin-assigned | + CRM tab | ✓ | — |
-| Leader | Admin account | + CRM tab | ✓ | ✓ |
+| Customer | During first booking | ✓ | — | — |
+| Service partner | `#vendor-onboard` | Assigned jobs | ✓ | `#vendor-admin` PIN |
+| Support agent | Admin-created | — | Desk | `#customer-support` |
+| Leader | Admin account | — | ✓ | `#admin` `#exec` `#pricing-admin` |
 
 ---
 
-## 7. Payment Flow
+## 7. Service Categories (12 verticals)
 
-```mermaid
-flowchart TD
-    BK[Booking confirmed] --> PF[Platform fee 10% online]
-    PF --> GST[GST 18% on subtotal]
-    GST --> UPI[UPI / Razorpay link]
-    UPI --> SF[Service fee to Partner]
-    SF -->|Cash categories| CASH[Cash on service]
-    SF -->|Other| ONLINE[UPI to Partner]
-```
+`legal` · `cloud` · `vip` · `health` · `property` · `household` · `delivery` · `food` · `two-wheeler` · `four-wheeler` · plus sub-services from `service_pricing`.
 
-**Pricing:** Default ₹500 service (50000 paise) unless overridden per service.
+Cash-on-service categories flagged in catalog (`household`, `delivery`, `food`, etc.).
 
 ---
 
-## 8. Legal & Compliance Pages
+## 8. Legal Routes
 
 | Route | Page |
 |-------|------|
-| `/privacy` | Privacy Policy — DPDP Act 2023 |
+| `/privacy` | Privacy Policy DPDP Act 2023 |
 | `/terms` | Terms & Conditions |
 | `/refund` | Refund Policy |
 | `/payment` | Payment Policy |
 
-Footer links on browse screen and profile. Served by `LegalPage` component with early route detection.
-
 ---
 
-## 9. Service Categories
-
-| ID | Category | Cash on service |
-|----|----------|-----------------|
-| legal | Legal services | No |
-| cloud | Cloud training | No |
-| vip | VIP appointments | No |
-| health | Health care | No |
-| property | Property & rentals | No |
-| household | Household services | Yes |
-| delivery | Deliveries | Yes |
-| food | Food | Yes |
-
----
-
-## 10. Data Captured (Silent + Explicit)
-
-**Silent on load:** IP, device type, OS, browser, timezone, language, battery, canvas fingerprint, GPS (if permitted)
-
-**Explicit at booking:** Name, mobile (OTP), address, village, city, pincode, booking notes
-
-**Stored in:** `visitor_sessions`, `profiles`, `bookings`, `service_requests`, `notifications`
-
----
-
-*Updated: 11 August 2026 · ScanV v5.4*
+*Updated for ScanV v5.5.3 · See [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) for webhook and dispatch sequences.*

@@ -16,7 +16,7 @@
 
 ### What’s in v5.5.2 (production)
 
-- Full-bleed mobile layout (Blinkit-style edge-to-edge)
+- Full-bleed mobile layout (edge-to-edge, no side gutters)
 - Trust pills: 5-column grid, commitment pages linked
 - GPS header shows real city + PIN (not “Local Communities” placeholder)
 - Copyright footer scrolls with content; Incorporation SF origin line

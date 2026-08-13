@@ -1,6 +1,8 @@
 # ScanV — Application Logic Run-down
 
-**Updated:** 12 Aug 2026 · `src/App.js` (~7,000 lines, single-file React)
+**Updated:** 14 Aug 2026 · **Version:** v5.5.3 · `src/App.js` (single-file React)
+
+> **Diagrams:** [ARCHITECTURE.md](./ARCHITECTURE.md) · [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) · [Live HTML](https://scanv-tau.vercel.app/docs/architecture.html)
 
 ---
 

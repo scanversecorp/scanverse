@@ -3,82 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ScanV v5.4 — Flow Charts</title>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  <style>
-    :root { --bg:#0d0f1a; --surf:#1a1a2e; --acc:#e94560; --txt:#f0f0f0; --sub:#a8a8c0; }
-    * { box-sizing:border-box; margin:0; padding:0; }
-    body { background:var(--bg); color:var(--txt); font-family:'Segoe UI',system-ui,sans-serif; line-height:1.6; }
-    header { background:var(--surf); border-bottom:1px solid rgba(255,255,255,.08); padding:20px 24px; position:sticky; top:0; z-index:10; }
-    header h1 { font-size:1.4rem; }
-    header h1 span { color:var(--acc); }
-    header p { color:var(--sub); font-size:.85rem; margin-top:4px; }
-    nav { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
-    nav a { color:var(--acc); font-size:.8rem; text-decoration:none; }
-    main { max-width:960px; margin:0 auto; padding:32px 20px 80px; }
-    section { margin-bottom:48px; }
-    h2 { font-size:1.1rem; margin-bottom:16px; color:var(--txt); border-left:3px solid var(--acc); padding-left:12px; }
-    .mermaid { background:var(--surf); border-radius:12px; padding:20px; border:1px solid rgba(255,255,255,.08); overflow-x:auto; }
-    table { width:100%; border-collapse:collapse; font-size:.85rem; margin-top:12px; }
-    th,td { border:1px solid rgba(255,255,255,.08); padding:8px 12px; text-align:left; }
-    th { background:var(--surf); color:var(--acc); }
-  </style>
+  <title>ScanV Data Flow — moved</title>
+  <meta http-equiv="refresh" content="0;url=https://scanv-tau.vercel.app/docs/data-flow.html">
+  <style>body{font-family:system-ui,sans-serif;padding:40px;text-align:center;background:#f2efe8}</style>
 </head>
 <body>
-  <header>
-    <h1>Scan<span>V</span> v5.4 Flow Charts</h1>
-    <p>DCORE Global Corporation · PCMC, Pune · <a href="https://scanv-tau.vercel.app" style="color:var(--acc)">scanv-tau.vercel.app</a></p>
-    <nav>
-      <a href="README.md">Docs index</a>
-      <a href="ScanV-Architecture.html">Architecture</a>
-      <a href="scanv-ui-showcase/">UI Showcase</a>
-    </nav>
-  </header>
-  <main>
-    <section>
-      <h2>1. App State Machine</h2>
-      <div class="mermaid">
-stateDiagram-v2
-    [*] --> boot
-    boot --> legal: /privacy /terms
-    boot --> browse: default
-    boot --> app: session restored
-    browse --> app: OTP booking
-      </div>
-    </section>
-    <section>
-      <h2>2. Browse-First Booking</h2>
-      <div class="mermaid">
-flowchart TD
-    A[Services list] --> B[Detail]
-    B --> C[Book date/time]
-    C --> D[Verify mobile OTP]
-    D --> E[Payment]
-    E --> F[Logged-in Home]
-      </div>
-    </section>
-    <section>
-      <h2>3. OTP Sequence</h2>
-      <div class="mermaid">
-sequenceDiagram
-    User->>App: Mobile number
-    App->>Supabase: send-otp
-    Supabase->>MSG91: SMS
-    User->>App: 6-digit code
-    App->>Supabase: verify + create profile
-      </div>
-    </section>
-    <section>
-      <h2>4. Roles</h2>
-      <table>
-        <tr><th>Role</th><th>Label</th><th>CRM</th><th>QR</th></tr>
-        <tr><td>customer</td><td>Customer</td><td>—</td><td>—</td></tr>
-        <tr><td>candidate</td><td>Candidate</td><td>—</td><td>—</td></tr>
-        <tr><td>partner</td><td>Partner</td><td>✓</td><td>—</td></tr>
-        <tr><td>admin</td><td>Leader</td><td>✓</td><td>✓</td></tr>
-      </table>
-    </section>
-  </main>
-  <script>mermaid.initialize({ startOnLoad:true, theme:'dark', themeVariables:{ primaryColor:'#16213e', primaryTextColor:'#f0f0f0', lineColor:'#e94560' }});</script>
+  <p>Data flow diagrams moved to <a href="https://scanv-tau.vercel.app/docs/data-flow.html">scanv-tau.vercel.app/docs/data-flow.html</a></p>
 </body>
 </html>
