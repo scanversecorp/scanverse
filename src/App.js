@@ -3368,9 +3368,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     { serviceId: activeSvc?.id, serviceName: activeSvc?.name },
   );
   const creatingRef = useRef(false);
+  const browseScrollRef = useRef(null);
 
   useEffect(() => {
-    if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop();
+    if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop(browseScrollRef.current);
   }, [screen]);
 
   useEffect(() => {
