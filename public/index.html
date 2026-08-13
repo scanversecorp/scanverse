@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
   <meta name="theme-color" content="#d63a56"/>
-  <meta name="description" content="ScanV — Find and book verified services in Local Communities worldwide. Legal, Health, Cloud, Property, Household, Deliveries, Food. Made in India · Designed & Developed with Incorporation, San Francisco, California, USA."/>
+  <meta name="description" content="ScanV — Find and book verified services in Local Communities worldwide. Legal, Health, Cloud, Property, Household, Deliveries, Food. Designed & Developed with Incorporation, San Francisco, California, USA."/>
   <meta name="author" content="Incorporation, San Francisco, California, USA"/>
 
   <!-- PWA / mobile app meta -->
@@ -17,7 +17,7 @@
 
   <!-- Open Graph -->
   <meta property="og:title" content="ScanV — Verified services · Local Communities"/>
-  <meta property="og:description" content="Legal · Health · Cloud · Property · Household · Food — verified partners in Local Communities. Made in India · Designed & Developed with Incorporation, San Francisco, California, USA."/>
+  <meta property="og:description" content="Legal · Health · Cloud · Property · Household · Food — verified partners in Local Communities. Designed & Developed with Incorporation, San Francisco, California, USA."/>
   <meta property="og:type" content="website"/>
   <meta property="og:url" content="https://scanv-tau.vercel.app"/>
 
@@ -50,20 +50,21 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root {
-      min-height: 100%;
-      height: auto;
+      height: 100%;
+      min-height: 100dvh;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #e8e6e1;
+      background: #fafafa;
       color: #121212;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
-    body { overscroll-behavior: none; overflow-x: hidden; background: #fafafa; }
-    @media (min-width: 481px) { body { background: #e8e6e1; } }
+    body { overscroll-behavior: none; overflow-x: hidden; }
+    @media (min-width: 481px) { html, body, #root { background: #e8e6e1; } }
     #root {
       min-height: 100dvh;
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
     ::-webkit-scrollbar { width: 0; background: transparent; }
     #root-loader {

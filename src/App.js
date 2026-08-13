@@ -25,7 +25,7 @@ const HDFC_VYAPAR_MERCHANT_ID = '82037575';
 const HDFC_VYAPAR_QR_PATH = '/hdfc-vyapar-qr.png';
 const ASSIST   = '+91-9270194842';
 const LOCAL_COMMUNITIES = 'Local Communities';
-const INCORPORATION_ORIGIN = 'Made in India · Designed & Developed with Incorporation, San Francisco, California, USA';
+const INCORPORATION_ORIGIN = 'Designed & Developed with Incorporation, San Francisco, California, USA';
 
 const UPI_PACKAGES = {
   GPay: 'com.google.android.apps.nbu.paisa.user',
@@ -2560,10 +2560,12 @@ const S = {
 const APP_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  html{background:#e8e6e1;height:100%}
+  html{background:#fafafa;height:100%}
   body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
-  @media (min-width:481px){body{background:#e8e6e1}}
+  @media (min-width:481px){html,body{background:#e8e6e1}}
+  .scanv-shell{width:100%;height:100dvh;max-height:100dvh;min-height:100dvh}
+  @media (min-width:481px){.scanv-shell{max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -3008,20 +3010,16 @@ const BROWSE_HOME_STACK = {
   width: '100%',
 };
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
-/** iPhone-style device frame — rounded viewport shell (mobile PWA + centered desktop) */
-const APP_SHELL_RADIUS = 22;
+/** Full-bleed mobile shell; centered phone frame on desktop via .scanv-shell */
 const APP_SHELL = {
   display: 'flex',
   flexDirection: 'column',
   height: '100dvh',
   maxHeight: '100dvh',
   minHeight: '100dvh',
-  maxWidth: 480,
-  margin: '0 auto',
-  background: C.bg,
   width: '100%',
+  background: C.bg,
   overflow: 'hidden',
-  borderRadius: APP_SHELL_RADIUS,
   boxSizing: 'border-box',
   fontFamily: FF,
 };
@@ -3050,15 +3048,18 @@ const BROWSE_SCROLL_BODY = {
 const BROWSE_WRAP_SHELL = { ...APP_SHELL };
 const TRUST_PILLS_ROW = {
   display: 'flex',
-  flexWrap: 'wrap',
+  flexWrap: 'nowrap',
   alignItems: 'center',
   gap: 4,
-  rowGap: 6,
   width: '100%',
   boxSizing: 'border-box',
   margin: 0,
   padding: '8px 10px 10px',
   borderTop: BDR,
+  overflowX: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  scrollbarWidth: 'none',
+  msOverflowStyle: 'none',
 };
 const TRUST_PILL = {
   fontSize: 8,
@@ -3088,7 +3089,6 @@ const BROWSE_TRUST_PILLS = [
   { key: 'verified', label: '✓ Verified partners', screen: 'trust-verified' },
   { key: 'discount', label: '✓ 25% off', screen: 'trust-discount' },
   { key: 'human', label: '✓ Human-First', screen: 'trust-human' },
-  { key: 'top-rated', label: '✓ Top Rated', screen: 'top-rated' },
   { key: 'trusted', label: '✓ Trusted', screen: 'trust-trusted' },
 ];
 const TRUST_COMMITMENT_PAGES = {
@@ -3360,7 +3360,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
-    <div style={{flexShrink:0,background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,borderBottomLeftRadius:APP_SHELL_RADIUS,borderBottomRightRadius:APP_SHELL_RADIUS,overflow:'hidden'}}>
+    <div style={{flexShrink:0,background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,overflow:'hidden'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
@@ -4568,7 +4568,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   })();
 
   const browseWrap = (content, sticky=null) => (
-    <div style={BROWSE_WRAP_SHELL}>
+    <div className="scanv-shell" style={BROWSE_WRAP_SHELL}>
       <div style={APP_MAIN}>
         <div style={BROWSE_MAIN_INNER}>
           {content}
@@ -4653,7 +4653,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)',flexShrink:0}}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)',flexShrink:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
@@ -5663,7 +5663,7 @@ function BottomNav() {
 function TopBar({title,back}) {
   const {setScreen,logout}=useApp();
   return (
-    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',paddingTop:'calc(12px + env(safe-area-inset-top, 0px))',display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
       {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
            :<div style={{fontWeight:800,fontSize:20,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
@@ -12433,7 +12433,7 @@ function LegalPage({page}) {
   const pg = pages[page];
   if (!pg) return null;
   return (
-    <div style={APP_SHELL}>
+    <div className="scanv-shell" style={APP_SHELL}>
       {/* Header */}
       <div style={{flexShrink:0,background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
@@ -12738,7 +12738,7 @@ export default function App() {
 
   if (state==='boot') return (
     <><style>{APP_CSS}</style>
-    <div style={{...APP_SHELL, minHeight: '100vh', justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
+    <div className="scanv-shell" style={{...APP_SHELL, minHeight: '100vh', justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
       <div style={{fontSize:32,fontWeight:800,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
       <Spin size={32}/>
       <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
@@ -12799,7 +12799,7 @@ export default function App() {
         <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
         <PartnerGpsTracker />
-        <div style={APP_SHELL}>
+        <div className="scanv-shell" style={APP_SHELL}>
           <div style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <Boundary>{renderScreen()}</Boundary>
             <CopyrightLine style={{ padding: '6px 16px 24px' }} />
