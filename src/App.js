@@ -1028,8 +1028,26 @@ const SUB_CATEGORIES = {
   'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 8 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
 };
 
-const ALL_SUB_SVCS = Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
-const SUB_BY_ID = Object.fromEntries(ALL_SUB_SVCS.map(s => [s.id, s]));
+/** Parent category ids — home cards + pricing admin grouping */
+const PARENT_IDS = new Set(['legal', 'cloud', 'vip', 'health', 'property', 'household', 'delivery', 'food', 'two-wheeler', 'four-wheeler']);
+
+/**
+ * PRICING DATA FLOW (single source of truth)
+ * 1. Admin edits service_pricing via #pricing-admin (edge fn pricing-admin)
+ * 2. DB trigger sync_public_prices → service_prices_public (anon-readable catalog + prices)
+ * 3. DB trigger sync_services_from_pricing → public.services (bookings FK)
+ * 4. App boot: fetchCatalogFromDb() reads service_prices_public, merges prices/names into
+ *    SVCS + SUB_CATEGORIES (static templates supply desc/img/features only)
+ * 5. Home cards, sub-cards, booking, and pricing admin all use merged svc.price / svc.mrp
+ */
+let subByIdIndex = {};
+function getAllSubSvcs() {
+  return Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
+}
+function rebuildCatalogIndex() {
+  subByIdIndex = Object.fromEntries(getAllSubSvcs().map(s => [s.id, s]));
+}
+rebuildCatalogIndex();
 
 function subCatId(svc) {
   if (!svc) return null;
@@ -1052,7 +1070,7 @@ function svcSupportsLiveTrack(svc) {
 
 function findSvcByName(name) {
   if (!name) return null;
-  return ALL_SUB_SVCS.find(s => s.name === name) || SVCS.find(s => s.name === name) || null;
+  return getAllSubSvcs().find(s => s.name === name) || SVCS.find(s => s.name === name) || null;
 }
 
 function svcParentId(svc) {
@@ -1196,7 +1214,7 @@ const DISPATCH_FN = `${SB_URL}/functions/v1/booking-dispatch`;
 const RAZORPAY_FN = `${SB_URL}/functions/v1/razorpay-payment`;
 
 function findSvcById(id) {
-  return SVCS.find(s => s.id === id) || SUB_BY_ID[id] || null;
+  return SVCS.find(s => s.id === id) || subByIdIndex[id] || null;
 }
 
 function bookingTotalsForSvc(svc) {
@@ -1209,7 +1227,7 @@ function bookingTotalsForSvc(svc) {
 function inferServiceFromTotalPaise(totalPaise, hints = {}) {
   const { serviceId = null, serviceName = null } = hints;
   const matches = [];
-  for (const svc of ALL_SUB_SVCS) {
+  for (const svc of getAllSubSvcs()) {
     if (bookingTotalsForSvc(svc).total === totalPaise) matches.push(svc);
   }
   for (const svc of SVCS) {
@@ -1486,21 +1504,128 @@ async function resumePaidBookingDraft(addToast) {
 }
 
 const TOP_RATED_BY_ID = {};
+const SERVICE_STATUS_BY_ID = {};
 
-function applyLivePricingRows(rows) {
+function normalizeSvcStatus(row) {
+  const raw = String(row?.service_status || '').trim().toLowerCase();
+  if (raw === 'active' || raw === 'inactive' || raw === 'paused') return raw;
+  return row?.active === false ? 'inactive' : 'active';
+}
+
+function svcStatus(svc) {
+  if (!svc?.id) return 'active';
+  return SERVICE_STATUS_BY_ID[svc.id] || 'active';
+}
+
+function isSvcVisible(svc) {
+  return svcStatus(svc) === 'active';
+}
+
+function visibleSvcs(list) {
+  return (list || []).filter(isSvcVisible);
+}
+
+function dbRowToSvc(row) {
+  return {
+    id: row.service_id,
+    parent: row.parent_id || undefined,
+    theme: row.theme || 'default',
+    icon: row.icon || '✨',
+    name: row.service_name || row.service_id,
+    sub: row.sub_service_name || '',
+    unit: row.unit || 'visit',
+    mrp: Number(row.mrp_paise) || 0,
+    price: Number(row.price_paise) || 0,
+    cash: false,
+    desc: row.sub_service_name || row.service_name || '',
+    features: [],
+    turnaround: 'Same day',
+    rating: '4.8 ⭐',
+    bookings: 'New',
+    top_rated: Number(row.top_rated) === 1 ? 1 : 0,
+  };
+}
+
+function ensureCategoryShell(parentId, row) {
+  if (!SUB_CATEGORIES[parentId]) {
+    SUB_CATEGORIES[parentId] = {
+      title: HOME_CARD_TITLE[parentId] || row.card || parentId,
+      subtitle: row.sub_service_name || row.sub_card || '',
+      cat: row.card || parentId,
+      themes: {
+        default: {
+          id: 'default', label: row.sub_card || 'Services', color: C.acc, bg: C.surf,
+          border: C.bdr, gradFrom: C.surf, gradTo: C.acc, tagline: '',
+        },
+      },
+      svcs: [],
+      themeOrder: ['default'],
+    };
+  }
+  if (!SVCS.find(s => s.id === parentId)) {
+    SVCS.push({
+      id: parentId,
+      icon: row.icon || '✨',
+      name: HOME_CARD_TITLE[parentId] || row.card || parentId,
+      sub: row.sub_service_name || row.sub_card || '',
+      cat: row.card || parentId,
+      cash: false,
+      mrp: Number(row.mrp_paise) || 0,
+      price: Number(row.price_paise) || 0,
+    });
+  }
+}
+
+function applyDbCatalog(rows) {
   if (!rows?.length) return;
   for (const row of rows) {
+    SERVICE_STATUS_BY_ID[row.service_id] = normalizeSvcStatus(row);
+  }
+  for (const row of rows) {
+    if (normalizeSvcStatus(row) !== 'active') continue;
+    const flag = Number(row.top_rated) === 1 ? 1 : 0;
+    TOP_RATED_BY_ID[row.service_id] = flag;
+
     const svc = findSvcById(row.service_id);
-    if (row.top_rated != null) {
-      const flag = Number(row.top_rated) === 1 ? 1 : 0;
-      TOP_RATED_BY_ID[row.service_id] = flag;
-      if (svc) svc.top_rated = flag;
+    if (svc) {
+      if (row.service_name) svc.name = row.service_name;
+      if (row.sub_service_name) svc.sub = row.sub_service_name;
+      if (row.price_paise != null) svc.price = row.price_paise;
+      if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
+      svc.top_rated = flag;
+      if (row.theme) svc.theme = row.theme;
+      if (row.unit) svc.unit = row.unit;
+      if (row.icon) svc.icon = row.icon;
+      continue;
     }
-    if (!svc) continue;
-    if (row.price_paise != null) svc.price = row.price_paise;
-    if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
+
+    const isCategory = row.is_category || PARENT_IDS.has(row.service_id);
+    if (isCategory) {
+      ensureCategoryShell(row.service_id, row);
+      const cat = SVCS.find(s => s.id === row.service_id);
+      if (cat) {
+        cat.name = HOME_CARD_TITLE[row.service_id] || row.service_name || cat.name;
+        if (row.price_paise != null) cat.price = row.price_paise;
+        if (row.mrp_paise != null) cat.mrp = row.mrp_paise;
+        if (row.icon) cat.icon = row.icon;
+        if (row.sub_service_name) cat.sub = row.sub_service_name;
+      }
+      continue;
+    }
+
+    if (row.parent_id) {
+      ensureCategoryShell(row.parent_id, row);
+      const fresh = dbRowToSvc(row);
+      SUB_CATEGORIES[row.parent_id].svcs.push(fresh);
+    }
   }
   syncParentFromPrices(rows);
+  rebuildCatalogIndex();
+}
+
+/** @deprecated alias — use applyDbCatalog */
+function applyLivePricingRows(rows) {
+  applyDbCatalog(rows);
 }
 
 function getTopRatedServices() {
@@ -1509,19 +1634,25 @@ function getTopRatedServices() {
   for (const [id, flag] of Object.entries(TOP_RATED_BY_ID)) {
     if (flag !== 1 || seen.has(id)) continue;
     const svc = findSvcById(id);
-    if (svc) { seen.add(id); out.push(svc); }
+    if (svc && isSvcVisible(svc)) { seen.add(id); out.push(svc); }
   }
   return out.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
-/** Parent cards without DB rows show min sub-service price after live sync. */
+/** Parent cards: DB row wins; else min sub-service price after catalog sync. */
 function syncParentFromPrices(rows) {
-  const dbIds = new Set((rows || []).map(r => r.service_id));
+  const dbById = Object.fromEntries((rows || []).map(r => [r.service_id, r]));
   for (const parent of SVCS) {
+    const dbRow = dbById[parent.id];
+    if (dbRow?.price_paise != null) {
+      parent.price = dbRow.price_paise;
+      if (dbRow.mrp_paise != null) parent.mrp = dbRow.mrp_paise;
+      continue;
+    }
     const cfg = SUB_CATEGORIES[parent.id];
-    if (!cfg?.svcs?.length || dbIds.has(parent.id)) continue;
-    const prices = cfg.svcs.map(s => s.price).filter(p => p > 0);
-    const mrps = cfg.svcs.map(s => s.mrp).filter(p => p > 0);
+    if (!cfg?.svcs?.length) continue;
+    const prices = visibleSvcs(cfg.svcs).map(s => s.price).filter(p => p > 0);
+    const mrps = visibleSvcs(cfg.svcs).map(s => s.mrp).filter(p => p > 0);
     if (prices.length) parent.price = Math.min(...prices);
     if (mrps.length) parent.mrp = Math.min(...mrps);
   }
@@ -1536,25 +1667,30 @@ async function waitForSupabase(maxMs = 8000) {
   return false;
 }
 
-async function fetchLivePricing(onApplied) {
+async function fetchCatalogFromDb(onApplied) {
   try {
     if (!(await waitForSupabase())) {
-      console.warn('[ScanV] Supabase not ready — using catalog prices');
+      console.warn('[ScanV] Supabase not ready — using catalog template prices');
       return [];
     }
-    const { data, error } = await sb().from('service_prices_public').select('service_id,price_paise,mrp_paise,top_rated');
+    const { data, error } = await sb().from('service_prices_public').select('*').order('sort_order');
     if (error) {
-      console.warn('[ScanV] Live pricing fetch failed:', error.message);
+      console.warn('[ScanV] Catalog fetch failed:', error.message);
       return [];
     }
     if (!data?.length) return [];
-    applyLivePricingRows(data);
+    applyDbCatalog(data);
     onApplied?.();
     return data;
   } catch (e) {
-    console.warn('[ScanV] Live pricing fetch error:', e?.message || e);
+    console.warn('[ScanV] Catalog fetch error:', e?.message || e);
     return [];
   }
+}
+
+/** @deprecated alias */
+async function fetchLivePricing(onApplied) {
+  return fetchCatalogFromDb(onApplied);
 }
 
 function pricingAuthOk() {
@@ -1585,6 +1721,26 @@ async function pricingAdminSave(pin, rows) {
     body: JSON.stringify({ rows }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
+  return res.json();
+}
+
+async function pricingAdminCreate(pin, create) {
+  const res = await fetch(PRICING_FN, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'x-pricing-pin': pin },
+    body: JSON.stringify({ create }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Create failed');
+  return res.json();
+}
+
+async function pricingAdminRemove(pin, serviceId) {
+  const res = await fetch(PRICING_FN, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'x-pricing-pin': pin },
+    body: JSON.stringify({ remove: serviceId }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Remove failed');
   return res.json();
 }
 
@@ -1621,6 +1777,10 @@ function splitPricingRow(row, field, value) {
     next.current_amount_paise = num(value);
   } else if (field === 'top_rated') {
     next.top_rated = Number(value) === 1 ? 1 : 0;
+  } else if (field === 'service_status') {
+    const st = ['active', 'inactive', 'paused'].includes(String(value)) ? String(value) : 'active';
+    next.service_status = st;
+    next.active = st === 'active';
   }
   return next;
 }
@@ -2104,13 +2264,13 @@ function searchAllServices(query) {
   const emptySubs = Object.fromEntries(Object.keys(SUB_CATEGORIES).map(k => [k, []]));
   if (!q) return { categories: SVCS, ...emptySubs };
   const inText = (parts) => parts.filter(Boolean).join(' ').toLowerCase().includes(q);
-  const categories = SVCS.filter(s => {
+  const categories = visibleSvcs(SVCS.filter(s => {
     const d = SVC_DETAIL[s.id] || {};
     return inText([s.name, s.sub, s.cat, SVC_SHORT[s.id], d.desc, ...(d.features || [])]);
-  });
+  }));
   const subs = {};
   for (const [id, cfg] of Object.entries(SUB_CATEGORIES)) {
-    subs[id] = cfg.svcs.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]));
+    subs[id] = visibleSvcs(cfg.svcs.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])])));
   }
   return { categories, ...subs };
 }
@@ -2465,7 +2625,7 @@ function CategoryListBody({ categoryId, onSelect }) {
   const cfg = SUB_CATEGORIES[categoryId];
   const [filter, setFilter] = useState('all');
   if (!cfg) return null;
-  const list = cfg.svcs.filter(s => filter === 'all' || s.theme === filter);
+  const list = visibleSvcs(cfg.svcs).filter(s => filter === 'all' || s.theme === filter);
   const accent = SVC_CARD_THEME[categoryId]?.b2 || C.acc;
   const pills = [['all', 'All', accent, C.surf], ...cfg.themeOrder.map(k => [k, cfg.themes[k].label, cfg.themes[k].color, cfg.themes[k].bg])];
   return (
@@ -7009,6 +7169,31 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({
+    parent_id: 'household',
+    card: 'Household services',
+    sub_card: '—',
+    theme: 'default',
+    service_name: '',
+    sub_service_name: '',
+    new_amount_rupees: '',
+    unit: 'visit',
+    icon: '✨',
+    service_status: 'active',
+    is_category: false,
+  });
+
+  const rowStatus = (r) => normalizeSvcStatus(r);
+  const statusColor = (st) => (st === 'active' ? C.grn : st === 'paused' ? C.gold : C.dim);
+
+  const parentOptions = useMemo(() => (
+    SVCS.map(s => ({
+      id: s.id,
+      label: HOME_CARD_TITLE[s.id] || s.name,
+      card: s.cat || SUB_CATEGORIES[s.id]?.cat || s.name,
+    }))
+  ), [rows.length]);
 
   const cards = ['all', ...Array.from(new Set(rows.map(r => r.card)))];
 
@@ -7051,14 +7236,15 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   };
 
   const updateRow = (idx, field, rawVal) => {
-    setRows(prev => prev.map((r, i) => i === idx ? splitPricingRow(r, field, field.includes('pct') || field === 'top_rated' ? rawVal : paiseFromInp(rawVal)) : r));
+    const asIs = field.includes('pct') || field === 'top_rated' || field === 'service_status';
+    setRows(prev => prev.map((r, i) => i === idx ? splitPricingRow(r, field, asIs ? rawVal : paiseFromInp(rawVal)) : r));
   };
 
   const saveAll = async () => {
     setSaving(true); setErr(''); setMsg('');
     try {
       await pricingAdminSave(pin, rows);
-      await fetchLivePricing(onPricesUpdated);
+      await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Saved ${rows.length} rows — live on site now`);
     } catch (e) {
       setErr(e.message || 'Save failed');
@@ -7069,10 +7255,57 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     setSaving(true); setErr('');
     try {
       await pricingAdminSave(pin, [rows[idx]]);
-      await fetchLivePricing(onPricesUpdated);
+      await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Saved ${rows[idx].service_name}`);
     } catch (e) {
       setErr(e.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const removeRow = async (idx) => {
+    const r = rows[idx];
+    if (!r?.service_id) return;
+    const label = r.service_name || r.service_id;
+    if (!window.confirm(`Remove "${label}" from the live catalog? (Sets Inactive — reactivate from Status column.)`)) return;
+    setSaving(true); setErr('');
+    try {
+      await pricingAdminRemove(pin, r.service_id);
+      setRows(prev => prev.map((row, i) => i === idx ? { ...row, service_status: 'inactive', active: false } : row));
+      await fetchCatalogFromDb(onPricesUpdated);
+      setMsg(`Removed ${label} — hidden from home cards & booking`);
+    } catch (e) {
+      setErr(e.message || 'Remove failed');
+    } finally { setSaving(false); }
+  };
+
+  const addService = async () => {
+    if (!addForm.service_name.trim()) { setErr('Service name required'); return; }
+    if (!addForm.new_amount_rupees || Number(addForm.new_amount_rupees) <= 0) {
+      setErr('New price (₹) required'); return;
+    }
+    setSaving(true); setErr(''); setMsg('');
+    try {
+      const parent = parentOptions.find(p => p.id === addForm.parent_id);
+      const { rows: created } = await pricingAdminCreate(pin, {
+        parent_id: addForm.parent_id,
+        card: addForm.card || parent?.card || '',
+        sub_card: addForm.sub_card || '—',
+        theme: addForm.theme || 'default',
+        service_name: addForm.service_name.trim(),
+        sub_service_name: addForm.sub_service_name.trim() || null,
+        new_amount_rupees: Number(addForm.new_amount_rupees),
+        unit: addForm.unit,
+        icon: addForm.icon || '✨',
+        service_status: addForm.service_status || 'active',
+        is_category: addForm.is_category,
+      });
+      await fetchCatalogFromDb(onPricesUpdated);
+      await load(pin);
+      setShowAdd(false);
+      setAddForm(f => ({ ...f, service_name: '', sub_service_name: '', new_amount_rupees: '' }));
+      setMsg(`Added ${created?.[0]?.service_name || addForm.service_name} — live on home, sub-cards & booking`);
+    } catch (e) {
+      setErr(e.message || 'Could not add service');
     } finally { setSaving(false); }
   };
 
@@ -7101,7 +7334,11 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     );
   }
 
-  const shown = filter === 'all' ? rows : rows.filter(r => r.card === filter);
+  const shown = rows.filter(r => {
+    if (filter !== 'all' && r.card !== filter) return false;
+    if (statusFilter !== 'all' && rowStatus(r) !== statusFilter) return false;
+    return true;
+  });
 
   return (
     <div style={{ minHeight: embedded ? 'auto' : '100vh', background:C.bg, fontFamily:FF, display: embedded ? undefined : 'flex', flexDirection: embedded ? undefined : 'column' }}>
@@ -7124,19 +7361,91 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
       )}
 
       <div style={{ maxWidth:1400, margin:'0 auto', padding: embedded ? '0' : '16px' }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14, alignItems:'center' }}>
           {cards.map(c => (
             <button key={c} onClick={()=>setFilter(c)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${filter===c?C.acc:C.bdr}`, background:filter===c?`${C.acc}18`:C.surf, color:filter===c?C.acc:C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF }}>
               {c === 'all' ? 'All cards' : c}
             </button>
           ))}
+          <Btn v="outline" sm onClick={()=>setShowAdd(v=>!v)}>{showAdd ? 'Cancel add' : '+ Add service'}</Btn>
         </div>
 
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
+          {['all', 'active', 'inactive', 'paused'].map(st => (
+            <button key={st} onClick={()=>setStatusFilter(st)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${statusFilter===st?statusColor(st === 'all' ? 'active' : st):C.bdr}`, background:statusFilter===st?`${statusColor(st === 'all' ? 'active' : st)}18`:C.surf, color:statusFilter===st?statusColor(st === 'all' ? 'active' : st):C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF, textTransform:'capitalize' }}>
+              {st === 'all' ? 'All status' : st}
+            </button>
+          ))}
+        </div>
+
+        {showAdd && (
+          <div style={{ ...S.card(), padding:16, marginBottom:14 }}>
+            <div style={{ fontSize:14, fontWeight:800, color:C.txt, marginBottom:12 }}>Add new service</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:12 }}>
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:C.sub }}>
+                <input type="radio" checked={!addForm.is_category} onChange={()=>setAddForm(f=>({...f,is_category:false}))} /> Sub-service
+              </label>
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:C.sub }}>
+                <input type="radio" checked={addForm.is_category} onChange={()=>setAddForm(f=>({...f,is_category:true}))} /> Category card
+              </label>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10 }}>
+              {!addForm.is_category && (
+              <Field label="Category">
+                <select
+                  value={addForm.parent_id}
+                  onChange={e => {
+                    const opt = parentOptions.find(p => p.id === e.target.value);
+                    setAddForm(f => ({ ...f, parent_id: e.target.value, card: opt?.card || f.card }));
+                  }}
+                  style={S.inp()}
+                >
+                  {parentOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </Field>
+              )}
+              {!addForm.is_category && (
+              <Field label="Sub-card (theme label)">
+                <input value={addForm.sub_card} onChange={e=>setAddForm(f=>({...f, sub_card:e.target.value}))} style={S.inp()} placeholder="Deep cleaning" />
+              </Field>
+              )}
+              <Field label="Service name *">
+                <input value={addForm.service_name} onChange={e=>setAddForm(f=>({...f, service_name:e.target.value}))} style={S.inp()} placeholder="Bathroom Deep Clean" />
+              </Field>
+              <Field label="Subtitle">
+                <input value={addForm.sub_service_name} onChange={e=>setAddForm(f=>({...f, sub_service_name:e.target.value}))} style={S.inp()} placeholder="45–60 min · sanitise" />
+              </Field>
+              <Field label="New price ₹ *">
+                <input type="number" value={addForm.new_amount_rupees} onChange={e=>setAddForm(f=>({...f, new_amount_rupees:e.target.value}))} style={S.inp()} placeholder="499" />
+              </Field>
+              <Field label="Unit">
+                <select value={addForm.unit} onChange={e=>setAddForm(f=>({...f, unit:e.target.value}))} style={S.inp()}>
+                  {['visit','hour','month','project','course'].map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </Field>
+              <Field label="Icon">
+                <input value={addForm.icon} onChange={e=>setAddForm(f=>({...f, icon:e.target.value}))} style={S.inp()} maxLength={4} />
+              </Field>
+              <Field label="Status">
+                <select value={addForm.service_status} onChange={e=>setAddForm(f=>({...f, service_status:e.target.value}))} style={S.inp()}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="paused">Paused</option>
+                </select>
+              </Field>
+            </div>
+            <div style={{ marginTop:12, fontSize:11, color:C.dim, lineHeight:1.5 }}>
+              Saves to Supabase <code>service_pricing</code> → syncs to home cards, category sub-cards, booking, and this table.
+            </div>
+            <Btn sm onClick={addService} disabled={saving} style={{ marginTop:12 }}>{saving ? 'Adding…' : 'Add & go live'}</Btn>
+          </div>
+        )}
+
         <div style={{ ...S.card(), padding:0, overflow:'auto', maxHeight:'calc(100vh - 180px)' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1100 }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1200 }}>
             <thead>
               <tr>
-                {[['#','num'],['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['Top Rated','top_rated'],['','save']].map(([label, key])=>(
+                {[['#','num'],['Card','card'],['Sub-card','sub_card'],['Service','service_name'],['Sub-service','sub_service_name'],['Status','status'],['Current ₹','current'],['New ₹','new'],['Partner ₹','partner_amt'],['Partner %','partner_pct'],['ScanV ₹','scanv_amt'],['ScanV %','scanv_pct'],['Top Rated','top_rated'],['','save'],['','remove']].map(([label, key])=>(
                   <th key={key} style={{ ...th, ...(key === 'num' ? { width:36, textAlign:'center' } : {}) }}>{label}</th>
                 ))}
               </tr>
@@ -7145,13 +7454,21 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
               {shown.map((r) => {
                 const idx = rows.indexOf(r);
                 const rowNum = idx + 1;
+                const st = rowStatus(r);
                 return (
-                  <tr key={r.service_id}>
+                  <tr key={r.service_id} style={{ opacity: st === 'active' ? 1 : 0.72 }}>
                     <td style={{ ...td, textAlign:'center', fontWeight:700, color:C.acc, fontSize:11 }} title={`Row ${rowNum} · ${r.service_id}`}>{rowNum}</td>
                     <td style={{ ...td, color:C.sub, maxWidth:100 }}>{r.card}</td>
                     <td style={{ ...td, color:C.dim, fontSize:10 }}>{r.sub_card}</td>
                     <td style={{ ...td, fontWeight:600, color:C.txt }}>{r.service_name}</td>
                     <td style={{ ...td, color:C.dim, fontSize:10, maxWidth:140 }}>{r.sub_service_name}</td>
+                    <td style={td}>
+                      <select value={st} onChange={e=>updateRow(idx,'service_status',e.target.value)} style={{ ...inp, width:88, color:statusColor(st), fontWeight:700 }}>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="paused">Paused</option>
+                      </select>
+                    </td>
                     <td style={td}><input type="number" value={paiseInp(r.current_amount_paise)} onChange={e=>updateRow(idx,'current_amount_paise',e.target.value)} style={inp}/></td>
                     <td style={td}><input type="number" value={paiseInp(r.new_amount_paise)} onChange={e=>updateRow(idx,'new_amount_paise',e.target.value)} style={{ ...inp, borderColor:C.acc, fontWeight:700 }}/></td>
                     <td style={td}><input type="number" value={paiseInp(r.partner_amount_paise)} onChange={e=>updateRow(idx,'partner_amount_paise',e.target.value)} style={inp}/></td>
@@ -7165,6 +7482,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
                       </select>
                     </td>
                     <td style={td}><Btn v="ghost" sm onClick={()=>saveOne(idx)} disabled={saving}>Save</Btn></td>
+                    <td style={td}><Btn v="danger" sm onClick={()=>removeRow(idx)} disabled={saving || st === 'inactive'}>{st === 'inactive' ? 'Removed' : 'Remove'}</Btn></td>
                   </tr>
                 );
               })}
@@ -7173,7 +7491,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           {!shown.length && !loading && <div style={{ padding:40, textAlign:'center', color:C.dim }}>No rows — deploy migration & edge function first</div>}
         </div>
         <div style={{ marginTop:14, fontSize:11, color:C.dim, lineHeight:1.6 }}>
-          <strong>#</strong> is the fixed row number (1–{rows.length}) — use it when asking to change a specific row. Change <strong>New ₹</strong> to update card prices on the live app. Set <strong>Top Rated</strong> to show a service on the customer Top Rated tab. Partner % and ScanV % auto-balance to 100%. Click <strong>Save all & go live</strong> — changes reflect immediately for all visitors.
+          <strong>Status:</strong> Active = visible on home, sub-cards & booking. Inactive = removed (soft delete). Paused = temporarily hidden. Use <strong>+ Add service</strong> for new cards. <strong>Remove</strong> sets Inactive — reactivate from Status. Change <strong>New ₹</strong> for live prices. Set <strong>Top Rated</strong> for the Top Rated tab. Click <strong>Save all & go live</strong> after bulk edits.
         </div>
       </div>
       {!embedded && <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />}
@@ -11221,8 +11539,8 @@ export default function App() {
 
   useEffect(()=>{
     (async()=>{
-      // Load live pricing overrides before showing services
-      await fetchLivePricing(refreshPricing);
+      // Load catalog (prices + names) from Supabase before showing services
+      await fetchCatalogFromDb(refreshPricing);
 
       // Silently capture device + IP + location in background
       try {
@@ -11310,7 +11628,7 @@ export default function App() {
     let cancelled = false;
     const refetch = async () => {
       if (cancelled) return;
-      await fetchLivePricing(refreshPricing);
+      await fetchCatalogFromDb(refreshPricing);
     };
     const onHash = () => { if (!isPricingAdminRoute()) refetch(); };
     const onVisible = () => { if (document.visibilityState === 'visible') refetch(); };
