@@ -4789,7 +4789,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
                 <span style={{color:C.dim}}>, </span>
                 <span style={{color:C.grn}}>Local Support</span>
                 <span style={{color:C.dim}}>, </span>
-                <span style={{color:C.acc}}>Local Happiness...!</span>
+                <span style={{color:C.acc}}>Global Happiness...!</span>
               </div>
             </div>
             {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
