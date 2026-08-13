@@ -4314,12 +4314,12 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     const isSubSvc = !!parentCat && !!activeSvc.parent;
     const listBack = isSubSvc ? `${parentCat}-list` : 'services';
     return browseWrap(
-      <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-          <button onClick={()=>setScreen(listBack)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{activeSvc.name}</div>
-        </div>
-        <div style={{padding:'14px 16px 120px',overflowY:'auto'}}>
+      <BrowseCategoryShell
+        scrollRef={browseScrollRef}
+        title={activeSvc.name}
+        onBack={() => { setScreen(listBack); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
+      >
+        <div style={{ padding: '14px 16px 24px' }}>
           {isSubSvc && <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}><ServiceThumb svc={activeSvc} categoryId={subCatId(activeSvc)} height={140} /></div>}
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
             {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={activeSvc.theme} /></div>}
@@ -4341,9 +4341,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
               </div>
             ))}
           </div>
+          <Btn full onClick={startBrowseBook} style={{ marginTop: 4 }}>Book now — verify & pay →</Btn>
         </div>
-      </>,
-      <StickyCta onClick={startBrowseBook}>Book now — verify & pay →</StickyCta>
+      </BrowseCategoryShell>
     );
   }
 
