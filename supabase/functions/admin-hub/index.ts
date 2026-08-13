@@ -411,7 +411,7 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
       activity_updates_7d: adminActivity7d,
     },
     infra: {
-      app_version: "5.5.2",
+      app_version: "5.5.3",
       supabase_project: "rwlwrmmqtedugcreweut",
       edge_functions: 11,
       migrations: 14,

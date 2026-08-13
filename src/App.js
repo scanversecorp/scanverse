@@ -19,6 +19,8 @@ import QRCode from 'qrcode';
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
+/** Scan this URL — opens ScanV in the browser; no “Add to Home Screen” step. */
+const SCANV_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
 const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const HDFC_VYAPAR_MERCHANT_ID = '82037575';
@@ -3307,12 +3309,11 @@ const BROWSE_INLINE_HDR = {
   display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
 };
 
-function CustomerShell({ children, toasts, offerInstall = true }) {
+function CustomerShell({ children, toasts }) {
   return (
     <>
       <style>{APP_CSS}</style>
       <Toast toasts={toasts} />
-      <InstallAppGate enabled={offerInstall} />
       {children}
     </>
   );
@@ -3372,71 +3373,6 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
       >
         {children}
         <CopyrightLine style={{ padding: '12px 16px 24px' }} />
-      </div>
-    </div>
-  );
-}
-
-function isPwaStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-}
-
-function isIosDevice() {
-  const ua = navigator.userAgent || '';
-  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-function isMobileHandheld() {
-  const t = detectDevice().deviceType;
-  return t === 'Mobile' || t === 'Tablet';
-}
-
-function shouldOfferPwaInstall() {
-  if (isPwaStandalone()) return false;
-  if (!isMobileHandheld()) return false;
-  return true;
-}
-
-/** iOS install sheet on first visit; Android uses Chrome's automatic install banner. */
-function InstallAppGate({ enabled = true }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!enabled || !shouldOfferPwaInstall()) return undefined;
-    if (isIosDevice()) setOpen(true);
-
-    const onStandalone = () => {
-      if (isPwaStandalone()) setOpen(false);
-    };
-
-    window.addEventListener('appinstalled', onStandalone);
-    window.addEventListener('visibilitychange', onStandalone);
-    window.addEventListener('focus', onStandalone);
-    const poll = setInterval(onStandalone, 1500);
-
-    return () => {
-      window.removeEventListener('appinstalled', onStandalone);
-      window.removeEventListener('visibilitychange', onStandalone);
-      window.removeEventListener('focus', onStandalone);
-      clearInterval(poll);
-    };
-  }, [enabled]);
-
-  if (!enabled || !open || !isIosDevice() || isPwaStandalone()) return null;
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(18,18,18,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 10, paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }}>
-      <div style={{ background: C.surf, borderRadius: 20, padding: '20px 18px', width: '100%', maxWidth: 420, boxShadow: '0 16px 48px rgba(0,0,0,0.28)' }}>
-        <div style={{ fontSize: 24, fontWeight: 800, fontFamily: FF, marginBottom: 6 }}>Scan<span style={{ color: C.acc }}>V</span></div>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Install ScanV on your phone</div>
-        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>
-          Follow these steps to add ScanV to your home screen for full-screen booking — like Blinkit.
-        </div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={{ ...S.card({ padding: '10px 12px' }), fontSize: 12, color: C.sub, lineHeight: 1.5 }}>① Tap <strong>Share</strong> in your browser toolbar</div>
-          <div style={{ ...S.card({ padding: '10px 12px' }), fontSize: 12, color: C.sub, lineHeight: 1.5 }}>② Choose <strong>Add to Home Screen</strong></div>
-          <div style={{ ...S.card({ padding: '10px 12px' }), fontSize: 12, color: C.sub, lineHeight: 1.5 }}>③ Tap <strong>Add</strong>, then open ScanV from your home screen</div>
-        </div>
       </div>
     </div>
   );
@@ -4022,97 +3958,92 @@ function QRCodeDisplay({ url, size=220 }) {
   );
 }
 
-/* ================================================================
-   QR LANDING PAGE -- shown when ?qr=1 in URL
-   Captures maximum data on scan
-================================================================ */
-function QRLandingPage({ onContinue }) {
-  const [loading, setLoading] = useState(true);
-  const [scanId, setScanId]   = useState(null);
-  const [gpsMsg, setGpsMsg]   = useState('Detecting location…');
+function stripQrParamsFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    if (!u.searchParams.has('qr')) return;
+    u.searchParams.delete('qr');
+    u.searchParams.delete('utm_source');
+    u.searchParams.delete('utm_medium');
+    const qs = u.searchParams.toString();
+    window.history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
+  } catch (_) { /* non-blocking */ }
+}
 
-  useEffect(()=>{
-    (async()=>{
-      const dev     = detectDevice();
-      const battery = await getBattery();
-      const canvasFP = getCanvasFP();
-      const ip      = await getIP();
-      const params  = new URLSearchParams(window.location.search);
+/** Background QR capture — app opens to browse immediately; scan data saved silently. */
+async function recordQrScan({ onGeo } = {}) {
+  const params = new URLSearchParams(window.location.search);
+  const utmSource = params.get('utm_source') || 'qr';
+  const utmMedium = params.get('utm_medium') || 'print';
+  const dev = detectDevice();
+  const battery = await getBattery();
+  const canvasFP = getCanvasFP();
+  const ip = await getIP();
+  const scanData = {
+    ip_address: ip,
+    device_type: dev.deviceType,
+    os_name: dev.osName,
+    os_version: dev.osVersion,
+    browser: dev.browser,
+    browser_version: dev.browserVersion,
+    screen_res: dev.screenRes,
+    color_depth: dev.colorDepth,
+    pixel_ratio: dev.pixelRatio,
+    touch_points: dev.touchPoints,
+    language: dev.language,
+    languages: dev.languages,
+    timezone: dev.timezone,
+    cpu_cores: dev.cpuCores,
+    device_memory: dev.deviceMemory,
+    connection_type: dev.connectionType,
+    canvas_fp: canvasFP,
+    battery_level: battery.level,
+    battery_charging: battery.charging,
+    user_agent: dev.userAgent,
+    utm_source: utmSource,
+    utm_medium: utmMedium,
+    referrer: document.referrer || '',
+    consent_given: true,
+    consent_at: new Date().toISOString(),
+  };
 
-      // Store everything immediately on QR scan
-      const scanData = {
-        ip_address:      ip,
-        device_type:     dev.deviceType,
-        os_name:         dev.osName,
-        os_version:      dev.osVersion,
-        browser:         dev.browser,
-        browser_version: dev.browserVersion,
-        screen_res:      dev.screenRes,
-        color_depth:     dev.colorDepth,
-        pixel_ratio:     dev.pixelRatio,
-        touch_points:    dev.touchPoints,
-        language:        dev.language,
-        languages:       dev.languages,
-        timezone:        dev.timezone,
-        cpu_cores:       dev.cpuCores,
-        device_memory:   dev.deviceMemory,
-        connection_type: dev.connectionType,
-        canvas_fp:       canvasFP,
-        battery_level:   battery.level,
-        battery_charging:battery.charging,
-        user_agent:      dev.userAgent,
-        utm_source:      params.get('utm_source')||'qr',
-        utm_medium:      params.get('utm_medium')||'print',
-        referrer:        document.referrer||'',
-        consent_given:   true,
-        consent_at:      new Date().toISOString(),
-      };
+  let scanId = null;
+  try {
+    const { data: vs } = await sb().from('qr_scans').insert(scanData).select('id').single();
+    scanId = vs?.id || null;
+  } catch (_) { /* non-blocking */ }
 
-      const { data:vs } = await sb().from('qr_scans').insert(scanData).select('id').single();
-      if (vs?.id) setScanId(vs.id);
-
-      // Now get GPS
-      setGpsMsg('Getting your location…');
-      navigator.geolocation.getCurrentPosition(
-        async pos=>{
-          const geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
-          setGpsMsg(`📍 ${geo.village||geo.city}`);
-          if (vs?.id) {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation?.getCurrentPosition) {
+      onGeo?.({ scanId, dev, ip, geo: null, coords: null });
+      resolve({ scanId, dev, ip, geo: null, coords: null });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        let geo = null;
+        try { geo = await reverseGeo(pos.coords.latitude, pos.coords.longitude); } catch (_) { /* non-blocking */ }
+        if (scanId && geo) {
+          try {
             await sb().from('qr_scans').update({
-              lat:pos.coords.latitude, lng:pos.coords.longitude,
-              address:geo.address, village:geo.village, city:geo.city,
-              state:geo.state, pincode:geo.pincode, country:geo.country,
-            }).eq('id', vs.id);
-          }
-          setLoading(false);
-          setTimeout(()=> onContinue(vs?.id, dev, ip, geo, pos.coords), 800);
-        },
-        ()=>{
-          setGpsMsg('Location unavailable');
-          setLoading(false);
-          setTimeout(()=> onContinue(vs?.id, dev, ip, null, null), 800);
-        },
-        {timeout:8000, enableHighAccuracy:true, maximumAge:0}
-      );
-    })();
-  },[]);
-
-  return (
-    <div style={{...S.center, flexDirection: 'column', minHeight: '100vh', position: 'relative', padding: '16px 16px 48px'}}>
-      <div style={{fontSize:34,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif"}}>
-        <span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span>
-      </div>
-      <Spin size={36}/>
-      <div style={{color:C.txt,fontSize:15,fontWeight:600}}>
-        {loading?'Setting up for you…':'Ready!'}
-      </div>
-      <div style={{color:C.sub,fontSize:12}}>{gpsMsg}</div>
-      <div style={{color:C.dim,fontSize:11,maxWidth:260,textAlign:'center'}}>
-        Collecting your device & location details to show nearby services
-      </div>
-      <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
-    </div>
-  );
+              lat: pos.coords.latitude, lng: pos.coords.longitude,
+              address: geo.address, village: geo.village, city: geo.city,
+              state: geo.state, pincode: geo.pincode, country: geo.country,
+            }).eq('id', scanId);
+          } catch (_) { /* non-blocking */ }
+        }
+        const result = { scanId, dev, ip, geo, coords: pos.coords };
+        onGeo?.(result);
+        resolve(result);
+      },
+      () => {
+        const result = { scanId, dev, ip, geo: null, coords: null };
+        onGeo?.(result);
+        resolve(result);
+      },
+      { timeout: 8000, enableHighAccuracy: true, maximumAge: 0 }
+    );
+  });
 }
 
 /* ================================================================
@@ -5680,7 +5611,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
 ================================================================ */
 function QRScreen() {
   const { setScreen } = useApp();
-  const qrUrl = `${APP_URL}?qr=1&utm_source=qr&utm_medium=print`;
+  const qrUrl = SCANV_QR_URL;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
@@ -5689,6 +5620,9 @@ function QRScreen() {
       </div>
       <div style={{padding:24,display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
         <QRCodeDisplay url={qrUrl} size={240}/>
+        <div style={{ fontSize: 13, color: C.sub, textAlign: 'center', maxWidth: 300, lineHeight: 1.5 }}>
+          Scan opens ScanV in the browser — browse and book immediately. No install step.
+        </div>
 
         <div style={S.card({width:'100%',textAlign:'center'})}>
           <div style={{color:C.txt,fontSize:14,fontWeight:600,marginBottom:8}}>What this QR captures</div>
@@ -12702,8 +12636,24 @@ export default function App() {
         setState('browse');
         return;
       }
-      // Always show services first -- no registration wall
-      setState(isQRScan?'qr':'browse');
+      setState('browse');
+      if (isQRScan) {
+        recordQrScan({
+          onGeo: ({ scanId, dev, ip, geo, coords }) => {
+            if (geo) {
+              setSilentGeo((prev) => ({
+                ...(prev || {}),
+                ...geo,
+                lat: coords?.latitude,
+                lng: coords?.longitude,
+                device: dev,
+                ip,
+              }));
+            }
+            if (scanId) sessionStorage.setItem('scanv_qr_scan', scanId);
+          },
+        }).catch(() => {}).finally(() => stripQrParamsFromUrl());
+      }
     })();
   },[]);
 
@@ -12843,16 +12793,6 @@ export default function App() {
       <Spin size={32}/>
       <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
     </div></>
-  );
-
-  // QR landing page -- capture data then proceed to register
-  if (state==='qr') return (
-    <Boundary><CustomerShell toasts={toasts}>
-    <QRLandingPage onContinue={(scanId,dev,ip,geo,coords)=>{
-      setQrPrefill({scanId,dev,ip,geo});
-      setState('register');
-    }}/>
-    </CustomerShell></Boundary>
   );
 
   // BROWSE: Show services without registration wall
