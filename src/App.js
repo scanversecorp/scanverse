@@ -1086,8 +1086,8 @@ function resolveSvcImage(svc) {
 function effectiveSvcPrices(svc) {
   let mrp = Number(svc?.mrp) || 0;
   let price = Number(svc?.price) || 0;
+  // Infer missing half only — never override Pricing Admin values
   if (!mrp && price) mrp = Math.round(price / (1 - DISC_PCT));
-  if (mrp > 0 && price > 0 && price < mrp * 0.15) price = discPaise(mrp);
   if (mrp > 0 && !price) price = discPaise(mrp);
   return { mrp, price };
 }
@@ -1610,9 +1610,11 @@ function applyDbCatalog(rows) {
     SERVICE_STATUS_BY_ID[row.service_id] = normalizeSvcStatus(row);
   }
   for (const row of rows) {
-    if (normalizeSvcStatus(row) !== 'active') continue;
+    const st = normalizeSvcStatus(row);
+    const isActive = st === 'active';
     const flag = Number(row.top_rated) === 1 ? 1 : 0;
-    TOP_RATED_BY_ID[row.service_id] = flag;
+    if (isActive) TOP_RATED_BY_ID[row.service_id] = flag;
+    else delete TOP_RATED_BY_ID[row.service_id];
 
     const svc = findSvcById(row.service_id);
     if (svc) {
@@ -1620,7 +1622,7 @@ function applyDbCatalog(rows) {
       if (row.sub_service_name) svc.sub = row.sub_service_name;
       if (row.price_paise != null) svc.price = row.price_paise;
       if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
-      svc.top_rated = flag;
+      if (isActive) svc.top_rated = flag;
       if (row.theme && row.theme !== 'default') {
         const parentId = row.parent_id || svc.parent;
         const themes = SUB_CATEGORIES[parentId]?.themes;
@@ -1630,6 +1632,8 @@ function applyDbCatalog(rows) {
       if (row.icon) svc.icon = row.icon;
       continue;
     }
+
+    if (!isActive) continue;
 
     const isCategory = row.is_category || PARENT_IDS.has(row.service_id);
     if (isCategory) {
@@ -2609,11 +2613,12 @@ function CloudCategoryPill({ theme, sm }) { return <CategoryPill categoryId="clo
 function PriceTag({ svc, sm }) {
   const { mrp, price } = effectiveSvcPrices(svc);
   const unit = svc.unit === 'hour' ? '/hr' : svc.unit === 'month' ? '/mo' : svc.unit === 'project' ? '/project' : svc.unit === 'course' ? '/course' : '';
+  const pctOff = mrp > price ? Math.round((1 - price / mrp) * 100) : 0;
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-      <span style={{ color: C.dim, fontSize: sm ? 10 : 11, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>
+      {mrp > price && <span style={{ color: C.dim, fontSize: sm ? 10 : 11, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>}
       <span style={{ color: C.acc, fontSize: sm ? 13 : 15, fontWeight: 800 }}>₹{fmtRs(price)}{unit}</span>
-      <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>25% OFF</span>
+      {pctOff > 0 && <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>{pctOff}% OFF</span>}
     </div>
   );
 }
@@ -11598,10 +11603,10 @@ export default function App() {
   const [toasts,setToasts]     = useState([]);
   const [notifs,setNotifs]     = useState([]);
   const [qrPrefill,setQrPrefill] = useState(null);
-  const [,forceUpdate]         = useReducer(x=>x+1,0);
-  const [silentGeo, setSilentGeo] = useState(null); // GPS captured silently
+  const [catalogTick, setCatalogTick] = useState(0);
+  const [silentGeo, setSilentGeo] = useState(null);
   const [trackBookingId, setTrackBookingId] = useState(() => trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY) || null);
-  const refreshPricing = useCallback(() => { forceUpdate(); }, []);
+  const refreshPricing = useCallback(() => { setCatalogTick(t => t + 1); }, []);
 
   const addToast=useCallback((msg,type='info')=>{
     const id=Date.now(); setToasts(t=>[...t,{id,msg,type}]);
@@ -11733,9 +11738,13 @@ export default function App() {
   useEffect(()=>{
     let channel;
     let cancelled = false;
-    const refetch = async () => {
-      if (cancelled) return;
-      await fetchCatalogFromDb(refreshPricing);
+    let refetchTimer = null;
+    const refetch = () => {
+      clearTimeout(refetchTimer);
+      refetchTimer = setTimeout(async () => {
+        if (cancelled) return;
+        await fetchCatalogFromDb(refreshPricing);
+      }, 250);
     };
     const onHash = () => { if (!isPricingAdminRoute()) refetch(); };
     const onVisible = () => { if (document.visibilityState === 'visible') refetch(); };
@@ -11751,6 +11760,7 @@ export default function App() {
     })();
     return () => {
       cancelled = true;
+      clearTimeout(refetchTimer);
       window.removeEventListener('hashchange', onHash);
       document.removeEventListener('visibilitychange', onVisible);
       if (channel) sb().removeChannel(channel);
@@ -11894,7 +11904,7 @@ export default function App() {
     </Boundary>
   );
 
-  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,setUser,refreshPricing,trackBookingId,setTrackBookingId};
+  const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,catalogTick,refreshPricing,trackBookingId,setTrackBookingId};
 
   const renderScreen=()=>{
     if (screen==='book')     return <BookScreen/>;
