@@ -1525,6 +1525,26 @@ function visibleSvcs(list) {
   return (list || []).filter(isSvcVisible);
 }
 
+const SVC_PAUSED_MSG = 'This service is temporarily paused — check back soon';
+const SVC_INACTIVE_MSG = 'This service is no longer available';
+
+function svcBookBlockReason(svc) {
+  if (!svc?.id) return null;
+  const st = svcStatus(svc);
+  if (st === 'paused') return SVC_PAUSED_MSG;
+  if (st === 'inactive') return SVC_INACTIVE_MSG;
+  return null;
+}
+
+function guardBookStart(svc, addToast) {
+  const msg = svcBookBlockReason(svc);
+  if (msg) {
+    addToast?.(msg, 'error');
+    return false;
+  }
+  return true;
+}
+
 function dbRowToSvc(row) {
   return {
     id: row.service_id,
@@ -2811,6 +2831,25 @@ const TRUST_PILL = {
   flexShrink: 0,
   lineHeight: 1.2,
 };
+const TRUST_MINI_CARD = {
+  flex: 1,
+  minWidth: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  padding: '11px 10px',
+  borderRadius: 12,
+  background: '#e6f4ee',
+  border: '1.5px solid rgba(0,122,77,0.35)',
+  color: C.grn,
+  fontWeight: 800,
+  fontSize: 12,
+  cursor: 'pointer',
+  fontFamily: FF,
+  boxSizing: 'border-box',
+  boxShadow: '0 2px 8px rgba(0,122,77,0.08)',
+};
 const BROWSE_FIXED_HDR = {
   position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
   background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
@@ -2828,6 +2867,14 @@ function scrollBrowseTop(el) {
   };
   run();
   requestAnimationFrame(run);
+}
+
+function scrollBrowseToId(container, id) {
+  if (!container || !id) return;
+  const target = container.querySelector(`#${id}`);
+  if (!target) return;
+  const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+  container.scrollTo({ top: Math.max(0, offset - 8), behavior: 'smooth' });
 }
 
 function BrowseFixedHeader({ children, padX = 16 }) {
@@ -3597,6 +3644,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   );
   const creatingRef = useRef(false);
   const browseScrollRef = useRef(null);
+  const browseHomeScrollRef = useRef(null);
 
   useEffect(() => {
     if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop(browseScrollRef.current);
@@ -3875,6 +3923,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const createBooking = async () => {
     if (creatingRef.current) return;
+    if (!guardBookStart(activeSvc, addToast)) return;
     if (!bookingDetail?.date) return setErr('Select a date');
     if (!userId||!activeSvc||!txnId) return setErr('Session expired — start again');
     if (!paymentMethod || !browsePay.paymentVerified) return setErr('Complete payment first');
@@ -4101,6 +4150,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   };
 
   const openBrowseTopRatedSvc = (svc) => {
+    if (!guardBookStart(svc, addToast)) return;
     if (svc.parent && SUB_CATEGORIES[svc.parent]) {
       const cfg = SUB_CATEGORIES[svc.parent];
       setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
@@ -4111,6 +4161,20 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   };
 
   const topRatedItems = getTopRatedServices();
+
+  const startBrowseBook = () => {
+    if (!guardBookStart(activeSvc, addToast)) return;
+    setScreen('verify');
+  };
+
+  useEffect(() => {
+    if (!activeSvc || !['verify', 'payment', 'schedule'].includes(screen)) return;
+    const msg = svcBookBlockReason(activeSvc);
+    if (msg) {
+      addToast?.(msg, 'error');
+      setScreen('detail');
+    }
+  }, [screen, activeSvc, addToast]);
 
   const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
   if (listCatId && SUB_CATEGORIES[listCatId]) {
@@ -4153,6 +4217,16 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
           <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
         </div>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: 0 }}>
+          <button type="button" onClick={goBrowseTopRated} style={TRUST_MINI_CARD} aria-label="Top Rated services">
+            <span style={{ fontSize: 15, lineHeight: 1 }}>⭐</span>
+            <span>Top Rated</span>
+          </button>
+          <button type="button" onClick={() => scrollBrowseToId(browseHomeScrollRef.current, 'scanv-commitments')} style={TRUST_MINI_CARD} aria-label="Trusted verified partners">
+            <span style={{ fontSize: 15, lineHeight: 1 }}>✓</span>
+            <span>Trusted</span>
+          </button>
+        </div>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', overflow: 'hidden', padding: 0 }}>
           <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
             <span>🔍</span>
@@ -4160,13 +4234,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
           </div>
           <div className="trust-pills-row" style={TRUST_PILLS_ROW}>
-            {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-first'].map(p => (
+            {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-First'].map(p => (
               <span key={p} style={TRUST_PILL}>{p}</span>
             ))}
           </div>
         </div>
       </div>
-      <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
+      <div ref={browseHomeScrollRef} style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -4178,7 +4252,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           />
         ) : (
           <>
-            <div style={{marginBottom:14}}>
+            <div id="scanv-commitments" style={{marginBottom:14}}>
               <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
               <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
             </div>
@@ -4271,7 +4345,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           </div>
         </div>
       </>,
-      <StickyCta onClick={()=>setScreen('verify')}>Book now — verify & pay →</StickyCta>
+      <StickyCta onClick={startBrowseBook}>Book now — verify & pay →</StickyCta>
     );
   }
 
@@ -5225,10 +5299,11 @@ const SVC_DETAIL = {
 };
 
 function TopRatedScreen() {
-  const { setActiveSvc, setScreen } = useApp();
+  const { setActiveSvc, setScreen, addToast } = useApp();
   const items = getTopRatedServices();
 
   const openSvc = (svc) => {
+    if (!guardBookStart(svc, addToast)) return;
     if (svc.parent && SUB_CATEGORIES[svc.parent]) {
       const cfg = SUB_CATEGORIES[svc.parent];
       setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
@@ -5280,7 +5355,7 @@ function TopRatedScreen() {
 }
 
 function ServicesScreen() {
-  const {setActiveSvc,setScreen,activeSvc}=useApp();
+  const {setActiveSvc,setScreen,activeSvc,addToast}=useApp();
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [subListCat,setSubListCat]=useState(null);
@@ -5368,6 +5443,7 @@ function ServicesScreen() {
           </div>
           <AssistBanner/>
           <Btn full onClick={()=>{
+            if (!guardBookStart(detail, addToast)) return;
             const cfg = SUB_CATEGORIES[detail.parent];
             const payload = isSubSvc ? {...detail, cat: cfg?.cat || detail.cat, cash:false} : detail;
             setActiveSvc(payload);
@@ -5448,7 +5524,6 @@ function BookScreen() {
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
   const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name});
   const creatingRef = useRef(false);
-  if (!svc) { setScreen('services'); return null; }
 
   useEffect(() => {
     let cancelled = false;
@@ -5553,6 +5628,7 @@ function BookScreen() {
 
   const create = async () => {
     if (creatingRef.current) return;
+    if (!guardBookStart(svc, addToast)) return;
     if (!date) return addToast('Select a date', 'error');
     if (!txnId) return addToast('Complete payment first', 'error');
     if (!payMethod || !bookPay.paymentVerified) return addToast('Complete UPI payment first', 'error');
@@ -5691,6 +5767,18 @@ function BookScreen() {
   const progressTotal=skipVerify?3:4;
   const progressIdx=step===1?1:step===2?2:step===3?(skipVerify?2:3):step===4?(skipVerify?3:4):1;
   const stepLabels=skipVerify?['Service','Pay','Schedule']:['Service','Verify','Pay','Schedule'];
+  const bookBlockMsg = svc ? svcBookBlockReason(svc) : null;
+  if (!svc) return null;
+  if (bookBlockMsg) {
+    return (
+      <div style={{ ...S.center, minHeight: '60vh', padding: 24 }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>⏸️</div>
+        <div style={{ color: C.txt, fontSize: 17, fontWeight: 800, marginBottom: 8, textAlign: 'center', maxWidth: 300 }}>{bookBlockMsg}</div>
+        <div style={{ color: C.sub, fontSize: 13, marginBottom: 20, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>Browse other active services on the home page.</div>
+        <Btn onClick={() => setScreen('services')}>Browse services</Btn>
+      </div>
+    );
+  }
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
       <TopBar title={svc.name} back="services"/>
@@ -6238,7 +6326,7 @@ function TrackServiceScreen() {
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => { setActiveSvc(s); setScreen('book'); }}
+                  onClick={() => { if (!guardBookStart(s, addToast)) return; setActiveSvc(s); setScreen('book'); }}
                   style={{ background: C.deep, border: BDR, borderRadius: 10, padding: '8px 12px', cursor: 'pointer', fontFamily: FF, fontSize: 11, fontWeight: 700, color: C.txt, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   <span>{s.icon}</span> {s.name}
@@ -7165,6 +7253,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const [authed, setAuthed] = useState(!!hubPin || pricingAuthOk());
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -7176,6 +7265,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     sub_card: '—',
     theme: 'default',
     service_name: '',
+    service_id: '',
     sub_service_name: '',
     new_amount_rupees: '',
     unit: 'visit',
@@ -7266,13 +7356,14 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     const r = rows[idx];
     if (!r?.service_id) return;
     const label = r.service_name || r.service_id;
-    if (!window.confirm(`Remove "${label}" from the live catalog? (Sets Inactive — reactivate from Status column.)`)) return;
+    const kind = r.is_category ? 'category card' : 'sub-service';
+    if (!window.confirm(`Remove this ${kind} "${label}" from the live catalog? (Sets Inactive — reactivate from Status.)`)) return;
     setSaving(true); setErr('');
     try {
       await pricingAdminRemove(pin, r.service_id);
       setRows(prev => prev.map((row, i) => i === idx ? { ...row, service_status: 'inactive', active: false } : row));
       await fetchCatalogFromDb(onPricesUpdated);
-      setMsg(`Removed ${label} — hidden from home cards & booking`);
+      setMsg(`Removed ${kind} "${label}" — hidden from catalog`);
     } catch (e) {
       setErr(e.message || 'Remove failed');
     } finally { setSaving(false); }
@@ -7286,10 +7377,14 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     setSaving(true); setErr(''); setMsg('');
     try {
       const parent = parentOptions.find(p => p.id === addForm.parent_id);
+      const cardLabel = addForm.is_category
+        ? (addForm.card.trim() || addForm.service_name.trim())
+        : (addForm.card || parent?.card || '');
       const { rows: created } = await pricingAdminCreate(pin, {
-        parent_id: addForm.parent_id,
-        card: addForm.card || parent?.card || '',
-        sub_card: addForm.sub_card || '—',
+        parent_id: addForm.is_category ? null : addForm.parent_id,
+        service_id: addForm.is_category && addForm.service_id.trim() ? addForm.service_id.trim() : undefined,
+        card: cardLabel,
+        sub_card: addForm.is_category ? '—' : (addForm.sub_card || '—'),
         theme: addForm.theme || 'default',
         service_name: addForm.service_name.trim(),
         sub_service_name: addForm.sub_service_name.trim() || null,
@@ -7297,13 +7392,13 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
         unit: addForm.unit,
         icon: addForm.icon || '✨',
         service_status: addForm.service_status || 'active',
-        is_category: addForm.is_category,
+        is_category: !!addForm.is_category,
       });
       await fetchCatalogFromDb(onPricesUpdated);
       await load(pin);
       setShowAdd(false);
-      setAddForm(f => ({ ...f, service_name: '', sub_service_name: '', new_amount_rupees: '' }));
-      setMsg(`Added ${created?.[0]?.service_name || addForm.service_name} — live on home, sub-cards & booking`);
+      setAddForm(f => ({ ...f, service_name: '', service_id: '', sub_service_name: '', new_amount_rupees: '', card: f.is_category ? '' : f.card }));
+      setMsg(`Added ${created?.[0]?.service_name || addForm.service_name} — live on ${addForm.is_category ? 'home cards' : 'sub-cards & booking'}`);
     } catch (e) {
       setErr(e.message || 'Could not add service');
     } finally { setSaving(false); }
@@ -7367,7 +7462,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
               {c === 'all' ? 'All cards' : c}
             </button>
           ))}
-          <Btn v="outline" sm onClick={()=>setShowAdd(v=>!v)}>{showAdd ? 'Cancel add' : '+ Add service'}</Btn>
+          <Btn v="outline" sm onClick={()=>setShowAdd(v=>!v)}>{showAdd ? 'Cancel add' : '+ Add card / service'}</Btn>
         </div>
 
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
@@ -7380,18 +7475,28 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
 
         {showAdd && (
           <div style={{ ...S.card(), padding:16, marginBottom:14 }}>
-            <div style={{ fontSize:14, fontWeight:800, color:C.txt, marginBottom:12 }}>Add new service</div>
+            <div style={{ fontSize:14, fontWeight:800, color:C.txt, marginBottom:12 }}>Add to catalog</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:12 }}>
-              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:C.sub }}>
-                <input type="radio" checked={!addForm.is_category} onChange={()=>setAddForm(f=>({...f,is_category:false}))} /> Sub-service
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:C.sub, fontWeight: addForm.is_category ? 700 : 500 }}>
+                <input type="radio" checked={addForm.is_category} onChange={()=>setAddForm(f=>({...f,is_category:true}))} /> Category card (home)
               </label>
-              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:C.sub }}>
-                <input type="radio" checked={addForm.is_category} onChange={()=>setAddForm(f=>({...f,is_category:true}))} /> Category card
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:C.sub, fontWeight: !addForm.is_category ? 700 : 500 }}>
+                <input type="radio" checked={!addForm.is_category} onChange={()=>setAddForm(f=>({...f,is_category:false}))} /> Sub-service (under a category)
               </label>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10 }}>
+              {addForm.is_category && (
+              <Field label="Card label (catalog group)">
+                <input value={addForm.card} onChange={e=>setAddForm(f=>({...f,card:e.target.value}))} style={S.inp()} placeholder="Household services" />
+              </Field>
+              )}
+              {addForm.is_category && (
+              <Field label="Card ID (optional slug)">
+                <input value={addForm.service_id} onChange={e=>setAddForm(f=>({...f,service_id:e.target.value}))} style={S.inp()} placeholder="household" />
+              </Field>
+              )}
               {!addForm.is_category && (
-              <Field label="Category">
+              <Field label="Parent category">
                 <select
                   value={addForm.parent_id}
                   onChange={e => {
@@ -7409,8 +7514,8 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
                 <input value={addForm.sub_card} onChange={e=>setAddForm(f=>({...f, sub_card:e.target.value}))} style={S.inp()} placeholder="Deep cleaning" />
               </Field>
               )}
-              <Field label="Service name *">
-                <input value={addForm.service_name} onChange={e=>setAddForm(f=>({...f, service_name:e.target.value}))} style={S.inp()} placeholder="Bathroom Deep Clean" />
+              <Field label={addForm.is_category ? 'Home card title *' : 'Service name *'}>
+                <input value={addForm.service_name} onChange={e=>setAddForm(f=>({...f, service_name:e.target.value}))} style={S.inp()} placeholder={addForm.is_category ? 'Household' : 'Bathroom Deep Clean'} />
               </Field>
               <Field label="Subtitle">
                 <input value={addForm.sub_service_name} onChange={e=>setAddForm(f=>({...f, sub_service_name:e.target.value}))} style={S.inp()} placeholder="45–60 min · sanitise" />
@@ -7435,9 +7540,12 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
               </Field>
             </div>
             <div style={{ marginTop:12, fontSize:11, color:C.dim, lineHeight:1.5 }}>
-              Saves to Supabase <code>service_pricing</code> → syncs to home cards, category sub-cards, booking, and this table.
+              {addForm.is_category
+                ? 'Creates a home category card (is_category=true) — appears on the guest home grid.'
+                : 'Creates a bookable sub-service under the selected parent — appears in sub-cards & booking.'}
+              {' '}Saves to Supabase <code>service_pricing</code> → syncs live.
             </div>
-            <Btn sm onClick={addService} disabled={saving} style={{ marginTop:12 }}>{saving ? 'Adding…' : 'Add & go live'}</Btn>
+            <Btn sm onClick={addService} disabled={saving} style={{ marginTop:12 }}>{saving ? 'Adding…' : addForm.is_category ? 'Add category card' : 'Add sub-service'}</Btn>
           </div>
         )}
 
@@ -7491,7 +7599,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           {!shown.length && !loading && <div style={{ padding:40, textAlign:'center', color:C.dim }}>No rows — deploy migration & edge function first</div>}
         </div>
         <div style={{ marginTop:14, fontSize:11, color:C.dim, lineHeight:1.6 }}>
-          <strong>Status:</strong> Active = visible on home, sub-cards & booking. Inactive = removed (soft delete). Paused = temporarily hidden. Use <strong>+ Add service</strong> for new cards. <strong>Remove</strong> sets Inactive — reactivate from Status. Change <strong>New ₹</strong> for live prices. Set <strong>Top Rated</strong> for the Top Rated tab. Click <strong>Save all & go live</strong> after bulk edits.
+          <strong>Status:</strong> Active = visible on home, sub-cards & booking. Inactive = removed (soft delete). Paused = temporarily hidden. Use <strong>+ Add card / service</strong> for new home category cards or sub-services. <strong>Remove</strong> sets Inactive for that card or sub-service — reactivate from Status. Change <strong>New ₹</strong> for live prices. Set <strong>Top Rated</strong> for the Top Rated tab. Click <strong>Save all & go live</strong> after bulk edits.
         </div>
       </div>
       {!embedded && <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />}
