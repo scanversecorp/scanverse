@@ -2570,14 +2570,14 @@ const APP_CSS = `
   .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
   @media (max-width:480px){
     body{font-size:16px;-webkit-text-size-adjust:100%}
-    .scanv-mobile-zoom{zoom:1.07}
+    .scanv-mobile-zoom{zoom:1.08}
     .trust-pills-row{gap:4px!important;padding:10px 8px 12px!important}
     .trust-pills-row button{font-size:8px!important;padding:5px 3px!important;line-height:1.3!important}
     .browse-home-stack{gap:12px!important;padding-left:14px!important;padding-right:14px!important}
-    .scanv-bottom-nav .nav-row{padding:2px 0!important}
-    .scanv-bottom-nav button{gap:1px!important;padding:1px 0 2px!important}
-    .scanv-bottom-nav .nav-icon{font-size:15px!important;line-height:1!important}
-    .scanv-bottom-nav .nav-label{font-size:8px!important;line-height:1.1!important;font-weight:600!important}
+    .scanv-bottom-nav .nav-row{padding:3px 0!important}
+    .scanv-bottom-nav button{gap:2px!important;padding:2px 0 3px!important}
+    .scanv-bottom-nav .nav-icon{font-size:17px!important;line-height:1!important}
+    .scanv-bottom-nav .nav-label{font-size:9px!important;line-height:1.15!important;font-weight:700!important}
   }
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
