@@ -1632,6 +1632,38 @@ function guardBookStart(svc, addToast) {
   return true;
 }
 
+/** True when DB/card label is the parent category title, not a sub-service name. */
+function isParentCategoryLabel(name, parentId, row) {
+  const label = String(name || '').trim();
+  if (!label) return true;
+  const parentTitle = (HOME_CARD_TITLE[parentId] || row?.card || '').trim();
+  return label === parentTitle || label === String(parentId || '').trim();
+}
+
+function resolveCatalogSvcName(row, svc) {
+  const parentId = row.parent_id || svc?.parent;
+  const isSub = Boolean(parentId) && !row.is_category;
+  const dbName = String(row.service_name || '').trim();
+  const templateName = svc?.id === row.service_id ? String(svc?.name || '').trim() : '';
+
+  if (!isSub) return dbName || templateName || row.service_id;
+
+  if (dbName && !isParentCategoryLabel(dbName, parentId, row)) return dbName;
+  if (templateName) return templateName;
+
+  const subField = String(row.sub_service_name || '').trim();
+  if (subField && !subField.includes('·')) return subField;
+  return dbName || templateName || row.service_id;
+}
+
+function resolveCatalogSvcSub(row, svc, displayName) {
+  const templateSub = svc?.id === row.service_id ? String(svc?.sub || '').trim() : '';
+  const subField = String(row.sub_service_name || '').trim();
+  if (subField === displayName && templateSub) return templateSub;
+  if (subField && subField.includes('·')) return subField;
+  return templateSub || subField || '';
+}
+
 function dbRowToSvc(row) {
   const existing = findSvcById(row.service_id);
   const parentId = row.parent_id || existing?.parent;
@@ -1646,8 +1678,8 @@ function dbRowToSvc(row) {
     parent: parentId || undefined,
     theme: theme || 'default',
     icon: row.icon || '✨',
-    name: row.service_name || row.service_id,
-    sub: row.sub_service_name || '',
+    name: resolveCatalogSvcName(row, existing),
+    sub: resolveCatalogSvcSub(row, existing, resolveCatalogSvcName(row, existing)),
     unit: row.unit || 'visit',
     mrp: Number(row.mrp_paise) || 0,
     price: Number(row.price_paise) || 0,
@@ -1705,8 +1737,9 @@ function applyDbCatalog(rows) {
 
     const svc = findSvcById(row.service_id);
     if (svc) {
-      if (row.service_name) svc.name = row.service_name;
-      if (row.sub_service_name) svc.sub = row.sub_service_name;
+      const displayName = resolveCatalogSvcName(row, svc);
+      svc.name = displayName;
+      svc.sub = resolveCatalogSvcSub(row, svc, displayName);
       if (row.price_paise != null) svc.price = row.price_paise;
       if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
       if (isActive) svc.top_rated = flag;
