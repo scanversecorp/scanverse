@@ -30,6 +30,35 @@ function profileAuthEmails(mobile: string): string[] {
   ];
 }
 
+function mobile10FromEmail(email: string): string | null {
+  const local = (email || "").split("@")[0] || "";
+  const m10 = local.replace(/\D/g, "").slice(-10);
+  return m10.length === 10 ? m10 : null;
+}
+
+function profileIdFromMobile(mobile: string): string {
+  return `cust_${mobile.replace(/\D/g, "").slice(-10)}`;
+}
+
+async function verifyAuthMobileMatch(
+  req: Request,
+  supabaseUrl: string,
+  mobile: string,
+): Promise<boolean> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const anonKey = resolveAnonKey(req);
+  if (!anonKey) return false;
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error } = await userClient.auth.getUser();
+  if (error || !user?.email) return false;
+  const jwtM10 = mobile10FromEmail(user.email);
+  const mobM10 = mobile.replace(/\D/g, "").slice(-10);
+  return !!jwtM10 && jwtM10 === mobM10;
+}
+
 async function verifyOtpStored(
   supabase: SupabaseClient,
   mobile: string,
@@ -387,6 +416,73 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Session failed";
         return json({ success: false, error: msg });
+      }
+    }
+
+    if (action === "register_profile") {
+      try {
+        const authed = await verifyAuthMobileMatch(req, supabaseUrl, mobile);
+        if (!authed) {
+          return json({ success: false, error: "Sign-in required — verify OTP first" }, 401);
+        }
+
+        const profileId = profileIdFromMobile(mobile);
+        const incoming = (body.profile || {}) as Record<string, unknown>;
+        const row = {
+          id: profileId,
+          email: profileAuthEmail(mobile),
+          name: String(incoming.name || "").trim() || null,
+          first_name: String(incoming.first_name || "").trim() || null,
+          last_name: String(incoming.last_name || "").trim() || null,
+          phone: mobile,
+          address: String(incoming.address || ""),
+          village: String(incoming.village || ""),
+          city: String(incoming.city || ""),
+          pincode: String(incoming.pincode || ""),
+          ip_address: incoming.ip_address ?? null,
+          last_lat: incoming.last_lat ?? null,
+          last_lng: incoming.last_lng ?? null,
+          device_type: incoming.device_type ?? null,
+          os_name: incoming.os_name ?? null,
+          browser: incoming.browser ?? null,
+          timezone: incoming.timezone ?? null,
+          language: incoming.language ?? null,
+          mobile_verified: incoming.mobile_verified !== false,
+          mobile_verified_at: incoming.mobile_verified_at || new Date().toISOString(),
+          role: "customer",
+          status: "active",
+          avatar: incoming.avatar || "👤",
+        };
+
+        const { data: profile, error: profErr } = await supabase
+          .from("profiles")
+          .upsert(row, { onConflict: "id" })
+          .select()
+          .single();
+        if (profErr) {
+          return json({ success: false, error: profErr.message }, 500);
+        }
+
+        const loc = body.location as Record<string, unknown> | null;
+        if (loc && loc.lat != null && loc.lng != null) {
+          await supabase.from("user_locations").insert({
+            user_id: profileId,
+            lat: Number(loc.lat),
+            lng: Number(loc.lng),
+            address: String(loc.address || ""),
+            village: String(loc.village || ""),
+            city: String(loc.city || ""),
+            pincode: String(loc.pincode || ""),
+            source: String(loc.source || "gps"),
+            consent_given: true,
+            consent_at: new Date().toISOString(),
+          });
+        }
+
+        return json({ success: true, profile });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Profile save failed";
+        return json({ success: false, error: msg }, 500);
       }
     }
 

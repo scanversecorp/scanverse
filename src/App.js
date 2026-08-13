@@ -5066,7 +5066,7 @@ function BookScreen() {
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);setLoc([geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', '));setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
+  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setLoc(locStr);markBookAuto('loc');setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
@@ -5301,21 +5301,21 @@ function BookScreen() {
         {step===2&&!skipVerify&&<>
           <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 2 · Name, address & OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-            <Field label="First name" req><input value={bookFirstName} onChange={e=>setBookFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
-            <Field label="Last name"><input value={bookLastName} onChange={e=>setBookLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
+            <Field label="First name" req><input value={bookFirstName} {...bookBind('firstName', e=>setBookFirstName(e.target.value))} placeholder="Rahul" style={bookInpStyle('firstName')}/></Field>
+            <Field label="Last name"><input value={bookLastName} {...bookBind('lastName', e=>setBookLastName(e.target.value))} placeholder="Sharma" style={bookInpStyle('lastName')}/></Field>
           </div>
           <Field label="Mobile number" req note="OTP will be sent to verify">
             <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
               <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
-              <input type="tel" maxLength={10} value={bookPhone} onChange={e=>{ if(bookOtpSent) resetBookOtp(); setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+              <input type="tel" maxLength={10} value={bookPhone} {...bookBind('phone', e=>{ if(bookOtpSent) resetBookOtp(); setBookPhone(e.target.value.replace(/\D/g,'').slice(0,10)); })} placeholder="9876543210" style={{...bookInpStyle('phone',{border:'none',borderRadius:0,background:'transparent'})}}/>
             </div>
           </Field>
           <Field label="Address" req note="Where should the expert visit?">
-            <input value={bookAddress} onChange={e=>setBookAddress(e.target.value)} placeholder="Flat 302, Rose Society, Wakad" style={S.inp()}/>
+            <input value={bookAddress} {...bookBind('address', e=>setBookAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={bookInpStyle('address')}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-            <Field label="City" req><input value={bookCity} onChange={e=>setBookCity(e.target.value)} placeholder="Pune" style={S.inp()}/></Field>
-            <Field label="PIN code" req><input type="tel" maxLength={6} value={bookPincode} onChange={e=>setBookPincode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="411018" style={S.inp()}/></Field>
+            <Field label="City" req><input value={bookCity} {...bookBind('city', e=>setBookCity(e.target.value))} placeholder="Pune" style={bookInpStyle('city')}/></Field>
+            <Field label="PIN code" req><input type="tel" maxLength={6} value={bookPincode} {...bookBind('pincode', e=>setBookPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={bookInpStyle('pincode')}/></Field>
           </div>
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
@@ -5356,7 +5356,7 @@ function BookScreen() {
           )}
           <Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field>
           <Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field>
-          <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} onChange={e=>setLoc(e.target.value)} placeholder="Address or area" style={{...S.inp(),flex:1}}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
+          <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} {...bookBind('loc', e=>setLoc(e.target.value))} placeholder="Address or area" style={bookInpStyle('loc',{flex:1})}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
           <Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field>
           <Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:'Confirm booking →'}</Btn>
         </>}
