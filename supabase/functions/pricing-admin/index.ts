@@ -85,6 +85,19 @@ const PARENT_IDS = new Set([
   "delivery", "food", "two-wheeler", "four-wheeler",
 ]);
 
+const PARENT_CARD_TITLES: Record<string, string> = {
+  legal: "Legal & Consulting",
+  cloud: "AI, Cloud & Data Center",
+  vip: "VIP Concierge",
+  health: "Health at Home",
+  property: "Property & Rentals",
+  household: "Cleaning & Home Help",
+  delivery: "Courier & Deliveries",
+  food: "Food & Restaurants & Bars",
+  "two-wheeler": "Bike Care",
+  "four-wheeler": "Car Care",
+};
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -217,12 +230,23 @@ function normalizeRow(r: Record<string, unknown>) {
   const partnerPct = Number(r.partner_pct ?? 70);
   const split = splitAmounts(newAmt, partnerPct);
   const serviceStatus = normalizeServiceStatus(r);
+  const card = String(r.card || "");
+  const serviceName = String(r.service_name || "").trim();
+
+  if (!isCategory && parentId) {
+    const parentTitle = PARENT_CARD_TITLES[parentId] || card;
+    if (serviceName === parentTitle || serviceName === card) {
+      throw new Error(
+        `Sub-service name must differ from category card "${parentTitle}" — use the specific service name (e.g. Lawyer Consultation)`,
+      );
+    }
+  }
 
   return {
     service_id: serviceId,
-    card: String(r.card || ""),
+    card,
     sub_card: String(r.sub_card || "—"),
-    service_name: String(r.service_name || ""),
+    service_name: serviceName,
     sub_service_name: r.sub_service_name ? String(r.sub_service_name) : null,
     current_amount_paise: currentAmt,
     new_amount_paise: newAmt,

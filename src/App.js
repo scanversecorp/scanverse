@@ -1664,6 +1664,21 @@ function resolveCatalogSvcSub(row, svc, displayName) {
   return templateSub || subField || '';
 }
 
+function mergeCatalogUnit(svc, rowUnit) {
+  const dbUnit = String(rowUnit || '').trim();
+  const templateUnit = String(svc?.unit || '').trim();
+  if (!dbUnit) return templateUnit || 'visit';
+  if (dbUnit === 'visit' && templateUnit && templateUnit !== 'visit') return templateUnit;
+  return dbUnit;
+}
+
+function mergeCatalogIcon(svc, rowIcon) {
+  const dbIcon = String(rowIcon || '').trim();
+  const templateIcon = String(svc?.icon || '').trim();
+  if (!dbIcon || dbIcon === '✨') return templateIcon || dbIcon || '✨';
+  return dbIcon;
+}
+
 function dbRowToSvc(row) {
   const existing = findSvcById(row.service_id);
   const parentId = row.parent_id || existing?.parent;
@@ -1677,10 +1692,10 @@ function dbRowToSvc(row) {
     id: row.service_id,
     parent: parentId || undefined,
     theme: theme || 'default',
-    icon: row.icon || '✨',
     name: resolveCatalogSvcName(row, existing),
     sub: resolveCatalogSvcSub(row, existing, resolveCatalogSvcName(row, existing)),
-    unit: row.unit || 'visit',
+    unit: mergeCatalogUnit(existing, row.unit),
+    icon: mergeCatalogIcon(existing, row.icon),
     mrp: Number(row.mrp_paise) || 0,
     price: Number(row.price_paise) || 0,
     cash: false,
@@ -1748,8 +1763,8 @@ function applyDbCatalog(rows) {
         const themes = SUB_CATEGORIES[parentId]?.themes;
         if (!themes || themes[row.theme]) svc.theme = row.theme;
       }
-      if (row.unit) svc.unit = row.unit;
-      if (row.icon) svc.icon = row.icon;
+      svc.unit = mergeCatalogUnit(svc, row.unit);
+      svc.icon = mergeCatalogIcon(svc, row.icon);
       continue;
     }
 
@@ -7457,7 +7472,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState({
     parent_id: 'household',
-    card: 'Household services',
+    card: HOME_CARD_TITLE.household,
     sub_card: '—',
     theme: 'default',
     service_name: '',
@@ -7479,7 +7494,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     SVCS.map(s => ({
       id: s.id,
       label: HOME_CARD_TITLE[s.id] || s.name,
-      card: s.cat || SUB_CATEGORIES[s.id]?.cat || s.name,
+      card: HOME_CARD_TITLE[s.id] || s.name,
     }))
   ), [rows.length]);
 
