@@ -2568,6 +2568,15 @@ const APP_CSS = `
   @media (min-width:481px){.scanv-shell{height:100dvh;max-height:100dvh;min-height:100dvh;max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
   #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
+  @media (max-width:480px){
+    body{font-size:16px;-webkit-text-size-adjust:100%}
+    .scanv-root{zoom:1.06}
+    .trust-pills-row{gap:4px!important;padding:10px 8px 12px!important}
+    .trust-pills-row button{font-size:8px!important;padding:5px 3px!important;line-height:1.3!important}
+    .browse-home-stack{gap:12px!important;padding-left:14px!important;padding-right:14px!important}
+    .scanv-bottom-nav .nav-label{font-size:11px!important}
+    .scanv-bottom-nav .nav-icon{font-size:22px!important}
+  }
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -3439,12 +3448,12 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
-    <div style={{ flexShrink: 0, background: C.surf, borderTop: BDR, boxShadow: '0 -4px 16px rgba(18,18,18,0.08)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+    <div className="scanv-bottom-nav" style={{ flexShrink: 0, background: C.surf, borderTop: BDR, boxShadow: '0 -4px 16px rgba(18,18,18,0.08)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div style={{ display: 'flex', padding: '4px 0' }}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
-          <span style={{fontSize:20}}>{t.icon}</span>
-          <span style={{fontSize:10,fontWeight:700,fontFamily:FF,color:activeTab===t.id?C.acc:C.dim}}>{t.label}</span>
+          <span className="nav-icon" style={{fontSize:20}}>{t.icon}</span>
+          <span className="nav-label" style={{fontSize:10,fontWeight:700,fontFamily:FF,color:activeTab===t.id?C.acc:C.dim}}>{t.label}</span>
           {activeTab===t.id&&<div style={{position:'absolute',bottom:0,left:'25%',right:'25%',height:2,background:C.acc,borderRadius:2}}/>}
         </button>
       ))}
@@ -4740,7 +4749,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
-      <div style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
+      <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 20, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
           <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
@@ -5727,13 +5736,13 @@ function BottomNav() {
     setScreen(id);
   };
   return (
-    <div style={{flexShrink:0,background:C.surf,borderTop:`1px solid ${C.bdr}`,zIndex:50,paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
+    <div className="scanv-bottom-nav" style={{flexShrink:0,background:C.surf,borderTop:`1px solid ${C.bdr}`,zIndex:50,paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
       <div style={{display:'flex',padding:'4px 0'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>goTab(t.id)}
           style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
-          <span style={{fontSize:20}}>{t.icon}</span>
-          <span style={{fontSize:10,color:screen===t.id?C.acc:C.dim,fontFamily:"'DM Sans',sans-serif",fontWeight:screen===t.id?600:400}}>{t.label}</span>
+          <span className="nav-icon" style={{fontSize:20}}>{t.icon}</span>
+          <span className="nav-label" style={{fontSize:10,color:screen===t.id?C.acc:C.dim,fontFamily:"'DM Sans',sans-serif",fontWeight:screen===t.id?600:400}}>{t.label}</span>
           {t.id==='services'&&unread>0&&<div style={{position:'absolute',top:2,right:'20%',background:C.red,color:'#fff',borderRadius:99,width:16,height:16,fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>{unread}</div>}
           {screen===t.id&&<div style={{position:'absolute',bottom:0,left:'25%',right:'25%',height:2,background:C.acc,borderRadius:2}}/>}
         </button>
