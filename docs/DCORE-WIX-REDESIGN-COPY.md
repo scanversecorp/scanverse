@@ -128,6 +128,16 @@ Keep six services — rename **Datacenter** → **Data Center** everywhere:
 
 ## 10. Wix edit checklist (Sam + Cursor session)
 
+**Live verify 13 Aug 2026:** none published yet — `connect@decoreglobal.com`, old hero, `Fortune 100`, `Datacenter` still on https://www.dcoreglobal.com/
+
+**Editor:** `https://samirworldwide-dcore.editor.wix.com/studio/a5ce12a1-9237-4757-898d-05050c8ac14f?metaSiteId=53806a05-be11-49dd-b1ea-3ef2d1590be4`
+
+**Quick targets (homepage):**
+- Hero subhead `comp-md7bixpg` → section 1 copy
+- Managed #3 title `comp-mfcd2kpu3__item-j9plerjk` → **Data Center Managed Services**
+- Why Choose Us `comp-md5rarom10` → soften Fortune 100 (section 7)
+- Footer master page → fix email to **connect@dcoreglobal.com**
+
 - [ ] Fix footer email typo  
 - [ ] Replace hero text (section 1)  
 - [ ] Replace 8-pillar block with 4 journeys (section 3)  
