@@ -2557,8 +2557,9 @@ const S = {
 const APP_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  html{background:#e8e6e1}
-  body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;min-height:100dvh;overflow-x:hidden}
+  html{background:#e8e6e1;height:100%}
+  body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
+  @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
   @media (min-width:481px){body{background:#e8e6e1}}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
@@ -2994,8 +2995,6 @@ function captureFreshGps(fallbackGeo = null) {
 
 /** Fixed browse header — sticky breaks on mobile when inner panels scroll */
 const BROWSE_HDR_PAD = 'calc(12px + env(safe-area-inset-top, 0px))';
-const BROWSE_HDR_H = 'calc(52px + env(safe-area-inset-top, 0px))';
-const BROWSE_NAV_BOTTOM = 'calc(68px + env(safe-area-inset-bottom, 0px))';
 const BROWSE_HOME_PAD = 16;
 const BROWSE_HOME_STACK = {
   display: 'grid',
@@ -3011,6 +3010,8 @@ const APP_SHELL_RADIUS = 22;
 const APP_SHELL = {
   display: 'flex',
   flexDirection: 'column',
+  height: '100dvh',
+  maxHeight: '100dvh',
   minHeight: '100dvh',
   maxWidth: 480,
   margin: '0 auto',
@@ -3021,10 +3022,29 @@ const APP_SHELL = {
   boxSizing: 'border-box',
   fontFamily: FF,
 };
-const BROWSE_WRAP_SHELL = {
-  ...APP_SHELL,
-  paddingBottom: 'calc(68px + env(safe-area-inset-bottom, 0px))',
+/** Scrollable main column — flex child keeps bottom nav visible in iOS Safari (fixed/sticky break inside overflow:hidden). */
+const APP_MAIN = {
+  flex: 1,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
 };
+const BROWSE_MAIN_INNER = {
+  flex: 1,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+};
+const BROWSE_SCROLL_BODY = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  overscrollBehavior: 'contain',
+};
+const BROWSE_WRAP_SHELL = { ...APP_SHELL };
 const TRUST_PILLS_ROW = {
   display: 'flex',
   flexWrap: 'nowrap',
@@ -3062,12 +3082,11 @@ const TRUST_PILL_BTN = {
   appearance: 'none',
   WebkitAppearance: 'none',
 };
-const BROWSE_FIXED_HDR = {
-  position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
+const BROWSE_INLINE_HDR = {
+  flexShrink: 0,
   background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
   display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
 };
-const BROWSE_HDR_SPACER = { height: BROWSE_HDR_H, flexShrink: 0 };
 
 function scrollBrowseTop(el) {
   const run = () => {
@@ -3091,21 +3110,16 @@ function scrollBrowseToId(container, id) {
 
 function BrowseFixedHeader({ children, padX = 16 }) {
   return (
-    <>
-      <div style={{ ...BROWSE_FIXED_HDR, paddingLeft: padX, paddingRight: padX }}>{children}</div>
-      <div style={BROWSE_HDR_SPACER} aria-hidden="true" />
-    </>
+    <div style={{ ...BROWSE_INLINE_HDR, paddingLeft: padX, paddingRight: padX }}>{children}</div>
   );
 }
 
-/** Viewport-locked category panel — header never scrolls; body scrolls internally.
- *  Sticky/fixed fail when scroll is on a sibling or when an ancestor has overflow-x:hidden (iOS Safari). */
-function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, bottomOffset = BROWSE_NAV_BOTTOM, children }) {
+/** Category panel — header pinned in flex column; body scrolls internally (Safari-safe vs position:fixed). */
+function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children }) {
   return (
     <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
-      bottom: bottomOffset, display: 'flex', flexDirection: 'column', background: C.bg,
-      zIndex: 90, fontFamily: FF, borderRadius: APP_SHELL_RADIUS, overflow: 'hidden',
+      flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: C.bg,
+      fontFamily: FF, overflow: 'hidden',
     }}>
       <div style={{
         flexShrink: 0, background: C.surf, borderBottom: BDR,
@@ -3140,7 +3154,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
-    <div style={{position:'fixed',bottom:0,left:0,right:0,maxWidth:480,margin:'0 auto',background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,borderBottomLeftRadius:APP_SHELL_RADIUS,borderBottomRightRadius:APP_SHELL_RADIUS,overflow:'hidden'}}>
+    <div style={{flexShrink:0,background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,borderBottomLeftRadius:APP_SHELL_RADIUS,borderBottomRightRadius:APP_SHELL_RADIUS,overflow:'hidden'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
@@ -3154,7 +3168,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
 
 function StickyCta({ children, onClick }) {
   return (
-    <div style={{position:'fixed',bottom:64,left:0,right:0,maxWidth:480,margin:'0 auto',padding:'10px 16px',background:`linear-gradient(transparent, ${C.bg} 40%)`,zIndex:40}}>
+    <div style={{flexShrink:0,padding:'10px 16px',background:C.bg,borderTop:BDR,zIndex:40}}>
       <button onClick={onClick} style={{width:'100%',background:C.acc,color:'#fff',border:'none',borderRadius:12,padding:14,fontSize:15,fontWeight:800,fontFamily:FF,cursor:'pointer',boxShadow:'0 6px 20px rgba(214,58,86,0.4)'}}>{children}</button>
     </div>
   );
@@ -4339,9 +4353,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const browseWrap = (content, sticky=null) => (
     <div style={BROWSE_WRAP_SHELL}>
-      {content}
-      {sticky}
-      <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
+      <div style={APP_MAIN}>
+        <div style={BROWSE_MAIN_INNER}>
+          {content}
+        </div>
+        {sticky}
+        <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
+      </div>
       <GuestBottomNav
         activeTab={guestActiveTab}
         onHome={goBrowseHome}
@@ -4420,11 +4438,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)',flexShrink:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||'PCMC'} {silentGeo?.pincode||''}</div>
       </div>
-      <div style={{ ...BROWSE_HOME_STACK, marginTop: 12 }}>
+      <div style={{ ...BROWSE_HOME_STACK, marginTop: 12, flexShrink: 0 }}>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
           <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
@@ -4449,7 +4467,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           </div>
         </div>
       </div>
-      <div ref={browseHomeScrollRef} style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
+      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -4480,10 +4498,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- TOP RATED (public, no login) -----------------------------------------
   if (screen === 'top-rated') return browseWrap(
     <>
-      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.1)' }}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.1)', flexShrink: 0 }}>
         <div style={{ fontWeight: 800, fontSize: 20, fontFamily: FF, color: C.txt }}>⭐ Top Rated</div>
       </div>
-      <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
         {topRatedItems.length ? (
           <>
             <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#fffbeb', border: '2px solid rgba(251,191,36,0.45)' }}>
@@ -4564,11 +4582,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
     return browseWrap(
       <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>setScreen('payment')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pick date & time</div>
         </div>
-        <div style={{padding:'14px 16px 120px'}}>
+        <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           {browsePay.paymentVerified && (
             <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
           )}
@@ -4595,11 +4613,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     const { setUpiOpened, setPaymentVerified } = browsePay;
     return browseWrap(
       <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>{setScreen('verify');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
         </div>
-        <div style={{padding:'14px 16px 120px'}}>
+        <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
             <div style={{fontSize:13,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
@@ -4655,11 +4673,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
     return browseWrap(
       <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
         </div>
-        <div style={{padding:'16px 16px 24px'}}>
+        <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP before payment</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
@@ -4740,7 +4758,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
         </BrowseFixedHeader>
-        <div style={{padding:'16px 16px 24px'}}>
+        <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
           {silentGeo?.city && (
@@ -5391,7 +5409,7 @@ function BottomNav() {
     setScreen(id);
   };
   return (
-    <div style={{display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'8px 0 4px',position:'sticky',bottom:0,zIndex:50}}>
+    <div style={{flexShrink:0,display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'8px 0 calc(4px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>goTab(t.id)}
           style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
@@ -12174,10 +12192,11 @@ function LegalPage({page}) {
   return (
     <div style={APP_SHELL}>
       {/* Header */}
-      <div style={{background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+      <div style={{flexShrink:0,background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
         <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>
       </div>
+      <div style={{...BROWSE_SCROLL_BODY}}>
       <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
         {/* Hero */}
         <div style={{background:`linear-gradient(135deg,${C.surf},${C.card})`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'28px 24px',marginBottom:28}}>
@@ -12193,6 +12212,7 @@ function LegalPage({page}) {
           <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global ↗</a>
         </div>
         <CopyrightLine style={{ marginTop: 16 }} />
+      </div>
       </div>
     </div>
   );
@@ -12536,8 +12556,12 @@ export default function App() {
         <Toast toasts={toasts}/>
         <PartnerGpsTracker />
         <div style={APP_SHELL}>
-          <Boundary>{renderScreen()}</Boundary>
-          <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />
+          <div style={APP_MAIN}>
+            <div style={BROWSE_MAIN_INNER}>
+              <Boundary>{renderScreen()}</Boundary>
+            </div>
+            <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />
+          </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>
       </Ctx.Provider>
