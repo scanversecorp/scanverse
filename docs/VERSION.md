@@ -41,7 +41,7 @@ Opens QR landing → register flow (not direct browse).
 | Field | Value |
 |-------|-------|
 | **Version** | `5.5.3.1786665000000` |
-| **Git commit** | `dc4de6c` (tag `v5.5.3`) |
+| **Git commit** | `6625e82` (tag `v5.5.3`) |
 | **Status** | Committed locally · awaiting `git push` |
 | **JS bundle (local build)** | `main.d1387dad.js` |
 | **Built** | 2026-08-14 |
@@ -82,7 +82,7 @@ Same URL — after deploy, scan goes straight to browse; `?qr=` params stripped 
 | Tag | Points to | Notes |
 |-----|-----------|-------|
 | `v5.5.2` | `8fbfd93` | Last production deploy before QR/install changes |
-| `v5.5.3` | `dc4de6c` | QR direct-open + no install gate |
+| `v5.5.3` | `6625e82` | QR direct-open + no install gate |
 
 ## Verify production
 
