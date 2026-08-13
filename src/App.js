@@ -1886,6 +1886,22 @@ const ADMIN_HUB_HASH = 'admin';
 const ADMIN_HUB_ALIASES = new Set(['admin', 'admin-hub']);
 const EXEC_DASHBOARD_HASH = 'exec';
 const EXEC_DASHBOARD_ALIASES = new Set(['exec', 'exec-dashboard']);
+
+/** Legacy hash aliases → single canonical bookmark URL */
+const HASH_CANONICAL = {
+  'admin-hub': ADMIN_HUB_HASH,
+  'exec-dashboard': EXEC_DASHBOARD_HASH,
+};
+
+function canonicalizeHashRoute() {
+  const raw = window.location.hash.replace(/^#/, '');
+  const base = hashBase();
+  const canonical = HASH_CANONICAL[base];
+  if (!canonical) return;
+  const query = raw.includes('?') ? raw.slice(raw.indexOf('?')) : '';
+  const next = `${window.location.pathname}${window.location.search}#${canonical}${query}`;
+  window.history.replaceState({}, '', next);
+}
 const OTP_DELIVERY_REPORT_HASH = 'otp-delivery-report';
 const OTP_DELIVERY_CALLBACK_URL = process.env.REACT_APP_OTP_DELIVERY_CALLBACK_URL
   || `${SB_URL}/functions/v1/otp-delivery-report`;
@@ -10815,7 +10831,7 @@ function OtpDeliveryReportPage() {
 }
 
 /* ================================================================
-   ADMIN CONTROL CENTER — #admin / #admin-hub
+   ADMIN CONTROL CENTER — #admin (legacy #admin-hub redirects here)
 ================================================================ */
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
@@ -12007,6 +12023,13 @@ function LegalPage({page}) {
 }
 
 export default function App() {
+  useEffect(() => {
+    canonicalizeHashRoute();
+    const onHash = () => canonicalizeHashRoute();
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   const [state,setState]       = useState('boot');
   const [user,setUser]         = useState(null);
   const [screen,setScreen]     = useState('services');
