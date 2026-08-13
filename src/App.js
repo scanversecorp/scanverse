@@ -2570,12 +2570,14 @@ const APP_CSS = `
   .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
   @media (max-width:480px){
     body{font-size:16px;-webkit-text-size-adjust:100%}
-    .scanv-root{zoom:1.06}
+    .scanv-mobile-zoom{zoom:1.07}
     .trust-pills-row{gap:4px!important;padding:10px 8px 12px!important}
     .trust-pills-row button{font-size:8px!important;padding:5px 3px!important;line-height:1.3!important}
     .browse-home-stack{gap:12px!important;padding-left:14px!important;padding-right:14px!important}
-    .scanv-bottom-nav .nav-label{font-size:11px!important}
-    .scanv-bottom-nav .nav-icon{font-size:22px!important}
+    .scanv-bottom-nav .nav-row{padding:2px 0!important}
+    .scanv-bottom-nav button{gap:1px!important;padding:1px 0 2px!important}
+    .scanv-bottom-nav .nav-icon{font-size:15px!important;line-height:1!important}
+    .scanv-bottom-nav .nav-label{font-size:8px!important;line-height:1.1!important;font-weight:600!important}
   }
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
@@ -3449,7 +3451,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
   ];
   return (
     <div className="scanv-bottom-nav" style={{ flexShrink: 0, background: C.surf, borderTop: BDR, boxShadow: '0 -4px 16px rgba(18,18,18,0.08)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      <div style={{ display: 'flex', padding: '4px 0' }}>
+      <div className="nav-row" style={{ display: 'flex', padding: '4px 0' }}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span className="nav-icon" style={{fontSize:20}}>{t.icon}</span>
@@ -4659,7 +4661,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const browseWrap = (content, sticky=null) => (
     <div className="scanv-shell" style={BROWSE_WRAP_SHELL}>
-      <div style={APP_MAIN}>
+      <div className="scanv-mobile-zoom" style={APP_MAIN}>
         <div style={BROWSE_MAIN_INNER}>
           {content}
         </div>
@@ -5737,7 +5739,7 @@ function BottomNav() {
   };
   return (
     <div className="scanv-bottom-nav" style={{flexShrink:0,background:C.surf,borderTop:`1px solid ${C.bdr}`,zIndex:50,paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
-      <div style={{display:'flex',padding:'4px 0'}}>
+      <div className="nav-row" style={{display:'flex',padding:'4px 0'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>goTab(t.id)}
           style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
@@ -12894,7 +12896,7 @@ export default function App() {
         <PartnerGpsTracker />
         <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>
-          <div style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div className="scanv-mobile-zoom" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <Boundary>{renderScreen()}</Boundary>
             <CopyrightLine style={{ padding: '6px 16px 16px' }} />
           </div>
