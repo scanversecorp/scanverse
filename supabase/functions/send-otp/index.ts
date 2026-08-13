@@ -40,6 +40,43 @@ function profileIdFromMobile(mobile: string): string {
   return `cust_${mobile.replace(/\D/g, "").slice(-10)}`;
 }
 
+function phoneLookupVariants(mobile: string): string[] {
+  const d10 = mobile.replace(/\D/g, "").slice(-10);
+  if (d10.length !== 10) return [mobile].filter(Boolean);
+  const norm = normalizeMobile(mobile);
+  return [...new Set([norm, `+91${d10}`, `91${d10}`, d10, mobile].filter(Boolean))];
+}
+
+function profileLooksRegistered(p: {
+  first_name?: string | null;
+  name?: string | null;
+} | null): boolean {
+  return !!(String(p?.first_name || "").trim() || String(p?.name || "").trim());
+}
+
+async function findProfileByMobile(
+  supabase: SupabaseClient,
+  mobile: string,
+) {
+  for (const ph of phoneLookupVariants(mobile)) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id,first_name,last_name,name,phone,email")
+      .eq("phone", ph)
+      .maybeSingle();
+    if (data?.id) return data;
+  }
+  for (const email of profileAuthEmails(mobile)) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id,first_name,last_name,name,phone,email")
+      .eq("email", email)
+      .maybeSingle();
+    if (data?.id) return data;
+  }
+  return null;
+}
+
 async function verifyAuthMobileMatch(
   req: Request,
   supabaseUrl: string,
@@ -419,6 +456,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (action === "check_mobile") {
+      const existing = await findProfileByMobile(supabase, mobile);
+      return json({
+        exists: !!existing,
+        registered: !!(existing && profileLooksRegistered(existing)),
+      });
+    }
+
     if (action === "register_profile") {
       try {
         const authed = await verifyAuthMobileMatch(req, supabaseUrl, mobile);
@@ -426,7 +471,16 @@ Deno.serve(async (req: Request) => {
           return json({ success: false, error: "Sign-in required — verify OTP first" }, 401);
         }
 
-        const profileId = profileIdFromMobile(mobile);
+        const existing = await findProfileByMobile(supabase, mobile);
+        if (existing && profileLooksRegistered(existing)) {
+          return json({
+            success: false,
+            code: "already_registered",
+            error: "This number is already registered. Log in instead?",
+          });
+        }
+
+        const profileId = existing?.id || profileIdFromMobile(mobile);
         const incoming = (body.profile || {}) as Record<string, unknown>;
         const row = {
           id: profileId,
@@ -454,19 +508,51 @@ Deno.serve(async (req: Request) => {
           avatar: incoming.avatar || "👤",
         };
 
-        const { data: profile, error: profErr } = await supabase
-          .from("profiles")
-          .upsert(row, { onConflict: "id" })
-          .select()
-          .single();
-        if (profErr) {
-          return json({ success: false, error: profErr.message }, 500);
+        let profile;
+        let profErr;
+        if (existing?.id) {
+          ({ data: profile, error: profErr } = await supabase
+            .from("profiles")
+            .update(row)
+            .eq("id", profileId)
+            .select()
+            .single());
+        } else {
+          ({ data: profile, error: profErr } = await supabase
+            .from("profiles")
+            .upsert(row, { onConflict: "id" })
+            .select()
+            .single());
+          if (profErr && /profiles_phone|phone_key|duplicate key/i.test(profErr.message)) {
+            const byPhone = await findProfileByMobile(supabase, mobile);
+            if (byPhone?.id) {
+              ({ data: profile, error: profErr } = await supabase
+                .from("profiles")
+                .update({ ...row, id: byPhone.id })
+                .eq("id", byPhone.id)
+                .select()
+                .single());
+            }
+          }
+        }
+        if (profErr || !profile) {
+          if (profErr && /profiles_phone|phone_key|duplicate key/i.test(profErr.message)) {
+            return json({
+              success: false,
+              code: "already_registered",
+              error: "This number is already registered. Log in instead?",
+            });
+          }
+          return json({
+            success: false,
+            error: "Could not save profile. Try again or log in with this number.",
+          }, 500);
         }
 
         const loc = body.location as Record<string, unknown> | null;
         if (loc && loc.lat != null && loc.lng != null) {
           await supabase.from("user_locations").insert({
-            user_id: profileId,
+            user_id: profile.id,
             lat: Number(loc.lat),
             lng: Number(loc.lng),
             address: String(loc.address || ""),
@@ -482,7 +568,14 @@ Deno.serve(async (req: Request) => {
         return json({ success: true, profile });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Profile save failed";
-        return json({ success: false, error: msg }, 500);
+        if (/profiles_phone|phone_key|duplicate key/i.test(msg)) {
+          return json({
+            success: false,
+            code: "already_registered",
+            error: "This number is already registered. Log in instead?",
+          });
+        }
+        return json({ success: false, error: "Could not save profile. Try again." }, 500);
       }
     }
 

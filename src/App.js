@@ -1354,6 +1354,55 @@ function isUniqueViolation(error) {
   return error?.code === '23505' || /duplicate key|unique constraint/i.test(error?.message || '');
 }
 
+function isProfilesPhoneConflict(error) {
+  return isUniqueViolation(error) && /profiles_phone|phone_key/i.test(error?.message || error?.details || '');
+}
+
+/** E.164 and legacy phone variants for profile lookup */
+function phoneLookupVariants(mob) {
+  const d10 = String(mob || '').replace(/\D/g, '').slice(-10);
+  if (d10.length !== 10) return [mob].filter(Boolean);
+  const norm = normalizeMobileE164(mob);
+  return [...new Set([norm, `+91${d10}`, `91${d10}`, d10, mob].filter(Boolean))];
+}
+
+function profileLooksRegistered(p) {
+  return !!(p?.first_name?.trim() || p?.name?.trim());
+}
+
+function friendlySignupError(error) {
+  const msg = error?.message || '';
+  if (error?.code === 'PHONE_EXISTS' || isProfilesPhoneConflict(error)) {
+    return { type: 'phone_exists', message: 'This number is already registered. Log in instead?' };
+  }
+  if (/already registered/i.test(msg)) {
+    return { type: 'phone_exists', message: msg };
+  }
+  if (/row-level security|RLS policy/i.test(msg)) {
+    return { type: 'rls', message: 'Could not save profile. Try again or log in with this number.' };
+  }
+  return { type: 'generic', message: msg || 'Something went wrong. Please try again.' };
+}
+
+/** Find existing customer profile by JWT-visible email or phone (post-OTP auth) */
+async function findCustomerProfileByMobile(mob) {
+  const emails = [
+    profileAuthEmail(mob),
+    `${String(mob).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
+  ];
+  for (const email of emails) {
+    const { data } = await sb().from('profiles').select('id,phone,first_name,last_name,name,email')
+      .eq('email', email).maybeSingle();
+    if (data?.id) return data;
+  }
+  for (const ph of phoneLookupVariants(mob)) {
+    const { data } = await sb().from('profiles').select('id,phone,first_name,last_name,name,email')
+      .eq('phone', ph).maybeSingle();
+    if (data?.id) return data;
+  }
+  return null;
+}
+
 /** One visible booking per txn_id — keeps oldest non-cancelled row. */
 function dedupeBookingsForDisplay(bookings) {
   const canonicalByTxn = new Map();
@@ -3036,8 +3085,11 @@ function customerProfileId(mob) {
   return `cust_${d}`;
 }
 
-/** Resolve profile id: canonical cust_<10digits>, with legacy stored-uid fallback when valid */
+/** Resolve profile id: phone/email match first, then canonical cust_<10digits> */
 async function resolveCustomerProfileId(mob) {
+  const byMobile = await findCustomerProfileByMobile(mob);
+  if (byMobile?.id) return byMobile.id;
+
   const profileId = customerProfileId(mob);
   const stored = localStorage.getItem('scanv_uid');
   if (stored && stored !== profileId && /^cust_[0-9]{10}$/.test(stored)) {
@@ -3052,17 +3104,28 @@ async function resolveCustomerProfileId(mob) {
 async function upsertCustomerProfile({
   id, mob, firstName, lastName, address, village, city, pincode, email,
   lastLat, lastLng, silentGeo, ip, dev, mobileVerified = true,
+  allowRegistered = false,
 }) {
+  const normMob = normalizeMobileE164(mob);
   const fakeEmail = email || profileAuthEmail(mob);
   const device = dev || detectDevice();
   const ipAddr = ip || await getIP();
+
+  const existingByPhone = await findCustomerProfileByMobile(mob);
+  if (existingByPhone && profileLooksRegistered(existingByPhone) && !allowRegistered) {
+    const err = new Error('This number is already registered. Log in instead?');
+    err.code = 'PHONE_EXISTS';
+    throw err;
+  }
+
+  const targetId = existingByPhone?.id || id || customerProfileId(mob);
   const row = {
-    id,
+    id: targetId,
     email: fakeEmail,
     name: `${firstName} ${lastName}`.trim(),
     first_name: (firstName || '').trim(),
     last_name: (lastName || '').trim(),
-    phone: mob,
+    phone: normMob,
     address: address || '',
     village: village || '',
     city: city || '',
@@ -3081,11 +3144,25 @@ async function upsertCustomerProfile({
     status: 'active',
     avatar: '👤',
   };
-  const { data: existing } = await sb().from('profiles').select('id').eq('id', id).maybeSingle();
-  const { data, error } = existing
-    ? await sb().from('profiles').update(row).eq('id', id).select().single()
-    : await sb().from('profiles').insert(row).select().single();
-  if (error) throw error;
+
+  const { data: existingById } = await sb().from('profiles').select('id').eq('id', targetId).maybeSingle();
+  let data, error;
+  if (existingById) {
+    ({ data, error } = await sb().from('profiles').update(row).eq('id', targetId).select().single());
+  } else {
+    ({ data, error } = await sb().from('profiles').insert(row).select().single());
+    if (isProfilesPhoneConflict(error) && existingByPhone?.id) {
+      ({ data, error } = await sb().from('profiles').update(row).eq('id', existingByPhone.id).select().single());
+    }
+  }
+  if (error) {
+    if (isProfilesPhoneConflict(error)) {
+      const err = new Error('This number is already registered. Log in instead?');
+      err.code = 'PHONE_EXISTS';
+      throw err;
+    }
+    throw error;
+  }
   localStorage.setItem('scanv_uid', data.id);
   return data;
 }
@@ -3101,6 +3178,11 @@ async function saveCustomerProfileViaEdge(mob, profileFields, location) {
     },
   });
   const errMsg = await edgeFnErrorMessageAsync(r);
+  if (r.data?.code === 'already_registered') {
+    const err = new Error('This number is already registered. Log in instead?');
+    err.code = 'PHONE_EXISTS';
+    throw err;
+  }
   if (r.error || r.data?.success === false) {
     throw new Error(errMsg || r.data?.error || 'Could not save profile');
   }
@@ -3288,6 +3370,17 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   useEffect(() => {
     if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop();
   }, [screen]);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem('scanv_login_mobile');
+    if (saved && /^\d{10}$/.test(saved)) {
+      sessionStorage.removeItem('scanv_login_mobile');
+      setMobile(saved);
+      setLoginIntent('home');
+      setScreen('login');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -4177,7 +4270,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 /* ================================================================
    REGISTRATION FLOW
 ================================================================ */
-function RegistrationFlow({ onComplete, prefill }) {
+function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const [phase, setPhase]   = useState('consent');
   const [dev, setDev]       = useState(prefill?.dev||null);
   const [ip, setIp]         = useState(prefill?.ip||'');
@@ -4185,6 +4278,7 @@ function RegistrationFlow({ onComplete, prefill }) {
   const [sessionId, setSessionId] = useState(prefill?.scanId||null);
   const [waToken, setWaToken]       = useState('');
   const [waChecking, setWaChecking] = useState(false);
+  const [loginPrompt, setLoginPrompt] = useState(false);
 
   const [form, setForm] = useState({
     firstName:'', lastName:'', age:'', mobile:'', email:'',
@@ -4294,11 +4388,19 @@ function RegistrationFlow({ onComplete, prefill }) {
     if (!form.mobile)           return setErr('Enter your mobile number');
     if (!form.city.trim())      return setErr('Enter your city');
     if (!form.pincode.trim())   return setErr('Enter PIN code');
-    setLoading(true); setErr('');
+    setLoading(true); setErr(''); setLoginPrompt(false);
     try {
       const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
-      // 1. Send OTP via Twilio Verify (server-side, no DLT needed)
-      //    Twilio generates and sends the OTP -- we don’t need to store it
+      try {
+        const check = await sb().functions.invoke('send-otp', { body: { mobile: mob, action: 'check_mobile' } });
+        if (check.data?.registered) {
+          setLoginPrompt(true);
+          setErr('This number is already registered. Log in instead?');
+          setLoading(false);
+          return;
+        }
+      } catch (_) { /* proceed — save path handles duplicates after OTP */ }
+
       setLoading(false);
       setPhase('otp'); setCd(OTP_RESEND_COOLDOWN_SEC); setDigits(['','','','','','']);
       setWaToken('');
@@ -4343,7 +4445,16 @@ function RegistrationFlow({ onComplete, prefill }) {
       await ensureProfileAuthSession(mob, { waToken });
       setPhase('completing');
       await finalise(null, profileAuthEmail(mob), mob);
-    } catch(e) { setErr(e.message||'Verification failed.'); setPhase('form'); }
+    } catch(e) {
+      const friendly = friendlySignupError(e);
+      if (friendly.type === 'phone_exists') {
+        setLoginPrompt(true);
+        setErr(friendly.message);
+      } else {
+        setErr(friendly.message);
+      }
+      setPhase('form');
+    }
     finally { setLoading(false); }
   };
 
@@ -4364,7 +4475,16 @@ function RegistrationFlow({ onComplete, prefill }) {
       await ensureProfileAuthSession(mob, { otp: token });
       setPhase('completing');
       await finalise(null, profileAuthEmail(mob), mob);
-    } catch(e) { setErr(e.message||'Verification failed.'); }
+    } catch(e) {
+      const friendly = friendlySignupError(e);
+      if (friendly.type === 'phone_exists') {
+        setLoginPrompt(true);
+        setErr(friendly.message);
+        setPhase('form');
+      } else {
+        setErr(friendly.message || 'Verification failed.');
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -4412,6 +4532,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       try {
         profile = await saveCustomerProfileViaEdge(mob, profileFields, location);
       } catch (edgeErr) {
+        if (edgeErr?.code === 'PHONE_EXISTS' || isProfilesPhoneConflict(edgeErr)) throw edgeErr;
         profile = await upsertCustomerProfile({
           id: resolvedId,
           mob,
@@ -4455,7 +4576,22 @@ function RegistrationFlow({ onComplete, prefill }) {
       }
 
       onComplete(profile);
-    } catch(e) { setErr(e.message||'Could not save profile. Try again.'); setPhase('form'); }
+    } catch(e) {
+      const friendly = friendlySignupError(e);
+      if (friendly.type === 'phone_exists') {
+        setLoginPrompt(true);
+        setErr(friendly.message);
+      } else {
+        setErr(friendly.message);
+      }
+      setPhase('form');
+    }
+  };
+
+  const goToLogin = () => {
+    const mob10 = form.mobile.replace(/\D/g, '').slice(0, 10);
+    if (mob10) sessionStorage.setItem('scanv_login_mobile', mob10);
+    onGoToLogin?.(mob10);
   };
 
   /* -- UI -- */
@@ -4492,6 +4628,14 @@ function RegistrationFlow({ onComplete, prefill }) {
         {logo}{stepBar}
         <div style={S.card({padding:24})}>
           {err&&<div style={S.err}>{err}</div>}
+          {loginPrompt&&(
+            <div style={{marginBottom:14,padding:'12px 14px',background:C.gls,border:`1px solid ${C.acc}55`,borderRadius:10}}>
+              <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:10}}>
+                An account with <strong style={{color:C.txt}}>+91 {form.mobile.replace(/\D/g,'').slice(0,10)}</strong> already exists.
+              </div>
+              <Btn full onClick={goToLogin}>Log in with this number →</Btn>
+            </div>
+          )}
           {content}
         </div>
         <CopyrightLine style={{ marginTop: 12 }} />
@@ -11220,7 +11364,11 @@ export default function App() {
 
   if (state==='register') return (
     <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
-    <RegistrationFlow prefill={qrPrefill} onComplete={p=>{setUser(p);setState('app');}}/>
+    <RegistrationFlow
+      prefill={qrPrefill}
+      onComplete={p=>{setUser(p);setState('app');}}
+      onGoToLogin={()=>setState('browse')}
+    />
     </Boundary>
   );
 
