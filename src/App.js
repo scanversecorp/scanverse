@@ -4783,8 +4783,14 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         ) : (
           <>
             <div id="scanv-commitments" style={{marginBottom:14}}>
-              <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
-              <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||LOCAL_COMMUNITIES} · people you can trust</div>
+              <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:6}}>Our commitments</div>
+              <div style={{fontSize:12,fontWeight:700,lineHeight:1.55}}>
+                <span style={{color:'#ea580c'}}>Local Community</span>
+                <span style={{color:C.dim}}>, </span>
+                <span style={{color:C.grn}}>Local Support</span>
+                <span style={{color:C.dim}}>, </span>
+                <span style={{color:C.acc}}>Local Happiness...!</span>
+              </div>
             </div>
             {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
             <SvcGrid2 gap={12} items={svcList} renderItem={(s, i) => <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />} />
