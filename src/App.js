@@ -1405,6 +1405,22 @@ async function findCustomerProfileByMobile(mob) {
   return null;
 }
 
+/** Login profile lookup: client RLS first, server fallback for legacy cust_* ids */
+async function resolveLoginProfile(mob) {
+  const norm = normalizeMobileE164(mob);
+  const found = await findCustomerProfileByMobile(norm);
+  if (found?.id) return found;
+  try {
+    const r = await sb().functions.invoke('send-otp', {
+      body: { mobile: norm, action: 'get_login_profile' },
+    });
+    if (r.data?.profile?.id) return r.data.profile;
+  } catch (_) { /* fall through to canonical id */ }
+  const canonicalId = customerProfileId(norm);
+  const { data } = await sb().from('profiles').select('*').eq('id', canonicalId).maybeSingle();
+  return data || null;
+}
+
 /** One visible booking per txn_id — keeps oldest non-cancelled row. */
 function dedupeBookingsForDisplay(bookings) {
   const canonicalByTxn = new Map();
@@ -3549,9 +3565,18 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         if (code.length < 6) throw new Error('Enter 6-digit OTP');
       }
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
-      const profileId = await resolveCustomerProfileId(mob);
-      const {data:existing} = await sb().from('profiles').select('*').eq('id', profileId).maybeSingle();
-      if (!existing||!existing.first_name) throw new Error('No account found. Sign up first or book a service to create your profile.');
+      let existing = await resolveLoginProfile(mob);
+      if (!existing?.id) throw new Error('No account found. Sign up first or book a service to create your profile.');
+      if (!profileLooksRegistered(existing)) {
+        const patch = {
+          email: existing.email || profileAuthEmail(mob),
+          phone: existing.phone || mob,
+          mobile_verified: true,
+          mobile_verified_at: new Date().toISOString(),
+        };
+        const { data: patched } = await sb().from('profiles').update(patch).eq('id', existing.id).select().single();
+        existing = patched || { ...existing, ...patch };
+      }
       const loginGeo = await captureFreshGps(silentGeo);
       const geoUpdates = {
         mobile_verified: true,
@@ -3581,7 +3606,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         }).then(() => {}).catch(() => {});
       }
       localStorage.setItem('scanv_uid', existing.id);
-      addToast?.(`Welcome back, ${existing.first_name}!`, 'success');
+      const welcomeName = (existing.first_name || existing.name || '').trim() || 'there';
+      addToast?.(`Welcome back, ${welcomeName}!`, 'success');
       onRegistered(prof || { ...existing, ...geoUpdates }, null, loginIntent);
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
