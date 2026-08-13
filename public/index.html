@@ -52,12 +52,13 @@
       min-height: 100%;
       height: auto;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #fafafa;
+      background: #e8e6e1;
       color: #121212;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
-    body { overscroll-behavior: none; overflow-x: hidden; }
+    body { overscroll-behavior: none; overflow-x: hidden; background: #fafafa; }
+    @media (min-width: 481px) { body { background: #e8e6e1; } }
     #root {
       min-height: 100dvh;
       padding-top: env(safe-area-inset-top);

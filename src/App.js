@@ -2167,7 +2167,9 @@ const S = {
 const APP_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
+  html{background:#e8e6e1}
   body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;min-height:100dvh;overflow-x:hidden}
+  @media (min-width:481px){body{background:#e8e6e1}}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -2175,6 +2177,7 @@ const APP_CSS = `
   @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes heroPulse{0%,100%{opacity:0.45;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
   ::-webkit-scrollbar{width:0}
+  .trust-pills-row::-webkit-scrollbar{display:none;height:0}
   a:focus-visible,button:focus-visible{outline:2px solid ${C.acc};outline-offset:2px}
   .rzp-pay-wrap{display:flex;justify-content:center;align-items:center;width:100%;max-width:480px;margin:0 auto}
 `;
@@ -2600,6 +2603,54 @@ const BROWSE_HOME_STACK = {
   width: '100%',
 };
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
+/** iPhone-style device frame — rounded viewport shell (mobile PWA + centered desktop) */
+const APP_SHELL_RADIUS = 22;
+const APP_SHELL = {
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: '100dvh',
+  maxWidth: 480,
+  margin: '0 auto',
+  background: C.bg,
+  width: '100%',
+  overflow: 'hidden',
+  borderRadius: APP_SHELL_RADIUS,
+  boxSizing: 'border-box',
+  fontFamily: FF,
+};
+const BROWSE_WRAP_SHELL = {
+  ...APP_SHELL,
+  paddingBottom: 'calc(68px + env(safe-area-inset-bottom, 0px))',
+};
+const TRUST_PILLS_ROW = {
+  display: 'flex',
+  flexWrap: 'nowrap',
+  alignItems: 'center',
+  gap: 4,
+  width: '100%',
+  boxSizing: 'border-box',
+  margin: 0,
+  padding: '8px 10px 10px',
+  borderTop: BDR,
+  overflowX: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  scrollbarWidth: 'none',
+  msOverflowStyle: 'none',
+};
+const TRUST_PILL = {
+  fontSize: 8,
+  fontWeight: 800,
+  color: C.grn,
+  background: '#e6f4ee',
+  border: '1.5px solid rgba(0,122,77,0.35)',
+  padding: '3px 5px',
+  borderRadius: 99,
+  boxSizing: 'border-box',
+  margin: 0,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+  lineHeight: 1.2,
+};
 const BROWSE_FIXED_HDR = {
   position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
   background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
@@ -2635,7 +2686,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, bo
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
       bottom: bottomOffset, display: 'flex', flexDirection: 'column', background: C.bg,
-      zIndex: 90, fontFamily: FF,
+      zIndex: 90, fontFamily: FF, borderRadius: APP_SHELL_RADIUS, overflow: 'hidden',
     }}>
       <div style={{
         flexShrink: 0, background: C.surf, borderBottom: BDR,
@@ -2670,7 +2721,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
-    <div style={{position:'fixed',bottom:0,left:0,right:0,maxWidth:480,margin:'0 auto',background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50}}>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,maxWidth:480,margin:'0 auto',background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,borderBottomLeftRadius:APP_SHELL_RADIUS,borderBottomRightRadius:APP_SHELL_RADIUS,overflow:'hidden'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
@@ -3852,7 +3903,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   })();
 
   const browseWrap = (content, sticky=null) => (
-    <div style={{minHeight:'100dvh',background:C.bg,fontFamily:FF,display:'flex',flexDirection:'column',maxWidth:480,margin:'0 auto',paddingBottom:'calc(68px + env(safe-area-inset-bottom, 0px))',width:'100%',overflowX:'hidden'}}>
+    <div style={BROWSE_WRAP_SHELL}>
       {content}
       {sticky}
       <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
@@ -3948,9 +3999,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, width: '100%', boxSizing: 'border-box', margin: 0, padding: '8px 0 10px', borderTop: BDR }}>
+          <div className="trust-pills-row" style={TRUST_PILLS_ROW}>
             {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-first'].map(p => (
-              <span key={p} style={{ fontSize: 9, fontWeight: 800, color: C.grn, background: '#e6f4ee', border: '1.5px solid rgba(0,122,77,0.35)', padding: '4px 6px', borderRadius: 99, boxSizing: 'border-box', margin: 0, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 0, lineHeight: 1.2 }}>{p}</span>
+              <span key={p} style={TRUST_PILL}>{p}</span>
             ))}
           </div>
         </div>
@@ -11088,7 +11139,7 @@ function LegalPage({page}) {
   const pg = pages[page];
   if (!pg) return null;
   return (
-    <div style={{minHeight:'100vh',background:C.bg,fontFamily:FF}}>
+    <div style={APP_SHELL}>
       {/* Header */}
       <div style={{background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
@@ -11379,7 +11430,7 @@ export default function App() {
 
   if (state==='boot') return (
     <><style>{APP_CSS}</style>
-    <div style={{...S.center, flexDirection: 'column', minHeight: '100vh', position: 'relative', padding: '16px 16px 48px'}}>
+    <div style={{...APP_SHELL, minHeight: '100vh', justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
       <div style={{fontSize:32,fontWeight:800,fontFamily:FF}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>
       <Spin size={32}/>
       <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
@@ -11439,7 +11490,7 @@ export default function App() {
         <style>{APP_CSS}</style>
         <Toast toasts={toasts}/>
         <PartnerGpsTracker />
-        <div style={{display:'flex',flexDirection:'column',minHeight:'100dvh',maxWidth:480,margin:'0 auto',background:C.bg,width:'100%',overflowX:'hidden'}}>
+        <div style={APP_SHELL}>
           <Boundary>{renderScreen()}</Boundary>
           <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />
           {!['book','track'].includes(screen)&&<BottomNav/>}
