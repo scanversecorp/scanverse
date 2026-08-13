@@ -1204,6 +1204,7 @@ function clearPaymentReturnUrl() {
 }
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
+const PRICING_IDLE_MS = 5 * 60 * 1000;
 const VENDOR_PIN_KEY = 'scanv_vendor_pin';
 const SUPPORT_PIN_KEY = 'scanv_support_pin';
 const SUPPORT_AUTH_KEY = 'scanv_support_auth';
@@ -7370,6 +7371,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
       const auth = getPricingAuth();
       setPin(auth.pin);
       setAuthed(true);
+      setTotpEnrolled(true);
       setAuthStep('done');
       setTotpCode('');
       load(auth.pin);
@@ -7428,6 +7430,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     try {
       const verified = await pricingAdminTotp(pin, 'totp_verify', {}, activeTotp);
       setPricingAuth(pin, true, verified.session_token);
+      setTotpEnrolled(true);
       setTotpCode('');
       const { rows: data } = await pricingAdminFetch(pin);
       setRows(data || []);
@@ -7570,7 +7573,62 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     setEnrollQr('');
     setEnrollSecret('');
     setRows([]);
+    setMsg('');
+    setErr('');
   };
+
+  const lockIdle = useCallback(() => {
+    sessionStorage.removeItem(PRICING_AUTH_KEY);
+    setAuthed(false);
+    setAuthStep(totpEnrolled === false ? 'pin' : 'totp');
+    setTotpCode('');
+    setEnrollQr('');
+    setEnrollSecret('');
+    setRows([]);
+    setErr('');
+    setMsg(totpEnrolled === false
+      ? 'Locked after 5 minutes of inactivity — enter your PIN to continue'
+      : 'Locked after 5 minutes of inactivity — enter a fresh authenticator code');
+  }, [totpEnrolled]);
+
+  const idleTimerRef = useRef(null);
+  const lastActiveRef = useRef(Date.now());
+
+  useEffect(() => {
+    if (!authed) return undefined;
+
+    lastActiveRef.current = Date.now();
+    const clearIdleTimer = () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+    };
+    const scheduleIdleLock = () => {
+      clearIdleTimer();
+      idleTimerRef.current = setTimeout(lockIdle, PRICING_IDLE_MS);
+    };
+    const bumpActivity = () => {
+      lastActiveRef.current = Date.now();
+      scheduleIdleLock();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastActiveRef.current >= PRICING_IDLE_MS) lockIdle();
+      else scheduleIdleLock();
+    };
+
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click', 'input', 'wheel'];
+    events.forEach((ev) => window.addEventListener(ev, bumpActivity, { capture: true, passive: true }));
+    document.addEventListener('visibilitychange', onVisibility);
+
+    scheduleIdleLock();
+    return () => {
+      clearIdleTimer();
+      events.forEach((ev) => window.removeEventListener(ev, bumpActivity, { capture: true }));
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [authed, lockIdle]);
 
   if (!authed) {
     const cardStyle = { ...S.card(), maxWidth: embedded ? '100%' : 400, width: '100%', padding: 24 };
