@@ -21,6 +21,8 @@ const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
+const HDFC_VYAPAR_MERCHANT_ID = '82037575';
+const HDFC_VYAPAR_QR_PATH = '/hdfc-vyapar-qr.png';
 const ASSIST   = '+91-9270194842';
 
 const UPI_PACKAGES = {
@@ -57,7 +59,10 @@ function buildUpiParams(amountPaise, txnRef, note) {
   sp.set('pn', UPI_PN);
   if (amountPaise) sp.set('am', (amountPaise / 100).toFixed(2));
   sp.set('cu', 'INR');
-  if (note) sp.set('tn', note);
+  const ref = txnRef ? String(txnRef).trim() : '';
+  const txnNote = note || (ref ? `ScanV ${ref}` : 'ScanV Booking');
+  if (txnNote) sp.set('tn', txnNote);
+  if (ref) sp.set('tr', ref);
   return sp.toString();
 }
 function buildUpiLink(amountPaise, txnRef, note) {
@@ -185,6 +190,74 @@ async function requirePaymentVerified(txnId, expectedAmountPaise, onStale) {
   if (!ok) onStale?.();
   return ok;
 }
+function DynamicUpiQr({ amountPaise, txnId, size = 168 }) {
+  const [dataUrl, setDataUrl] = useState('');
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setFailed(false);
+    setDataUrl('');
+    if (!amountPaise || !txnId) return undefined;
+    const link = buildUpiLink(amountPaise, txnId, `ScanV ${txnId}`);
+    QRCode.toDataURL(link, {
+      width: size,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => { if (!cancelled) setDataUrl(url); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [amountPaise, txnId, size]);
+  if (!amountPaise || !txnId) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      {dataUrl ? (
+        <img src={dataUrl} alt="UPI pay QR with amount and reference" width={size} height={size} style={{ display: 'block', borderRadius: 10, border: `2px solid ${C.bdr}`, background: '#fff' }} />
+      ) : (
+        <div style={{ width: size, height: size, borderRadius: 10, border: `2px dashed ${C.bdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: C.dim, textAlign: 'center', padding: 8 }}>
+          {failed ? 'QR unavailable — use standee or UPI apps below' : <Spin size={22} />}
+        </div>
+      )}
+      <div style={{ fontSize: 10, color: C.dim, textAlign: 'center', lineHeight: 1.5 }}>
+        Amount &amp; ref pre-filled · GPay, PhonePe, Paytm
+      </div>
+    </div>
+  );
+}
+function VyaparQrSection({ amountPaise, txnId, onScannedPaid, paymentVerified, checkingPay }) {
+  const amountRu = amountPaise ? (amountPaise / 100).toLocaleString('en-IN') : '0';
+  return (
+    <div style={{ ...S.card(), padding: '14px 14px 16px', marginBottom: 14, textAlign: 'center' }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.txt, marginBottom: 4 }}>Scan &amp; Pay · HDFC SmartHub Vyapar</div>
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{UPI_PN} · Merchant {HDFC_VYAPAR_MERCHANT_ID}</div>
+      <img
+        src={HDFC_VYAPAR_QR_PATH}
+        alt="DCORE GLOBAL CORPORATION HDFC Vyapar QR — Scan and Pay"
+        style={{ width: '100%', maxWidth: 280, height: 'auto', borderRadius: 12, border: `1px solid ${C.bdr}`, display: 'block', margin: '0 auto 12px', background: '#fff' }}
+      />
+      <div style={{ background: `${C.acc}10`, border: `1px solid ${C.acc}33`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, textAlign: 'left' }}>
+        <div style={{ fontSize: 12, color: C.txt, fontWeight: 700, marginBottom: 4 }}>Pay exactly ₹{amountRu}</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
+          If your UPI app asks for a note or remarks, enter <strong style={{ color: C.acc, fontFamily: 'monospace' }}>{txnId}</strong>.
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
+        <DynamicUpiQr amountPaise={amountPaise} txnId={txnId} />
+      </div>
+      {!paymentVerified && (
+        <Btn full v="outline" onClick={onScannedPaid} style={{ marginBottom: 8 }}>
+          {checkingPay ? 'Checking payment…' : 'I\'ve scanned & paid →'}
+        </Btn>
+      )}
+      {paymentVerified && (
+        <div style={{ background: '#e6f4ee', border: '1.5px solid rgba(0,122,77,0.35)', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: C.grn, fontWeight: 700 }}>
+          ✅ Payment received — you can continue
+        </div>
+      )}
+    </div>
+  );
+}
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
   const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, setPaymentVerified, amountPaise, txnId } = pay;
   const [confirming, setConfirming] = useState(false);
@@ -208,6 +281,10 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
       setConfirming(false);
     }
   };
+  const handleScannedPaid = () => {
+    setUpiOpened(true);
+    addToast?.('Checking for your payment — this usually takes a few seconds', 'info');
+  };
   return (
     <>
       {inApp && <InAppBrowserBanner addToast={addToast} />}
@@ -216,6 +293,14 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
         <div style={{ fontSize: 36, fontWeight: 900, color: C.acc, fontFamily: FF }}>₹{amountRu}</div>
         {txnId && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Ref: {txnId}</div>}
       </div>
+      <VyaparQrSection
+        amountPaise={amountPaise}
+        txnId={txnId}
+        onScannedPaid={handleScannedPaid}
+        paymentVerified={paymentVerified}
+        checkingPay={checkingPay}
+      />
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, textAlign: 'center', marginBottom: 10 }}>Or pay via UPI app</div>
       <UpiVpaCopy addToast={addToast} />
       <Btn full onClick={() => launchUpi('Any UPI')} disabled={inApp} style={{ marginBottom: 14, boxShadow: inApp ? 'none' : '0 4px 16px rgba(214,58,86,0.35)', opacity: inApp ? 0.5 : 1 }}>
         💳 Pay via UPI →
@@ -419,7 +504,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
   }, [txnId, amountPaise, userId, registerGen, loadRazorpayLink]);
   const retryRazorpay = useCallback(() => setRegisterGen(g => g + 1), []);
   useEffect(() => {
-    if (!upiOpened || !txnId || paymentVerified) return;
+    if (!txnId || !amountPaise || paymentVerified) return;
     let cancelled = false;
     const poll = async () => {
       setCheckingPay(true);
@@ -435,7 +520,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
     const onVis = () => { if (document.visibilityState === 'visible') poll(); };
     document.addEventListener('visibilitychange', onVis);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
-  }, [upiOpened, txnId, amountPaise, paymentVerified, addToast]);
+  }, [txnId, amountPaise, paymentVerified, addToast]);
   const openRazorpay = () => {
     if (!razorpayLinkUrl) {
       addToast?.('Razorpay link not ready — use UPI or wait a moment', 'error');

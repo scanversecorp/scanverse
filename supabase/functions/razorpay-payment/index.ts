@@ -735,6 +735,103 @@ async function handleWebhook(
   });
 }
 
+function normalizeVyaparTxnId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const id = decodeURIComponent(raw.trim());
+  if (!id.startsWith("TXN-")) return null;
+  const hash = id.indexOf("#");
+  return hash > 0 ? id.slice(0, hash) : id;
+}
+
+function extractTxnFromRemark(text: unknown): string | null {
+  if (typeof text !== "string" || !text.trim()) return null;
+  const match = text.match(/TXN-\d+/);
+  return match ? match[0] : null;
+}
+
+function parseVyaparAmountPaise(body: Record<string, unknown>): number | null {
+  if (body.amount_paise != null) {
+    const paise = Number(body.amount_paise);
+    return Number.isFinite(paise) && paise > 0 ? Math.round(paise) : null;
+  }
+  if (body.amount != null) {
+    const ru = Number(body.amount);
+    if (!Number.isFinite(ru) || ru <= 0) return null;
+    return Math.round(ru * 100);
+  }
+  if (body.amount_inr != null) {
+    const ru = Number(body.amount_inr);
+    if (!Number.isFinite(ru) || ru <= 0) return null;
+    return Math.round(ru * 100);
+  }
+  return null;
+}
+
+async function handleVyaparNotify(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const secret = Deno.env.get("VYAPAR_WEBHOOK_SECRET");
+  const provided = String(
+    body.secret || body.webhook_secret || body.token || "",
+  ).trim();
+  if (secret) {
+    if (provided !== secret) return json({ error: "Unauthorized" }, 401);
+  } else if (Deno.env.get("OTP_DEV_MODE") !== "1") {
+    return json({ error: "Vyapar webhook secret not configured" }, 503);
+  }
+
+  let txnId =
+    normalizeVyaparTxnId(body.txn_id) ||
+    normalizeVyaparTxnId(body.reference_id) ||
+    normalizeVyaparTxnId(body.reference) ||
+    extractTxnFromRemark(body.remark) ||
+    extractTxnFromRemark(body.note) ||
+    extractTxnFromRemark(body.description) ||
+    extractTxnFromRemark(body.remarks) ||
+    extractTxnFromRemark(body.narration);
+
+  const amountPaise = parseVyaparAmountPaise(body);
+  if (!amountPaise) {
+    return json({ error: "amount or amount_paise required", processed: false }, 400);
+  }
+
+  if (!txnId) {
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: candidates } = await supabase
+      .from("payment_intents")
+      .select("txn_id, amount_paise")
+      .eq("status", "pending")
+      .eq("amount_paise", amountPaise)
+      .gte("created_at", since);
+    if (candidates?.length === 1) txnId = String(candidates[0].txn_id);
+  }
+
+  if (!txnId) {
+    return json({
+      processed: false,
+      error: "Could not match txn_id — include TXN reference in payment remarks",
+    }, 400);
+  }
+
+  const payerVpaRaw = body.payer_vpa || body.vpa || body.sender_vpa;
+  const payerVpa = typeof payerVpaRaw === "string" && payerVpaRaw.includes("@")
+    ? payerVpaRaw.trim().toLowerCase()
+    : null;
+
+  const marked = await markPaid(supabase, txnId, amountPaise, {
+    verified_via: "vyapar_webhook",
+    payer_vpa: payerVpa,
+  });
+
+  return json({
+    processed: marked,
+    verified: marked,
+    txn_id: txnId,
+    amount_paise: amountPaise,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -770,6 +867,9 @@ Deno.serve(async (req) => {
   if (action === "webhook") {
     return handleWebhook(supabase, rawBody, body, signature);
   }
+  if (action === "vyapar_notify") {
+    return handleVyaparNotify(supabase, body);
+  }
 
-  return json({ error: "Unknown action. Use register, check, cancel, or webhook." }, 400);
+  return json({ error: "Unknown action. Use register, check, cancel, webhook, or vyapar_notify." }, 400);
 });
