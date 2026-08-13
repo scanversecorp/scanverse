@@ -1,6 +1,6 @@
 /**
  * ScanV v5.5 -- Daylight Trust UI
- * DCORE Global Corporation - PCMC, Pune
+ * DCORE Global Corporation · Global marketplace
  * URL: https://scanv-tau.vercel.app
  * Daylight Trust: #f2efe8 · #d63a56 · Android-first
  *
@@ -24,6 +24,8 @@ const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const HDFC_VYAPAR_MERCHANT_ID = '82037575';
 const HDFC_VYAPAR_QR_PATH = '/hdfc-vyapar-qr.png';
 const ASSIST   = '+91-9270194842';
+const LOCAL_COMMUNITIES = 'Local Communities';
+const INCORPORATION_ORIGIN = 'Made in India · Designed & developed with Incorporation, San Francisco, California, USA';
 
 const UPI_PACKAGES = {
   GPay: 'com.google.android.apps.nbu.paisa.user',
@@ -771,7 +773,7 @@ const HOUSEHOLD_SVCS = [
     desc:'ScanV bathroom deep clean — tiles, WC, taps, mirrors & exhaust fan. Eco-friendly products, background-verified professionals, satisfaction guaranteed.',
     features:['WC & basin deep scrub','Tile & grout cleaning','Mirror & tap polish','Exhaust fan wipe','Re-clean if not satisfied'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'5,000+' },
   { id:'hh-kitchen-deep', parent:'household', theme:'pink', fulfillVia:'x', icon:'🍳', img:'/services/kitchen-deep.png', name:'Kitchen Deep Clean', sub:'Counters · chimney · floor · grease', unit:'visit', mrp:59900, price:discPaise(59900), cash:false,
-    desc:'ScanV kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. All supplies included, verified professionals across Pune & PCMC.',
+    desc:'ScanV kitchen deep clean — counters, chimney exterior, cabinets, sink & floor. All supplies included, verified professionals across local communities.',
     features:['Counter & cabinet wipe','Chimney exterior clean','Sink & tap descale','Floor mop & degrease','Eco-friendly products'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'3,200+' },
   { id:'hh-flat-clean', parent:'household', theme:'pink', fulfillVia:'x', icon:'🏠', img:'/services/flat-clean.png', name:'Full Flat Cleaning', sub:'Complete home · 1–3 BHK · 3–5 hrs', unit:'visit', mrp:199900, price:discPaise(199900), cash:false,
     desc:'Complete flat cleaning through ScanV — every room, kitchen & bathroom. Ideal for move-in, festival prep or monthly deep clean.',
@@ -883,16 +885,16 @@ const LG_THEME = {
 };
 const LEGAL_SVCS = [
   { id:'lg-consult', parent:'legal', theme:'counsel', icon:'⚖️', img:'/services/legal/consult.png', name:'Lawyer Consultation', sub:'30-min advice · civil · property · family', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
-    desc:'ScanV lawyer consultation — speak with a verified advocate for initial advice on civil, property, family, or business matters. Online or in-person across Pune & PCMC.',
+    desc:'ScanV lawyer consultation — speak with a verified advocate for initial advice on civil, property, family, or business matters. Online or in-person across local communities.',
     features:['Verified advocates','30-min session','Written summary note','Follow-up quote if needed','Online or office'], turnaround:'Within 24 hrs', rating:'4.8 ⭐', bookings:'2,400+' },
   { id:'lg-court', parent:'legal', theme:'counsel', icon:'🏛️', img:'/services/legal/court.png', name:'Court Filing & Notices', sub:'Draft · file · track · represent', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
-    desc:'ScanV court services — drafting and filing notices, plaints, and replies with status tracking. Advocate representation available for Pune district courts.',
+    desc:'ScanV court services — drafting and filing notices, plaints, and replies with status tracking. Advocate representation available for local district courts.',
     features:['Draft & review','E-filing where supported','Case status updates','Court day briefing','Escalation support'], turnaround:'2–5 days', rating:'4.7 ⭐', bookings:'680+' },
   { id:'lg-contract', parent:'legal', theme:'counsel', icon:'📋', img:'/services/legal/contract.png', name:'Business Contract Review', sub:'Vendor · lease · employment · NDAs', unit:'project', mrp:3999900, price:discPaise(3999900), cash:false,
     desc:'ScanV contract review — protect your business with lawyer-reviewed agreements before you sign. Turnaround includes redlines and a short risk summary.',
     features:['Full clause review','Risk summary memo','Suggested redlines','One revision round','Phone walkthrough'], turnaround:'3–5 days', rating:'4.8 ⭐', bookings:'420+' },
   { id:'lg-family', parent:'legal', theme:'counsel', icon:'👨‍👩‍👧', img:'/services/legal/family.png', name:'Family & Divorce Consult', sub:'Marriage · custody · maintenance · mediation', unit:'visit', mrp:149900, price:discPaise(149900), cash:false,
-    desc:'ScanV family law consultation — sensitive guidance on divorce, custody, maintenance, and mediation with verified family court advocates in Pune & PCMC.',
+    desc:'ScanV family law consultation — sensitive guidance on divorce, custody, maintenance, and mediation with verified family court advocates in local communities.',
     features:['Confidential session','Custody & maintenance advice','Mediation options','Document checklist','Court roadmap if needed'], turnaround:'Within 48 hrs', rating:'4.8 ⭐', bookings:'960+' },
   { id:'lg-doc-draft', parent:'legal', theme:'docs', icon:'📝', img:'/services/legal/doc-draft.png', name:'Document Drafting', sub:'Agreements · wills · affidavits · deeds', unit:'project', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV document drafting — custom legal documents prepared by qualified advocates. Includes one revision and e-copy delivery.',
@@ -901,7 +903,7 @@ const LEGAL_SVCS = [
     desc:'ScanV property registration — end-to-end support for sale deeds, gift deeds, and lease registration with document checklist and sub-registrar coordination.',
     features:['Document checklist','Draft & vetting','Appointment booking','Registration day support','Index II follow-up'], turnaround:'5–10 days', rating:'4.9 ⭐', bookings:'890+' },
   { id:'lg-notary', parent:'legal', theme:'docs', icon:'✍️', img:'/services/legal/notary.png', name:'Notary & Affidavit', sub:'Attestation · sworn statements · copies', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
-    desc:'ScanV notary services — affidavits, attestations, and certified copies through empanelled notaries. Home or office visit available in PCMC/Pune.',
+    desc:'ScanV notary services — affidavits, attestations, and certified copies through empanelled notaries. Home or office visit available in local communities.',
     features:['Affidavit drafting help','Notary attestation','Certified true copies','Same-day slots','Doorstep option'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,200+' },
   { id:'lg-rental', parent:'legal', theme:'docs', icon:'🔑', img:'/services/legal/rental-agreement.png', name:'Rental Agreement Pack', sub:'Draft · stamp · registration guidance · 11-month', unit:'project', mrp:99900, price:discPaise(99900), cash:false,
     desc:'ScanV rental agreement pack — lawyer-drafted leave & licence or rent agreement with stamp duty guidance and registration steps for landlords and tenants.',
@@ -923,10 +925,10 @@ const VIP_SVCS = [
     desc:'ScanV priority appointments — skip the queue for hard-to-get slots with doctors, consultants, and government-related visits. Confirmation within hours.',
     features:['Fast-track booking','Reminder calls','Reschedule support','Multi-category requests','Escalation desk'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'540+' },
   { id:'vip-dining', parent:'vip', theme:'concierge', icon:'🍷', img:'/services/vip/dining.png', name:'Premium Dining Reservations', sub:'Top restaurants · private tables · occasions', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
-    desc:'ScanV dining concierge — secure hard-to-get tables at premium Pune restaurants with preference notes for birthdays, anniversaries, and client dinners.',
+    desc:'ScanV dining concierge — secure hard-to-get tables at premium local restaurants with preference notes for birthdays, anniversaries, and client dinners.',
     features:['Priority table holds','Special occasion notes','Dietary preferences sent','Reminder & directions','Cancel / change support'], turnaround:'Same day', rating:'4.9 ⭐', bookings:'410+' },
-  { id:'vip-airport', parent:'vip', theme:'travel', icon:'✈️', img:'/services/vip/airport.png', name:'Airport Transfer', sub:'Pickup · drop · meet & greet · Pune', unit:'visit', mrp:1499900, price:discPaise(1499900), cash:false,
-    desc:'ScanV airport transfer — chauffeur pickup and drop for Pune airport with flight tracking, meet-and-greet, and clean premium vehicles.',
+  { id:'vip-airport', parent:'vip', theme:'travel', icon:'✈️', img:'/services/vip/airport.png', name:'Airport Transfer', sub:'Pickup · drop · meet & greet · local', unit:'visit', mrp:1499900, price:discPaise(1499900), cash:false,
+    desc:'ScanV airport transfer — chauffeur pickup and drop for local airports with flight tracking, meet-and-greet, and clean premium vehicles.',
     features:['Flight tracking','Meet & greet option','Premium sedans & SUVs','Bottled water & tissues','Corporate billing'], turnaround:'On schedule', rating:'4.9 ⭐', bookings:'760+' },
   { id:'vip-event', parent:'vip', theme:'travel', icon:'🎉', img:'/services/vip/event.png', name:'Event Planning', sub:'Corporate · wedding · private · end-to-end', unit:'project', mrp:4999900, price:discPaise(4999900), cash:false,
     desc:'ScanV event planning — venue shortlist, vendor coordination, run-of-show, and on-day management for corporate events and private celebrations.',
@@ -938,17 +940,17 @@ const HL_THEME = {
   clinical: { id:'clinical', label:'Tests & pharmacy', color:'#E11D48', bg:'#FFE4E6', border:'#FDA4AF', gradFrom:'#FECDD3', gradTo:'#FB7185', tagline:'Labs · medicines · checkups' },
 };
 const HEALTH_SVCS = [
-  { id:'hl-doctor', parent:'health', theme:'home', icon:'🩺', img:'/services/health/doctor.png', name:'Doctor at Home', sub:'GP visit · vitals · prescription · PCMC', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+  { id:'hl-doctor', parent:'health', theme:'home', icon:'🩺', img:'/services/health/doctor.png', name:'Doctor at Home', sub:'GP visit · vitals · prescription · local', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
     desc:'ScanV doctor at home — general physician visit with vitals check and e-prescription. Ideal for fever, minor illness, or elderly patients who prefer home care.',
     features:['MBBS / MD doctors','Vitals & basic exam','E-prescription','Follow-up advice','Same-day slots'], turnaround:'Within 2 hrs', rating:'4.8 ⭐', bookings:'5,200+' },
   { id:'hl-specialist', parent:'health', theme:'home', icon:'👨‍⚕️', img:'/services/health/specialist.png', name:'Specialist Consultation', sub:'Cardio · ortho · derma · paediatric', unit:'visit', mrp:1499900, price:discPaise(1499900), cash:false,
-    desc:'ScanV specialist consult — book verified specialists for second opinions or chronic care. Home or clinic visit based on availability in Pune & PCMC.',
+    desc:'ScanV specialist consult — book verified specialists for second opinions or chronic care. Home or clinic visit based on availability in local communities.',
     features:['Verified specialists','Home or clinic','Report review','Care plan summary','Referral network'], turnaround:'24–48 hrs', rating:'4.7 ⭐', bookings:'1,400+' },
   { id:'hl-elder', parent:'health', theme:'home', icon:'🤝', img:'/services/health/elder.png', name:'Elder Care Visit', sub:'Vitals · medication · mobility · hourly', unit:'hour', mrp:29900, price:discPaise(29900), cash:false,
     desc:'ScanV elder care — trained caregivers for vitals monitoring, medication reminders, and companionship at home. Book hourly blocks with family updates.',
     features:['Trained caregivers','Vitals logging','Medication reminders','Family WhatsApp updates','Flexible hours'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,800+' },
   { id:'hl-nursing', parent:'health', theme:'home', icon:'💉', img:'/services/health/nursing.png', name:'Nursing Care at Home', sub:'Post-op · injections · wound dressings', unit:'hour', mrp:49900, price:discPaise(49900), cash:false,
-    desc:'ScanV nursing at home — qualified nurses for post-operative care, injections, IV support, and wound dressing under doctor prescription in PCMC/Pune.',
+    desc:'ScanV nursing at home — qualified nurses for post-operative care, injections, IV support, and wound dressing under doctor prescription in local communities.',
     features:['Registered nurses','Post-op monitoring','Injection & dressing','Doctor prescription required','Shift booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,100+' },
   { id:'hl-checkup', parent:'health', theme:'clinical', icon:'📋', img:'/services/health/checkup.png', name:'Full Body Checkup', sub:'40+ tests · home sample · report', unit:'visit', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV full body checkup — comprehensive preventive health package with home sample collection and digital report with doctor summary call.',
@@ -957,7 +959,7 @@ const HEALTH_SVCS = [
     desc:'ScanV lab at home — certified phlebotomists collect samples at your doorstep. Choose individual tests or curated panels with app-tracked reports.',
     features:['Certified phlebotomist','NABL partner labs','App-tracked reports','Fasting guidance','Bulk family booking'], turnaround:'Same day pickup', rating:'4.8 ⭐', bookings:'8,900+' },
   { id:'hl-pharmacy', parent:'health', theme:'clinical', icon:'💊', img:'/services/health/pharmacy.png', name:'Pharmacy Delivery', sub:'Prescription · OTC · 60 min target', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
-    desc:'ScanV pharmacy delivery — upload prescription or order OTC essentials with fast delivery from verified pharmacies near you in PCMC/Pune.',
+    desc:'ScanV pharmacy delivery — upload prescription or order OTC essentials with fast delivery from verified pharmacies near you in local communities.',
     features:['Prescription upload','Verified pharmacies','60-min target zones','Cold-chain items','Reorder reminders'], turnaround:'30–60 min', rating:'4.6 ⭐', bookings:'12,000+' },
   { id:'hl-vaccine', parent:'health', theme:'clinical', icon:'💉', img:'/services/health/vaccine.png', name:'Vaccination at Home', sub:'Flu · hepatitis · travel · corporate camps', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
     desc:'ScanV vaccination at home — certified nurses administer approved vaccines at your doorstep with cold-chain handling and digital records.',
@@ -969,7 +971,7 @@ const PR_THEME = {
   verify: { id:'verify', label:'Verify & finance', color:'#C2410C', bg:'#FFF7ED', border:'#FDBA74', gradFrom:'#FFEDD5', gradTo:'#F97316', tagline:'Legal checks · loan assistance' },
 };
 const PROPERTY_SVCS = [
-  { id:'pr-buy', parent:'property', theme:'find', icon:'🏘️', img:'/services/property/buy-sell.png', name:'Buy / Sell Assistance', sub:'Shortlist · negotiate · close · PCMC', unit:'project', mrp:9999900, price:discPaise(9999900), cash:false,
+  { id:'pr-buy', parent:'property', theme:'find', icon:'🏘️', img:'/services/property/buy-sell.png', name:'Buy / Sell Assistance', sub:'Shortlist · negotiate · close · local', unit:'project', mrp:9999900, price:discPaise(9999900), cash:false,
     desc:'ScanV buy/sell assistance — verified listings, site coordination, price benchmarking, and documentation support for flats, plots, and commercial units.',
     features:['Verified listings','Price benchmarking','Site visit coordination','Negotiation support','Documentation checklist'], turnaround:'3–7 days', rating:'4.6 ⭐', bookings:'890+' },
   { id:'pr-rent', parent:'property', theme:'find', icon:'🔑', img:'/services/property/rent.png', name:'Rent & PG Finder', sub:'Flat · PG · coliving · tenant match', unit:'project', mrp:49900, price:discPaise(49900), cash:false,
@@ -978,7 +980,7 @@ const PROPERTY_SVCS = [
   { id:'pr-site', parent:'property', theme:'find', icon:'📍', img:'/services/property/site-visit.png', name:'Site Visit Package', sub:'3–5 properties · agent · same day', unit:'visit', mrp:1999900, price:discPaise(1999900), cash:false,
     desc:'ScanV site visit package — an assigned agent takes you through shortlisted properties in one trip with comparison notes and photos after the tour.',
     features:['Pre-shortlisted list','Dedicated agent','Comparison sheet','Photos & notes','Follow-up call'], turnaround:'Same day', rating:'4.6 ⭐', bookings:'1,100+' },
-  { id:'pr-commercial', parent:'property', theme:'find', icon:'🏢', img:'/services/property/commercial.png', name:'Commercial Space Finder', sub:'Office · shop · warehouse · PCMC', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
+  { id:'pr-commercial', parent:'property', theme:'find', icon:'🏢', img:'/services/property/commercial.png', name:'Commercial Space Finder', sub:'Office · shop · warehouse · local', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
     desc:'ScanV commercial finder — shortlist offices, retail shops, and warehouses by size, budget, and connectivity with landlord verification before you visit.',
     features:['Size & budget match','Connectivity check','Landlord verification','Comparison sheet','Lease term guidance'], turnaround:'3–5 days', rating:'4.7 ⭐', bookings:'480+' },
   { id:'pr-legal', parent:'property', theme:'verify', icon:'📑', img:'/services/property/legal-check.png', name:'Legal Verification', sub:'Title · encumbrance · approvals · report', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
@@ -994,8 +996,8 @@ const DL_THEME = {
   express: { id:'express', label:'Express & bulk', color:'#0E7490', bg:'#ECFEFF', border:'#A5F3FC', gradFrom:'#CFFAFE', gradTo:'#06B6D4', tagline:'Inter-city · business logistics' },
 };
 const DELIVERY_SVCS = [
-  { id:'dl-sameday', parent:'delivery', theme:'local', icon:'📦', img:'/services/delivery/sameday.png', name:'Same-Day Courier', sub:'Pickup in 60 min · PCMC · Pune', unit:'visit', mrp:9900, price:discPaise(9900), cash:false,
-    desc:'ScanV same-day courier — door pickup and delivery within Pune & PCMC city limits. Live status updates and OTP handover for security.',
+  { id:'dl-sameday', parent:'delivery', theme:'local', icon:'📦', img:'/services/delivery/sameday.png', name:'Same-Day Courier', sub:'Pickup in 60 min · local communities', unit:'visit', mrp:9900, price:discPaise(9900), cash:false,
+    desc:'ScanV same-day courier — door pickup and delivery within local communities city limits. Live status updates and OTP handover for security.',
     features:['60-min pickup target','Live tracking','OTP delivery','Up to 5 kg standard','Insurance add-on'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   { id:'dl-doc', parent:'delivery', theme:'local', icon:'📄', img:'/services/delivery/document.png', name:'Document Delivery', sub:'Legal · bank · office · confidential', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV document delivery — confidential handover for legal papers, cheques, and contracts with chain-of-custody notes and photo proof.',
@@ -1006,8 +1008,8 @@ const DELIVERY_SVCS = [
   { id:'dl-grocery', parent:'delivery', theme:'local', icon:'🛒', img:'/services/delivery/grocery.png', name:'Grocery & Essentials Run', sub:'Kirana · milk · bread · 90 min target', unit:'visit', mrp:14900, price:discPaise(14900), cash:false,
     desc:'ScanV grocery run — send your list and we pick up from nearby stores and deliver to your door. Perfect when you cannot step out.',
     features:['Custom shopping list','Local kirana partners','Bill photo before pay','90-min target','OTP handover'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'9,800+' },
-  { id:'dl-intercity', parent:'delivery', theme:'express', icon:'🚚', img:'/services/delivery/intercity.png', name:'Inter-City Express', sub:'Maharashtra · overnight · tracked', unit:'project', mrp:49900, price:discPaise(49900), cash:false,
-    desc:'ScanV inter-city express — overnight and next-day delivery across Maharashtra with tracking, insurance options, and business manifests.',
+  { id:'dl-intercity', parent:'delivery', theme:'express', icon:'🚚', img:'/services/delivery/intercity.png', name:'Inter-City Express', sub:'Regional · overnight · tracked', unit:'project', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV inter-city express — overnight and next-day delivery across regions with tracking, insurance options, and business manifests.',
     features:['Overnight lanes','Live tracking','Insurance optional','Business manifests','Pickup scheduling'], turnaround:'Next day', rating:'4.8 ⭐', bookings:'2,100+' },
   { id:'dl-bulk', parent:'delivery', theme:'express', icon:'🏢', img:'/services/delivery/bulk.png', name:'Business Bulk Delivery', sub:'Daily routes · SLAs · invoicing', unit:'project', mrp:99900, price:discPaise(99900), cash:false,
     desc:'ScanV bulk delivery — recurring routes for shops, pharmacies, and offices with SLA-backed pickups, monthly invoicing, and dedicated coordinator.',
@@ -1026,7 +1028,7 @@ const FOOD_SVCS = [
     desc:'ScanV restaurant order — discover nearby restaurants and cloud kitchens with live tracking, UPI payment, and repeat favourites saved to your profile.',
     features:['Local restaurant partners','Live order tracking','UPI at checkout','Repeat favourites','Group orders'], turnaround:'30–60 min', rating:'4.6 ⭐', bookings:'18,000+' },
   { id:'fd-office', parent:'food', theme:'daily', icon:'🥗', img:'/services/food/office.png', name:'Office Lunch Box', sub:'Team orders · invoicing · daily menu', unit:'month', mrp:1499900, price:discPaise(1499900), cash:false,
-    desc:'ScanV office lunch — daily lunch boxes for teams with rotating menus, bulk pricing, and GST invoices for Pune & PCMC offices.',
+    desc:'ScanV office lunch — daily lunch boxes for teams with rotating menus, bulk pricing, and GST invoices for local community offices.',
     features:['Team dashboards','Rotating menus','Bulk pricing','GST invoices','Dedicated support'], turnaround:'Next day start', rating:'4.7 ⭐', bookings:'620+' },
   { id:'fd-breakfast', parent:'food', theme:'daily', icon:'🥐', img:'/services/food/breakfast.png', name:'Breakfast & Snacks Plan', sub:'Morning tiffin · poha · idli · monthly', unit:'month', mrp:3499900, price:discPaise(3499900), cash:false,
     desc:'ScanV breakfast plan — hot morning meals and evening snacks delivered on schedule from verified home kitchens. Pause days supported.',
@@ -1045,7 +1047,7 @@ const TW_THEME = {
 };
 const TWO_WHEELER_SVCS = [
   { id:'tw-mechanic', parent:'two-wheeler', theme:'roadside', icon:'🔧', img:'/services/two-wheeler/mechanic.png', name:'Mechanic Support', sub:'Breakdown · tune-up · at home or roadside', unit:'visit', mrp:29900, price:discPaise(29900), cash:false,
-    desc:'ScanV two-wheeler mechanic — verified bike technicians for breakdowns, tune-ups, and general repairs at your location or roadside across Pune & PCMC.',
+    desc:'ScanV two-wheeler mechanic — verified bike technicians for breakdowns, tune-ups, and general repairs at your location or roadside across local communities.',
     features:['Roadside or home visit','Verified bike mechanics','Parts guidance','Same-day slots','Live partner tracking'], turnaround:'60–90 min', rating:'4.8 ⭐', bookings:'3,400+' },
   { id:'tw-pickup', parent:'two-wheeler', theme:'care', icon:'🛵', img:'/services/two-wheeler/pickup.png', name:'Pick-up & Drop Servicing', sub:'Garage run · service · return to doorstep', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
     desc:'ScanV pick-up & drop — we collect your two-wheeler, take it to a trusted garage for servicing, and return it washed and ready. Live GPS tracking throughout.',
@@ -1065,8 +1067,8 @@ const TWO_WHEELER_SVCS = [
   { id:'tw-battery', parent:'two-wheeler', theme:'roadside', icon:'🔋', img:'/services/two-wheeler/battery.png', name:'Battery & Tyre Check', sub:'Health test · air · replacement guidance', unit:'visit', mrp:12900, price:discPaise(12900), cash:false,
     desc:'ScanV battery & tyre check — doorstep health diagnostics, air top-up, and honest replacement guidance from verified partners. No upsell pressure.',
     features:['Battery load test','Tyre pressure check','Tread inspection','Replacement quote','Monsoon prep add-on'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,900+' },
-  { id:'tw-towing', parent:'two-wheeler', theme:'roadside', icon:'🚛', img:'/services/two-wheeler/towing.png', name:'Emergency Towing', sub:'Breakdown tow · garage drop · 24×7 · PCMC', unit:'visit', mrp:34900, price:discPaise(34900), cash:false,
-    desc:'ScanV emergency towing — flatbed pickup for breakdowns, accident recovery, and garage drop anywhere in Pune & PCMC. Live GPS tracking until handover.',
+  { id:'tw-towing', parent:'two-wheeler', theme:'roadside', icon:'🚛', img:'/services/two-wheeler/towing.png', name:'Emergency Towing', sub:'Breakdown tow · garage drop · 24×7 · local', unit:'visit', mrp:34900, price:discPaise(34900), cash:false,
+    desc:'ScanV emergency towing — flatbed pickup for breakdowns, accident recovery, and garage drop anywhere in local communities. Live GPS tracking until handover.',
     features:['Flatbed tow truck','Breakdown & accident recovery','Garage drop-off','Live GPS tracking','24×7 dispatch'], turnaround:'30–60 min', rating:'4.8 ⭐', bookings:'1,200+' },
 ];
 
@@ -2097,8 +2099,9 @@ function FooterLegalLinks({ current, small }) {
 
 function CopyrightLine({ style }) {
   return (
-    <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.4, ...style }}>
-      © All rights reserved. DCore Global Corporation
+    <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.45, ...style }}>
+      <div>© All rights reserved. DCore Global Corporation</div>
+      <div style={{ marginTop: 4 }}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
 }
@@ -2480,7 +2483,7 @@ const HOME_CARD_META = {
   cloud:    { commitment:'Scale with confidence.',          face:'AI · cloud · data center · 18 services' },
   vip:      { commitment:'You first. Every single time.',   face:'Meera · concierge lead' },
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
-  property: { commitment:'Find home. Find peace.',          face:'Verified listings · PCMC' },
+  property: { commitment:'Find home. Find peace.',          face:'Verified listings · local' },
   household:{ commitment:'A lighter home. A lighter heart.',face:'Deep clean & home help · 12 services' },
   delivery: { commitment:'On time. With a smile.',          face:'Vikram · local delivery' },
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
@@ -3128,10 +3131,10 @@ const TRUST_COMMITMENT_PAGES = {
   human: {
     title: 'Human-First',
     headline: '✓ Human-First care',
-    intro: 'ScanV is built around real people — verified partners, local teams in PCMC/Pune, and human support when you need help.',
+    intro: 'ScanV is built around real people — verified partners, local teams in Local Communities, and human support when you need help.',
     sections: [
       ['Real people', ['Partners are named and rated — not faceless gig listings', 'Category experts for legal, health, home, food, and more', 'Assist line for booking help and escalations']],
-      ['Local first', ['Services matched to your GPS and PIN code', 'PCMC and Pune coverage with expanding categories', 'Same-day options where partners are available']],
+      ['Local first', ['Services matched to your GPS and PIN code', 'local communities coverage with expanding categories', 'Same-day options where partners are available']],
       ['After you book', ['SMS and in-app updates through confirmation and completion', 'Live map tracking on supported services', 'Dispute and rating flow with ScanV mediation']],
     ],
     action: { label: 'See our commitments →', type: 'screen', target: 'trust-trusted' },
@@ -3158,7 +3161,7 @@ const TRUST_COMMITMENT_PAGES = {
       ['Partner onboarding — what we verify', [
         'OTP on the partner mobile — same number used for job alerts and dispatch',
         'PAN format validation and Aadhaar eKYC session (Digio / UIDAI pathway)',
-        'Live GPS + IP country check — VPN/proxy flagged; India-first service area',
+        'Live GPS + IP country check — VPN/proxy flagged; local community service area',
         'Business address, service catalogue, profile photo, and UPI payout ID submitted',
         'Registration stays pending until Vendor Admin manually activates the partner',
       ]],
@@ -3472,13 +3475,13 @@ async function reverseGeo(lat,lng) {
     return {
       address,
       village: a.village||a.suburb||a.neighbourhood||a.town||'',
-      city: a.city||a.state_district||a.town||a.county?.replace(/\s*Subdistrict$/i,'')||'Pune',
+      city: a.city||a.state_district||a.town||a.county?.replace(/\s*Subdistrict$/i,'')||'',
       state,
       pincode,
       country: a.country||'India',
       lat,lng,
     };
-  } catch(e) { return {address:'',village:'',city:'Pune',state:'Maharashtra',pincode:'',country:'India',lat,lng}; }
+  } catch(e) { return {address:'',village:'',city:'',state:'',pincode:'',country:'',lat,lng}; }
 }
 
 /* --- CANVAS FINGERPRINT ------------------------------------------- */
@@ -4144,7 +4147,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     if (!silentGeo) return;
     setAddress(a=>a||silentGeo.address||'');
     setVillage(v=>v||silentGeo.village||'');
-    setCity(c=>c||silentGeo.city||'Pune');
+    setCity(c=>c||silentGeo.city||'');
     setPincode(p=>p||silentGeo.pincode||'');
     markAuto(autoFlagsFromValues({
       address: silentGeo.address,
@@ -4654,7 +4657,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     <>
       <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)',flexShrink:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
-        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||'PCMC'} {silentGeo?.pincode||''}</div>
+        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||LOCAL_COMMUNITIES} {silentGeo?.pincode||''}</div>
       </div>
       <div style={{ ...BROWSE_HOME_STACK, marginTop: 12, flexShrink: 0 }}>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
@@ -4689,7 +4692,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <>
             <div id="scanv-commitments" style={{marginBottom:14}}>
               <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:3}}>Our commitments to you</div>
-              <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||'PCMC, Pune'} · people you can trust</div>
+              <div style={{color:C.dim,fontSize:12,fontWeight:500}}>10 categories · {silentGeo?.city||LOCAL_COMMUNITIES} · people you can trust</div>
             </div>
             {svcList.length > 0 && <HomeHeroCarousel services={svcList} onSelect={openBrowseSvc} />}
             <SvcGrid2 gap={12} items={svcList} renderItem={(s, i) => <HomeModelCard key={s.id} svc={s} onClick={()=>openBrowseSvc(s)} index={i} />} />
@@ -4728,8 +4731,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- TOP RATED (public, no login) -----------------------------------------
   if (screen === 'top-rated') return browseWrap(
     <>
-      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.1)', flexShrink: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: 20, fontFamily: FF, color: C.txt }}>⭐ Top Rated</div>
+      <div style={BROWSE_INLINE_HDR}>
+        <button type="button" aria-label="Go back" onClick={goBrowseHome} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0, minWidth: 44, minHeight: 44, lineHeight: 1 }}>←</button>
+        <div style={{ fontWeight: 800, fontSize: 20, fontFamily: FF, color: C.txt, flex: 1 }}>⭐ Top Rated</div>
       </div>
       <div style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
         {topRatedItems.length ? (
@@ -4924,7 +4928,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             <input value={address} {...browseBind('address', e=>setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
-            <Field label="City" req><input value={city} {...browseBind('city', e=>setCity(e.target.value))} placeholder="Pune" style={inpStyle('city')}/></Field>
+            <Field label="City" req><input value={city} {...browseBind('city', e=>setCity(e.target.value))} placeholder="Your city" style={inpStyle('city')}/></Field>
             <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e=>setPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={inpStyle('pincode')}/></Field>
           </div>
           {!termsAccepted&&(
@@ -5056,7 +5060,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
     firstName:'', lastName:'', age:'', mobile:'', email:'',
     address:prefill?.geo?.address||'',
     village:prefill?.geo?.village||'',
-    city:prefill?.geo?.city||'Pune',
+    city:prefill?.geo?.city||'',
     state:prefill?.geo?.state||'Maharashtra',
     pincode:prefill?.geo?.pincode||'',
     gender:'',
@@ -5092,7 +5096,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       if (ipGeo?.city) {
         setForm(p=>({
           ...p,
-          city: p.city||ipGeo.city||'Pune',
+          city: p.city||ipGeo.city||'',
           state: p.state||ipGeo.region||'Maharashtra',
         }));
         markRegAuto({ city: true, state: true });
@@ -5365,7 +5369,8 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'-0.02em'}}>
         <span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span>
       </div>
-      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCORE Global Corporation · PCMC, Pune</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCORE Global Corporation · {LOCAL_COMMUNITIES}</div>
+      <div style={{fontSize:10,color:C.dim,marginTop:4,lineHeight:1.4}}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
 
@@ -5494,7 +5499,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <Field label="Address" note="House no, street, area"><input value={form.address} {...regBind('address', e=>f('address',e.target.value))} placeholder="House no, street, area" style={regInpStyle('address')}/></Field>
       <Field label="Village / Area" note="e.g. Pimpri, Wakad, Chinchwad"><input value={form.village} {...regBind('village', e=>f('village',e.target.value))} placeholder="Pimpri, Wakad…" style={regInpStyle('village')}/></Field>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <Field label="City" req><input value={form.city} {...regBind('city', e=>f('city',e.target.value))} placeholder="Pune" style={regInpStyle('city')}/></Field>
+        <Field label="City" req><input value={form.city} {...regBind('city', e=>f('city',e.target.value))} placeholder="Your city" style={regInpStyle('city')}/></Field>
         <Field label="PIN code" req><input type="tel" maxLength={6} value={form.pincode} {...regBind('pincode', e=>f('pincode',e.target.value))} placeholder="411018" style={regInpStyle('pincode')}/></Field>
       </div>
 
@@ -5676,7 +5681,7 @@ function HomeScreen() {
   },[user.id,user.role]);
   const rc=user.role==='admin'?C.gold:user.role==='partner'?C.cyan:user.role==='candidate'?C.vio:C.acc;
   const rl=user.role==='admin'?'Leader':user.role==='partner'?'Partner':user.role==='candidate'?'Candidate':'Customer';
-  const loc=[user.village,user.city,user.pincode].filter(Boolean).join(', ')||'PCMC, Pune';
+  const loc=[user.village,user.city,user.pincode].filter(Boolean).join(', ')||LOCAL_COMMUNITIES;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar/>
@@ -5740,7 +5745,7 @@ const SVC_DETAIL = {
   cloud:    { desc:'AI, cloud hosting, data center, managed IT, turnkey packages, and training — 18 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Data Center & network design','Infrastructure audits & roadmaps','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,600+' },
   vip:      { desc:'Premium concierge, executive assistant, airport transfers, and event planning — 6 VIP services · 25% off.', features:['24×7 personal concierge','Executive assistant hourly','Premium dining reservations','Airport transfers','Event planning'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Doctors at home, lab tests, pharmacy delivery, nursing, and vaccinations — 8 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Nursing care at home','Vaccination at home'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
-  property: { desc:'Buy, sell, rent, verify, and finance property in PCMC/Pune — 6 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Commercial space search','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
+  property: { desc:'Buy, sell, rent, verify, and finance property in local communities — 6 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Commercial space search','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
   household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 14 services · 25% off.', features:['Deep cleaning visits','Sofa & upholstery clean','Hourly home help','Ironing & pressing','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   delivery: { desc:'Same-day courier, documents, parcels, groceries, and inter-city express — 6 delivery services · 25% off.', features:['Same-day pickup','Document handover','Grocery & essentials run','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Home tiffin, breakfast plans, restaurant orders, office lunch, and catering — 6 food services · 25% off.', features:['Monthly tiffin plans','Breakfast & snacks plan','Restaurant delivery','Office lunch boxes','Party catering'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
@@ -6275,7 +6280,7 @@ function BookScreen() {
             <input value={bookAddress} {...bookBind('address', e=>setBookAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={bookInpStyle('address')}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-            <Field label="City" req><input value={bookCity} {...bookBind('city', e=>setBookCity(e.target.value))} placeholder="Pune" style={bookInpStyle('city')}/></Field>
+            <Field label="City" req><input value={bookCity} {...bookBind('city', e=>setBookCity(e.target.value))} placeholder="Your city" style={bookInpStyle('city')}/></Field>
             <Field label="PIN code" req><input type="tel" maxLength={6} value={bookPincode} {...bookBind('pincode', e=>setBookPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={bookInpStyle('pincode')}/></Field>
           </div>
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
@@ -6575,7 +6580,7 @@ const WAIT_HEALTH_TIPS = [
 const WAIT_JOKES = [
   'Why did the delivery partner bring a ladder? The customer ordered high-speed internet.',
   'My Wi‑Fi and my motivation have something in common — both disappear when I need them most.',
-  'Partner: “I’m 5 minutes away.” Also partner: still finishing their chai. Classic Pune timing.',
+  'Partner: “I’m 5 minutes away.” Also partner: still finishing their chai. Classic local timing.',
   'I told my smart speaker to book a cleaner. It replied: “Playing ‘Clean Bandit’ on Spotify.”',
   'Why don’t secrets stay at the gym? Because they always get leaked at the water cooler.',
   'Customer: “Is the expert verified?” ScanV: “Yes — OTP, GPS, and a very serious profile photo.”',
@@ -7566,7 +7571,7 @@ function CRMScreen() {
   const [requests,setRequests]=useState([]);
   const [loading,setLoading]=useState(true);
   const [showAdd,setShowAdd]=useState(false);
-  const [frm,setFrm]=useState({type:'customer',firstName:'',lastName:'',age:'',mobile:'',course:'',service_type:'Legal',village:'',city:'Pune',pincode:''});
+  const [frm,setFrm]=useState({type:'customer',firstName:'',lastName:'',age:'',mobile:'',course:'',service_type:'Legal',village:'',city:'',pincode:''});
   const f=(k,v)=>setFrm(p=>({...p,[k]:v}));
   const STATS={service:['new','assigned','in_progress','awaiting_payment','paid','completed','cancelled','escalated'],training:['enquiry','enrolled','fee_due','fee_paid','in_training','certified','dropped','deferred']};
   const SC={new:'#5a5a7a',enquiry:'#5a5a7a',assigned:'#7c3aed',enrolled:'#7c3aed',in_progress:'#f5a623',fee_due:'#f5a623',in_training:'#f5a623',awaiting_payment:'#e94560',fee_paid:'#e94560',paid:'#00c48c',completed:'#00c48c',certified:'#00c48c',cancelled:'#ff4d6d',escalated:'#ff4d6d',dropped:'#ff4d6d',deferred:'#888'};
@@ -9034,7 +9039,7 @@ function VendorOnboardPage() {
           <Field label="Street name" req><input value={streetName} onChange={e => setStreetName(e.target.value)} style={S.inp()} placeholder="Wakad Main Road" /></Field>
           <Field label="Village / locality"><input value={village} onChange={e => setVillage(e.target.value)} style={S.inp()} placeholder="Wakad" /></Field>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Field label="City" req><input value={city} onChange={e => setCity(e.target.value)} style={S.inp()} placeholder="Pune" /></Field>
+            <Field label="City" req><input value={city} onChange={e => setCity(e.target.value)} style={S.inp()} placeholder="Your city" /></Field>
             <Field label="PIN code" req><input maxLength={6} value={pincode} onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={S.inp()} placeholder="411057" /></Field>
           </div>
           <Field label="State" req>
@@ -9691,7 +9696,7 @@ function TicketActivityFeed({ comments, agentMode = false }) {
 function FaqPage() {
   const faqs = [
     ['How do I book a service on ScanV?', 'Browse services on the home page, verify your mobile via OTP, pay the platform fee, and schedule date/time/location. You receive a TXN ID for tracking.'],
-    ['What areas does ScanV cover?', 'ScanV operates across PCMC, Pune, and wider Maharashtra. GPS is used to match you with nearby service partners.'],
+    ['What areas does ScanV cover?', 'ScanV operates across Local Communities worldwide. GPS is used to match you with nearby service partners in your area.'],
     ['How does OTP verification work?', 'We send a 6-digit OTP to your mobile via SMS/WhatsApp. Enter it to verify before booking. This protects your account under DPDP Act 2023.'],
     ['How can I track my booking?', 'After payment, use the tracking link or go to #track with your booking ID. You can also view bookings in your profile after login.'],
     ['What payment methods are accepted?', 'UPI (GPay, PhonePe, Paytm), debit/credit cards, and net banking via Razorpay. Platform fee (10%) is paid online at booking.'],
@@ -9701,7 +9706,7 @@ function FaqPage() {
     ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). You will see basic status, subject, and resolution note when closed.'],
     ['Can I change or cancel a booking?', 'Yes — open Bookings or Track my service and tap Cancel booking on any confirmed or in-progress order. You will see a breakdown: 30% cancellation fee (18% GST + 12% platform service of total paid) and 70% refund. See /refund for details.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
-    ['Who operates ScanV?', 'DCORE Global Corporation, Pune. Marketplace connecting customers with independent service partners. Call +91-9270194842 for help.'],
+    ['Who operates ScanV?', 'DCORE Global Corporation — a global marketplace connecting customers with independent service partners. Made in India; designed & developed with Incorporation, San Francisco, California, USA. Call +91-9270194842 for help.'],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
     ['How are partners assigned?', 'After payment, we offer the job to the 3 nearest active partners one-by-one in the ScanV app. SMS, call & WhatsApp are sent as backup. First partner to accept is assigned and live map tracking starts.'],
     ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Track progress at #track-ticket.'],
@@ -12327,7 +12332,7 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 All data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your data</p>
           </div>
           {[
-            ['Who We Are','ScanV is operated by DCORE Global Corporation, Pune, Maharashtra. We connect customers with independent service providers across PCMC, Pune and Maharashtra. DPO: privacy@dcoreglobal.com'],
+            ['Who We Are','ScanV is operated by DCORE Global Corporation. We connect customers with independent service providers across Local Communities worldwide. Made in India; designed & developed with Incorporation, San Francisco, California, USA. DPO: privacy@dcoreglobal.com'],
             ['Data We Collect','Identity (name), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city), Device (type, OS, browser, timezone, language, battery, canvas fingerprint), Booking details, and session behaviour. We do NOT collect Aadhaar, PAN, passport, card numbers, passwords, or biometrics.'],
             ['How We Use It','Verify identity via OTP before any booking · Match you with nearby service providers · Send booking updates · Process payments for GST compliance · Prevent fraud · Improve platform quality through anonymised analytics · Comply with Indian law'],
             ['Location Data','ScanV requests GPS when you open the app and when you book. Location is used only to show nearby services and enable delivery routing. IP-based location is used as fallback. We never sell location data to advertisers.'],
@@ -12358,7 +12363,7 @@ function LegalPage({page}) {
             ['Professional Services Disclaimer','Legal services: advice is between you and the advocate (DCORE has no liability). Healthcare: treatment is between you and the practitioner (DCORE has no liability). Training: results are between you and the trainer.'],
             ['Liability Limitation','DCORE’s total liability for any claim is capped at the platform fee for that booking. We are not liable for indirect, consequential, or punitive damages. Partners are independent contractors.'],
             ['Prohibited Uses','Illegal purposes · Reverse engineering the platform · Fake bookings or reviews · Soliciting Partners outside ScanV · Abuse or harassment of Partners or Users'],
-            ['Governing Law','Laws of India · Courts of Pune, Maharashtra have exclusive jurisdiction · 30-day good-faith negotiation before legal action · Contact: legal@dcoreglobal.com'],
+            ['Governing Law','Laws of India · Indian courts have jurisdiction · 30-day good-faith negotiation before legal action · Contact: legal@dcoreglobal.com'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
