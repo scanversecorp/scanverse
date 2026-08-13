@@ -2456,6 +2456,36 @@ function AssistBanner() {
   );
 }
 
+/** Fresh GPS for login/sign-in — falls back to cached silentGeo if permission denied */
+function captureFreshGps(fallbackGeo = null) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (geo) => {
+      if (settled) return;
+      settled = true;
+      resolve(geo?.lat != null ? geo : fallbackGeo);
+    };
+    if (!navigator.geolocation) { finish(fallbackGeo); return; }
+    requestNativeGps({
+      onFast: async ({ lat, lng }) => {
+        try {
+          const geoData = await reverseGeo(lat, lng);
+          finish({ lat, lng, ...geoData, source: 'gps' });
+        } catch {
+          finish({ lat, lng, source: 'gps' });
+        }
+      },
+      onError: () => finish(fallbackGeo),
+    });
+    setTimeout(() => finish(fallbackGeo), 10000);
+  });
+}
+
+const BROWSE_STICKY_HDR = {
+  background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+  boxShadow: '0 3px 14px rgba(18,18,18,0.08)', position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
+};
+
 function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }) {
   const tabs = [
     {id:'home', icon:'🏠', label:'Home', go:onHome},
@@ -3069,10 +3099,10 @@ function QRLandingPage({ onContinue }) {
    BROWSE FLOW -- Services first, no registration wall
    User browses → picks service → books → THEN registers
 ================================================================ */
-function BrowseFlow({ silentGeo, onRegistered, addToast }) {
+function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const [screen, setScreen] = useState('services'); // services | top-rated | detail | verify | payment | schedule | login
   const [navTab, setNavTab] = useState('home');
-  const [loginIntent, setLoginIntent] = useState(null); // 'bookings' | 'profile'
+  const [loginIntent, setLoginIntent] = useState(null); // 'home' | 'bookings' | 'profile'
   const [activeSvc, setActiveSvc] = useState(null);
   const [bookingDetail, setBookingDetail] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -3261,14 +3291,38 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
       const profileId = await resolveCustomerProfileId(mob);
       const {data:existing} = await sb().from('profiles').select('*').eq('id', profileId).maybeSingle();
-      if (!existing||!existing.first_name) throw new Error('No account found. Book a service first to create your profile.');
-      const {data:prof} = await sb().from('profiles').update({
-        mobile_verified:true,
-        mobile_verified_at:new Date().toISOString(),
-      }).eq('id',existing.id).select().single();
-      localStorage.setItem('scanv_uid',existing.id);
-      addToast?.(`Welcome back, ${existing.first_name}!`,'success');
-      onRegistered(prof || {...existing,mobile_verified:true}, null, loginIntent);
+      if (!existing||!existing.first_name) throw new Error('No account found. Sign up first or book a service to create your profile.');
+      const loginGeo = await captureFreshGps(silentGeo);
+      const geoUpdates = {
+        mobile_verified: true,
+        mobile_verified_at: new Date().toISOString(),
+      };
+      if (loginGeo?.lat != null && loginGeo?.lng != null) {
+        geoUpdates.last_lat = loginGeo.lat;
+        geoUpdates.last_lng = loginGeo.lng;
+        if (loginGeo.address) geoUpdates.address = loginGeo.address;
+        if (loginGeo.village) geoUpdates.village = loginGeo.village;
+        if (loginGeo.city) geoUpdates.city = loginGeo.city;
+        if (loginGeo.pincode) geoUpdates.pincode = loginGeo.pincode;
+      }
+      const {data:prof} = await sb().from('profiles').update(geoUpdates).eq('id', existing.id).select().single();
+      if (loginGeo?.lat != null && loginGeo?.lng != null) {
+        await sb().from('user_locations').insert({
+          user_id: existing.id,
+          lat: loginGeo.lat,
+          lng: loginGeo.lng,
+          address: loginGeo.address || null,
+          village: loginGeo.village || null,
+          city: loginGeo.city || null,
+          pincode: loginGeo.pincode || null,
+          source: 'gps',
+          consent_given: true,
+          consent_at: new Date().toISOString(),
+        }).then(() => {}).catch(() => {});
+      }
+      localStorage.setItem('scanv_uid', existing.id);
+      addToast?.(`Welcome back, ${existing.first_name}!`, 'success');
+      onRegistered(prof || { ...existing, ...geoUpdates }, null, loginIntent);
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
   };
@@ -3480,6 +3534,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     if (await tryExistingSession('bookings')) return;
     setLoginIntent('bookings');
     resetOtpFlow();
+    setVerifyMethod('sms');
     setErr('');
     setScreen('login');
   };
@@ -3489,12 +3544,21 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     if (await tryExistingSession('profile')) return;
     setLoginIntent('profile');
     resetOtpFlow();
+    setVerifyMethod('sms');
+    setErr('');
+    setScreen('login');
+  };
+
+  const goBrowseLogin = () => {
+    setLoginIntent('home');
+    resetOtpFlow();
+    setVerifyMethod('sms');
     setErr('');
     setScreen('login');
   };
 
   const guestActiveTab = (() => {
-    if (screen === 'login') return loginIntent || 'bookings';
+    if (screen === 'login') return loginIntent === 'home' ? 'home' : (loginIntent || 'bookings');
     if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'home';
     if (screen === 'services') return 'home';
     if (screen === 'top-rated') return 'top-rated';
@@ -3549,9 +3613,9 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
     const cfg = SUB_CATEGORIES[listCatId];
     return browseWrap(
       <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-          <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0}}>←</button>
-          <div style={{flex:1}}>
+        <div style={BROWSE_STICKY_HDR}>
+          <button type="button" aria-label="Go back" onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0,flexShrink:0}}>←</button>
+          <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
             <div style={{fontSize:11,color:C.dim,fontWeight:600}}>{cfg.subtitle}</div>
           </div>
@@ -3572,6 +3636,10 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
         <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase',opacity:0.92,marginBottom:6}}>Real people · Real care</div>
         <div style={{fontSize:20,fontWeight:800,lineHeight:1.28,marginBottom:6,fontFamily:FF}}>Book services with a smile</div>
         <div style={{fontSize:12,fontWeight:500,opacity:0.94,lineHeight:1.45}}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
+      </div>
+      <div style={{display:'flex',gap:10,margin:'12px 16px 0'}}>
+        <Btn v="outline" onClick={goBrowseLogin} sm style={{flex:1}}>Log in</Btn>
+        <Btn onClick={()=>onSignUp?.()} sm style={{flex:1}}>Sign up</Btn>
       </div>
       <div style={{margin:'12px 16px 0',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
         <span>🔍</span>
@@ -3860,19 +3928,26 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
 
   // -- LOGIN: Guest Bookings/Profile tab — OTP gate at sign-in -----------------------
   if (screen==='login') {
-    const loginTitle = loginIntent === 'profile' ? 'Sign in to Profile' : 'Sign in to Bookings';
+    const loginTitle = loginIntent === 'profile' ? 'Sign in to Profile'
+      : loginIntent === 'bookings' ? 'Sign in to Bookings'
+      : 'Log in';
     const loginHint = loginIntent === 'profile'
-      ? 'Verify mobile to view and update your address. Name and mobile are OTP-verified and read-only.'
-      : 'Verify mobile to view your bookings and orders. OTP required each sign-in.';
+      ? 'Verify mobile to view and update your address. Name and mobile are OTP-verified and read-only. Location is captured on sign-in.'
+      : loginIntent === 'bookings'
+      ? 'Verify mobile to view your bookings and orders. OTP required each sign-in. Location is captured on sign-in.'
+      : 'Enter mobile + SMS OTP to sign in. We capture your GPS location to show nearby services — same as sign-up.';
     return browseWrap(
       <>
-        <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+        <div style={BROWSE_STICKY_HDR}>
+          <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
         </div>
         <div style={{padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
+          {silentGeo?.city && (
+            <div style={{fontSize:11,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {silentGeo.village || silentGeo.city}{silentGeo.pincode ? ` · ${silentGeo.pincode}` : ''} detected</div>
+          )}
           <Field label="Mobile" req note="10-digit Indian mobile">
             <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
               <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
@@ -3900,7 +3975,7 @@ function BrowseFlow({ silentGeo, onRegistered, addToast }) {
                     style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={()=>loginProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Sign in →'}</Btn>
+              <Btn full onClick={()=>loginProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying &amp; locating…</>:'Sign in →'}</Btn>
             </>
           )}
           {verifyMethod==='whatsapp'&&!otpSent&&(
@@ -4602,9 +4677,9 @@ function ServicesScreen() {
     const cfg = SUB_CATEGORIES[subListCat];
     return (
       <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setSubListCat(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{flex:1}}>
+        <div style={{...BROWSE_STICKY_HDR, padding:'12px 20px'}}>
+          <button type="button" aria-label="Go back" onClick={()=>setSubListCat(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
+          <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
             <div style={{fontSize:11,color:C.dim}}>{cfg.subtitle}</div>
           </div>
@@ -10885,6 +10960,7 @@ export default function App() {
     <BrowseFlow
       silentGeo={silentGeo}
       onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='top-rated')setScreen('top-rated');else setScreen('services');}}
+      onSignUp={()=>{ setQrPrefill({ geo: silentGeo, dev: silentGeo?.device }); setState('register'); }}
       addToast={addToast}
     />
     </Boundary>
