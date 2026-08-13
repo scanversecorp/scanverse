@@ -1546,10 +1546,18 @@ function guardBookStart(svc, addToast) {
 }
 
 function dbRowToSvc(row) {
+  const existing = findSvcById(row.service_id);
+  const parentId = row.parent_id || existing?.parent;
+  let theme = row.theme;
+  if (!theme || theme === 'default') theme = existing?.theme;
+  if (theme && parentId) {
+    const themes = SUB_CATEGORIES[parentId]?.themes;
+    if (themes && !themes[theme]) theme = existing?.theme || Object.keys(themes)[0];
+  }
   return {
     id: row.service_id,
-    parent: row.parent_id || undefined,
-    theme: row.theme || 'default',
+    parent: parentId || undefined,
+    theme: theme || 'default',
     icon: row.icon || '✨',
     name: row.service_name || row.service_id,
     sub: row.sub_service_name || '',
@@ -1613,7 +1621,11 @@ function applyDbCatalog(rows) {
       if (row.price_paise != null) svc.price = row.price_paise;
       if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
       svc.top_rated = flag;
-      if (row.theme) svc.theme = row.theme;
+      if (row.theme && row.theme !== 'default') {
+        const parentId = row.parent_id || svc.parent;
+        const themes = SUB_CATEGORIES[parentId]?.themes;
+        if (!themes || themes[row.theme]) svc.theme = row.theme;
+      }
       if (row.unit) svc.unit = row.unit;
       if (row.icon) svc.icon = row.icon;
       continue;
@@ -1635,8 +1647,9 @@ function applyDbCatalog(rows) {
 
     if (row.parent_id) {
       ensureCategoryShell(row.parent_id, row);
-      const fresh = dbRowToSvc(row);
-      SUB_CATEGORIES[row.parent_id].svcs.push(fresh);
+      if (!findSvcById(row.service_id)) {
+        SUB_CATEGORIES[row.parent_id].svcs.push(dbRowToSvc(row));
+      }
     }
   }
   syncParentFromPrices(rows);
@@ -1664,17 +1677,18 @@ function syncParentFromPrices(rows) {
   const dbById = Object.fromEntries((rows || []).map(r => [r.service_id, r]));
   for (const parent of SVCS) {
     const dbRow = dbById[parent.id];
-    if (dbRow?.price_paise != null) {
-      parent.price = dbRow.price_paise;
-      if (dbRow.mrp_paise != null) parent.mrp = dbRow.mrp_paise;
+    const cfg = SUB_CATEGORIES[parent.id];
+    const subPrices = cfg?.svcs?.length ? visibleSvcs(cfg.svcs).map(s => s.price).filter(p => p > 0) : [];
+    if (subPrices.length) {
+      parent.price = Math.min(...subPrices);
+      const subMrps = visibleSvcs(cfg.svcs).map(s => s.mrp).filter(p => p > 0);
+      if (subMrps.length) parent.mrp = Math.min(...subMrps);
       continue;
     }
-    const cfg = SUB_CATEGORIES[parent.id];
-    if (!cfg?.svcs?.length) continue;
-    const prices = visibleSvcs(cfg.svcs).map(s => s.price).filter(p => p > 0);
-    const mrps = visibleSvcs(cfg.svcs).map(s => s.mrp).filter(p => p > 0);
-    if (prices.length) parent.price = Math.min(...prices);
-    if (mrps.length) parent.mrp = Math.min(...mrps);
+    if (dbRow?.price_paise != null && dbRow.price_paise >= 10000) {
+      parent.price = dbRow.price_paise;
+      if (dbRow.mrp_paise != null) parent.mrp = dbRow.mrp_paise;
+    }
   }
 }
 
@@ -2646,8 +2660,20 @@ function CategoryListBody({ categoryId, onSelect }) {
   const [filter, setFilter] = useState('all');
   if (!cfg) return null;
   const list = visibleSvcs(cfg.svcs).filter(s => filter === 'all' || s.theme === filter);
+  const knownThemes = new Set(cfg.themeOrder);
+  const extraThemes = [...new Set(list.map(s => s.theme).filter(t => t && !knownThemes.has(t)))];
+  const renderThemes = [...cfg.themeOrder, ...extraThemes];
   const accent = SVC_CARD_THEME[categoryId]?.b2 || C.acc;
   const pills = [['all', 'All', accent, C.surf], ...cfg.themeOrder.map(k => [k, cfg.themes[k].label, cfg.themes[k].color, cfg.themes[k].bg])];
+  if (!list.length) {
+    return (
+      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+        <div style={{ color: C.txt, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>No services available</div>
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>This category is being updated — check back soon.</div>
+      </div>
+    );
+  }
   return (
     <div style={{ padding: '14px 16px 24px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
@@ -2657,10 +2683,10 @@ function CategoryListBody({ categoryId, onSelect }) {
           </button>
         ))}
       </div>
-      {cfg.themeOrder.map(theme => {
+      {renderThemes.map(theme => {
         const items = list.filter(s => s.theme === theme);
         if (!items.length) return null;
-        const t = cfg.themes[theme];
+        const t = cfg.themes[theme] || { label: theme, color: accent, bg: C.surf, tagline: '' };
         return (
           <div key={theme} style={{ marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -2831,24 +2857,13 @@ const TRUST_PILL = {
   flexShrink: 0,
   lineHeight: 1.2,
 };
-const TRUST_MINI_CARD = {
-  flex: 1,
-  minWidth: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-  padding: '11px 10px',
-  borderRadius: 12,
-  background: '#e6f4ee',
-  border: '1.5px solid rgba(0,122,77,0.35)',
-  color: C.grn,
-  fontWeight: 800,
-  fontSize: 12,
+const TRUST_PILL_BTN = {
+  ...TRUST_PILL,
   cursor: 'pointer',
   fontFamily: FF,
-  boxSizing: 'border-box',
-  boxShadow: '0 2px 8px rgba(0,122,77,0.08)',
+  border: 'none',
+  appearance: 'none',
+  WebkitAppearance: 'none',
 };
 const BROWSE_FIXED_HDR = {
   position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
@@ -4144,7 +4159,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const openSubSvc = (catId, svc) => {
     const cfg = SUB_CATEGORIES[catId];
-    setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
+    setActiveSvc({ ...svc, parent: catId, cat: cfg?.cat || svc.cat, cash: false });
     setScreen('detail');
     requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current));
   };
@@ -4179,24 +4194,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
   if (listCatId && SUB_CATEGORIES[listCatId]) {
     const cfg = SUB_CATEGORIES[listCatId];
-    return (
-      <>
-        <BrowseCategoryShell
-          scrollRef={browseScrollRef}
-          title={cfg.title}
-          subtitle={cfg.subtitle}
-          onBack={() => { setScreen('services'); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
-        >
-          <CategoryListBody categoryId={listCatId} onSelect={(svc) => openSubSvc(listCatId, svc)} />
-        </BrowseCategoryShell>
-        <GuestBottomNav
-          activeTab={guestActiveTab}
-          onHome={goBrowseHome}
-          onTopRated={goBrowseTopRated}
-          onBookings={goBrowseBookings}
-          onProfile={goBrowseProfile}
-        />
-      </>
+    return browseWrap(
+      <BrowseCategoryShell
+        scrollRef={browseScrollRef}
+        title={cfg.title}
+        subtitle={cfg.subtitle}
+        onBack={() => { setScreen('services'); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
+      >
+        <CategoryListBody categoryId={listCatId} onSelect={(svc) => openSubSvc(listCatId, svc)} />
+      </BrowseCategoryShell>
     );
   }
 
@@ -4217,16 +4223,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
           <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: 0 }}>
-          <button type="button" onClick={goBrowseTopRated} style={TRUST_MINI_CARD} aria-label="Top Rated services">
-            <span style={{ fontSize: 15, lineHeight: 1 }}>⭐</span>
-            <span>Top Rated</span>
-          </button>
-          <button type="button" onClick={() => scrollBrowseToId(browseHomeScrollRef.current, 'scanv-commitments')} style={TRUST_MINI_CARD} aria-label="Trusted verified partners">
-            <span style={{ fontSize: 15, lineHeight: 1 }}>✓</span>
-            <span>Trusted</span>
-          </button>
-        </div>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', overflow: 'hidden', padding: 0 }}>
           <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
             <span>🔍</span>
@@ -4237,6 +4233,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-First'].map(p => (
               <span key={p} style={TRUST_PILL}>{p}</span>
             ))}
+            <button type="button" onClick={goBrowseTopRated} style={TRUST_PILL_BTN} aria-label="Top Rated services">⭐ Top Rated</button>
+            <button type="button" onClick={() => scrollBrowseToId(browseHomeScrollRef.current, 'scanv-commitments')} style={TRUST_PILL_BTN} aria-label="Trusted verified partners">✓ Trusted</button>
           </div>
         </div>
       </div>
@@ -5374,8 +5372,9 @@ function ServicesScreen() {
 
   const openSubSvc = (catId, svc) => {
     const cfg = SUB_CATEGORIES[catId];
-    setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
-    setDetail(svc);
+    const enriched = { ...svc, parent: catId, cat: cfg?.cat || svc.cat, cash: false };
+    setActiveSvc(enriched);
+    setDetail(enriched);
     setSubListCat(null);
     scrollBrowseTop(scrollRef.current);
   };
