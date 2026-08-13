@@ -1736,8 +1736,8 @@ function pricingAuthOk() {
   try {
     const raw = sessionStorage.getItem(PRICING_AUTH_KEY);
     if (!raw) return false;
-    const { pin, totpOk, exp } = JSON.parse(raw);
-    return !!pin && totpOk === true && Date.now() < exp;
+    const { pin, totpOk, sessionToken, exp } = JSON.parse(raw);
+    return !!pin && totpOk === true && !!sessionToken && Date.now() < exp;
   } catch { return false; }
 }
 
@@ -1751,13 +1751,20 @@ function getPricingAuth() {
   } catch { return null; }
 }
 
-function setPricingAuth(pin, totpOk = false) {
-  sessionStorage.setItem(PRICING_AUTH_KEY, JSON.stringify({ pin, totpOk: !!totpOk, exp: Date.now() + 28800000 }));
+function setPricingAuth(pin, totpOk = false, sessionToken = null) {
+  sessionStorage.setItem(PRICING_AUTH_KEY, JSON.stringify({
+    pin, totpOk: !!totpOk, sessionToken: sessionToken || null, exp: Date.now() + 28800000,
+  }));
 }
 
-function pricingAdminHeaders(pin, totp) {
+function pricingAdminHeaders(pin, { totp } = {}) {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'x-pricing-pin': pin };
-  if (totp) headers['x-pricing-totp'] = String(totp).replace(/\D/g, '');
+  const auth = getPricingAuth();
+  if (auth?.sessionToken && auth.pin === pin) {
+    headers['x-pricing-session'] = auth.sessionToken;
+  } else if (totp) {
+    headers['x-pricing-totp'] = String(totp).replace(/\D/g, '');
+  }
   return headers;
 }
 
@@ -1772,9 +1779,9 @@ async function pricingAdminTotp(pin, action, extra = {}, totp) {
   return data;
 }
 
-async function pricingAdminFetch(pin, totp) {
+async function pricingAdminFetch(pin) {
   const res = await fetch(PRICING_FN, {
-    headers: pricingAdminHeaders(pin, totp),
+    headers: pricingAdminHeaders(pin),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -1785,30 +1792,30 @@ async function pricingAdminFetch(pin, totp) {
   return data;
 }
 
-async function pricingAdminSave(pin, rows, totp) {
+async function pricingAdminSave(pin, rows) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
+    headers: { ...pricingAdminHeaders(pin), 'Content-Type': 'application/json' },
     body: JSON.stringify({ rows }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
   return res.json();
 }
 
-async function pricingAdminCreate(pin, create, totp) {
+async function pricingAdminCreate(pin, create) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
+    headers: { ...pricingAdminHeaders(pin), 'Content-Type': 'application/json' },
     body: JSON.stringify({ create }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Create failed');
   return res.json();
 }
 
-async function pricingAdminRemove(pin, serviceId, totp) {
+async function pricingAdminRemove(pin, serviceId) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
+    headers: { ...pricingAdminHeaders(pin), 'Content-Type': 'application/json' },
     body: JSON.stringify({ remove: serviceId }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Remove failed');
@@ -7332,17 +7339,17 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
 
   const cards = ['all', ...Array.from(new Set(rows.map(r => r.card)))];
 
-  const load = useCallback(async (usePin, useTotp) => {
+  const load = useCallback(async (usePin) => {
     setLoading(true); setErr('');
     try {
-      const { rows: data } = await pricingAdminFetch(usePin, useTotp);
+      const { rows: data } = await pricingAdminFetch(usePin);
       setRows(data || []);
       setMsg(`Loaded ${data?.length || 0} services`);
     } catch (e) {
       if (e.totpRequired) {
         setAuthStep('totp');
         setAuthed(false);
-        setErr('Enter the 6-digit code from your authenticator app');
+        setErr('Session expired — enter a fresh authenticator code');
       } else {
         setErr(e.message || 'Could not load pricing');
         setAuthed(false);
@@ -7357,6 +7364,15 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   }, [hubPin]);
 
   useEffect(() => {
+    if (pricingAuthOk()) {
+      const auth = getPricingAuth();
+      setPin(auth.pin);
+      setAuthed(true);
+      setAuthStep('done');
+      setTotpCode('');
+      load(auth.pin);
+      return;
+    }
     const savedPin = hubPin || savedAuth?.pin || sessionStorage.getItem(PRICING_PIN_KEY);
     if (!savedPin) return;
     (async () => {
@@ -7368,13 +7384,9 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           setAuthStep('totp');
           setMsg('Enter your authenticator code to continue');
         }
-      } catch { /* pin invalid or offline — stay on pin step */ }
+      } catch { /* pin invalid — stay on pin step */ }
     })();
-  }, [hubPin]);
-
-  useEffect(() => {
-    if (authed && pin && authStep === 'done' && activeTotp.length === 6) load(pin, activeTotp);
-  }, [authed, authStep]);
+  }, [hubPin, load]);
 
   const startEnroll = async (usePin) => {
     const data = await pricingAdminTotp(usePin, 'totp_enroll');
@@ -7411,9 +7423,10 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     if (activeTotp.length !== 6) { setErr('Enter the 6-digit authenticator code'); return; }
     setLoading(true); setErr('');
     try {
-      await pricingAdminTotp(pin, 'totp_verify', {}, activeTotp);
-      const { rows: data } = await pricingAdminFetch(pin, activeTotp);
-      setPricingAuth(pin, true);
+      const verified = await pricingAdminTotp(pin, 'totp_verify', {}, activeTotp);
+      setPricingAuth(pin, true, verified.session_token);
+      setTotpCode('');
+      const { rows: data } = await pricingAdminFetch(pin);
       setRows(data || []);
       setAuthed(true);
       setAuthStep('done');
@@ -7427,10 +7440,11 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     if (activeTotp.length !== 6) { setErr('Enter the 6-digit code from your authenticator app'); return; }
     setLoading(true); setErr('');
     try {
-      await pricingAdminTotp(pin, 'totp_confirm', { code: activeTotp }, activeTotp);
-      setPricingAuth(pin, true);
+      const confirmed = await pricingAdminTotp(pin, 'totp_confirm', { code: activeTotp }, activeTotp);
+      setPricingAuth(pin, true, confirmed.session_token);
       setTotpEnrolled(true);
-      const { rows: data } = await pricingAdminFetch(pin, activeTotp);
+      setTotpCode('');
+      const { rows: data } = await pricingAdminFetch(pin);
       setRows(data || []);
       setAuthed(true);
       setAuthStep('done');
@@ -7450,7 +7464,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const saveAll = async () => {
     setSaving(true); setErr(''); setMsg('');
     try {
-      await pricingAdminSave(pin, rows, activeTotp);
+      await pricingAdminSave(pin, rows);
       await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Saved ${rows.length} rows — live on site now`);
     } catch (e) {
@@ -7461,7 +7475,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const saveOne = async (idx) => {
     setSaving(true); setErr('');
     try {
-      await pricingAdminSave(pin, [rows[idx]], activeTotp);
+      await pricingAdminSave(pin, [rows[idx]]);
       await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Saved ${rows[idx].service_name}`);
     } catch (e) {
@@ -7477,7 +7491,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     if (!window.confirm(`Remove this ${kind} "${label}" from the live catalog? (Sets Inactive — reactivate from Status.)`)) return;
     setSaving(true); setErr('');
     try {
-      await pricingAdminRemove(pin, r.service_id, activeTotp);
+      await pricingAdminRemove(pin, r.service_id);
       setRows(prev => prev.map((row, i) => i === idx ? { ...row, service_status: 'inactive', active: false } : row));
       await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Removed ${kind} "${label}" — hidden from catalog`);
@@ -7510,9 +7524,9 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
         icon: addForm.icon || '✨',
         service_status: addForm.service_status || 'active',
         is_category: !!addForm.is_category,
-      }, activeTotp);
+      });
       await fetchCatalogFromDb(onPricesUpdated);
-      await load(pin, activeTotp);
+      await load(pin);
       setShowAdd(false);
       setAddForm(f => ({ ...f, service_name: '', service_id: '', sub_service_name: '', new_amount_rupees: '', card: f.is_category ? '' : f.card }));
       setMsg(`Added ${created?.[0]?.service_name || addForm.service_name} — live on ${addForm.is_category ? 'home cards' : 'sub-cards & booking'}`);
@@ -7626,7 +7640,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
             <div style={{ fontSize:18, fontWeight:800, color:C.txt }}>ScanV Pricing Input</div>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <Btn v="outline" sm onClick={()=>load(pin, activeTotp)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
+            <Btn v="outline" sm onClick={()=>load(pin)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
             <Btn sm onClick={saveAll} disabled={saving||!rows.length}>{saving?'Saving…':'Save all & go live'}</Btn>
             <Btn v="ghost" sm onClick={lock}>Lock</Btn>
           </div>

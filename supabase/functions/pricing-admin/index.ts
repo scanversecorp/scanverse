@@ -16,12 +16,69 @@ import {
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-pricing-pin, x-pricing-totp",
+    "authorization, x-client-info, apikey, content-type, x-pricing-pin, x-pricing-totp, x-pricing-session",
 };
 
 const TOTP_SECRET_KEY = "pricing_admin_totp_secret";
 const TOTP_PENDING_KEY = "pricing_admin_totp_pending";
 const TOTP_ISSUER = "ScanV Pricing Admin";
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+async function sessionHmacKey(): Promise<CryptoKey> {
+  const material = Deno.env.get("PRICING_ADMIN_PIN") || "scanv-pricing-session";
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(material),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+}
+
+function b64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function b64urlDecode(s: string): Uint8Array {
+  const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
+  const bin = atob(b64);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+async function createPricingSession(): Promise<{ token: string; exp: number }> {
+  const exp = Date.now() + SESSION_TTL_MS;
+  const nonce = crypto.randomUUID();
+  const payload = `${exp}.${nonce}`;
+  const key = await sessionHmacKey();
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return { token: `${payload}.${b64url(new Uint8Array(sig))}`, exp };
+}
+
+async function verifyPricingSession(token: string): Promise<boolean> {
+  if (!token) return false;
+  const lastDot = token.lastIndexOf(".");
+  if (lastDot <= 0) return false;
+  const payload = token.slice(0, lastDot);
+  const sigPart = token.slice(lastDot + 1);
+  const exp = Number(payload.split(".")[0]);
+  if (!exp || Date.now() > exp) return false;
+  try {
+    const key = await sessionHmacKey();
+    const sig = b64urlDecode(sigPart);
+    return await crypto.subtle.verify("HMAC", key, sig, new TextEncoder().encode(payload));
+  } catch {
+    return false;
+  }
+}
+
+async function issueSessionResponse(extra: Record<string, unknown> = {}) {
+  const session = await createPricingSession();
+  return json({ ...extra, session_token: session.token, session_exp: session.exp });
+}
 
 const PARENT_IDS = new Set([
   "legal", "cloud", "vip", "health", "property", "household",
@@ -84,6 +141,12 @@ async function checkTotp(req: Request, sb: ReturnType<typeof adminSb>): Promise<
 
 async function checkAuth(req: Request, sb: ReturnType<typeof adminSb>): Promise<Response | null> {
   if (!checkPin(req)) return json({ error: "Unauthorized" }, 401);
+  const secret = await getEnrolledTotpSecret(sb);
+  if (!secret) return null;
+
+  const session = req.headers.get("x-pricing-session") || "";
+  if (await verifyPricingSession(session)) return null;
+
   const totp = await checkTotp(req, sb);
   if (!totp.ok) return json({ error: totp.error, totp_required: totp.enrolled }, 401);
   return null;
@@ -190,14 +253,14 @@ async function handleTotpAction(
     if (!valid) return json({ error: "Invalid code — check Microsoft Authenticator and try again" }, 401);
     await setSetting(sb, TOTP_SECRET_KEY, pending, "TOTP secret for pricing admin 2FA");
     await deleteSetting(sb, TOTP_PENDING_KEY);
-    return json({ success: true, enrolled: true });
+    return issueSessionResponse({ success: true, enrolled: true });
   }
 
   if (action === "totp_verify") {
     const totp = await checkTotp(req, sb);
     if (!totp.enrolled) return json({ success: true, enrolled: false });
     if (!totp.ok) return json({ error: totp.error }, 401);
-    return json({ success: true, enrolled: true });
+    return issueSessionResponse({ success: true, enrolled: true });
   }
 
   return null;
