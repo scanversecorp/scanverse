@@ -2564,9 +2564,10 @@ const APP_CSS = `
   body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
   @media (min-width:481px){html,body{background:#e8e6e1}}
-  .scanv-shell{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;height:100%;background:${C.bg}}
+  .scanv-shell{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;height:100%;min-height:100dvh;min-height:-webkit-fill-available;background:${C.bg}}
   @media (min-width:481px){.scanv-shell{height:100dvh;max-height:100dvh;min-height:100dvh;max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
-  #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;height:100%}
+  #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
+  .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -3000,7 +3001,7 @@ function captureFreshGps(fallbackGeo = null) {
 }
 
 /** Fixed browse header — sticky breaks on mobile when inner panels scroll */
-const BROWSE_HDR_PAD = 'env(safe-area-inset-top, 0px)';
+const BROWSE_HDR_PAD = 'max(10px, env(safe-area-inset-top, 0px))';
 const BROWSE_HOME_INSET = 12;
 const BROWSE_HOME_STACK = {
   display: 'grid',
@@ -3084,6 +3085,7 @@ const TRUST_PILL_BTN = {
   alignItems: 'center',
   justifyContent: 'center',
   width: '100%',
+  textAlign: 'center',
 };
 const BROWSE_TRUST_PILLS = [
   { key: 'dpdp', label: '✓ DPDP', screen: 'trust-dpdp', aria: 'DPDP 2023' },
@@ -3437,7 +3439,8 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
-    <div style={{flexShrink:0,background:C.surf,borderTop:BDR,display:'flex',padding:'4px 0 max(2px, env(safe-area-inset-bottom, 0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,overflow:'hidden'}}>
+    <div style={{ flexShrink: 0, background: C.surf, borderTop: BDR, boxShadow: '0 -4px 16px rgba(18,18,18,0.08)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div style={{ display: 'flex', padding: '4px 0' }}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
@@ -3445,6 +3448,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
           {activeTab===t.id&&<div style={{position:'absolute',bottom:0,left:'25%',right:'25%',height:2,background:C.acc,borderRadius:2}}/>}
         </button>
       ))}
+      </div>
     </div>
   );
 }
@@ -4730,14 +4734,14 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
       <div style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 20, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
           <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
           <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.94, lineHeight: 1.45 }}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
@@ -5723,7 +5727,8 @@ function BottomNav() {
     setScreen(id);
   };
   return (
-    <div style={{flexShrink:0,display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'4px 0 max(2px, env(safe-area-inset-bottom, 0px))',zIndex:50}}>
+    <div style={{flexShrink:0,background:C.surf,borderTop:`1px solid ${C.bdr}`,zIndex:50,paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
+      <div style={{display:'flex',padding:'4px 0'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>goTab(t.id)}
           style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
@@ -5733,6 +5738,7 @@ function BottomNav() {
           {screen===t.id&&<div style={{position:'absolute',bottom:0,left:'25%',right:'25%',height:2,background:C.acc,borderRadius:2}}/>}
         </button>
       ))}
+      </div>
     </div>
   );
 }
