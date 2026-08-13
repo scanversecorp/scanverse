@@ -464,6 +464,34 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (action === "get_login_profile") {
+      const authed = await verifyAuthMobileMatch(req, supabaseUrl, mobile);
+      if (!authed) {
+        return json({ success: false, error: "Sign-in required — verify OTP first" }, 401);
+      }
+      const profile = await findProfileByMobile(supabase, mobile);
+      if (!profile?.id) {
+        const canonicalId = profileIdFromMobile(mobile);
+        const { data } = await supabase
+          .from("profiles")
+          .select("id,first_name,last_name,name,phone,email")
+          .eq("id", canonicalId)
+          .maybeSingle();
+        return json({ success: true, profile: data || null });
+      }
+      const canonicalId = profileIdFromMobile(mobile);
+      if (profile.id !== canonicalId) {
+        await supabase
+          .from("profiles")
+          .update({
+            email: profile.email || profileAuthEmail(mobile),
+            phone: profile.phone || mobile,
+          })
+          .eq("id", profile.id);
+      }
+      return json({ success: true, profile });
+    }
+
     if (action === "register_profile") {
       try {
         const authed = await verifyAuthMobileMatch(req, supabaseUrl, mobile);

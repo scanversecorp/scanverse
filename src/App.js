@@ -2578,11 +2578,12 @@ const BROWSE_HOME_PAD = 16;
 const BROWSE_HOME_STACK = {
   display: 'grid',
   gridTemplateColumns: '1fr',
-  padding: '0 16px',
+  padding: `0 ${BROWSE_HOME_PAD}px`,
   gap: 12,
   boxSizing: 'border-box',
   width: '100%',
 };
+const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
 const BROWSE_FIXED_HDR = {
   position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
   background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
@@ -3906,26 +3907,26 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||'PCMC'} {silentGeo?.pincode||''}</div>
       </div>
       <div style={{ ...BROWSE_HOME_STACK, marginTop: 12 }}>
-        <div style={{ width: '100%', boxSizing: 'border-box', borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)', margin: 0 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
           <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
           <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.94, lineHeight: 1.45 }}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
         </div>
-        <div style={{ display: 'flex', gap: 10, width: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: 0 }}>
           <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
           <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
         </div>
-        <div style={{ width: '100%', boxSizing: 'border-box', background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', overflow: 'hidden', margin: 0, padding: 0 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', overflow: 'hidden', padding: 0 }}>
           <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
             <span>🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
           </div>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: '100%', margin: 0, padding: 0, boxSizing: 'border-box' }}>
-          {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-first'].map(p => (
-            <span key={p} style={{ fontSize: 9, fontWeight: 800, color: C.grn, background: '#e6f4ee', border: '1.5px solid rgba(0,122,77,0.35)', padding: '4px 9px', borderRadius: 99, boxSizing: 'border-box', margin: 0 }}>{p}</span>
-          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, width: '100%', boxSizing: 'border-box', margin: 0, padding: '8px 0 10px', borderTop: BDR }}>
+            {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-first'].map(p => (
+              <span key={p} style={{ fontSize: 9, fontWeight: 800, color: C.grn, background: '#e6f4ee', border: '1.5px solid rgba(0,122,77,0.35)', padding: '4px 6px', borderRadius: 99, boxSizing: 'border-box', margin: 0, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 0, lineHeight: 1.2 }}>{p}</span>
+            ))}
+          </div>
         </div>
       </div>
       <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
