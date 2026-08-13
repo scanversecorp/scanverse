@@ -1,19 +1,27 @@
 /**
  * ScanV confidential pricing admin API
- * GET  — list all pricing rows (requires x-pricing-pin)
- * POST — upsert rows { rows: [...] } (requires x-pricing-pin)
+ * GET  — list all pricing rows (requires x-pricing-pin + x-pricing-totp when 2FA enrolled)
+ * POST — upsert rows, 2FA enroll/verify (requires x-pricing-pin)
  *
- * service_pricing is the single source of truth; triggers sync
- * service_prices_public (customer app) and public.services (bookings FK).
+ * Two-factor: TOTP (Microsoft Authenticator, Google Authenticator, Authy, etc.)
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  generateTotpSecret,
+  otpAuthUri,
+  verifyTotp,
+} from "../_shared/totp.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-pricing-pin",
+    "authorization, x-client-info, apikey, content-type, x-pricing-pin, x-pricing-totp",
 };
+
+const TOTP_SECRET_KEY = "pricing_admin_totp_secret";
+const TOTP_PENDING_KEY = "pricing_admin_totp_pending";
+const TOTP_ISSUER = "ScanV Pricing Admin";
 
 const PARENT_IDS = new Set([
   "legal", "cloud", "vip", "health", "property", "household",
@@ -39,6 +47,48 @@ function adminSb() {
   return createClient(url, key);
 }
 
+async function getSetting(sb: ReturnType<typeof adminSb>, key: string): Promise<string | null> {
+  const { data } = await sb.from("platform_settings").select("value").eq("key", key).maybeSingle();
+  return data?.value ? String(data.value) : null;
+}
+
+async function setSetting(sb: ReturnType<typeof adminSb>, key: string, value: string, description?: string) {
+  const { error } = await sb.from("platform_settings").upsert({
+    key,
+    value,
+    description: description || null,
+    updated_by: "pricing-admin",
+  }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
+
+async function deleteSetting(sb: ReturnType<typeof adminSb>, key: string) {
+  await sb.from("platform_settings").delete().eq("key", key);
+}
+
+async function getEnrolledTotpSecret(sb: ReturnType<typeof adminSb>): Promise<string | null> {
+  const envSecret = Deno.env.get("PRICING_TOTP_SECRET")?.trim();
+  if (envSecret) return envSecret;
+  return await getSetting(sb, TOTP_SECRET_KEY);
+}
+
+async function checkTotp(req: Request, sb: ReturnType<typeof adminSb>): Promise<{ ok: boolean; enrolled: boolean; error?: string }> {
+  const secret = await getEnrolledTotpSecret(sb);
+  if (!secret) return { ok: true, enrolled: false };
+  const code = req.headers.get("x-pricing-totp") || "";
+  if (!code) return { ok: false, enrolled: true, error: "Authenticator code required" };
+  const valid = await verifyTotp(secret, code);
+  if (!valid) return { ok: false, enrolled: true, error: "Invalid authenticator code" };
+  return { ok: true, enrolled: true };
+}
+
+async function checkAuth(req: Request, sb: ReturnType<typeof adminSb>): Promise<Response | null> {
+  if (!checkPin(req)) return json({ error: "Unauthorized" }, 401);
+  const totp = await checkTotp(req, sb);
+  if (!totp.ok) return json({ error: totp.error, totp_required: totp.enrolled }, 401);
+  return null;
+}
+
 function splitAmounts(newPaise: number, partnerPct: number) {
   const pct = Math.min(100, Math.max(0, partnerPct));
   const partner = Math.round(newPaise * (pct / 100));
@@ -60,10 +110,10 @@ function slugifyId(raw: string): string {
     .slice(0, 48);
 }
 
-function normalizeServiceStatus(r: Record<string, unknown>): 'active' | 'inactive' | 'paused' {
-  const raw = String(r.service_status || '').trim().toLowerCase();
-  if (raw === 'active' || raw === 'inactive' || raw === 'paused') return raw;
-  return r.active === false ? 'inactive' : 'active';
+function normalizeServiceStatus(r: Record<string, unknown>): "active" | "inactive" | "paused" {
+  const raw = String(r.service_status || "").trim().toLowerCase();
+  if (raw === "active" || raw === "inactive" || raw === "paused") return raw;
+  return r.active === false ? "inactive" : "active";
 }
 
 function normalizeRow(r: Record<string, unknown>) {
@@ -102,11 +152,55 @@ function normalizeRow(r: Record<string, unknown>) {
     icon: String(r.icon || "✨"),
     sort_order: Number(r.sort_order) || 0,
     service_status: serviceStatus,
-    active: serviceStatus === 'active',
+    active: serviceStatus === "active",
     is_category: isCategory,
     ...split,
     updated_at: new Date().toISOString(),
   };
+}
+
+async function handleTotpAction(
+  sb: ReturnType<typeof adminSb>,
+  action: string,
+  body: Record<string, unknown>,
+  req: Request,
+) {
+  if (!checkPin(req)) return json({ error: "Unauthorized" }, 401);
+
+  if (action === "totp_status") {
+    const secret = await getEnrolledTotpSecret(sb);
+    const pending = await getSetting(sb, TOTP_PENDING_KEY);
+    return json({ enrolled: !!secret, pending: !!pending });
+  }
+
+  if (action === "totp_enroll") {
+    const existing = await getEnrolledTotpSecret(sb);
+    if (existing) return json({ error: "Two-factor already enrolled" }, 400);
+    const secret = generateTotpSecret();
+    await setSetting(sb, TOTP_PENDING_KEY, secret, "Pending TOTP enrollment for pricing admin");
+    const uri = otpAuthUri(secret, TOTP_ISSUER, "pricing-admin");
+    return json({ secret, otpauth_uri: uri, issuer: TOTP_ISSUER });
+  }
+
+  if (action === "totp_confirm") {
+    const pending = await getSetting(sb, TOTP_PENDING_KEY);
+    if (!pending) return json({ error: "No pending enrollment — start again" }, 400);
+    const code = String(body.code || req.headers.get("x-pricing-totp") || "");
+    const valid = await verifyTotp(pending, code);
+    if (!valid) return json({ error: "Invalid code — check Microsoft Authenticator and try again" }, 401);
+    await setSetting(sb, TOTP_SECRET_KEY, pending, "TOTP secret for pricing admin 2FA");
+    await deleteSetting(sb, TOTP_PENDING_KEY);
+    return json({ success: true, enrolled: true });
+  }
+
+  if (action === "totp_verify") {
+    const totp = await checkTotp(req, sb);
+    if (!totp.enrolled) return json({ success: true, enrolled: false });
+    if (!totp.ok) return json({ error: totp.error }, 401);
+    return json({ success: true, enrolled: true });
+  }
+
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -114,11 +208,23 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  if (!checkPin(req)) {
-    return json({ error: "Unauthorized" }, 401);
+  const sb = adminSb();
+  let postBody: Record<string, unknown> | null = null;
+  if (req.method === "POST") {
+    try {
+      postBody = await req.json();
+    } catch {
+      postBody = {};
+    }
+    const action = String(postBody?.action || "");
+    if (action.startsWith("totp_")) {
+      const res = await handleTotpAction(sb, action, postBody || {}, req);
+      if (res) return res;
+    }
   }
 
-  const sb = adminSb();
+  const authErr = await checkAuth(req, sb);
+  if (authErr) return authErr;
 
   if (req.method === "GET") {
     const { data, error } = await sb
@@ -133,19 +239,16 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "POST") {
-    let body: {
+    const body = postBody || {};
+    const typedBody = body as {
       rows?: Record<string, unknown>[];
       create?: Record<string, unknown>;
       remove?: string;
+      action?: string;
     };
-    try {
-      body = await req.json();
-    } catch {
-      return json({ error: "Invalid JSON" }, 400);
-    }
 
-    if (body.remove) {
-      const serviceId = String(body.remove).trim();
+    if (typedBody.remove) {
+      const serviceId = String(typedBody.remove).trim();
       if (!serviceId) return json({ error: "remove requires service_id" }, 400);
       const { data, error } = await sb
         .from("service_pricing")
@@ -157,9 +260,9 @@ Deno.serve(async (req) => {
       return json({ success: true, removed: serviceId, rows: data });
     }
 
-    let rawRows = body.rows;
-    if ((!rawRows || !rawRows.length) && body.create) {
-      const c = body.create;
+    let rawRows = typedBody.rows;
+    if ((!rawRows || !rawRows.length) && typedBody.create) {
+      const c = typedBody.create;
       const name = String(c.service_name || "").trim();
       const parentId = c.parent_id ? String(c.parent_id) : null;
       const isCategory = Boolean(c.is_category);

@@ -14,6 +14,7 @@ import {
   useState, useEffect, useRef, useCallback, useMemo,
   createContext, useContext, useReducer, Component
 } from 'react';
+import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
@@ -1735,47 +1736,79 @@ function pricingAuthOk() {
   try {
     const raw = sessionStorage.getItem(PRICING_AUTH_KEY);
     if (!raw) return false;
-    const { pin, exp } = JSON.parse(raw);
-    return !!pin && Date.now() < exp;
+    const { pin, totpOk, exp } = JSON.parse(raw);
+    return !!pin && totpOk === true && Date.now() < exp;
   } catch { return false; }
 }
 
-function setPricingAuth(pin) {
-  sessionStorage.setItem(PRICING_AUTH_KEY, JSON.stringify({ pin, exp: Date.now() + 86400000 }));
+function getPricingAuth() {
+  try {
+    const raw = sessionStorage.getItem(PRICING_AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.pin || Date.now() >= parsed.exp) return null;
+    return parsed;
+  } catch { return null; }
 }
 
-async function pricingAdminFetch(pin) {
-  const res = await fetch(PRICING_FN, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'x-pricing-pin': pin },
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Fetch failed');
-  return res.json();
+function setPricingAuth(pin, totpOk = false) {
+  sessionStorage.setItem(PRICING_AUTH_KEY, JSON.stringify({ pin, totpOk: !!totpOk, exp: Date.now() + 28800000 }));
 }
 
-async function pricingAdminSave(pin, rows) {
+function pricingAdminHeaders(pin, totp) {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'x-pricing-pin': pin };
+  if (totp) headers['x-pricing-totp'] = String(totp).replace(/\D/g, '');
+  return headers;
+}
+
+async function pricingAdminTotp(pin, action, extra = {}, totp) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'x-pricing-pin': pin },
+    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...extra }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function pricingAdminFetch(pin, totp) {
+  const res = await fetch(PRICING_FN, {
+    headers: pricingAdminHeaders(pin, totp),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || 'Fetch failed');
+    err.totpRequired = data.totp_required;
+    throw err;
+  }
+  return data;
+}
+
+async function pricingAdminSave(pin, rows, totp) {
+  const res = await fetch(PRICING_FN, {
+    method: 'POST',
+    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
     body: JSON.stringify({ rows }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
   return res.json();
 }
 
-async function pricingAdminCreate(pin, create) {
+async function pricingAdminCreate(pin, create, totp) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'x-pricing-pin': pin },
+    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
     body: JSON.stringify({ create }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Create failed');
   return res.json();
 }
 
-async function pricingAdminRemove(pin, serviceId) {
+async function pricingAdminRemove(pin, serviceId, totp) {
   const res = await fetch(PRICING_FN, {
     method: 'POST',
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'x-pricing-pin': pin },
+    headers: { ...pricingAdminHeaders(pin, totp), 'Content-Type': 'application/json' },
     body: JSON.stringify({ remove: serviceId }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Remove failed');
@@ -7253,8 +7286,14 @@ function LeaderHome() {
    CONFIDENTIAL PRICING ADMIN — #pricing-admin (PIN only, not in nav)
 ================================================================ */
 function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
-  const [pin, setPin] = useState(() => hubPin || sessionStorage.getItem(PRICING_PIN_KEY) || '');
-  const [authed, setAuthed] = useState(!!hubPin || pricingAuthOk());
+  const savedAuth = getPricingAuth();
+  const [pin, setPin] = useState(() => hubPin || savedAuth?.pin || sessionStorage.getItem(PRICING_PIN_KEY) || '');
+  const [totpCode, setTotpCode] = useState('');
+  const [authStep, setAuthStep] = useState('pin');
+  const [authed, setAuthed] = useState(false);
+  const [totpEnrolled, setTotpEnrolled] = useState(null);
+  const [enrollQr, setEnrollQr] = useState('');
+  const [enrollSecret, setEnrollSecret] = useState('');
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -7278,6 +7317,8 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     is_category: false,
   });
 
+  const activeTotp = totpCode.replace(/\D/g, '').slice(0, 6);
+
   const rowStatus = (r) => normalizeSvcStatus(r);
   const statusColor = (st) => (st === 'active' ? C.grn : st === 'paused' ? C.gold : C.dim);
 
@@ -7291,41 +7332,113 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
 
   const cards = ['all', ...Array.from(new Set(rows.map(r => r.card)))];
 
-  const load = useCallback(async (usePin) => {
+  const load = useCallback(async (usePin, useTotp) => {
     setLoading(true); setErr('');
     try {
-      const { rows: data } = await pricingAdminFetch(usePin);
+      const { rows: data } = await pricingAdminFetch(usePin, useTotp);
       setRows(data || []);
       setMsg(`Loaded ${data?.length || 0} services`);
     } catch (e) {
-      setErr(e.message || 'Could not load pricing');
-      setAuthed(false);
+      if (e.totpRequired) {
+        setAuthStep('totp');
+        setAuthed(false);
+        setErr('Enter the 6-digit code from your authenticator app');
+      } else {
+        setErr(e.message || 'Could not load pricing');
+        setAuthed(false);
+        setAuthStep('pin');
+      }
       sessionStorage.removeItem(PRICING_AUTH_KEY);
     } finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (hubPin) { setPin(hubPin); setAuthed(true); }
+    if (hubPin) setPin(hubPin);
   }, [hubPin]);
 
   useEffect(() => {
-    if (authed && pin) load(pin);
-  }, [authed, pin, load]);
+    const savedPin = hubPin || savedAuth?.pin || sessionStorage.getItem(PRICING_PIN_KEY);
+    if (!savedPin) return;
+    (async () => {
+      try {
+        const status = await pricingAdminTotp(savedPin, 'totp_status');
+        setPin(savedPin);
+        setTotpEnrolled(!!status.enrolled);
+        if (status.enrolled) {
+          setAuthStep('totp');
+          setMsg('Enter your authenticator code to continue');
+        }
+      } catch { /* pin invalid or offline — stay on pin step */ }
+    })();
+  }, [hubPin]);
 
-  const login = async () => {
+  useEffect(() => {
+    if (authed && pin && authStep === 'done' && activeTotp.length === 6) load(pin, activeTotp);
+  }, [authed, authStep]);
+
+  const startEnroll = async (usePin) => {
+    const data = await pricingAdminTotp(usePin, 'totp_enroll');
+    setEnrollSecret(data.secret || '');
+    if (data.otpauth_uri) {
+      const qr = await QRCode.toDataURL(data.otpauth_uri, { margin: 1, width: 200 });
+      setEnrollQr(qr);
+    }
+    setAuthStep('enroll');
+  };
+
+  const submitPin = async () => {
     if (!pin) { setErr('Enter your PIN'); return; }
     setLoading(true); setErr('');
     try {
-      const { rows: data } = await pricingAdminFetch(pin);
+      const status = await pricingAdminTotp(pin, 'totp_status');
+      setTotpEnrolled(!!status.enrolled);
       sessionStorage.setItem(PRICING_PIN_KEY, pin);
-      setPricingAuth(pin);
-      setRows(data || []);
-      setAuthed(true);
-      setMsg(`Loaded ${data?.length || 0} services`);
+      setPricingAuth(pin, false);
+      if (!status.enrolled) {
+        await startEnroll(pin);
+        setMsg('Set up two-factor authentication to continue');
+      } else {
+        setAuthStep('totp');
+        setMsg('Enter the 6-digit code from Microsoft Authenticator (or Google Authenticator / Authy)');
+      }
     } catch {
       setErr('Incorrect PIN — set it in Supabase: npx supabase secrets set PRICING_ADMIN_PIN=YourPin');
-      setAuthed(false);
-      sessionStorage.removeItem(PRICING_AUTH_KEY);
+      setAuthStep('pin');
+    } finally { setLoading(false); }
+  };
+
+  const submitTotp = async () => {
+    if (activeTotp.length !== 6) { setErr('Enter the 6-digit authenticator code'); return; }
+    setLoading(true); setErr('');
+    try {
+      await pricingAdminTotp(pin, 'totp_verify', {}, activeTotp);
+      const { rows: data } = await pricingAdminFetch(pin, activeTotp);
+      setPricingAuth(pin, true);
+      setRows(data || []);
+      setAuthed(true);
+      setAuthStep('done');
+      setMsg(`Loaded ${data?.length || 0} services`);
+    } catch (e) {
+      setErr(e.message || 'Invalid authenticator code');
+    } finally { setLoading(false); }
+  };
+
+  const confirmEnroll = async () => {
+    if (activeTotp.length !== 6) { setErr('Enter the 6-digit code from your authenticator app'); return; }
+    setLoading(true); setErr('');
+    try {
+      await pricingAdminTotp(pin, 'totp_confirm', { code: activeTotp }, activeTotp);
+      setPricingAuth(pin, true);
+      setTotpEnrolled(true);
+      const { rows: data } = await pricingAdminFetch(pin, activeTotp);
+      setRows(data || []);
+      setAuthed(true);
+      setAuthStep('done');
+      setEnrollQr('');
+      setEnrollSecret('');
+      setMsg(`Two-factor enabled · loaded ${data?.length || 0} services`);
+    } catch (e) {
+      setErr(e.message || 'Could not confirm authenticator — try again');
     } finally { setLoading(false); }
   };
 
@@ -7337,7 +7450,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const saveAll = async () => {
     setSaving(true); setErr(''); setMsg('');
     try {
-      await pricingAdminSave(pin, rows);
+      await pricingAdminSave(pin, rows, activeTotp);
       await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Saved ${rows.length} rows — live on site now`);
     } catch (e) {
@@ -7348,7 +7461,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const saveOne = async (idx) => {
     setSaving(true); setErr('');
     try {
-      await pricingAdminSave(pin, [rows[idx]]);
+      await pricingAdminSave(pin, [rows[idx]], activeTotp);
       await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Saved ${rows[idx].service_name}`);
     } catch (e) {
@@ -7364,7 +7477,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     if (!window.confirm(`Remove this ${kind} "${label}" from the live catalog? (Sets Inactive — reactivate from Status.)`)) return;
     setSaving(true); setErr('');
     try {
-      await pricingAdminRemove(pin, r.service_id);
+      await pricingAdminRemove(pin, r.service_id, activeTotp);
       setRows(prev => prev.map((row, i) => i === idx ? { ...row, service_status: 'inactive', active: false } : row));
       await fetchCatalogFromDb(onPricesUpdated);
       setMsg(`Removed ${kind} "${label}" — hidden from catalog`);
@@ -7397,9 +7510,9 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
         icon: addForm.icon || '✨',
         service_status: addForm.service_status || 'active',
         is_category: !!addForm.is_category,
-      });
+      }, activeTotp);
       await fetchCatalogFromDb(onPricesUpdated);
-      await load(pin);
+      await load(pin, activeTotp);
       setShowAdd(false);
       setAddForm(f => ({ ...f, service_name: '', service_id: '', sub_service_name: '', new_amount_rupees: '', card: f.is_category ? '' : f.card }));
       setMsg(`Added ${created?.[0]?.service_name || addForm.service_name} — live on ${addForm.is_category ? 'home cards' : 'sub-cards & booking'}`);
@@ -7412,22 +7525,86 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   const td = { padding:'6px 8px', borderBottom:`1px solid ${C.bdr}`, fontSize:11, verticalAlign:'middle' };
   const inp = { width:72, padding:'4px 6px', borderRadius:6, border:BDR, background:C.bg, color:C.txt, fontSize:11, fontFamily:FF };
 
-  if (!authed && !embedded) {
+  const lock = () => {
+    sessionStorage.removeItem(PRICING_AUTH_KEY);
+    setAuthed(false);
+    setAuthStep('pin');
+    setTotpCode('');
+    setEnrollQr('');
+    setEnrollSecret('');
+    setRows([]);
+  };
+
+  if (!authed) {
+    const cardStyle = { ...S.card(), maxWidth: embedded ? '100%' : 400, width: '100%', padding: 24 };
+    const wrapStyle = embedded
+      ? { padding: 0, fontFamily: FF }
+      : { minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 };
     return (
-      <div style={{ minHeight:'100vh', background:C.bg, fontFamily:FF, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-        <div style={{ ...S.card(), maxWidth:360, width:'100%', padding:24 }}>
-          <div style={{ fontSize:11, color:C.red, fontWeight:700, letterSpacing:1, marginBottom:8 }}>CONFIDENTIAL</div>
-          <div style={{ fontSize:20, fontWeight:800, color:C.txt, marginBottom:6 }}>ScanV Pricing Input</div>
-          <div style={{ fontSize:12, color:C.sub, marginBottom:20, lineHeight:1.5 }}>Leader-only. Not linked in the app. Enter your private PIN to edit service amounts and partner splits.</div>
-          <Field label="Private PIN">
-            <input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()} style={S.inp()} placeholder="••••••••" autoComplete="off"/>
-          </Field>
-          {err && <div style={{ color:C.red, fontSize:12, marginBottom:12 }}>{err}</div>}
-          <Btn full onClick={login} disabled={!pin}>Unlock pricing table</Btn>
-          <div style={{ marginTop:16, fontSize:11, color:C.dim, textAlign:'center' }}>
-            Bookmark: <code style={{ color:C.acc }}>{APP_URL}/#pricing-admin</code>
-          </div>
-          <CopyrightLine style={{ marginTop: 12 }} />
+      <div style={wrapStyle}>
+        <div style={cardStyle}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>CONFIDENTIAL · 2FA</div>
+          <div style={{ fontSize: embedded ? 18 : 20, fontWeight: 800, color: C.txt, marginBottom: 6 }}>ScanV Pricing Input</div>
+
+          {authStep === 'pin' && (
+            <>
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+                Leader-only. Step 1: private PIN. Step 2: authenticator app (Microsoft Authenticator, Google Authenticator, or Authy).
+              </div>
+              <Field label="Private PIN">
+                <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitPin()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 12 }}>{msg}</div>}
+              <Btn full onClick={submitPin} disabled={!pin || loading}>{loading ? 'Checking…' : 'Continue →'}</Btn>
+            </>
+          )}
+
+          {authStep === 'totp' && (
+            <>
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+                Open <strong>Microsoft Authenticator</strong> (or Google Authenticator / Authy) and enter the 6-digit code for <em>ScanV Pricing Admin</em>.
+              </div>
+              <Field label="Authenticator code">
+                <input inputMode="numeric" pattern="[0-9]*" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && submitTotp()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 12 }}>{msg}</div>}
+              <Btn full onClick={submitTotp} disabled={activeTotp.length !== 6 || loading}>{loading ? 'Verifying…' : 'Verify & unlock'}</Btn>
+              <Btn v="ghost" full onClick={() => { setAuthStep('pin'); setTotpCode(''); setErr(''); }} style={{ marginTop: 8 }}>← Back to PIN</Btn>
+            </>
+          )}
+
+          {authStep === 'enroll' && (
+            <>
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.5 }}>
+                First-time setup: scan this QR in <strong>Microsoft Authenticator</strong> → Add account → Scan QR code.
+              </div>
+              {enrollQr ? (
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                  <img src={enrollQr} alt="Scan with Microsoft Authenticator" style={{ width: 200, height: 200, borderRadius: 12, border: BDR }} />
+                </div>
+              ) : null}
+              {enrollSecret ? (
+                <div style={{ fontSize: 10, color: C.dim, wordBreak: 'break-all', marginBottom: 12, padding: 10, background: C.deep, borderRadius: 8 }}>
+                  Manual key: <code style={{ color: C.acc }}>{enrollSecret}</code>
+                </div>
+              ) : null}
+              <Field label="Enter code from app to confirm">
+                <input inputMode="numeric" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && confirmEnroll()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 12 }}>{msg}</div>}
+              <Btn full onClick={confirmEnroll} disabled={activeTotp.length !== 6 || loading}>{loading ? 'Enabling…' : 'Enable 2FA & unlock'}</Btn>
+            </>
+          )}
+
+          {!embedded && (
+            <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+              Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#pricing-admin</code>
+            </div>
+          )}
+          {!embedded && <CopyrightLine style={{ marginTop: 12 }} />}
         </div>
       </div>
     );
@@ -7449,9 +7626,9 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
             <div style={{ fontSize:18, fontWeight:800, color:C.txt }}>ScanV Pricing Input</div>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <Btn v="outline" sm onClick={()=>load(pin)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
+            <Btn v="outline" sm onClick={()=>load(pin, activeTotp)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
             <Btn sm onClick={saveAll} disabled={saving||!rows.length}>{saving?'Saving…':'Save all & go live'}</Btn>
-            <Btn v="ghost" sm onClick={()=>{ sessionStorage.removeItem(PRICING_AUTH_KEY); setAuthed(false); }}>Lock</Btn>
+            <Btn v="ghost" sm onClick={lock}>Lock</Btn>
           </div>
         </div>
         {msg && <div style={{ color:C.grn, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{msg}</div>}
