@@ -2399,7 +2399,7 @@ function CategoryListBody({ categoryId, onSelect }) {
   const accent = SVC_CARD_THEME[categoryId]?.b2 || C.acc;
   const pills = [['all', 'All', accent, C.surf], ...cfg.themeOrder.map(k => [k, cfg.themes[k].label, cfg.themes[k].color, cfg.themes[k].bg])];
   return (
-    <div style={{ padding: '14px 16px 24px', flex: 1, overflowY: 'auto' }}>
+    <div style={{ padding: '14px 16px 24px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
         {pills.map(([k, l, col, bg]) => (
           <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
@@ -2522,20 +2522,24 @@ function captureFreshGps(fallbackGeo = null) {
 /** Fixed browse header — sticky breaks on mobile when inner panels scroll */
 const BROWSE_HDR_PAD = 'calc(12px + env(safe-area-inset-top, 0px))';
 const BROWSE_HDR_H = 'calc(52px + env(safe-area-inset-top, 0px))';
+const BROWSE_NAV_BOTTOM = 'calc(68px + env(safe-area-inset-bottom, 0px))';
 const BROWSE_FIXED_HDR = {
   position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
-  background: C.surf, borderBottom: BDR, padding: `12px 16px`, paddingTop: BROWSE_HDR_PAD,
+  background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
   display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
 };
 const BROWSE_HDR_SPACER = { height: BROWSE_HDR_H, flexShrink: 0 };
-/** @deprecated use BROWSE_FIXED_HDR + BROWSE_HDR_SPACER */
-const BROWSE_STICKY_HDR = BROWSE_FIXED_HDR;
 
 function scrollBrowseTop(el) {
-  window.scrollTo(0, 0);
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-  if (el?.scrollTo) el.scrollTo(0, 0);
+  const run = () => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if (el?.scrollTo) el.scrollTo({ top: 0, left: 0 });
+    else if (el) el.scrollTop = 0;
+  };
+  run();
+  requestAnimationFrame(run);
 }
 
 function BrowseFixedHeader({ children, padX = 16 }) {
@@ -2544,6 +2548,40 @@ function BrowseFixedHeader({ children, padX = 16 }) {
       <div style={{ ...BROWSE_FIXED_HDR, paddingLeft: padX, paddingRight: padX }}>{children}</div>
       <div style={BROWSE_HDR_SPACER} aria-hidden="true" />
     </>
+  );
+}
+
+/** Viewport-locked category panel — header never scrolls; body scrolls internally.
+ *  Sticky/fixed fail when scroll is on a sibling or when an ancestor has overflow-x:hidden (iOS Safari). */
+function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, bottomOffset = BROWSE_NAV_BOTTOM, children }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
+      bottom: bottomOffset, display: 'flex', flexDirection: 'column', background: C.bg,
+      zIndex: 90, fontFamily: FF,
+    }}>
+      <div style={{
+        flexShrink: 0, background: C.surf, borderBottom: BDR,
+        padding: `12px ${padX}px`, paddingTop: BROWSE_HDR_PAD,
+        display: 'flex', alignItems: 'center', gap: 12,
+        boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
+      }}>
+        <button type="button" aria-label="Go back" onClick={onBack}
+          style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, padding: 0, flexShrink: 0, minWidth: 44, minHeight: 44, lineHeight: 1 }}>
+          ←
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>{title}</div>
+          {subtitle ? <div style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>{subtitle}</div> : null}
+        </div>
+      </div>
+      <div
+        ref={scrollRef}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -3043,6 +3081,26 @@ async function upsertCustomerProfile({
   return data;
 }
 
+/** Server-side profile save after OTP session — bypasses client RLS edge cases */
+async function saveCustomerProfileViaEdge(mob, profileFields, location) {
+  const r = await sb().functions.invoke('send-otp', {
+    body: {
+      mobile: normalizeMobileE164(mob),
+      action: 'register_profile',
+      profile: profileFields,
+      location: location || null,
+    },
+  });
+  const errMsg = await edgeFnErrorMessageAsync(r);
+  if (r.error || r.data?.success === false) {
+    throw new Error(errMsg || r.data?.error || 'Could not save profile');
+  }
+  const profile = r.data?.profile;
+  if (!profile?.id) throw new Error('Profile save returned no data');
+  localStorage.setItem('scanv_uid', profile.id);
+  return profile;
+}
+
 /* ================================================================
    QR CODE GENERATOR COMPONENT
 ================================================================ */
@@ -3265,14 +3323,17 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   // Update address fields when GPS arrives
   useEffect(()=>{
-    if (silentGeo) {
-      const flags = {};
-      if (silentGeo.address) { setAddress(a=>{ if (!a) flags.address = true; return a||silentGeo.address||''; }); }
-      if (silentGeo.village) { setVillage(v=>{ if (!v) flags.village = true; return v||silentGeo.village||''; }); }
-      if (silentGeo.city) { setCity(c=>{ if (!c) flags.city = true; return c||silentGeo.city||'Pune'; }); }
-      if (silentGeo.pincode) { setPincode(p=>{ if (!p) flags.pincode = true; return p||silentGeo.pincode||''; }); }
-      if (Object.keys(flags).length) markAuto(flags);
-    }
+    if (!silentGeo) return;
+    setAddress(a=>a||silentGeo.address||'');
+    setVillage(v=>v||silentGeo.village||'');
+    setCity(c=>c||silentGeo.city||'Pune');
+    setPincode(p=>p||silentGeo.pincode||'');
+    markAuto(autoFlagsFromValues({
+      address: silentGeo.address,
+      village: silentGeo.village,
+      city: silentGeo.city,
+      pincode: silentGeo.pincode,
+    }));
   },[silentGeo, markAuto]);
 
   useEffect(() => {
@@ -3678,16 +3739,22 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const searching = !!search.trim();
 
   const openBrowseSvc = (s) => {
-    if (SUB_CATEGORIES[s.id]) { setActiveSvc(s); setScreen(`${s.id}-list`); scrollBrowseTop(); return; }
+    if (SUB_CATEGORIES[s.id]) {
+      setActiveSvc(s);
+      setScreen(`${s.id}-list`);
+      requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current));
+      return;
+    }
     setActiveSvc(s);
     setScreen('detail');
-    scrollBrowseTop();
+    requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current));
   };
 
   const openSubSvc = (catId, svc) => {
     const cfg = SUB_CATEGORIES[catId];
     setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
     setScreen('detail');
+    requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current));
   };
 
   const openBrowseTopRatedSvc = (svc) => {
@@ -3705,16 +3772,23 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
   if (listCatId && SUB_CATEGORIES[listCatId]) {
     const cfg = SUB_CATEGORIES[listCatId];
-    return browseWrap(
+    return (
       <>
-        <BrowseFixedHeader>
-          <button type="button" aria-label="Go back" onClick={()=>{ setScreen('services'); scrollBrowseTop(); }} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0,flexShrink:0}}>←</button>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
-            <div style={{fontSize:11,color:C.dim,fontWeight:600}}>{cfg.subtitle}</div>
-          </div>
-        </BrowseFixedHeader>
-        <CategoryListBody categoryId={listCatId} onSelect={(svc)=>openSubSvc(listCatId, svc)} />
+        <BrowseCategoryShell
+          scrollRef={browseScrollRef}
+          title={cfg.title}
+          subtitle={cfg.subtitle}
+          onBack={() => { setScreen('services'); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
+        >
+          <CategoryListBody categoryId={listCatId} onSelect={(svc) => openSubSvc(listCatId, svc)} />
+        </BrowseCategoryShell>
+        <GuestBottomNav
+          activeTab={guestActiveTab}
+          onHome={goBrowseHome}
+          onTopRated={goBrowseTopRated}
+          onBookings={goBrowseBookings}
+          onProfile={goBrowseProfile}
+        />
       </>
     );
   }
@@ -4108,6 +4182,14 @@ function RegistrationFlow({ onComplete, prefill }) {
     pincode:prefill?.geo?.pincode||'',
     gender:'',
   });
+  const regAuto = useAutoFillFields(autoFlagsFromValues({
+    address: prefill?.geo?.address,
+    village: prefill?.geo?.village,
+    city: prefill?.geo?.city,
+    state: prefill?.geo?.state,
+    pincode: prefill?.geo?.pincode,
+  }));
+  const { markAuto: markRegAuto, inpStyle: regInpStyle, bind: regBind } = regAuto;
   const [digits, setDigits] = useState(['','','','','','']);
   const [cd, setCd]         = useState(0);
   const [loading, setLoading] = useState(false);
@@ -4134,6 +4216,7 @@ function RegistrationFlow({ onComplete, prefill }) {
           city: p.city||ipGeo.city||'Pune',
           state: p.state||ipGeo.region||'Maharashtra',
         }));
+        markRegAuto({ city: true, state: true });
       }
     } catch(e) { /* silent fail */ }
 
@@ -4276,29 +4359,69 @@ function RegistrationFlow({ onComplete, prefill }) {
     try {
       await ensureProfileAuthSession(mob);
       const resolvedId = await resolveCustomerProfileId(mob);
-      const profile = await upsertCustomerProfile({
+      const device = dev || detectDevice();
+      const ipAddr = ip || await getIP();
+      const profileFields = {
         id: resolvedId,
-        mob,
-        firstName: form.firstName,
-        lastName: form.lastName,
+        email: profileAuthEmail(mob),
+        name: `${form.firstName} ${form.lastName}`.trim(),
+        first_name: (form.firstName || '').trim(),
+        last_name: (form.lastName || '').trim(),
+        phone: mob,
+        address: form.address || '',
+        village: form.village || '',
+        city: form.city || '',
+        pincode: form.pincode || '',
+        ip_address: ipAddr,
+        last_lat: geo?.lat ?? null,
+        last_lng: geo?.lng ?? null,
+        device_type: device.deviceType,
+        os_name: device.osName,
+        browser: device.browser,
+        timezone: device.timezone,
+        language: device.language,
+        mobile_verified: true,
+        mobile_verified_at: new Date().toISOString(),
+        role: 'customer',
+        status: 'active',
+        avatar: '👤',
+      };
+      const location = geo?.lat != null && geo?.lng != null ? {
+        lat: geo.lat,
+        lng: geo.lng,
         address: form.address,
         village: form.village,
         city: form.city,
         pincode: form.pincode,
-        email: profileAuthEmail(mob),
-        lastLat: geo?.lat,
-        lastLng: geo?.lng,
-        dev,
-        ip,
-      });
-
-      await sb().from('user_locations').insert({
-        user_id: profile.id, lat:geo?.lat||null, lng:geo?.lng||null,
-        address:form.address, village:form.village, city:form.city,
-        state:form.state, pincode:form.pincode, ip_address:ip||await getIP(),
-        source:geo?.source||'manual', consent_given:true,
-        consent_at:new Date().toISOString(), is_primary:true,
-      }).then(()=>{});
+        source: geo?.source || 'gps',
+      } : null;
+      let profile;
+      try {
+        profile = await saveCustomerProfileViaEdge(mob, profileFields, location);
+      } catch (edgeErr) {
+        profile = await upsertCustomerProfile({
+          id: resolvedId,
+          mob,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          address: form.address,
+          village: form.village,
+          city: form.city,
+          pincode: form.pincode,
+          email: profileAuthEmail(mob),
+          lastLat: geo?.lat,
+          lastLng: geo?.lng,
+          dev,
+          ip,
+        });
+        if (location) {
+          await sb().from('user_locations').insert({
+            user_id: profile.id, ...location,
+            consent_given: true,
+            consent_at: new Date().toISOString(),
+          }).then(() => {});
+        }
+      }
 
       if (sessionId) {
         await sb().from('visitor_sessions').update({
@@ -4430,11 +4553,11 @@ function RegistrationFlow({ onComplete, prefill }) {
         </div>
       </Field>
 
-      <Field label="Address" note="House no, street, area"><input value={form.address} onChange={e=>f('address',e.target.value)} placeholder="House no, street, area" style={S.inp()}/></Field>
-      <Field label="Village / Area" note="e.g. Pimpri, Wakad, Chinchwad"><input value={form.village} onChange={e=>f('village',e.target.value)} placeholder="Pimpri, Wakad…" style={S.inp()}/></Field>
+      <Field label="Address" note="House no, street, area"><input value={form.address} {...regBind('address', e=>f('address',e.target.value))} placeholder="House no, street, area" style={regInpStyle('address')}/></Field>
+      <Field label="Village / Area" note="e.g. Pimpri, Wakad, Chinchwad"><input value={form.village} {...regBind('village', e=>f('village',e.target.value))} placeholder="Pimpri, Wakad…" style={regInpStyle('village')}/></Field>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <Field label="City" req><input value={form.city} onChange={e=>f('city',e.target.value)} placeholder="Pune" style={S.inp()}/></Field>
-        <Field label="PIN code" req><input type="tel" maxLength={6} value={form.pincode} onChange={e=>f('pincode',e.target.value)} placeholder="411018" style={S.inp()}/></Field>
+        <Field label="City" req><input value={form.city} {...regBind('city', e=>f('city',e.target.value))} placeholder="Pune" style={regInpStyle('city')}/></Field>
+        <Field label="PIN code" req><input type="tel" maxLength={6} value={form.pincode} {...regBind('pincode', e=>f('pincode',e.target.value))} placeholder="411018" style={regInpStyle('pincode')}/></Field>
       </div>
 
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:11,color:C.dim}}>
@@ -4753,7 +4876,7 @@ function ServicesScreen() {
   const searching = !!search.trim();
 
   useEffect(() => {
-    scrollBrowseTop(scrollRef.current);
+    requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
   }, [subListCat, detail]);
 
   useEffect(()=>{
@@ -4769,38 +4892,42 @@ function ServicesScreen() {
   };
 
   const openCategory = (s) => {
-    if (SUB_CATEGORIES[s.id]) { setSubListCat(s.id); scrollBrowseTop(scrollRef.current); return; }
+    if (SUB_CATEGORIES[s.id]) {
+      setSubListCat(s.id);
+      requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
+      return;
+    }
     setDetail(s);
-    scrollBrowseTop(scrollRef.current);
+    requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
   };
 
   if (subListCat && SUB_CATEGORIES[subListCat]) {
     const cfg = SUB_CATEGORIES[subListCat];
     return (
-      <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
-        <BrowseFixedHeader padX={20}>
-          <button type="button" aria-label="Go back" onClick={()=>{ setSubListCat(null); scrollBrowseTop(scrollRef.current); }} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
-            <div style={{fontSize:11,color:C.dim}}>{cfg.subtitle}</div>
-          </div>
-        </BrowseFixedHeader>
-        <CategoryListBody categoryId={subListCat} onSelect={(svc)=>openSubSvc(subListCat, svc)} />
-      </div>
+      <BrowseCategoryShell
+        scrollRef={scrollRef}
+        padX={20}
+        title={cfg.title}
+        subtitle={cfg.subtitle}
+        onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
+      >
+        <CategoryListBody categoryId={subListCat} onSelect={(svc) => openSubSvc(subListCat, svc)} />
+      </BrowseCategoryShell>
     );
   }
 
-  if(detail) {
-    const d = detail.desc ? detail : (SVC_DETAIL[detail.id]||{});
+  if (detail) {
+    const d = detail.desc ? detail : (SVC_DETAIL[detail.id] || {});
     const parentCat = subCatId(detail);
     const isSubSvc = !!parentCat && !!detail.parent;
     return (
-      <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>setDetail(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
-        </div>
-        <div style={{padding:16}}>
+      <BrowseCategoryShell
+        scrollRef={scrollRef}
+        padX={20}
+        title={detail.name}
+        onBack={() => { setDetail(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
+      >
+        <div style={{ padding: 16 }}>
           {isSubSvc && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} categoryId={subCatId(detail)} height={160} /></div>}
           <div style={{background:`linear-gradient(135deg,${C.deep},${C.card})`,borderRadius:16,padding:24,textAlign:'center',marginBottom:16,border:`1px solid ${C.bdr}`}}>
             {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={detail.theme} /></div>}
@@ -4833,7 +4960,7 @@ function ServicesScreen() {
             setScreen('book');
           }}>Book now →</Btn>
         </div>
-      </div>
+      </BrowseCategoryShell>
     );
   }
 
@@ -4890,6 +5017,17 @@ function BookScreen() {
   const [bookAddress,setBookAddress]=useState(user?.address||'');
   const [bookCity,setBookCity]=useState(user?.city||'');
   const [bookPincode,setBookPincode]=useState(user?.pincode||'');
+  const initialLoc = [user?.village, user?.city, user?.pincode].filter(Boolean).join(', ') || '';
+  const bookAuto = useAutoFillFields(autoFlagsFromValues({
+    firstName: user?.first_name,
+    lastName: user?.last_name,
+    phone: user?.phone?.replace(/^\+91/, ''),
+    address: user?.address,
+    city: user?.city,
+    pincode: user?.pincode,
+    loc: initialLoc,
+  }));
+  const { markAuto: markBookAuto, inpStyle: bookInpStyle, bind: bookBind } = bookAuto;
   const [bookLat,setBookLat]=useState(user?.last_lat||silentGeo?.lat||null);
   const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
   const svc=activeSvc;
