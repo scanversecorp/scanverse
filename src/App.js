@@ -11081,6 +11081,123 @@ function AdminDispatchModePanel({ pin, onSaved }) {
   );
 }
 
+function AdminPricing2faResetPanel({ pin, onMsg, onErr }) {
+  const [status, setStatus] = useState(null);
+  const [step, setStep] = useState('idle');
+  const [otp, setOtp] = useState('');
+  const [channel, setChannel] = useState('sms');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true);
+    setErr('');
+    try {
+      const data = await adminHubFetch('pricing_2fa_status', {}, pin);
+      setStatus(data);
+      if (!data.enrolled) setStep('idle');
+    } catch (e) {
+      setErr(e.message);
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [pin]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const sendResetOtp = async () => {
+    setBusy(true); setErr('');
+    try {
+      const data = await adminHubFetch('pricing_2fa_reset_send', {}, pin);
+      setChannel(data.channel || 'sms');
+      setStep('otp');
+      setOtp('');
+      onMsg?.(data.channel === 'voice'
+        ? `Reset code — answer call to ${data.owner_mobile_masked}`
+        : `Reset code sent to ${data.owner_mobile_masked}`);
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally { setBusy(false); }
+  };
+
+  const confirmReset = async () => {
+    const code = otp.replace(/\D/g, '');
+    if (code.length !== 6) { setErr('Enter the 6-digit code'); return; }
+    setBusy(true); setErr('');
+    try {
+      const data = await adminHubFetch('pricing_2fa_reset_confirm', { otp: code }, pin);
+      sessionStorage.removeItem(PRICING_AUTH_KEY);
+      setStep('done');
+      setOtp('');
+      onMsg?.(data.message || 'Pricing 2FA reset — enroll a new authenticator on next login');
+      load();
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally { setBusy(false); }
+  };
+
+  if (loading) return <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}><Spin size={20} /></div>;
+
+  return (
+    <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}44` }}>
+      <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 4 }}>Pricing admin — reset authenticator (2FA)</div>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 12, lineHeight: 1.55 }}>
+        Lost Microsoft Authenticator access? Owner-only recovery: hub PIN + SMS/voice OTP to <code style={{ color: C.acc }}>PRICING_2FA_RESET_MOBILE</code>.
+        Requires <strong>ADMIN_HUB_PIN</strong> or <strong>SUPPORT_ADMIN_PIN</strong> (not pricing PIN alone).
+      </div>
+
+      {!status?.owner_configured && (
+        <div style={{ fontSize: 12, color: C.gold, marginBottom: 12, padding: 10, background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
+          Set owner phone first: <code>npx supabase secrets set PRICING_2FA_RESET_MOBILE=98XXXXXXXX</code>
+        </div>
+      )}
+
+      {status?.enrolled ? (
+        <>
+          <div style={{ fontSize: 12, color: C.grn, marginBottom: 10, fontWeight: 600 }}>● Authenticator enrolled</div>
+          {step === 'idle' && (
+            <Btn v="outline" onClick={sendResetOtp} disabled={busy || !status?.owner_configured}>
+              {busy ? 'Sending…' : `Send reset code${status?.owner_mobile_masked ? ` to ${status.owner_mobile_masked}` : ''}`}
+            </Btn>
+          )}
+          {step === 'otp' && (
+            <>
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 10 }}>
+                {channel === 'voice' ? 'Answer the incoming call and enter the 6-digit code.' : 'Enter the SMS code sent to the owner number.'}
+              </div>
+              <Field label="Reset code">
+                <input inputMode="numeric" maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && confirmReset()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                <Btn onClick={confirmReset} disabled={busy || otp.replace(/\D/g, '').length !== 6}>{busy ? 'Resetting…' : 'Confirm reset 2FA'}</Btn>
+                <Btn v="ghost" onClick={() => { setStep('idle'); setOtp(''); setErr(''); }} disabled={busy}>Cancel</Btn>
+                <Btn v="outline" sm onClick={sendResetOtp} disabled={busy}>Resend code</Btn>
+              </div>
+            </>
+          )}
+          {step === 'done' && (
+            <>
+              <div style={{ fontSize: 12, color: C.grn, lineHeight: 1.6, marginBottom: 10 }}>
+                2FA cleared. Open Pricing Admin with your PIN and scan a new QR in Microsoft Authenticator.
+              </div>
+              <AdminDeepLinkBtn hash="pricing-admin" label="Open Pricing admin →" />
+            </>
+          )}
+        </>
+      ) : (
+        <div style={{ fontSize: 12, color: C.dim }}>No pricing authenticator enrolled yet.</div>
+      )}
+
+      {err && <div style={{ color: C.red, fontSize: 12, marginTop: 10 }}>{err}</div>}
+    </div>
+  );
+}
+
 function AdminSupportQuickSearch({ pin }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
@@ -11596,6 +11713,7 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'pricing' && (
           <div>
+            <AdminPricing2faResetPanel pin={usePin} onMsg={setMsg} onErr={setErr} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 13, color: C.sub }}>Edit service prices and partner splits. Same PIN works if set as PRICING_ADMIN_PIN.</div>
               <AdminDeepLinkBtn hash="pricing-admin" label="Open full page →" />
@@ -11710,15 +11828,17 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'settings' && (
           <div>
+            <AdminPricing2faResetPanel pin={usePin} onMsg={setMsg} onErr={setErr} />
             <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>PIN and secrets checklist (values not shown — set in Supabase secrets only).</div>
             <div style={{ ...S.card(), padding: 16, marginBottom: 12 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Admin PIN secrets</div>
               {[
                 ['ADMIN_HUB_PIN', 'Dedicated hub PIN (optional — falls back to other admin PINs)'],
-                ['SUPPORT_ADMIN_PIN', 'Support desk admin + agent management'],
+                ['SUPPORT_ADMIN_PIN', 'Support desk admin + agent management + pricing 2FA reset'],
                 ['SUPPORT_AGENT_PIN', 'Read-only support desk (not hub access)'],
-                ['PRICING_ADMIN_PIN', 'Pricing admin + hub access'],
+                ['PRICING_ADMIN_PIN', 'Pricing admin + hub access (cannot reset 2FA alone)'],
                 ['VENDOR_ADMIN_PIN', 'Vendor admin + hub access'],
+                ['PRICING_2FA_RESET_MOBILE', 'Owner mobile for pricing 2FA reset OTP (10 digits, e.g. 8484850288)'],
               ].map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.bdr}`, fontSize: 12 }}>
                   <code style={{ color: C.acc }}>{key}</code>
@@ -11729,6 +11849,7 @@ function AdminControlCenter({ onPricesUpdated }) {
             <div style={{ ...S.card(), padding: 16 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Deploy checklist</div>
               <pre style={{ fontSize: 11, color: C.sub, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.6 }}>{`npx supabase secrets set ADMIN_HUB_PIN=YourHubPin123
+npx supabase secrets set PRICING_2FA_RESET_MOBILE=8484850288
 npx supabase functions deploy admin-hub --no-verify-jwt
 npx supabase functions deploy customer-support --no-verify-jwt
 npx supabase functions deploy support-tickets --no-verify-jwt

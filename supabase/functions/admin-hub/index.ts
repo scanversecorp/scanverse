@@ -19,6 +19,9 @@
  *   get_platform_settings — { keys? } dispatch_mode etc.
  *   update_platform_setting — { key, value, updated_by? }
  *   gps_status_report — { audience?, date_from?, date_to?, search?, status_filter? }
+ *   pricing_2fa_status — { enrolled, owner_configured, owner_mobile_masked }
+ *   pricing_2fa_reset_send — SMS/voice OTP to PRICING_2FA_RESET_MOBILE (exec PIN only)
+ *   pricing_2fa_reset_confirm — { otp } clears pricing admin TOTP enrollment
  *
  * Auth: x-admin-pin header
  *   ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN
@@ -37,6 +40,12 @@ import {
   respondInvestmentRequest,
 } from "../_shared/investments-admin.ts";
 import { gpsStatusReport, runDailyGpsCheck } from "../_shared/gps-status-admin.ts";
+import {
+  normalizeMobile,
+  hashOtp,
+  generateOtp,
+  sendOtpDelivery,
+} from "../_shared/notify.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -729,6 +738,108 @@ async function updatePlatformSetting(
   return json({ success: true, setting: data });
 }
 
+const PRICING_TOTP_SECRET_KEY = "pricing_admin_totp_secret";
+const PRICING_TOTP_PENDING_KEY = "pricing_admin_totp_pending";
+const PRICING_2FA_RESET_PURPOSE = "pricing_2fa_reset";
+
+function ownerResetMobile(): string | null {
+  const raw = Deno.env.get("PRICING_2FA_RESET_MOBILE")
+    || Deno.env.get("ADMIN_OWNER_MOBILE")
+    || "";
+  return normalizeMobile(String(raw).trim());
+}
+
+function maskMobile10(mobile: string): string {
+  const d = mobile.replace(/\D/g, "").slice(-10);
+  return d.length === 10 ? `******${d.slice(-4)}` : "**********";
+}
+
+async function pricing2faStatus(sb: ReturnType<typeof adminSb>): Promise<Response> {
+  const { data } = await sb.from("platform_settings").select("value").eq("key", PRICING_TOTP_SECRET_KEY).maybeSingle();
+  const enrolled = !!String(data?.value || "").trim();
+  const owner = ownerResetMobile();
+  return json({
+    enrolled,
+    owner_configured: !!owner,
+    owner_mobile_masked: owner ? maskMobile10(owner) : null,
+  });
+}
+
+async function pricing2faResetSend(sb: ReturnType<typeof adminSb>): Promise<Response> {
+  const owner = ownerResetMobile();
+  if (!owner) {
+    return json({
+      error: "Set PRICING_2FA_RESET_MOBILE in Supabase secrets (owner phone for 2FA reset)",
+    }, 503);
+  }
+
+  const { data: enrolledRow } = await sb.from("platform_settings").select("value").eq("key", PRICING_TOTP_SECRET_KEY).maybeSingle();
+  if (!String(enrolledRow?.value || "").trim()) {
+    return json({ error: "Pricing admin 2FA is not enrolled — nothing to reset" }, 400);
+  }
+
+  const otp = generateOtp();
+  const otpHash = await hashOtp(otp);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const { error: insertErr } = await sb.from("vendor_otp").insert({
+    mobile: owner,
+    otp_hash: otpHash,
+    purpose: PRICING_2FA_RESET_PURPOSE,
+    expires_at: expiresAt,
+  });
+  if (insertErr) return json({ error: insertErr.message }, 500);
+
+  const message = `ScanV Admin: pricing 2FA reset code ${otp}. Valid 10 min. Do not share.`;
+  const delivery = await sendOtpDelivery(owner, otp, message);
+  const devMode = !delivery.ok && Deno.env.get("OTP_DEV_MODE") === "1";
+  if (!delivery.ok && !devMode) {
+    return json({ success: false, error: delivery.error || "Could not send reset OTP" }, 502);
+  }
+
+  return json({
+    success: true,
+    owner_mobile_masked: maskMobile10(owner),
+    channel: delivery.channel || "sms",
+    provider: delivery.provider || (devMode ? "dev" : undefined),
+    ...(devMode ? { dev_otp: otp } : {}),
+  });
+}
+
+async function pricing2faResetConfirm(
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const owner = ownerResetMobile();
+  if (!owner) return json({ error: "Owner mobile not configured" }, 503);
+
+  const otp = String(body.otp || "").replace(/\D/g, "");
+  if (otp.length !== 6) return json({ error: "Enter 6-digit OTP" }, 400);
+
+  const otpHash = await hashOtp(otp);
+  const { data: row } = await sb
+    .from("vendor_otp")
+    .select("id")
+    .eq("mobile", owner)
+    .eq("otp_hash", otpHash)
+    .eq("purpose", PRICING_2FA_RESET_PURPOSE)
+    .eq("verified", false)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!row?.id) return json({ error: "Invalid or expired reset code" }, 401);
+
+  await sb.from("vendor_otp").update({ verified: true }).eq("id", row.id);
+  await sb.from("platform_settings").delete().eq("key", PRICING_TOTP_SECRET_KEY);
+  await sb.from("platform_settings").delete().eq("key", PRICING_TOTP_PENDING_KEY);
+
+  return json({
+    success: true,
+    message: "Pricing admin 2FA reset — open Pricing Admin and scan a new authenticator QR",
+  });
+}
+
 const REFUND_STATUSES = new Set([
   "refund_pending",
   "processing",
@@ -980,6 +1091,16 @@ Deno.serve(async (req) => {
     }
     if (action === "exec_stats") return execStats(sb);
     return execCharts(sb);
+  }
+
+  if (action === "pricing_2fa_status" || action === "pricing_2fa_reset_send" || action === "pricing_2fa_reset_confirm") {
+    const execRole = resolveExecRole(req);
+    if (!execRole) {
+      return json({ error: "Reset pricing 2FA requires ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN" }, 403);
+    }
+    if (action === "pricing_2fa_status") return pricing2faStatus(sb);
+    if (action === "pricing_2fa_reset_send") return pricing2faResetSend(sb);
+    return pricing2faResetConfirm(sb, body);
   }
 
   return json({ error: "Unknown action" }, 400);
