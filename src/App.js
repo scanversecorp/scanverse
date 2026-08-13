@@ -2481,10 +2481,33 @@ function captureFreshGps(fallbackGeo = null) {
   });
 }
 
-const BROWSE_STICKY_HDR = {
-  background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
-  boxShadow: '0 3px 14px rgba(18,18,18,0.08)', position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
+/** Fixed browse header — sticky breaks on mobile when inner panels scroll */
+const BROWSE_HDR_PAD = 'calc(12px + env(safe-area-inset-top, 0px))';
+const BROWSE_HDR_H = 'calc(52px + env(safe-area-inset-top, 0px))';
+const BROWSE_FIXED_HDR = {
+  position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
+  background: C.surf, borderBottom: BDR, padding: `12px 16px`, paddingTop: BROWSE_HDR_PAD,
+  display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
 };
+const BROWSE_HDR_SPACER = { height: BROWSE_HDR_H, flexShrink: 0 };
+/** @deprecated use BROWSE_FIXED_HDR + BROWSE_HDR_SPACER */
+const BROWSE_STICKY_HDR = BROWSE_FIXED_HDR;
+
+function scrollBrowseTop(el) {
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  if (el?.scrollTo) el.scrollTo(0, 0);
+}
+
+function BrowseFixedHeader({ children, padX = 16 }) {
+  return (
+    <>
+      <div style={{ ...BROWSE_FIXED_HDR, paddingLeft: padX, paddingRight: padX }}>{children}</div>
+      <div style={BROWSE_HDR_SPACER} aria-hidden="true" />
+    </>
+  );
+}
 
 function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }) {
   const tabs = [
@@ -2973,7 +2996,10 @@ async function upsertCustomerProfile({
     status: 'active',
     avatar: '👤',
   };
-  const { data, error } = await sb().from('profiles').upsert(row, { onConflict: 'id' }).select().single();
+  const { data: existing } = await sb().from('profiles').select('id').eq('id', id).maybeSingle();
+  const { data, error } = existing
+    ? await sb().from('profiles').update(row).eq('id', id).select().single()
+    : await sb().from('profiles').insert(row).select().single();
   if (error) throw error;
   localStorage.setItem('scanv_uid', data.id);
   return data;
@@ -3144,6 +3170,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     { serviceId: activeSvc?.id, serviceName: activeSvc?.name },
   );
   const creatingRef = useRef(false);
+
+  useEffect(() => {
+    if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop();
+  }, [screen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3585,9 +3615,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const searching = !!search.trim();
 
   const openBrowseSvc = (s) => {
-    if (SUB_CATEGORIES[s.id]) { setActiveSvc(s); setScreen(`${s.id}-list`); return; }
+    if (SUB_CATEGORIES[s.id]) { setActiveSvc(s); setScreen(`${s.id}-list`); scrollBrowseTop(); return; }
     setActiveSvc(s);
     setScreen('detail');
+    scrollBrowseTop();
   };
 
   const openSubSvc = (catId, svc) => {
@@ -3613,13 +3644,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     const cfg = SUB_CATEGORIES[listCatId];
     return browseWrap(
       <>
-        <div style={BROWSE_STICKY_HDR}>
-          <button type="button" aria-label="Go back" onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0,flexShrink:0}}>←</button>
+        <BrowseFixedHeader>
+          <button type="button" aria-label="Go back" onClick={()=>{ setScreen('services'); scrollBrowseTop(); }} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,padding:0,flexShrink:0}}>←</button>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
             <div style={{fontSize:11,color:C.dim,fontWeight:600}}>{cfg.subtitle}</div>
           </div>
-        </div>
+        </BrowseFixedHeader>
         <CategoryListBody categoryId={listCatId} onSelect={(svc)=>openSubSvc(listCatId, svc)} />
       </>
     );
@@ -3938,10 +3969,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       : 'Enter mobile + SMS OTP to sign in. We capture your GPS location to show nearby services — same as sign-up.';
     return browseWrap(
       <>
-        <div style={BROWSE_STICKY_HDR}>
+        <BrowseFixedHeader>
           <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
-        </div>
+        </BrowseFixedHeader>
         <div style={{padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
@@ -4653,9 +4684,14 @@ function ServicesScreen() {
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [subListCat,setSubListCat]=useState(null);
+  const scrollRef = useRef(null);
   const searchResult = searchAllServices(search);
   const { categories: list, ...searchSubs } = searchResult;
   const searching = !!search.trim();
+
+  useEffect(() => {
+    scrollBrowseTop(scrollRef.current);
+  }, [subListCat, detail]);
 
   useEffect(()=>{
     if (activeSvc && SUB_CATEGORIES[activeSvc.id] && !detail) setSubListCat(activeSvc.id);
@@ -4666,24 +4702,26 @@ function ServicesScreen() {
     setActiveSvc({ ...svc, cat: cfg?.cat || svc.cat, cash: false });
     setDetail(svc);
     setSubListCat(null);
+    scrollBrowseTop(scrollRef.current);
   };
 
   const openCategory = (s) => {
-    if (SUB_CATEGORIES[s.id]) { setSubListCat(s.id); return; }
+    if (SUB_CATEGORIES[s.id]) { setSubListCat(s.id); scrollBrowseTop(scrollRef.current); return; }
     setDetail(s);
+    scrollBrowseTop(scrollRef.current);
   };
 
   if (subListCat && SUB_CATEGORIES[subListCat]) {
     const cfg = SUB_CATEGORIES[subListCat];
     return (
-      <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
-        <div style={{...BROWSE_STICKY_HDR, padding:'12px 20px'}}>
-          <button type="button" aria-label="Go back" onClick={()=>setSubListCat(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
+      <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+        <BrowseFixedHeader padX={20}>
+          <button type="button" aria-label="Go back" onClick={()=>{ setSubListCat(null); scrollBrowseTop(scrollRef.current); }} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:800,color:C.txt}}>{cfg.title}</div>
             <div style={{fontSize:11,color:C.dim}}>{cfg.subtitle}</div>
           </div>
-        </div>
+        </BrowseFixedHeader>
         <CategoryListBody categoryId={subListCat} onSelect={(svc)=>openSubSvc(subListCat, svc)} />
       </div>
     );
@@ -4694,7 +4732,7 @@ function ServicesScreen() {
     const parentCat = subCatId(detail);
     const isSubSvc = !!parentCat && !!detail.parent;
     return (
-      <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+      <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
           <button onClick={()=>setDetail(null)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>{detail.name}</div>
@@ -4737,7 +4775,7 @@ function ServicesScreen() {
   }
 
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="Home"/>
       <div style={{padding:16}}>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:16}}>
