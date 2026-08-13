@@ -3100,6 +3100,25 @@ const APP_SHELL = {
   boxSizing: 'border-box',
   fontFamily: FF,
 };
+/** Full-page admin / desk layouts — sticky header + scrollable body (Safari-safe). */
+const ADMIN_PAGE_SHELL = {
+  height: '100dvh',
+  maxHeight: '100dvh',
+  minHeight: '100dvh',
+  background: C.bg,
+  fontFamily: FF,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  width: '100%',
+};
+const ADMIN_PAGE_SCROLL = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  overscrollBehavior: 'contain',
+};
 /** Scrollable main column — flex child keeps bottom nav visible in iOS Safari (fixed/sticky break inside overflow:hidden). */
 const APP_MAIN = {
   flex: 1,
@@ -8608,7 +8627,7 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, o
         <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>Showing {filtered.length} of {rows.length} · column filters apply instantly</div>
       </div>
       <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'min(70vh, 720px)' }}>
           <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 2400, width: '100%' }}>
             <thead>
               <tr>
@@ -11473,7 +11492,7 @@ function AdminGpsStatusTab({ pin }) {
       {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
 
       <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'min(65vh, 640px)', overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
             <thead>
               <tr style={{ position: 'sticky', top: 0, background: C.surf, zIndex: 1 }}>
@@ -12472,7 +12491,8 @@ function AdminControlCenter({ onPricesUpdated }) {
 
   if (!authed) {
     return (
-      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={ADMIN_PAGE_SHELL}>
+        <div style={{ ...ADMIN_PAGE_SCROLL, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         <div style={{ ...S.card(), maxWidth: 400, width: '100%', padding: 24 }}>
           <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER ONLY · CONFIDENTIAL</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Admin Control Center</div>
@@ -12489,13 +12509,14 @@ function AdminControlCenter({ onPricesUpdated }) {
           </div>
           <CopyrightLine style={{ marginTop: 12 }} />
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 2px 12px rgba(18,18,18,0.06)' }}>
+    <div style={ADMIN_PAGE_SHELL}>
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', flexShrink: 0, zIndex: 20, boxShadow: '0 2px 12px rgba(18,18,18,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1200, margin: '0 auto' }}>
           <div>
             <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 1 }}>ADMIN CONTROL CENTER</div>
@@ -12514,6 +12535,7 @@ function AdminControlCenter({ onPricesUpdated }) {
         {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8, maxWidth: 1200, margin: '8px auto 0' }}>{err}</div>}
       </div>
 
+      <div style={ADMIN_PAGE_SCROLL}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
         {tab === 'overview' && (
           <div>
@@ -12657,6 +12679,16 @@ function AdminControlCenter({ onPricesUpdated }) {
               ))}
             </div>
             <div style={{ ...S.card(), padding: 16, marginTop: 14 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Backup & recovery</div>
+              <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.7, marginBottom: 10 }}>
+                Run <code style={{ color: C.acc }}>./scripts/backup-db.sh</code> before major migrations. Full runbook: <code style={{ color: C.acc }}>docs/BACKUP-AND-SCALE.md</code>
+              </div>
+              <a href="https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/settings/addons" target="_blank" rel="noreferrer" style={{ ...S.card(), padding: 12, textDecoration: 'none', display: 'block', marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, color: C.acc, fontSize: 13 }}>Supabase backups & PITR ↗</div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Enable Pro daily backups before live customers</div>
+              </a>
+            </div>
+            <div style={{ ...S.card(), padding: 16, marginTop: 14 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Migrations applied</div>
               <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.8 }}>
                 20260811000000_wa_verifications · 20260811000001_wa_verifications_outbound · 20260811000002_payment_intents · 20260811000003_service_pricing · 20260812000004_sub_services_pricing · 20260812000005_fill_grid_pricing · 20260812000006_vendors_and_dispatch · 20260812000007_live_tracking_and_vehicle_pricing · 20260812000008_dispatch_cron · 20260812000009_vendor_live_locations_rls · 20260812000010_pricing_realtime_vehicle_cards · 20260812000011_customer_support_roles · 20260812000012_support_tickets · 20260812000013_support_ticket_comment_internal · 20260812000014_payer_vpa
@@ -12697,7 +12729,8 @@ npx supabase db push`}</pre>
           </div>
         )}
       </div>
-      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
+      <CopyrightLine style={{ padding: '16px' }} />
+      </div>
     </div>
   );
 }

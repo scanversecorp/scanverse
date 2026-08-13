@@ -37,7 +37,7 @@ Session stored in `sessionStorage` for 24 hours (same pattern as other admin pag
 | **Vendors & Dispatch** | Dispatch stats + links to `#vendor-admin`, `#vendor-onboard` |
 | **Bookings & Payments** | Search bookings by status/TXN; list payment intents |
 | **OTP Delivery** | 2Factor SMS delivery reports + callback URL |
-| **Go-Live** | Critical runtime switches (on/off), Supabase secret status, deploy commands |
+| **Go-Live** | Critical runtime switches (on/off), Supabase secret status, vendor toggles, manual checklist, deploy commands — see [BACKUP-AND-SCALE.md](./BACKUP-AND-SCALE.md) for DR |
 | **Database / App** | Links to Supabase dashboard, Vercel, key tables, migration list |
 | **Settings** | PIN secrets checklist (read-only, no values shown) |
 

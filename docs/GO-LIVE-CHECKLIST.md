@@ -136,7 +136,20 @@ Run this once on a physical device before announcing go-live:
 
 ---
 
-## I. Optional (not blocking web launch)
+## I. Backup & disaster recovery
+
+See full runbook: [BACKUP-AND-SCALE.md](./BACKUP-AND-SCALE.md)
+
+- [ ] Supabase **Pro** plan with **daily backups** enabled (Dashboard → Settings → Database → Backups)
+- [ ] Manual dump tested: `./scripts/backup-db.sh` → file in `backups/` (store off-site, encrypted)
+- [ ] **Restore drill** completed — backup restored to branch/local DB; bookings + payment_intents row counts verified
+- [ ] Secrets inventory exported to owner-local file (not in git) — [SECRETS-AND-PINS-INVENTORY.md](./SECRETS-AND-PINS-INVENTORY.md)
+
+Tick these in Admin → **Go-Live** → Manual checklist (section **I. Backup & DR**).
+
+---
+
+## J. Optional (not blocking web launch)
 
 - [ ] Custom domain (e.g. `app.scanv.com`) pointed to Vercel
 - [ ] Google Play Store listing (Capacitor) — [APP-STORE-ROADMAP.md](./APP-STORE-ROADMAP.md)

@@ -43,6 +43,8 @@ export const GO_LIVE_CHECK_KEYS = new Set([
   "go_live_check_e2e_otp",
   "go_live_check_e2e_payment",
   "go_live_check_e2e_track",
+  "go_live_check_supabase_pro_backups",
+  "go_live_check_db_restore_drill",
 ]);
 
 type ManualCheckDef = {
@@ -86,6 +88,8 @@ export const GO_LIVE_MANUAL_CHECKS: ManualCheckDef[] = [
   { key: "go_live_check_e2e_otp", category: "H. End-to-end smoke", functions: "send-otp", description: "Booking → Send OTP → SMS → verify", required: true },
   { key: "go_live_check_e2e_payment", category: "H. End-to-end smoke", functions: "UPI · Razorpay", description: "Pay via UPI or Razorpay — auto-confirmed", required: true },
   { key: "go_live_check_e2e_track", category: "H. End-to-end smoke", functions: "LiveTrack", description: "Track screen shows booking; visible in admin/dispatch", required: true },
+  { key: "go_live_check_supabase_pro_backups", category: "I. Backup & DR", functions: "Supabase", description: "Supabase Pro plan with daily backups enabled (Settings → Database → Backups)", required: true },
+  { key: "go_live_check_db_restore_drill", category: "I. Backup & DR", functions: "Postgres", description: "Restore drill completed — dump restored and bookings/payments verified (docs/BACKUP-AND-SCALE.md)", required: true },
 ];
 
 const SECRET_CHECKS: Array<{
@@ -371,6 +375,7 @@ export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, 
       "git push origin main",
       "npx supabase db push",
       "npx supabase functions deploy admin-hub send-otp razorpay-payment booking-dispatch vendor-onboard otp-delivery-report whatsapp-verify platform-config --no-verify-jwt",
+      "./scripts/backup-db.sh   # before major DB changes",
     ],
     docs: {
       go_live_checklist: "docs/GO-LIVE-CHECKLIST.md",
