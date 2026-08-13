@@ -13,6 +13,9 @@
 | Legacy (wrong app) | https://scanverse.vercel.app | Old QR scanner — **not ScanV** |
 | QR landing | https://scanv-tau.vercel.app?qr=1 | Print QR campaigns |
 | Corporate site | https://www.dcoreglobal.com | DCORE Global Corporation |
+| Parent engineering | https://www.vanguardnode.com | VanguardNode (Wix) |
+| Beauty brand | https://www.richroyalscorp.com | Rich Royals Corp (Wix) |
+| Redesign plan (internal) | docs/GROUP-REDESIGN-PLAN.md | Site audit + parallel workstreams |
 
 ---
 
