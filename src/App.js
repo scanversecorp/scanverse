@@ -7538,9 +7538,29 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     } finally { setSaving(false); }
   };
 
-  const th = { padding:'8px 10px', textAlign:'left', fontSize:10, fontWeight:700, color:C.sub, borderBottom:BDR, whiteSpace:'nowrap', background:C.surf, position:'sticky', top:0, zIndex:2 };
+  const th = { padding:'8px 10px', textAlign:'left', fontSize:10, fontWeight:700, color:C.sub, borderBottom:BDR, whiteSpace:'nowrap', background:C.surf, position:'sticky', top:0, zIndex:3 };
   const td = { padding:'6px 8px', borderBottom:`1px solid ${C.bdr}`, fontSize:11, verticalAlign:'middle' };
   const inp = { width:72, padding:'4px 6px', borderRadius:6, border:BDR, background:C.bg, color:C.txt, fontSize:11, fontFamily:FF };
+  const shellStyle = embedded
+    ? { background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column', maxHeight: 'min(72vh, 720px)' }
+    : { height: '100dvh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column', overflow: 'hidden' };
+  const toolbarStyle = {
+    flexShrink: 0,
+    background: C.surf,
+    borderBottom: BDR,
+    boxShadow: '0 2px 12px rgba(18,18,18,0.06)',
+    ...(embedded ? { position: 'sticky', top: 0, zIndex: 20 } : {}),
+  };
+  const scrollBodyStyle = {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    maxWidth: 1400,
+    margin: '0 auto',
+    padding: embedded ? '0' : '0 16px 16px',
+    width: '100%',
+  };
 
   const lock = () => {
     sessionStorage.removeItem(PRICING_AUTH_KEY);
@@ -7634,43 +7654,51 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
   });
 
   return (
-    <div style={{ minHeight: embedded ? 'auto' : '100vh', background:C.bg, fontFamily:FF, display: embedded ? undefined : 'flex', flexDirection: embedded ? undefined : 'column' }}>
-      {!embedded && (
-      <div style={{ background:C.surf, borderBottom:BDR, padding:'12px 16px', position:'sticky', top:0, zIndex:10, boxShadow:'0 2px 12px rgba(18,18,18,0.06)' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, maxWidth:1400, margin:'0 auto' }}>
-          <div>
-            <div style={{ fontSize:10, color:C.red, fontWeight:700, letterSpacing:1 }}>CONFIDENTIAL · PRICING</div>
-            <div style={{ fontSize:18, fontWeight:800, color:C.txt }}>ScanV Pricing Input</div>
+    <div style={shellStyle}>
+      <div style={toolbarStyle}>
+        {!embedded && (
+        <div style={{ padding:'12px 16px', maxWidth:1400, margin:'0 auto' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+            <div>
+              <div style={{ fontSize:10, color:C.red, fontWeight:700, letterSpacing:1 }}>CONFIDENTIAL · PRICING</div>
+              <div style={{ fontSize:18, fontWeight:800, color:C.txt }}>ScanV Pricing Input</div>
+            </div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <Btn v="outline" sm onClick={()=>load(pin)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
+              <Btn sm onClick={saveAll} disabled={saving||!rows.length}>{saving?'Saving…':'Save all & go live'}</Btn>
+              <Btn v="ghost" sm onClick={lock}>Lock</Btn>
+            </div>
+          </div>
+          {msg && <div style={{ color:C.grn, fontSize:12, marginTop:8 }}>{msg}</div>}
+          {err && <div style={{ color:C.red, fontSize:12, marginTop:8 }}>{err}</div>}
+        </div>
+        )}
+        <div style={{ padding: embedded ? '0 0 12px' : '0 16px 12px', maxWidth:1400, margin:'0 auto' }}>
+          {embedded && (msg || err) && (
+            <div style={{ marginBottom: 8 }}>
+              {msg && <div style={{ color:C.grn, fontSize:12 }}>{msg}</div>}
+              {err && <div style={{ color:C.red, fontSize:12, marginTop: msg ? 4 : 0 }}>{err}</div>}
+            </div>
+          )}
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10, alignItems:'center' }}>
+            {cards.map(c => (
+              <button key={c} onClick={()=>setFilter(c)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${filter===c?C.acc:C.bdr}`, background:filter===c?`${C.acc}18`:C.surf, color:filter===c?C.acc:C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF }}>
+                {c === 'all' ? 'All cards' : c}
+              </button>
+            ))}
+            <Btn v="outline" sm onClick={()=>setShowAdd(v=>!v)}>{showAdd ? 'Cancel add' : '+ Add card / service'}</Btn>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <Btn v="outline" sm onClick={()=>load(pin)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
-            <Btn sm onClick={saveAll} disabled={saving||!rows.length}>{saving?'Saving…':'Save all & go live'}</Btn>
-            <Btn v="ghost" sm onClick={lock}>Lock</Btn>
+            {['all', 'active', 'inactive', 'paused'].map(st => (
+              <button key={st} onClick={()=>setStatusFilter(st)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${statusFilter===st?statusColor(st === 'all' ? 'active' : st):C.bdr}`, background:statusFilter===st?`${statusColor(st === 'all' ? 'active' : st)}18`:C.surf, color:statusFilter===st?statusColor(st === 'all' ? 'active' : st):C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF, textTransform:'capitalize' }}>
+                {st === 'all' ? 'All status' : st}
+              </button>
+            ))}
           </div>
         </div>
-        {msg && <div style={{ color:C.grn, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{msg}</div>}
-        {err && <div style={{ color:C.red, fontSize:12, marginTop:8, maxWidth:1400, margin:'8px auto 0' }}>{err}</div>}
       </div>
-      )}
 
-      <div style={{ maxWidth:1400, margin:'0 auto', padding: embedded ? '0' : '16px' }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14, alignItems:'center' }}>
-          {cards.map(c => (
-            <button key={c} onClick={()=>setFilter(c)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${filter===c?C.acc:C.bdr}`, background:filter===c?`${C.acc}18`:C.surf, color:filter===c?C.acc:C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF }}>
-              {c === 'all' ? 'All cards' : c}
-            </button>
-          ))}
-          <Btn v="outline" sm onClick={()=>setShowAdd(v=>!v)}>{showAdd ? 'Cancel add' : '+ Add card / service'}</Btn>
-        </div>
-
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
-          {['all', 'active', 'inactive', 'paused'].map(st => (
-            <button key={st} onClick={()=>setStatusFilter(st)} style={{ padding:'6px 12px', borderRadius:20, border:`1.5px solid ${statusFilter===st?statusColor(st === 'all' ? 'active' : st):C.bdr}`, background:statusFilter===st?`${statusColor(st === 'all' ? 'active' : st)}18`:C.surf, color:statusFilter===st?statusColor(st === 'all' ? 'active' : st):C.sub, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FF, textTransform:'capitalize' }}>
-              {st === 'all' ? 'All status' : st}
-            </button>
-          ))}
-        </div>
-
+      <div style={scrollBodyStyle}>
         {showAdd && (
           <div style={{ ...S.card(), padding:16, marginBottom:14 }}>
             <div style={{ fontSize:14, fontWeight:800, color:C.txt, marginBottom:12 }}>Add to catalog</div>
@@ -7747,7 +7775,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           </div>
         )}
 
-        <div style={{ ...S.card(), padding:0, overflow:'auto', maxHeight:'calc(100vh - 180px)' }}>
+        <div style={{ ...S.card(), padding:0, marginTop: embedded ? 0 : 12 }}>
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1200 }}>
             <thead>
               <tr>
@@ -7800,7 +7828,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
           <strong>Status:</strong> Active = visible on home, sub-cards & booking. Inactive = removed (soft delete). Paused = temporarily hidden. Use <strong>+ Add card / service</strong> for new home category cards or sub-services. <strong>Remove</strong> sets Inactive for that card or sub-service — reactivate from Status. Change <strong>New ₹</strong> for live prices. Set <strong>Top Rated</strong> for the Top Rated tab. Click <strong>Save all & go live</strong> after bulk edits.
         </div>
       </div>
-      {!embedded && <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />}
+      {!embedded && <CopyrightLine style={{ flexShrink: 0, padding: '12px 16px' }} />}
     </div>
   );
 }
