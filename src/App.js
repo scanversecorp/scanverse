@@ -25,7 +25,7 @@ const HDFC_VYAPAR_MERCHANT_ID = '82037575';
 const HDFC_VYAPAR_QR_PATH = '/hdfc-vyapar-qr.png';
 const ASSIST   = '+91-9270194842';
 const LOCAL_COMMUNITIES = 'Local Communities';
-const INCORPORATION_ORIGIN = 'Made in India · Designed & developed with Incorporation, San Francisco, California, USA';
+const INCORPORATION_ORIGIN = 'Made in India · Designed & Developed with Incorporation, San Francisco, California, USA';
 
 const UPI_PACKAGES = {
   GPay: 'com.google.android.apps.nbu.paisa.user',
@@ -3050,18 +3050,15 @@ const BROWSE_SCROLL_BODY = {
 const BROWSE_WRAP_SHELL = { ...APP_SHELL };
 const TRUST_PILLS_ROW = {
   display: 'flex',
-  flexWrap: 'nowrap',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 4,
+  rowGap: 6,
   width: '100%',
   boxSizing: 'border-box',
   margin: 0,
   padding: '8px 10px 10px',
   borderTop: BDR,
-  overflowX: 'auto',
-  WebkitOverflowScrolling: 'touch',
-  scrollbarWidth: 'none',
-  msOverflowStyle: 'none',
 };
 const TRUST_PILL = {
   fontSize: 8,
@@ -3231,7 +3228,7 @@ function runTrustCommitmentAction(action, { setScreen, goBrowseHome }) {
   }
 }
 
-function TrustCommitmentBody({ pageKey, onAction }) {
+function TrustCommitmentBody({ pageKey, onAction, showCopyright = true }) {
   const pg = TRUST_COMMITMENT_PAGES[pageKey];
   if (!pg) return null;
   return (
@@ -3272,6 +3269,7 @@ function TrustCommitmentBody({ pageKey, onAction }) {
         </div>
       ) : null}
       <AssistBanner />
+      {showCopyright ? <CopyrightLine style={{ padding: '12px 0 0' }} /> : null}
     </>
   );
 }
@@ -3281,10 +3279,10 @@ function TrustCommitmentScreen({ pageKey }) {
   const pg = TRUST_COMMITMENT_PAGES[pageKey];
   if (!pg) return null;
   return (
-    <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF }}>
+    <div style={{ fontFamily: FF }}>
       <TopBar title={pg.title} back="services" />
       <div style={{ padding: 16 }}>
-        <TrustCommitmentBody pageKey={pageKey} onAction={(action) => runTrustCommitmentAction(action, { setScreen })} />
+        <TrustCommitmentBody pageKey={pageKey} showCopyright={false} onAction={(action) => runTrustCommitmentAction(action, { setScreen })} />
       </div>
     </div>
   );
@@ -3348,6 +3346,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         {children}
+        <CopyrightLine style={{ padding: '12px 16px 24px' }} />
       </div>
     </div>
   );
@@ -4575,7 +4574,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           {content}
         </div>
         {sticky}
-        <CopyrightLine style={{ padding: '6px 16px 8px', flexShrink: 0 }} />
       </div>
       <GuestBottomNav
         activeTab={guestActiveTab}
@@ -4657,7 +4655,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     <>
       <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)',flexShrink:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
-        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||LOCAL_COMMUNITIES} {silentGeo?.pincode||''}</div>
+        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
+        </div>
       </div>
       <div style={{ ...BROWSE_HOME_STACK, marginTop: 12, flexShrink: 0 }}>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
@@ -4669,7 +4669,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
           <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', overflow: 'hidden', padding: 0 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0 }}>
           <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
             <span>🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
@@ -4702,6 +4702,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
           <FooterLegalLinks small current={null}/>
         </div>
+        <CopyrightLine style={{ padding: '0 0 8px' }} />
       </div>
     </>
   );
@@ -4766,6 +4767,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           </div>
         )}
         <AssistBanner />
+        <CopyrightLine style={{ padding: '12px 0 0' }} />
       </div>
     </>
   );
@@ -5770,7 +5772,7 @@ function TopRatedScreen() {
   };
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF }}>
+    <div style={{ fontFamily: FF }}>
       <TopBar title="Top Rated" />
       <div style={{ padding: 16 }}>
         {items.length ? (
@@ -5911,7 +5913,7 @@ function ServicesScreen() {
   }
 
   return (
-    <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div ref={scrollRef} style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="Home"/>
       <div style={{padding:16}}>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
@@ -9706,7 +9708,7 @@ function FaqPage() {
     ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). You will see basic status, subject, and resolution note when closed.'],
     ['Can I change or cancel a booking?', 'Yes — open Bookings or Track my service and tap Cancel booking on any confirmed or in-progress order. You will see a breakdown: 30% cancellation fee (18% GST + 12% platform service of total paid) and 70% refund. See /refund for details.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
-    ['Who operates ScanV?', 'DCORE Global Corporation — a global marketplace connecting customers with independent service partners. Made in India; designed & developed with Incorporation, San Francisco, California, USA. Call +91-9270194842 for help.'],
+    ['Who operates ScanV?', `DCORE Global Corporation — a global marketplace connecting customers with independent service partners. ${INCORPORATION_ORIGIN}. Call +91-9270194842 for help.`],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
     ['How are partners assigned?', 'After payment, we offer the job to the 3 nearest active partners one-by-one in the ScanV app. SMS, call & WhatsApp are sent as backup. First partner to accept is assigned and live map tracking starts.'],
     ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Track progress at #track-ticket.'],
@@ -12332,7 +12334,7 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 All data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your data</p>
           </div>
           {[
-            ['Who We Are','ScanV is operated by DCORE Global Corporation. We connect customers with independent service providers across Local Communities worldwide. Made in India; designed & developed with Incorporation, San Francisco, California, USA. DPO: privacy@dcoreglobal.com'],
+            ['Who We Are',`ScanV is operated by DCORE Global Corporation. We connect customers with independent service providers across Local Communities worldwide. ${INCORPORATION_ORIGIN}. DPO: privacy@dcoreglobal.com`],
             ['Data We Collect','Identity (name), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city), Device (type, OS, browser, timezone, language, battery, canvas fingerprint), Booking details, and session behaviour. We do NOT collect Aadhaar, PAN, passport, card numbers, passwords, or biometrics.'],
             ['How We Use It','Verify identity via OTP before any booking · Match you with nearby service providers · Send booking updates · Process payments for GST compliance · Prevent fraud · Improve platform quality through anonymised analytics · Comply with Indian law'],
             ['Location Data','ScanV requests GPS when you open the app and when you book. Location is used only to show nearby services and enable delivery routing. IP-based location is used as fallback. We never sell location data to advertisers.'],
@@ -12798,11 +12800,9 @@ export default function App() {
         <Toast toasts={toasts}/>
         <PartnerGpsTracker />
         <div style={APP_SHELL}>
-          <div style={APP_MAIN}>
-            <div style={BROWSE_MAIN_INNER}>
-              <Boundary>{renderScreen()}</Boundary>
-            </div>
-            <CopyrightLine style={{ padding: '6px 16px 2px', flexShrink: 0 }} />
+          <div style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <Boundary>{renderScreen()}</Boundary>
+            <CopyrightLine style={{ padding: '6px 16px 24px' }} />
           </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>
