@@ -3155,7 +3155,7 @@ function handleOtpInputKeyDown(i, e, digits, idPrefix) {
   }
 }
 
-function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
+function OtpSentFooter({ mobile, onChangeNumber, onResend, loading, channel = 'sms' }) {
   const [cd, setCd] = useState(OTP_RESEND_COOLDOWN_SEC);
   const timerRef = useRef(null);
 
@@ -3173,9 +3173,13 @@ function OtpSentFooter({ mobile, onChangeNumber, onResend, loading }) {
     Promise.resolve(onResend?.()).then(() => setCd(OTP_RESEND_COOLDOWN_SEC));
   };
 
+  const sentLabel = channel === 'voice'
+    ? `📞 OTP call initiated to +91 ${mobile} — answer and listen for the 6-digit code`
+    : `✅ OTP sent to +91 ${mobile}`;
+
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ color: C.grn, fontSize: 12, marginBottom: 10, fontWeight: 700, textAlign: 'center' }}>✅ OTP sent to +91 {mobile}</div>
+      <div style={{ color: C.grn, fontSize: 12, marginBottom: 10, fontWeight: 700, textAlign: 'center' }}>{sentLabel}</div>
       <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
         <button type="button" onClick={onChangeNumber} style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Change number</button>
         <button type="button" onClick={handleResend} disabled={loading || cd > 0} style={{ background: 'none', border: 'none', color: cd > 0 ? C.dim : C.sub, fontSize: 12, fontWeight: 700, cursor: loading || cd > 0 ? 'not-allowed' : 'pointer', fontFamily: FF, opacity: loading ? 0.5 : cd > 0 ? 0.6 : 1 }}>
@@ -3193,7 +3197,9 @@ async function invokeSendOtp(mobile) {
   if (r.error || r.data?.success === false) {
     throw new Error(bodyErr || 'OTP service unavailable');
   }
-  if (r.data?.success || r.data?.provider) return { ...r.data, mobile: norm };
+  if (r.data?.success || r.data?.provider) {
+    return { ...r.data, mobile: norm, channel: r.data?.channel || 'sms' };
+  }
   throw new Error(bodyErr || 'OTP send failed — check number and try again');
 }
 
@@ -3682,6 +3688,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   }));
   const { markAuto, inpStyle, bind: browseBind } = browseAuto;
   const [otpSent, setOtpSent]     = useState(false);
+  const [otpChannel, setOtpChannel] = useState('sms');
   const [otpCode, setOtpCode]     = useState(['','','','','','']);
   const [otpTargetMobile, setOtpTargetMobile] = useState('');
   const [loading, setLoading]     = useState(false);
@@ -3796,6 +3803,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const resetOtpFlow = () => {
     setOtpSent(false);
+    setOtpChannel('sms');
     setOtpCode(emptyOtpDigits());
     setOtpTargetMobile('');
     setWaToken('');
@@ -3811,12 +3819,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     if (!localStorage.getItem('scanv_terms_accepted')) return setErr('Please accept Terms & Conditions to continue');
     setLoading(true); setErr('');
     try {
-      await invokeSendOtp(`+91${mobile}`);
+      const sent = await invokeSendOtp(`+91${mobile}`);
+      setOtpChannel(sent.channel || 'sms');
       setOtpSent(true);
       setOtpTargetMobile(mobile);
       setOtpCode(emptyOtpDigits());
       if (resend) setErr('');
-      addToast?.(resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`, 'success');
+      addToast?.(sent.channel === 'voice'
+        ? `Calling +91 ${mobile} with OTP`
+        : (resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`), 'success');
     } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
     finally { setLoading(false); }
   };
@@ -3939,12 +3950,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
     setLoading(true); setErr('');
     try {
-      await invokeSendOtp(`+91${mobile}`);
+      const sent = await invokeSendOtp(`+91${mobile}`);
+      setOtpChannel(sent.channel || 'sms');
       setOtpSent(true);
       setOtpTargetMobile(mobile);
       setOtpCode(emptyOtpDigits());
       if (resend) setErr('');
-      addToast?.(resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`, 'success');
+      addToast?.(sent.channel === 'voice'
+        ? `Calling +91 ${mobile} with OTP`
+        : (resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`), 'success');
     } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
     finally { setLoading(false); }
   };
@@ -4537,7 +4551,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendOTP(true)} loading={loading} />
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendOTP(true)} loading={loading} channel={otpChannel} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
@@ -4601,7 +4615,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           )}
           {verifyMethod==='sms'&&otpSent&&(
             <>
-              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} />
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} channel={otpChannel} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
                 {otpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
@@ -4765,18 +4779,11 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       setLoading(false);
       setPhase('otp'); setCd(OTP_RESEND_COOLDOWN_SEC); setDigits(['','','','','','']);
       setWaToken('');
-      // 2. Fire SMS via Edge Function in background
-      sb().functions.invoke('send-otp', { body: { mobile: mob } })
-        .then(r => {
-          if (r.data?.success) {
-            console.log('[OTP] Sent via', r.data.provider, '✓');
-          } else {
-            console.warn('[OTP]', r.data);
-            setErr('SMS could not be sent. Tap Resend OTP or check your number.');
-          }
-        })
-        .catch(e => { console.warn('[OTP]', e.message); setErr('SMS delivery failed. Tap Resend OTP.'); });
-      // 3. Try outbound WhatsApp verify in parallel (optional — SMS is primary)
+      const sent = await invokeSendOtp(mob);
+      if (sent.channel === 'voice') {
+        setErr('Answer the incoming call for your 6-digit OTP.');
+      }
+      // Try outbound WhatsApp verify in parallel (optional — SMS is primary)
       generateWAToken(mob)
         .then(data => {
           if (!data?.messageSent) return;
@@ -5545,6 +5552,7 @@ function BookScreen() {
   const [paymentAmountPaise,setPaymentAmountPaise]=useState(null);
   const [payMethod,setPayMethod]=useState(null);
   const [bookOtpSent,setBookOtpSent]=useState(false);
+  const [bookOtpChannel,setBookOtpChannel]=useState('sms');
   const [bookOtpCode,setBookOtpCode]=useState(['','','','','','']);
   const [bookOtpTarget,setBookOtpTarget]=useState('');
   const [bookOtpVerified,setBookOtpVerified]=useState(false);
@@ -5604,7 +5612,7 @@ function BookScreen() {
   }, []);
   const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setLoc(locStr);markBookAuto('loc');setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
 
-  const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
+  const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpChannel('sms');setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
   const sendBookOTP=async(resend=false)=>{
     if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
@@ -5615,11 +5623,12 @@ function BookScreen() {
     setLoading(true);
     try{
       const mob='+91'+bookPhone.replace(/\D/g,'');
-      await invokeSendOtp(mob);
+      const sent = await invokeSendOtp(mob);
+      setBookOtpChannel(sent.channel || 'sms');
       setBookOtpSent(true);
       setBookOtpTarget(bookPhone.replace(/\D/g,''));
       setBookOtpCode(emptyOtpDigits());
-      addToast(resend?'OTP resent to '+mob:'OTP sent to '+mob,'success');
+      addToast(sent.channel === 'voice' ? 'Calling '+mob+' with OTP' : (resend?'OTP resent to '+mob:'OTP sent to '+mob),'success');
     }catch(e){addToast(e.message||'Could not send OTP','error'); if(!resend) resetBookOtp();}
     finally{setLoading(false);}
   };
@@ -5868,7 +5877,7 @@ function BookScreen() {
           </div>
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
-              <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} />
+              <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} channel={bookOtpChannel} />
               <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
                 {bookOtpCode.map((d,i)=>(
                   <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
@@ -7659,6 +7668,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
             <>
               <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
                 Open <strong>Microsoft Authenticator</strong> (or Google Authenticator / Authy) and enter the 6-digit code for <em>ScanV Pricing Admin</em>.
+                <div style={{ marginTop: 8, fontSize: 11, color: C.dim }}>Pricing Admin does not send SMS — use your authenticator app only.</div>
               </div>
               <Field label="Authenticator code">
                 <input inputMode="numeric" pattern="[0-9]*" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && submitTotp()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />

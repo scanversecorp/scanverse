@@ -31,6 +31,90 @@ export function msg91AuthKey(): string | undefined {
   return Deno.env.get("MSG91_AUTH_KEY") || Deno.env.get("MSG91_WHATSAPP_AUTH_KEY");
 }
 
+function parse2FactorResponse(bodyText: string): { ok: boolean; ref?: string; error?: string } {
+  try {
+    const data = JSON.parse(bodyText);
+    const status = String(data?.Status || "").toLowerCase();
+    if (status === "success") {
+      const ref = data?.Details ? String(data.Details) : undefined;
+      return { ok: true, ref };
+    }
+    return { ok: false, error: String(data?.Details || data?.Status || bodyText || "2Factor failed") };
+  } catch {
+    if (/success/i.test(bodyText)) return { ok: true, ref: bodyText.trim().slice(0, 80) };
+    return { ok: false, error: bodyText || "2Factor failed" };
+  }
+}
+
+async function send2FactorOtpSms(
+  twoFactorKey: string,
+  norm: string,
+  otp: string,
+): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
+  const phone10 = mobileDigitsE164(norm).slice(-10);
+  const url = `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`;
+  const res = await fetch(url);
+  const bodyText = await res.text().catch(() => "");
+  const parsed = parse2FactorResponse(bodyText);
+  if (parsed.ok) return { ok: true, provider: "2factor", ref: parsed.ref };
+  return { ok: false, error: parsed.error || bodyText || "2Factor SMS failed" };
+}
+
+async function send2FactorOtpVoice(
+  twoFactorKey: string,
+  norm: string,
+  otp: string,
+): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
+  const phone10 = mobileDigitsE164(norm).slice(-10);
+  const url = `https://2factor.in/API/V1/${twoFactorKey}/VOICE/${phone10}/${otp}`;
+  const res = await fetch(url);
+  const bodyText = await res.text().catch(() => "");
+  const parsed = parse2FactorResponse(bodyText);
+  if (parsed.ok) return { ok: true, provider: "2factor-voice", ref: parsed.ref };
+  return { ok: false, error: parsed.error || bodyText || "2Factor voice failed" };
+}
+
+function msg91LooksSuccessful(data: unknown, bodyText: string): boolean {
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    const type = String(o.type || o.Type || "").toLowerCase();
+    if (type === "error" || type === "failure") return false;
+    if (o.message && /invalid|error|fail/i.test(String(o.message))) return false;
+    if (o.success === false) return false;
+  }
+  return !/invalid authkey|authentication fail|error/i.test(bodyText);
+}
+
+/** OTP delivery — prefers 2Factor.in for India (+91), voice fallback if SMS fails */
+export async function sendOtpDelivery(
+  mobile: string,
+  otpCode: string,
+  message: string,
+): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string; channel?: "sms" | "voice" }> {
+  const norm = normalizeMobile(mobile);
+  if (!norm) return { ok: false, error: "Invalid mobile" };
+
+  const twoFactorKey = Deno.env.get("TWOFACTOR_API_KEY");
+  if (twoFactorKey && norm.startsWith("+91")) {
+    const sms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
+    if (sms.ok) return { ...sms, channel: "sms" };
+    const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
+    if (voice.ok) return { ...voice, channel: "voice" };
+  }
+
+  const sms = await sendSms(mobile, message, otpCode);
+  if (sms.ok) return { ...sms, channel: "sms" };
+
+  if (twoFactorKey && !norm.startsWith("+91")) {
+    const tfSms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
+    if (tfSms.ok) return { ...tfSms, channel: "sms" };
+    const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
+    if (voice.ok) return { ...voice, channel: "voice" };
+  }
+
+  return { ok: false, error: sms.error || "OTP delivery failed — try Resend or WhatsApp verify" };
+}
+
 export async function sendSms(
   mobile: string,
   message: string,
@@ -64,14 +148,20 @@ export async function sendSms(
 
     if (res?.ok) {
       const data = await res.json().catch(() => ({}));
-      return { ok: true, provider: "msg91", ref: JSON.stringify(data).slice(0, 120) };
+      const bodyText = JSON.stringify(data);
+      if (msg91LooksSuccessful(data, bodyText)) {
+        return { ok: true, provider: "msg91", ref: bodyText.slice(0, 120) };
+      }
     }
 
     // MSG91 legacy route
     const legacy = await fetch(
       `https://api.msg91.com/api/sendhttp.php?authkey=${msg91Key}&mobiles=${mobileDigitsE164(norm)}&sender=${sender}&route=4&country=91&message=${encodeURIComponent(message)}`,
     ).catch(() => null);
-    if (legacy?.ok) return { ok: true, provider: "msg91-legacy" };
+    if (legacy?.ok) {
+      const legacyBody = await legacy.text().catch(() => "");
+      if (msg91LooksSuccessful(null, legacyBody)) return { ok: true, provider: "msg91-legacy" };
+    }
   }
 
   // Twilio SMS
@@ -119,18 +209,9 @@ export async function sendSms(
       const url = `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`;
       const res = await fetch(url);
       const bodyText = await res.text().catch(() => "");
-      if (res.ok) {
-        let ref: string | undefined;
-        try {
-          const data = JSON.parse(bodyText);
-          if (data?.Details) ref = String(data.Details);
-          else if (data?.SessionId) ref = String(data.SessionId);
-        } catch {
-          if (bodyText && bodyText.length < 80) ref = bodyText.trim();
-        }
-        return { ok: true, provider: "2factor", ref };
-      }
-      return { ok: false, error: bodyText || "2Factor SMS failed" };
+      const parsed = parse2FactorResponse(bodyText);
+      if (parsed.ok) return { ok: true, provider: "2factor", ref: parsed.ref };
+      return { ok: false, error: parsed.error || bodyText || "2Factor SMS failed" };
     }
     // Transactional SMS (booking alerts, not OTP)
     const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";

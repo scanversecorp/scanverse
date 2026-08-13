@@ -7,7 +7,7 @@ import {
   corsHeaders,
   json,
   normalizeMobile,
-  sendSms,
+  sendOtpDelivery,
   hashOtp,
   generateOtp,
 } from "../_shared/notify.ts";
@@ -629,7 +629,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const message = `ScanV OTP: ${otp}. Valid 10 min. Do not share.`;
-    const sms = await sendSms(mobile, message, otp);
+    const sms = await sendOtpDelivery(mobile, otp, message);
 
     if (sms.ref && otpRow?.id) {
       await supabase
@@ -647,6 +647,7 @@ Deno.serve(async (req: Request) => {
     return json({
       success: true,
       provider: sms.provider || "dev",
+      channel: sms.channel || "sms",
       ...(devMode ? { dev_otp: otp } : {}),
     });
   } catch (e) {

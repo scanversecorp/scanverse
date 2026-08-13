@@ -27,7 +27,7 @@ import {
   corsHeaders,
   json,
   normalizeMobile,
-  sendSms,
+  sendOtpDelivery,
   hashOtp,
   generateOtp,
   validatePan,
@@ -591,12 +591,12 @@ Deno.serve(async (req: Request) => {
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       });
 
-      const sms = await sendSms(mobile, `ScanV Partner OTP: ${otp}. Valid 10 min.`, otp);
+      const sms = await sendOtpDelivery(mobile, otp, `ScanV Partner OTP: ${otp}. Valid 10 min.`);
       const devMode = !sms.ok && Deno.env.get("OTP_DEV_MODE") === "1";
       if (!sms.ok && !devMode) {
         return json({ success: false, error: sms.error }, 502);
       }
-      return json({ success: true, provider: sms.provider || "dev", ...(devMode ? { dev_otp: otp } : {}) });
+      return json({ success: true, provider: sms.provider || "dev", channel: sms.channel || "sms", ...(devMode ? { dev_otp: otp } : {}) });
     }
 
     if (action === "verify-otp") {
