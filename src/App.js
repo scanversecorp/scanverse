@@ -2564,9 +2564,9 @@ const APP_CSS = `
   body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
   @media (min-width:481px){html,body{background:#e8e6e1}}
-  .scanv-shell{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;height:100%;min-height:100svh;min-height:-webkit-fill-available;max-height:100svh;background:${C.bg}}
+  .scanv-shell{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;height:100%;background:${C.bg}}
   @media (min-width:481px){.scanv-shell{height:100dvh;max-height:100dvh;min-height:100dvh;max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
-  #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column}
+  #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;height:100%}
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
   select option{background:${C.surf};color:${C.txt}}
@@ -3000,13 +3000,13 @@ function captureFreshGps(fallbackGeo = null) {
 }
 
 /** Fixed browse header — sticky breaks on mobile when inner panels scroll */
-const BROWSE_HDR_PAD = 'calc(12px + env(safe-area-inset-top, 0px))';
+const BROWSE_HDR_PAD = 'env(safe-area-inset-top, 0px)';
 const BROWSE_HOME_INSET = 12;
 const BROWSE_HOME_STACK = {
   display: 'grid',
   gridTemplateColumns: '1fr',
-  padding: 0,
-  gap: 0,
+  padding: `8px ${BROWSE_HOME_INSET}px 0`,
+  gap: 10,
   boxSizing: 'border-box',
   width: '100%',
 };
@@ -3290,9 +3290,20 @@ function TrustCommitmentScreen({ pageKey }) {
 }
 const BROWSE_INLINE_HDR = {
   flexShrink: 0,
-  background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
+  background: C.surf, borderBottom: BDR, padding: '10px 16px', paddingTop: BROWSE_HDR_PAD,
   display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
 };
+
+function CustomerShell({ children, toasts, offerInstall = true }) {
+  return (
+    <>
+      <style>{APP_CSS}</style>
+      <Toast toasts={toasts} />
+      <InstallAppGate enabled={offerInstall} />
+      {children}
+    </>
+  );
+}
 
 function scrollBrowseTop(el) {
   const run = () => {
@@ -3353,8 +3364,6 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
   );
 }
 
-const INSTALL_DISMISS_KEY = 'scanv_install_dismissed';
-
 function isPwaStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
@@ -3364,55 +3373,58 @@ function isIosDevice() {
   return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-function InstallAppBanner() {
-  const [visible, setVisible] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [ios, setIos] = useState(false);
+function isMobileHandheld() {
+  const t = detectDevice().deviceType;
+  return t === 'Mobile' || t === 'Tablet';
+}
+
+function shouldOfferPwaInstall() {
+  if (isPwaStandalone()) return false;
+  if (!isMobileHandheld()) return false;
+  return true;
+}
+
+/** iOS install sheet on first visit; Android uses Chrome's automatic install banner. */
+function InstallAppGate({ enabled = true }) {
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (isPwaStandalone()) return undefined;
-    if (localStorage.getItem(INSTALL_DISMISS_KEY) === '1') return undefined;
-    setIos(isIosDevice());
-    setVisible(true);
-    const onBip = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setVisible(true);
+    if (!enabled || !shouldOfferPwaInstall()) return undefined;
+    if (isIosDevice()) setOpen(true);
+
+    const onStandalone = () => {
+      if (isPwaStandalone()) setOpen(false);
     };
-    window.addEventListener('beforeinstallprompt', onBip);
-    return () => window.removeEventListener('beforeinstallprompt', onBip);
-  }, []);
 
-  const dismiss = () => {
-    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
-    setVisible(false);
-  };
+    window.addEventListener('appinstalled', onStandalone);
+    window.addEventListener('visibilitychange', onStandalone);
+    window.addEventListener('focus', onStandalone);
+    const poll = setInterval(onStandalone, 1500);
 
-  const install = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-    setVisible(false);
-  };
+    return () => {
+      window.removeEventListener('appinstalled', onStandalone);
+      window.removeEventListener('visibilitychange', onStandalone);
+      window.removeEventListener('focus', onStandalone);
+      clearInterval(poll);
+    };
+  }, [enabled]);
 
-  if (!visible) return null;
+  if (!enabled || !open || !isIosDevice() || isPwaStandalone()) return null;
 
   return (
-    <div style={{ flexShrink: 0, background: '#fffbeb', borderBottom: BDR, padding: `10px ${BROWSE_HOME_INSET}px`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-      <div style={{ fontSize: 20, lineHeight: 1 }}>📲</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: C.txt, marginBottom: 2 }}>Install ScanV on your home screen</div>
-        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.45 }}>
-          {ios
-            ? 'Tap Share (↑ or ⋯) in Safari or Chrome, then Add to Home Screen — full screen like Blinkit, no browser bar.'
-            : deferredPrompt
-              ? 'Install for faster booking, offline tiles, and full-screen mode.'
-              : 'Open browser menu → Install app or Add to Home screen.'}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(18,18,18,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 10, paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }}>
+      <div style={{ background: C.surf, borderRadius: 20, padding: '20px 18px', width: '100%', maxWidth: 420, boxShadow: '0 16px 48px rgba(0,0,0,0.28)' }}>
+        <div style={{ fontSize: 24, fontWeight: 800, fontFamily: FF, marginBottom: 6 }}>Scan<span style={{ color: C.acc }}>V</span></div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Install ScanV on your phone</div>
+        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>
+          Follow these steps to add ScanV to your home screen for full-screen booking — like Blinkit.
         </div>
-        {deferredPrompt && !ios ? <Btn sm onClick={install} style={{ marginTop: 8 }}>Install ScanV</Btn> : null}
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ ...S.card({ padding: '10px 12px' }), fontSize: 12, color: C.sub, lineHeight: 1.5 }}>① Tap <strong>Share</strong> in your browser toolbar</div>
+          <div style={{ ...S.card({ padding: '10px 12px' }), fontSize: 12, color: C.sub, lineHeight: 1.5 }}>② Choose <strong>Add to Home Screen</strong></div>
+          <div style={{ ...S.card({ padding: '10px 12px' }), fontSize: 12, color: C.sub, lineHeight: 1.5 }}>③ Tap <strong>Add</strong>, then open ScanV from your home screen</div>
+        </div>
       </div>
-      <button type="button" onClick={dismiss} aria-label="Dismiss install hint" style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}>×</button>
     </div>
   );
 }
@@ -3425,7 +3437,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }
     {id:'profile', icon:'👤', label:'Profile', go:onProfile},
   ];
   return (
-    <div style={{flexShrink:0,background:C.surf,borderTop:BDR,display:'flex',padding:'8px 0 calc(8px + env(safe-area-inset-bottom,0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,overflow:'hidden'}}>
+    <div style={{flexShrink:0,background:C.surf,borderTop:BDR,display:'flex',padding:'4px 0 max(2px, env(safe-area-inset-bottom, 0px))',boxShadow:'0 -4px 16px rgba(18,18,18,0.08)',zIndex:50,overflow:'hidden'}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span style={{fontSize:20}}>{t.icon}</span>
@@ -4718,25 +4730,24 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:`12px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
-      <InstallAppBanner />
       <div style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: `18px ${BROWSE_HOME_INSET}px`, color: '#fff' }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
           <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
           <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.94, lineHeight: 1.45 }}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: `10px ${BROWSE_HOME_INSET}px`, background: C.bg }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: 0 }}>
           <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
           <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, borderTop: BDR, borderBottom: BDR, padding: 0 }}>
-          <div style={{ padding: `12px ${BROWSE_HOME_INSET}px`, display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
             <span>🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
@@ -4744,7 +4755,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
       </div>
-      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`14px ${BROWSE_HOME_INSET}px 24px`}}>
+      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`12px ${BROWSE_HOME_INSET}px 16px`}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -5712,7 +5723,7 @@ function BottomNav() {
     setScreen(id);
   };
   return (
-    <div style={{flexShrink:0,display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'8px 0 calc(4px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
+    <div style={{flexShrink:0,display:'flex',background:C.surf,borderTop:`1px solid ${C.bdr}`,padding:'4px 0 max(2px, env(safe-area-inset-bottom, 0px))',zIndex:50}}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>goTab(t.id)}
           style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
@@ -5729,7 +5740,7 @@ function BottomNav() {
 function TopBar({title,back}) {
   const {setScreen,logout}=useApp();
   return (
-    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',paddingTop:'calc(12px + env(safe-area-inset-top, 0px))',display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'10px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
       {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
            :<div style={{fontWeight:800,fontSize:20,fontFamily:"'Space Grotesk',sans-serif"}}><span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span></div>}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
@@ -12813,17 +12824,17 @@ export default function App() {
 
   // QR landing page -- capture data then proceed to register
   if (state==='qr') return (
-    <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
+    <Boundary><CustomerShell toasts={toasts}>
     <QRLandingPage onContinue={(scanId,dev,ip,geo,coords)=>{
       setQrPrefill({scanId,dev,ip,geo});
       setState('register');
     }}/>
-    </Boundary>
+    </CustomerShell></Boundary>
   );
 
   // BROWSE: Show services without registration wall
   if (state==='browse') return (
-    <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
+    <Boundary><CustomerShell toasts={toasts}>
     <div className="scanv-root">
     <BrowseFlow
       silentGeo={silentGeo}
@@ -12832,17 +12843,17 @@ export default function App() {
       addToast={addToast}
     />
     </div>
-    </Boundary>
+    </CustomerShell></Boundary>
   );
 
   if (state==='register') return (
-    <Boundary><style>{APP_CSS}</style><Toast toasts={toasts}/>
+    <Boundary><CustomerShell toasts={toasts}>
     <RegistrationFlow
       prefill={qrPrefill}
       onComplete={p=>{setUser(p);setState('app');}}
       onGoToLogin={()=>setState('browse')}
     />
-    </Boundary>
+    </CustomerShell></Boundary>
   );
 
   const ctx={user,setUser,screen,setScreen,activeSvc,setActiveSvc,notifs,addToast,logout,silentGeo,setSilentGeo,setState,catalogTick,refreshPricing,trackBookingId,setTrackBookingId};
@@ -12864,18 +12875,18 @@ export default function App() {
   return (
     <Boundary>
       <Ctx.Provider value={ctx}>
-        <style>{APP_CSS}</style>
-        <Toast toasts={toasts}/>
+        <CustomerShell toasts={toasts}>
         <PartnerGpsTracker />
         <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>
           <div style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <Boundary>{renderScreen()}</Boundary>
-            <CopyrightLine style={{ padding: '6px 16px 24px' }} />
+            <CopyrightLine style={{ padding: '6px 16px 16px' }} />
           </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>
         </div>
+        </CustomerShell>
       </Ctx.Provider>
     </Boundary>
   );
