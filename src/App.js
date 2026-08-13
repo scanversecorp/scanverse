@@ -2523,6 +2523,7 @@ function captureFreshGps(fallbackGeo = null) {
 const BROWSE_HDR_PAD = 'calc(12px + env(safe-area-inset-top, 0px))';
 const BROWSE_HDR_H = 'calc(52px + env(safe-area-inset-top, 0px))';
 const BROWSE_NAV_BOTTOM = 'calc(68px + env(safe-area-inset-bottom, 0px))';
+const BROWSE_HOME_PAD = 16;
 const BROWSE_FIXED_HDR = {
   position: 'fixed', top: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto', zIndex: 100,
   background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
@@ -3800,25 +3801,27 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         <div style={{fontWeight:800,fontSize:20,fontFamily:FF,color:C.txt}}>Scan<span style={{color:C.acc}}>V</span></div>
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR}}>📍 {silentGeo?.city||'PCMC'} {silentGeo?.pincode||''}</div>
       </div>
-      <div style={{margin:'12px 16px 0',borderRadius:18,overflow:'hidden',background:`linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,padding:'18px 20px',color:'#fff',boxShadow:'0 10px 28px rgba(214,58,86,0.28)'}}>
+      <div style={{margin:`12px ${BROWSE_HOME_PAD}px 0`,borderRadius:18,overflow:'hidden',background:`linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,padding:'18px 20px',color:'#fff',boxShadow:'0 10px 28px rgba(214,58,86,0.28)'}}>
         <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase',opacity:0.92,marginBottom:6}}>Real people · Real care</div>
         <div style={{fontSize:20,fontWeight:800,lineHeight:1.28,marginBottom:6,fontFamily:FF}}>Book services with a smile</div>
         <div style={{fontSize:12,fontWeight:500,opacity:0.94,lineHeight:1.45}}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
       </div>
-      <div style={{padding:'0 16px'}}>
+      <div style={{padding:`0 ${BROWSE_HOME_PAD}px`}}>
         <div style={{display:'flex',gap:10,marginTop:12}}>
           <Btn v="outline" onClick={goBrowseLogin} sm style={{flex:1}}>Log in</Btn>
           <Btn onClick={()=>onSignUp?.()} sm style={{flex:1}}>Sign up</Btn>
         </div>
-        <div style={{marginTop:12,width:'100%',background:C.surf,border:BDR,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-          <span>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
-          {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
-        </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10,width:'100%'}}>
-          {['✓ DPDP 2023','✓ Verified partners','✓ 25% off','✓ Human-first'].map(p=>(
-            <span key={p} style={{fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99}}>{p}</span>
-          ))}
+        <div style={{marginTop:12,width:'100%',boxSizing:'border-box',background:C.surf,border:BDR,borderRadius:12,boxShadow:'0 3px 14px rgba(18,18,18,0.08)',overflow:'hidden'}}>
+          <div style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:10}}>
+            <span>🔍</span>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',flex:1,fontSize:14,fontFamily:FF,color:C.txt}}/>
+            {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:'0 0 12px',width:'100%',boxSizing:'border-box',margin:0}}>
+            {['✓ DPDP 2023','✓ Verified partners','✓ 25% off','✓ Human-first'].map(p=>(
+              <span key={p} style={{fontSize:9,fontWeight:800,color:C.grn,background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,padding:'4px 9px',borderRadius:99,boxSizing:'border-box',margin:0}}>{p}</span>
+            ))}
+          </div>
         </div>
       </div>
       <div style={{padding:'14px 16px 24px',flex:1,overflowY:'auto'}}>
