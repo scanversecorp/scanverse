@@ -3080,8 +3080,10 @@ const TRUST_PILL_BTN = {
   fontFamily: FF,
   appearance: 'none',
   WebkitAppearance: 'none',
-  display: 'inline-flex',
+  display: 'flex',
   alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
 };
 const BROWSE_TRUST_PILLS = [
   { key: 'dpdp', label: '✓ DPDP', screen: 'trust-dpdp', aria: 'DPDP 2023' },
@@ -3347,6 +3349,70 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
         {children}
         <CopyrightLine style={{ padding: '12px 16px 24px' }} />
       </div>
+    </div>
+  );
+}
+
+const INSTALL_DISMISS_KEY = 'scanv_install_dismissed';
+
+function isPwaStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isIosDevice() {
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function InstallAppBanner() {
+  const [visible, setVisible] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [ios, setIos] = useState(false);
+
+  useEffect(() => {
+    if (isPwaStandalone()) return undefined;
+    if (localStorage.getItem(INSTALL_DISMISS_KEY) === '1') return undefined;
+    setIos(isIosDevice());
+    setVisible(true);
+    const onBip = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setVisible(true);
+    };
+    window.addEventListener('beforeinstallprompt', onBip);
+    return () => window.removeEventListener('beforeinstallprompt', onBip);
+  }, []);
+
+  const dismiss = () => {
+    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+    setVisible(false);
+  };
+
+  const install = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    setVisible(false);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div style={{ flexShrink: 0, background: '#fffbeb', borderBottom: BDR, padding: `10px ${BROWSE_HOME_INSET}px`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ fontSize: 20, lineHeight: 1 }}>📲</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: C.txt, marginBottom: 2 }}>Install ScanV on your home screen</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.45 }}>
+          {ios
+            ? 'Tap Share (↑ or ⋯) in Safari or Chrome, then Add to Home Screen — full screen like Blinkit, no browser bar.'
+            : deferredPrompt
+              ? 'Install for faster booking, offline tiles, and full-screen mode.'
+              : 'Open browser menu → Install app or Add to Home screen.'}
+        </div>
+        {deferredPrompt && !ios ? <Btn sm onClick={install} style={{ marginTop: 8 }}>Install ScanV</Btn> : null}
+      </div>
+      <button type="button" onClick={dismiss} aria-label="Dismiss install hint" style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}>×</button>
     </div>
   );
 }
@@ -4658,6 +4724,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
+      <InstallAppBanner />
       <div style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: `18px ${BROWSE_HOME_INSET}px`, color: '#fff' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
