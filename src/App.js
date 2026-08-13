@@ -7590,10 +7590,12 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
     width: '100%',
   };
 
-  const lock = () => {
+  const logout = () => {
     sessionStorage.removeItem(PRICING_AUTH_KEY);
+    sessionStorage.removeItem(PRICING_PIN_KEY);
     setAuthed(false);
     setAuthStep('pin');
+    setPin('');
     setTotpCode('');
     setEnrollQr('');
     setEnrollSecret('');
@@ -7750,7 +7752,7 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               <Btn v="outline" sm onClick={()=>load(pin)} disabled={loading}>{loading?'Loading…':'Reload'}</Btn>
               <Btn sm onClick={saveAll} disabled={saving||!rows.length}>{saving?'Saving…':'Save all & go live'}</Btn>
-              <Btn v="ghost" sm onClick={lock}>Lock</Btn>
+              <Btn v="ghost" sm onClick={logout}>Logout</Btn>
             </div>
           </div>
           {msg && <div style={{ color:C.grn, fontSize:12, marginTop:8 }}>{msg}</div>}
@@ -7758,6 +7760,11 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
         </div>
         )}
         <div style={{ padding: embedded ? '0 0 12px' : '0 16px 12px', maxWidth:1400, margin:'0 auto' }}>
+          {embedded && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+              <Btn v="ghost" sm onClick={logout}>Logout</Btn>
+            </div>
+          )}
           {embedded && (msg || err) && (
             <div style={{ marginBottom: 8 }}>
               {msg && <div style={{ color:C.grn, fontSize:12 }}>{msg}</div>}
@@ -11721,7 +11728,7 @@ function AdminControlCenter({ onPricesUpdated }) {
           </div>
           <Btn v="ghost" sm onClick={lock}>Lock</Btn>
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto', maxWidth: 1200, margin: '12px auto 0', paddingBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap', alignItems: 'center', maxWidth: 1200, margin: '12px auto 0', paddingBottom: 4, width: '100%', boxSizing: 'border-box' }}>
           {ADMIN_TABS.map(t => (
             <button key={t.id} type="button" onClick={() => { setTab(t.id); setMsg(''); setErr(''); }} style={tabBtn(t)}>
               {t.icon} {t.label}
