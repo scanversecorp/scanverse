@@ -3078,10 +3078,214 @@ const TRUST_PILL_BTN = {
   ...TRUST_PILL,
   cursor: 'pointer',
   fontFamily: FF,
-  border: 'none',
   appearance: 'none',
   WebkitAppearance: 'none',
+  display: 'inline-flex',
+  alignItems: 'center',
 };
+const BROWSE_TRUST_PILLS = [
+  { key: 'dpdp', label: '✓ DPDP 2023', screen: 'trust-dpdp' },
+  { key: 'verified', label: '✓ Verified partners', screen: 'trust-verified' },
+  { key: 'discount', label: '✓ 25% off', screen: 'trust-discount' },
+  { key: 'human', label: '✓ Human-First', screen: 'trust-human' },
+  { key: 'top-rated', label: '✓ Top Rated', screen: 'top-rated' },
+  { key: 'trusted', label: '✓ Trusted', screen: 'trust-trusted' },
+];
+const TRUST_COMMITMENT_PAGES = {
+  dpdp: {
+    title: 'DPDP 2023',
+    headline: '✓ DPDP Act 2023 compliant',
+    intro: 'ScanV follows India\'s Digital Personal Data Protection Act 2023. Your data stays in India, consent is explicit, and you control access, correction, and deletion.',
+    sections: [
+      ['What we collect', ['Name and mobile (OTP-verified before booking)', 'GPS location to show nearby services and route deliveries', 'Device type, OS, and browser for fraud prevention', 'Booking and payment records for GST compliance']],
+      ['Where it lives', 'All production data is stored in India (AWS Mumbai). We do not sell personal data to advertisers or brokers.'],
+      ['Your rights', ['Access and download your profile data', 'Correct inaccurate details in Profile', 'Request erasure — removed within 30 days', 'Raise a grievance with our DPO at privacy@dcoreglobal.com']],
+      ['Before you book', 'OTP verification and Terms acceptance are required so every booking is tied to informed consent under DPDP 2023.'],
+    ],
+    action: { label: 'Read full Privacy Policy →', type: 'href', target: '/privacy' },
+  },
+  verified: {
+    title: 'Verified partners',
+    headline: '✓ Verified partners only',
+    intro: 'Every ScanV partner is checked before they can accept paid bookings. Customers see real people and real businesses — not anonymous listings.',
+    sections: [
+      ['Customer verification', ['Mobile OTP on every sign-in and first booking', 'GPS location captured to match nearby services', 'Name and address verified before payment']],
+      ['Partner verification', ['Digio eKYC and document checks for vendor onboarding', 'Business address and service area confirmation', 'UPI payout ID verified before first payout']],
+      ['On every job', ['Live GPS sharing when partner enables tracking', 'Ratings and dispute flow after completion', 'ScanV support can pause partners with repeated issues']],
+    ],
+    action: { label: 'Partner with ScanV →', type: 'hash', target: '#vendor-onboard' },
+  },
+  discount: {
+    title: '25% off',
+    headline: '✓ 25% off service prices',
+    intro: 'Indicative prices on ScanV cards already include a 25% discount on the service fee. Platform fee and GST are shown separately before you pay.',
+    sections: [
+      ['How it works', ['Card prices show the discounted service amount', 'Platform fee (10%) and GST (18%) are added at checkout', 'Pay only the platform portion via UPI before scheduling', 'Balance for the service is coordinated with your assigned partner']],
+      ['No surprises', ['Full breakdown on verify and payment screens', 'Reference ID on every transaction', 'Refund policy published at /refund']],
+    ],
+    action: { label: 'Browse discounted services →', type: 'screen', target: 'services' },
+  },
+  human: {
+    title: 'Human-First',
+    headline: '✓ Human-First care',
+    intro: 'ScanV is built around real people — verified partners, local teams in PCMC/Pune, and human support when you need help.',
+    sections: [
+      ['Real people', ['Partners are named and rated — not faceless gig listings', 'Category experts for legal, health, home, food, and more', 'Assist line for booking help and escalations']],
+      ['Local first', ['Services matched to your GPS and PIN code', 'PCMC and Pune coverage with expanding categories', 'Same-day options where partners are available']],
+      ['After you book', ['SMS and in-app updates through confirmation and completion', 'Live map tracking on supported services', 'Dispute and rating flow with ScanV mediation']],
+    ],
+    action: { label: 'See our commitments →', type: 'screen', target: 'trust-trusted' },
+  },
+  trusted: {
+    title: 'Trusted',
+    headline: '✓ How ScanV earns your trust',
+    intro: 'Trust is a process — not just a label. ScanV validates every customer and partner, documents each booking, and reviews quality after every job.',
+    pipeline: [
+      'Verify customer identity (OTP + consent)',
+      'Validate partner credentials (eKYC + admin review)',
+      'Confirm platform payment (UPI / Razorpay + receipt)',
+      'Track the job (dispatch + live GPS where supported)',
+      'Review outcomes (ratings, disputes, partner actions)',
+    ],
+    sections: [
+      ['Before you book — customer validation', [
+        'Mobile OTP via SMS or WhatsApp before payment — no anonymous bookings',
+        'Terms, Privacy Policy, and DPDP Act 2023 consent required on first booking',
+        'Name, address, and GPS location captured for dispatch and fraud prevention',
+        'Platform fee paid through UPI or Razorpay with a unique transaction reference',
+        'Inactive or paused services are blocked at booking with a clear message',
+      ]],
+      ['Partner onboarding — what we verify', [
+        'OTP on the partner mobile — same number used for job alerts and dispatch',
+        'PAN format validation and Aadhaar eKYC session (Digio / UIDAI pathway)',
+        'Live GPS + IP country check — VPN/proxy flagged; India-first service area',
+        'Business address, service catalogue, profile photo, and UPI payout ID submitted',
+        'Registration stays pending until Vendor Admin manually activates the partner',
+      ]],
+      ['Catalog, pricing & Top Rated review', [
+        'Pricing Admin (Microsoft Authenticator 2FA) is the source of truth for all cards',
+        'Sub-service names cannot duplicate parent category titles — validated on save',
+        'Prices, units, icons, and themes synced from DB to app and Pricing Admin',
+        'Top Rated services are hand-picked by the ScanV team — not auto-promoted',
+        'Paused or offboarded partners cannot receive new dispatch assignments',
+      ]],
+      ['During your service', [
+        'Unique booking reference (BK-…) on track screen and partner notifications',
+        'Automated dispatch to nearest active partners for supported categories',
+        'Live partner GPS map on eligible jobs (bike, car, delivery, and more)',
+        'Status pipeline: confirmed → partner assigned → in progress → complete',
+        'Customer Support desk can search bookings and assist in real time',
+      ]],
+      ['After completion — ratings & disputes', [
+        'Star rating stored against the booking and partner performance history',
+        'Customers raise disputes from Bookings — ScanV mediates with both parties',
+        'Public report form and ticket tracking for issues outside a booking',
+        'Vendor Admin can pause, suspend, or offboard partners with repeated failures',
+        'Payment disputes follow the published Refund Policy at /refund',
+      ]],
+      ['Documentation & records', [
+        'Privacy Policy (/privacy) — DPDP rights, retention, and India-only storage',
+        'Terms (/terms), Refund (/refund), and Payment (/payment) policies published',
+        'Booking and payment records retained per GST and regulatory requirements',
+        'OTP, device, and session logs used for fraud prevention — not sold to advertisers',
+        `Assist line ${ASSIST} for booking help, disputes, and escalations`,
+      ]],
+    ],
+    action: { label: 'Report an issue →', type: 'hash', target: '#report' },
+    links: [
+      { label: 'Privacy Policy', type: 'href', target: '/privacy' },
+      { label: 'Terms', type: 'href', target: '/terms' },
+      { label: 'Refund Policy', type: 'href', target: '/refund' },
+    ],
+  },
+};
+
+function TrustPillsRow({ onSelect }) {
+  return (
+    <div className="trust-pills-row" style={TRUST_PILLS_ROW}>
+      {BROWSE_TRUST_PILLS.map((p) => (
+        <button key={p.key} type="button" onClick={() => onSelect(p)} style={TRUST_PILL_BTN} aria-label={p.label.replace(/^✓\s*/, '')}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function runTrustCommitmentAction(action, { setScreen, goBrowseHome }) {
+  if (!action) return;
+  if (action.type === 'href') {
+    window.location.href = action.target;
+    return;
+  }
+  if (action.type === 'hash') {
+    window.location.hash = action.target.startsWith('#') ? action.target : `#${action.target}`;
+    return;
+  }
+  if (action.type === 'screen') {
+    if (action.target === 'services' && goBrowseHome) goBrowseHome();
+    else if (setScreen) setScreen(action.target);
+  }
+}
+
+function TrustCommitmentBody({ pageKey, onAction }) {
+  const pg = TRUST_COMMITMENT_PAGES[pageKey];
+  if (!pg) return null;
+  return (
+    <>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#e6f4ee', border: '2px solid rgba(0,122,77,0.35)' }}>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>{pg.headline}</div>
+        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>{pg.intro}</div>
+      </div>
+      {pg.pipeline?.length ? (
+        <div style={S.card({ marginBottom: 12, padding: '14px 16px' })}>
+          <div style={{ color: C.txt, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Trust validation flow</div>
+          {pg.pipeline.map((step, i) => (
+            <div key={step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < pg.pipeline.length - 1 ? 10 : 0 }}>
+              <div style={{ width: 22, height: 22, borderRadius: 99, background: C.grn, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</div>
+              <div style={{ color: C.sub, fontSize: 12, lineHeight: 1.55, paddingTop: 2 }}>{step}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {pg.sections.map(([heading, body]) => (
+        <div key={heading} style={S.card({ marginBottom: 12, padding: '14px 16px' })}>
+          <div style={{ color: C.txt, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+          {Array.isArray(body) ? (
+            <ul style={{ margin: 0, paddingLeft: 18, color: C.sub, fontSize: 12, lineHeight: 1.6 }}>
+              {body.map((item) => <li key={item} style={{ marginBottom: 4 }}>{item}</li>)}
+            </ul>
+          ) : (
+            <p style={{ margin: 0, color: C.sub, fontSize: 12, lineHeight: 1.6 }}>{body}</p>
+          )}
+        </div>
+      ))}
+      {pg.action && <Btn full onClick={() => onAction?.(pg.action)} style={{ marginTop: 4 }}>{pg.action.label}</Btn>}
+      {pg.links?.length ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, justifyContent: 'center' }}>
+          {pg.links.map((link) => (
+            <button key={link.label} type="button" onClick={() => onAction?.(link)} style={{ ...TRUST_PILL_BTN, fontSize: 10, padding: '5px 10px' }}>{link.label}</button>
+          ))}
+        </div>
+      ) : null}
+      <AssistBanner />
+    </>
+  );
+}
+
+function TrustCommitmentScreen({ pageKey }) {
+  const { setScreen } = useApp();
+  const pg = TRUST_COMMITMENT_PAGES[pageKey];
+  if (!pg) return null;
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF }}>
+      <TopBar title={pg.title} back="services" />
+      <div style={{ padding: 16 }}>
+        <TrustCommitmentBody pageKey={pageKey} onAction={(action) => runTrustCommitmentAction(action, { setScreen })} />
+      </div>
+    </div>
+  );
+}
 const BROWSE_INLINE_HDR = {
   flexShrink: 0,
   background: C.surf, borderBottom: BDR, padding: '12px 16px', paddingTop: BROWSE_HDR_PAD,
@@ -4304,6 +4508,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     setScreen('top-rated');
   };
 
+  const goBrowseTrustPill = (pill) => {
+    if (pill.screen === 'top-rated') {
+      goBrowseTopRated();
+      return;
+    }
+    resetBrowseLanding();
+    setScreen(pill.screen);
+  };
+
   const tryExistingSession = async (intent) => {
     const uid = localStorage.getItem('scanv_uid');
     if (!uid) return false;
@@ -4346,6 +4559,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const guestActiveTab = (() => {
     if (screen === 'login') return loginIntent === 'home' ? 'home' : (loginIntent || 'bookings');
     if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'home';
+    if (screen.startsWith('trust-')) return 'home';
     if (screen === 'services') return 'home';
     if (screen === 'top-rated') return 'top-rated';
     return navTab;
@@ -4458,13 +4672,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
           </div>
-          <div className="trust-pills-row" style={TRUST_PILLS_ROW}>
-            {['✓ DPDP 2023', '✓ Verified partners', '✓ 25% off', '✓ Human-First'].map(p => (
-              <span key={p} style={TRUST_PILL}>{p}</span>
-            ))}
-            <button type="button" onClick={goBrowseTopRated} style={TRUST_PILL_BTN} aria-label="Top Rated services">⭐ Top Rated</button>
-            <button type="button" onClick={() => scrollBrowseToId(browseHomeScrollRef.current, 'scanv-commitments')} style={TRUST_PILL_BTN} aria-label="Trusted verified partners">✓ Trusted</button>
-          </div>
+          <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
       </div>
       <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
@@ -4494,6 +4702,28 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       </div>
     </>
   );
+
+  // -- TRUST COMMITMENT PAGES (public) --------------------------------------
+  if (screen.startsWith('trust-')) {
+    const pageKey = screen.slice(6);
+    const pg = TRUST_COMMITMENT_PAGES[pageKey];
+    if (pg) {
+      return browseWrap(
+        <>
+          <div style={BROWSE_INLINE_HDR}>
+            <button type="button" aria-label="Go back" onClick={goBrowseHome} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0, minWidth: 44, minHeight: 44, lineHeight: 1 }}>←</button>
+            <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, flex: 1 }}>{pg.title}</div>
+          </div>
+          <div style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
+            <TrustCommitmentBody
+              pageKey={pageKey}
+              onAction={(action) => runTrustCommitmentAction(action, { setScreen, goBrowseHome })}
+            />
+          </div>
+        </>
+      );
+    }
+  }
 
   // -- TOP RATED (public, no login) -----------------------------------------
   if (screen === 'top-rated') return browseWrap(
@@ -5679,10 +5909,16 @@ function ServicesScreen() {
     <div ref={scrollRef} style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="Home"/>
       <div style={{padding:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
           <span>🔍</span>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
           {search&&<button type="button" onClick={()=>setSearch('')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:18,lineHeight:1,padding:0}} aria-label="Clear search">×</button>}
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <TrustPillsRow onSelect={(pill) => {
+            if (pill.screen === 'top-rated') setScreen('top-rated');
+            else setScreen(pill.screen);
+          }} />
         </div>
         {searching ? (
           <ServiceSearchResults
@@ -12541,6 +12777,7 @@ export default function App() {
     if (screen==='track')    return <TrackServiceScreen/>;
     if (screen==='services' || screen==='home') return <ServicesScreen/>;
     if (screen==='top-rated') return <TopRatedScreen/>;
+    if (screen.startsWith('trust-')) return <TrustCommitmentScreen pageKey={screen.slice(6)} />;
     if (screen==='bookings') return <BookingsScreen/>;
     if (screen==='crm')      return <CRMScreen/>;
     if (screen==='qr')       return <QRScreen/>;
