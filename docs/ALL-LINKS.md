@@ -17,6 +17,14 @@
 | Beauty brand | https://www.richroyalscorp.com | Rich Royals Corp (Wix) |
 | Redesign plan (internal) | docs/GROUP-REDESIGN-PLAN.md | Site audit + parallel workstreams |
 
+### Local redesign prototypes (dev only)
+
+| Site | URL |
+|------|-----|
+| DCORE Global | http://localhost:8765 |
+| VanguardNode | http://localhost:8766 |
+| Rich Royals | http://localhost:8767 |
+
 ---
 
 ## Hash Routes (Admin & Internal)

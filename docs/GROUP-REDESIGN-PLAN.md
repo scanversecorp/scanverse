@@ -1,7 +1,7 @@
 # Group website redesign — working plan (INTERNAL)
 
 **Owner:** Sam + Cursor · **Started:** 13 Aug 2026  
-**Status:** Audit complete · **Primary redesign: dcoreglobal.com** · Wix edits blocked until access  
+**Status:** Prototypes on localhost · **Primary redesign: dcoreglobal.com** · Wix at 2FA in Cursor browser  
 **Do not publish** parent/child hierarchy on live sites until Sam approves.
 
 ---
