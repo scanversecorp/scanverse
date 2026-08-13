@@ -20,7 +20,7 @@
 | cl-paas | App Platform (PaaS) | Deploy apps · skip server management | /services/cloud/paas.png | efca1149 | MATCH | photo | — |
 | cl-saas | Business Apps (SaaS) | Ready software · subscribe & go | /services/cloud/saas.png | d0febb2b | MATCH | photo | — |
 | cl-hybrid | Hybrid Cloud Setup | On-prem + cloud · unified control | /services/cloud/hybrid.png | 61690622 | MATCH | photo | — |
-| cl-datacenter | Datacenter Consulting | Design · build · optimise facilities | /services/cloud/datacenter.png | 7f6a20d5 | MATCH | photo | — |
+| cl-datacenter | Data Center Consulting | Design · build · optimise facilities | /services/cloud/datacenter.png | 7f6a20d5 | MATCH | photo | — |
 | cl-network | Enterprise Networking | LAN · WAN · secure connectivity | /services/cloud/network.png | 89713395 | MATCH | photo | — |
 | cl-hardware | IT Hardware Supply | Servers · storage · laptops · networking | /services/cloud/hardware.png | b28afe8d | MATCH | photo | — |
 | cl-infra-audit | Infrastructure Audit & Roadmap | Assess · benchmark · 12-month upgrade plan | /services/cloud/infra-audit.png | 3fcf2c1a | MATCH | photo | — |
@@ -29,7 +29,7 @@
 | cl-video | Video & Streaming Platform | Secure delivery · education · media | /services/cloud/video.png | 495cba6b | MATCH | photo | — |
 | cl-training | Cloud & IT Training | Hands-on labs · certs · career tracks | /services/cloud/training.png | b29d40a8 | MATCH | photo | — |
 | cl-office-box | Office IT-in-a-Box | Desks · Wi‑Fi · PCs · phones · go-live ready | /services/cloud/office-box.png | b014e8a5 | MATCH | photo | — |
-| cl-dc-operate | Datacenter Build & Run | Design · rack · power · operate · handover | /services/cloud/dc-operate.png | fb18801f | MATCH | photo | — |
+| cl-dc-operate | Data Center Build & Run | Design · rack · power · operate · handover | /services/cloud/dc-operate.png | fb18801f | MATCH | photo | — |
 | cl-dr-pack | Business Continuity Pack | Backup · failover · tested recovery playbooks | /services/cloud/dr-pack.png | 02bda405 | MATCH | photo | — |
 | cl-maas | Monitoring-as-a-Service | Dashboards · alerts · compliance views | /services/cloud/maas.png | 68e73105 | MATCH | photo | — |
 | cl-edtech | Learning Platform Pack | LMS · secure video · student portal | /services/cloud/edtech-lms.png | 11a59f3f | MATCH | photo | — |

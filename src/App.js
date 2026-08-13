@@ -652,6 +652,20 @@ const FF = "'Inter',system-ui,sans-serif";
 const BDR = `1.5px solid ${C.bdr}`;
 const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food', 'two-wheeler':'2-Wheeler', 'four-wheeler':'4-Wheeler' };
 
+/** Home page category card titles only (HomeModelCard) — no redundant "services" suffix */
+const HOME_CARD_TITLE = {
+  legal: 'Legal & Consulting',
+  cloud: 'AI, Cloud & Data Center',
+  vip: 'VIP Concierge',
+  health: 'Health at Home',
+  property: 'Property & Rentals',
+  household: 'Cleaning & Home Help',
+  delivery: 'Courier & Deliveries',
+  food: 'Food & Restaurants & Bars',
+  'two-wheeler': 'Bike Care',
+  'four-wheeler': 'Car Care',
+};
+
 const DISC_PCT = 0.25;
 const discPaise = (mrpPaise) => Math.round(mrpPaise * (1 - DISC_PCT));
 const fmtRs = (paise) => ((Number(paise) || 0) / 100).toLocaleString('en-IN');
@@ -730,8 +744,8 @@ const CLOUD_SVCS = [
   { id:'cl-hybrid', parent:'cloud', theme:'host', icon:'🔀', img:'/services/cloud/hybrid.png', name:'Hybrid Cloud Setup', sub:'On-prem + cloud · unified control', unit:'project', mrp:1499900, price:discPaise(1499900), cash:false,
     desc:'ScanV hybrid cloud — connect your office or private rack with public cloud resources under one governance model. Perfect when compliance, latency, or legacy apps need a blended architecture.',
     features:['Architecture assessment','Secure VPN / interconnect','Workload placement plan','Migration roadmap','Unified monitoring'], turnaround:'1–2 weeks', rating:'4.9 ⭐', bookings:'280+' },
-  { id:'cl-datacenter', parent:'cloud', theme:'build', icon:'🏢', img:'/services/cloud/datacenter.png', name:'Datacenter Consulting', sub:'Design · build · optimise facilities', unit:'project', mrp:4999900, price:discPaise(4999900), cash:false,
-    desc:'ScanV datacenter consulting — from capacity planning and rack layout to power, cooling, and compliance documentation. We help you build or refresh facilities that are secure, efficient, and future-ready.',
+  { id:'cl-datacenter', parent:'cloud', theme:'build', icon:'🏢', img:'/services/cloud/datacenter.png', name:'Data Center Consulting', sub:'Design · build · optimise facilities', unit:'project', mrp:4999900, price:discPaise(4999900), cash:false,
+    desc:'ScanV data center consulting — from capacity planning and rack layout to power, cooling, and compliance documentation. We help you build or refresh facilities that are secure, efficient, and future-ready.',
     features:['Site & capacity planning','Rack & power design','Compliance documentation','Vendor-neutral advice','Handover runbooks'], turnaround:'2–4 weeks', rating:'4.9 ⭐', bookings:'150+' },
   { id:'cl-network', parent:'cloud', theme:'build', icon:'🌐', img:'/services/cloud/network.png', name:'Enterprise Networking', sub:'LAN · WAN · secure connectivity', unit:'project', mrp:2999900, price:discPaise(2999900), cash:false,
     desc:'ScanV enterprise networking — structured cabling, switching, routing, Wi‑Fi, and WAN links designed for reliability. We segment traffic, enforce policies, and document every connection for your team.',
@@ -757,8 +771,8 @@ const CLOUD_SVCS = [
   { id:'cl-office-box', parent:'cloud', theme:'pack', icon:'📦', img:'/services/cloud/office-box.png', name:'Office IT-in-a-Box', sub:'Desks · Wi‑Fi · PCs · phones · go-live ready', unit:'project', mrp:3499900, price:discPaise(3499900), cash:false,
     desc:'ScanV office-in-a-box — a pre-tested bundle that wires up your new branch or startup floor: cabling, Wi‑Fi, workstations, printers, and baseline security policies. Arrive Monday, work Tuesday.',
     features:['Structured cabling & Wi‑Fi','Workstation imaging','Firewall baseline config','User onboarding guide','30-day hypercare support'], turnaround:'5–10 days', rating:'4.9 ⭐', bookings:'190+' },
-  { id:'cl-dc-operate', parent:'cloud', theme:'pack', icon:'🏗️', img:'/services/cloud/dc-operate.png', name:'Datacenter Build & Run', sub:'Design · rack · power · operate · handover', unit:'project', mrp:7999900, price:discPaise(7999900), cash:false,
-    desc:'ScanV datacenter build & operate — we take you from empty floor to production-ready facility, then optionally run day-two ops. Capacity, cooling, security, and monitoring included in one programme.',
+  { id:'cl-dc-operate', parent:'cloud', theme:'pack', icon:'🏗️', img:'/services/cloud/dc-operate.png', name:'Data Center Build & Run', sub:'Design · rack · power · operate · handover', unit:'project', mrp:7999900, price:discPaise(7999900), cash:false,
+    desc:'ScanV data center build & operate — we take you from empty floor to production-ready facility, then optionally run day-two ops. Capacity, cooling, security, and monitoring included in one programme.',
     features:['Facility & rack design','Power / cooling planning','Security & access layers','Monitoring from day one','Optional managed operate'], turnaround:'4–8 weeks', rating:'4.9 ⭐', bookings:'95+' },
   { id:'cl-dr-pack', parent:'cloud', theme:'pack', icon:'🔒', img:'/services/cloud/dr-pack.png', name:'Business Continuity Pack', sub:'Backup · failover · tested recovery playbooks', unit:'project', mrp:2499900, price:discPaise(2499900), cash:false,
     desc:'ScanV business continuity pack — a fixed-scope programme that maps critical apps, configures replication, and runs a live restore drill with your team. Know your RPO/RTO before an incident, not during one.',
@@ -1001,13 +1015,13 @@ const FOUR_WHEELER_SVCS = [
 
 const SUB_CATEGORIES = {
   household: { title:'Household services', subtitle:'Deep cleaning & home help · 25% off · verified partners', cat:'Household Services', themes:HH_THEME, svcs:HOUSEHOLD_SVCS, themeOrder:['pink','green'] },
-  cloud:     { title:'Cloud services', subtitle:'Hosting · infrastructure · packages · 25% off', cat:'Cloud Services', themes:CL_THEME, svcs:CLOUD_SVCS, themeOrder:['host','build','care','pack'] },
+  cloud:     { title:'Cloud services', subtitle:'AI · cloud · data center · packages · 25% off', cat:'Cloud Services', themes:CL_THEME, svcs:CLOUD_SVCS, themeOrder:['host','build','care','pack'] },
   legal:     { title:'Legal services', subtitle:'Lawyers · docs · registration · 25% off', cat:'Legal', themes:LG_THEME, svcs:LEGAL_SVCS, themeOrder:['counsel','docs'] },
   vip:       { title:'VIP appointments', subtitle:'Concierge · travel · events · 25% off', cat:'VIP Appointments', themes:VIP_THEME, svcs:VIP_SVCS, themeOrder:['concierge','travel'] },
   health:    { title:'Health care', subtitle:'Doctors · tests · pharmacy · 25% off', cat:'Health Care', themes:HL_THEME, svcs:HEALTH_SVCS, themeOrder:['home','clinical'] },
   property:  { title:'Property & rentals', subtitle:'Buy · rent · verify · 25% off', cat:'Property & Rentals', themes:PR_THEME, svcs:PROPERTY_SVCS, themeOrder:['find','verify'] },
   delivery:  { title:'Deliveries', subtitle:'Courier · parcels · express · 25% off', cat:'Deliveries', themes:DL_THEME, svcs:DELIVERY_SVCS, themeOrder:['local','express'] },
-  food:      { title:'Food', subtitle:'Tiffin · restaurant · catering · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
+  food:      { title:'Food', subtitle:'Tiffin · restaurants · bars · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
   'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · polish · 8 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
   'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 8 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
 };
@@ -1971,16 +1985,23 @@ const paiseFromInp = (r) => Math.round((Number(r) || 0) * 100);
 /* --- SERVICES ----------------------------------------------------- */
 const SVCS = [
   { id:'legal',    icon:'⚖️', name:'Legal services',     sub:'Lawyers · docs · registration · 8 services', cat:'Legal',              cash:false, ...svcDisc(999), legal:true },
-  { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'Hosting · infra · packages · 18 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
+  { id:'cloud',    icon:'☁️', name:'Cloud services',     sub:'AI · cloud · data center · 18 services', cat:'Cloud Services',     cash:false, ...svcDisc(4999), cloud:true },
   { id:'vip',      icon:'👑', name:'VIP appointments',   sub:'Concierge · travel · events · 6 services', cat:'VIP Appointments',   cash:false, ...svcDisc(9999), vip:true },
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 8 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 6 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
-  { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurant · catering · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
+  { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurants · bars · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
   { id:'two-wheeler', icon:'🛵', name:'Two Wheeler Support', sub:'Mechanic · pick-up · wash · 8 services', cat:'Two Wheeler Support', cash:false, ...svcDisc(299), twowheeler:true },
   { id:'four-wheeler', icon:'🚗', name:'Four Wheeler Support', sub:'Car service · pick-up · sanitization · 8 services', cat:'Four Wheeler Support', cash:false, ...svcDisc(499), fourwheeler:true },
 ];
+
+for (const s of SVCS) {
+  if (HOME_CARD_TITLE[s.id]) s.name = HOME_CARD_TITLE[s.id];
+}
+for (const id of Object.keys(HOME_CARD_TITLE)) {
+  if (SUB_CATEGORIES[id]) SUB_CATEGORIES[id].title = HOME_CARD_TITLE[id];
+}
 
 const SVC_CARD_THEME = {
   legal:    { bgFrom:'#EEF2FF', bgTo:'#E0E7FF', b1:'#818CF8', b2:'#6366F1', glow:'rgba(99,102,241,0.18)', img:'/home-models/legal.png' },
@@ -1997,7 +2018,7 @@ const SVC_CARD_THEME = {
 
 const HOME_CARD_META = {
   legal:    { commitment:'Justice with a human touch.',     face:'Adv. Priya · verified lawyer' },
-  cloud:    { commitment:'Scale with confidence.',          face:'Cloud · infra · 18 services' },
+  cloud:    { commitment:'Scale with confidence.',          face:'AI · cloud · data center · 18 services' },
   vip:      { commitment:'You first. Every single time.',   face:'Meera · concierge lead' },
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
   property: { commitment:'Find home. Find peace.',          face:'Verified listings · PCMC' },
@@ -2130,7 +2151,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   const theme = SVC_CARD_THEME[svc.id] || SVC_CARD_THEME.legal;
   const meta = HOME_CARD_META[svc.id] || {};
   const d = SVC_DETAIL[svc.id] || {};
-  const title = SVC_SHORT[svc.id] ? `${SVC_SHORT[svc.id]} services` : svc.name;
+  const title = HOME_CARD_TITLE[svc.id] || svc.name;
   const imgH = compact ? 72 : hero ? 168 : 132;
 
   if (hero && !compact) {
@@ -4179,7 +4200,7 @@ function RegistrationFlow({ onComplete, prefill }) {
       <div style={{fontSize:40,textAlign:'center',marginBottom:12}}>📍</div>
       <div style={{color:C.txt,fontSize:17,fontWeight:600,textAlign:'center',marginBottom:8}}>Welcome to ScanV</div>
       <div style={{color:C.sub,fontSize:12,textAlign:'center',lineHeight:1.65,marginBottom:10}}>
-        Find and book verified services near you — Legal, Health, Cloud Services, Property, Household, Food & more.
+        Find and book verified services near you — Legal & Consulting, Health at Home, AI Cloud & Data Center, Property, Home Help, Food & more.
       </div>
       {/* DPDP consent -- compact as requested */}
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:18,fontSize:11,color:C.dim,lineHeight:1.6}}>
@@ -4486,7 +4507,7 @@ function HomeScreen() {
 // Service detail data
 const SVC_DETAIL = {
   legal:    { desc:'Verified lawyers for consultation, drafting, registration, and court filings — 8 ScanV legal services · 25% off.', features:['Lawyer consultation','Document drafting','Property registration','Court filing support','Rental agreements & notary'], turnaround:'Within 24 hours', rating:'4.8 ⭐', bookings:'2,400+' },
-  cloud:    { desc:'Enterprise cloud hosting, infrastructure, managed IT, turnkey packages, and training — 18 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Datacenter & network design','Infrastructure audits & roadmaps','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,600+' },
+  cloud:    { desc:'AI, cloud hosting, data center, managed IT, turnkey packages, and training — 18 ScanV services · 25% off.', features:['IaaS · PaaS · SaaS hosting','Data Center & network design','Infrastructure audits & roadmaps','Turnkey office & OTT packs','Learning & streaming platforms'], turnaround:'From 24 hours', rating:'4.9 ⭐', bookings:'7,600+' },
   vip:      { desc:'Premium concierge, executive assistant, airport transfers, and event planning — 6 VIP services · 25% off.', features:['24×7 personal concierge','Executive assistant hourly','Premium dining reservations','Airport transfers','Event planning'], turnaround:'Same day', rating:'5.0 ⭐', bookings:'800+' },
   health:   { desc:'Doctors at home, lab tests, pharmacy delivery, nursing, and vaccinations — 8 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Nursing care at home','Vaccination at home'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent, verify, and finance property in PCMC/Pune — 6 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Commercial space search','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
