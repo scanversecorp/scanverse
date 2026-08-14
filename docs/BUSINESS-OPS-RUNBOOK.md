@@ -14,12 +14,26 @@
 
 ```bash
 node scripts/business_growth_agent.mjs
+node scripts/send_vendor_outreach.mjs    # ScanV MSG91 WhatsApp agent (autonomous)
+bash scripts/open-vendor-whatsapp-links.sh   # Mac fallback — opens 5 chats in Safari
 ```
 
 Reads `.env` for `ADMIN_HUB_PIN` / `SUPPORT_ADMIN_PIN`. Outputs:
 - Top 5 household vendors to call/WhatsApp (Wakad/PCMC priority)
 - Logistics follow-ups due
 - Card priority queue
+
+### ScanV WhatsApp outreach agent
+
+When `MSG91_WHATSAPP_INTEGRATED_NUMBER` is set (already used for customer OTP):
+
+```bash
+node scripts/send_vendor_outreach.mjs
+```
+
+Or **Business HQ → Send all 5 via ScanV WA**. Marks leads `contacted` automatically. No personal Mac WhatsApp needed.
+
+If MSG91 cold outbound fails, register a Meta template `scanv_vendor_outreach` in MSG91 dashboard.
 
 Lightweight pulse:
 

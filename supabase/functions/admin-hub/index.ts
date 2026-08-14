@@ -118,6 +118,11 @@ import {
   updateCardBusiness,
 } from "../_shared/business-command-admin.ts";
 import {
+  outreachAgentStatus,
+  sendStrikeListOutreach,
+  sendVendorOutreach,
+} from "../_shared/vendor-outreach-admin.ts";
+import {
   hasPermission,
   iamWhoamiPayload,
   requireHubPermission,
@@ -1458,7 +1463,7 @@ Deno.serve(async (req) => {
   if (action === "get_business_command") {
     try {
       const data = await getBusinessCommand(sb);
-      return json(data);
+      return json({ ...data, outreach_agent: outreachAgentStatus() });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Business command failed";
       return json({ error: msg }, 500);
@@ -1469,6 +1474,22 @@ Deno.serve(async (req) => {
     const result = await updateCardBusiness(sb, body);
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, card: result.card });
+  }
+
+  if (action === "send_vendor_outreach") {
+    const gate = requireHubPermission(iam, "send_vendor_outreach");
+    if (gate) return gate;
+    const result = await sendVendorOutreach(sb, body, iam.actor);
+    if (result.error) return json(result, result.configured === false ? 503 : 400);
+    return json(result);
+  }
+
+  if (action === "send_strike_list_outreach") {
+    const gate = requireHubPermission(iam, "send_strike_list_outreach");
+    if (gate) return gate;
+    const result = await sendStrikeListOutreach(sb, body, iam.actor);
+    if (result.error && !result.results) return json(result, result.configured === false ? 503 : 400);
+    return json(result);
   }
 
   return json({ error: "Unknown action" }, 400);

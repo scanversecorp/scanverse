@@ -23,6 +23,7 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [msg, setMsg] = useState('');
+  const [blastBusy, setBlastBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -95,6 +96,38 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
     }
   };
 
+  const sendViaScanV = async (leadId) => {
+    setBusyId(leadId);
+    setMsg('');
+    try {
+      const r = await adminHubFetch('send_vendor_outreach', { lead_id: leadId }, pin);
+      if (r?.error) throw new Error(r.error);
+      setMsg(`Sent via ${r.provider || 'ScanV WhatsApp'}`);
+      await load();
+    } catch (e) {
+      setMsg(e.message || 'Send failed');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const blastStrikeList = async () => {
+    setBlastBusy(true);
+    setMsg('');
+    try {
+      const r = await adminHubFetch('send_strike_list_outreach', { limit: 5 }, pin);
+      if (r?.error && !r?.results) throw new Error(r.error);
+      setMsg(`Agent sent ${r.sent || 0}/${(r.results || []).length} via ScanV WhatsApp`);
+      await load();
+    } catch (e) {
+      setMsg(e.message || 'Blast failed');
+    } finally {
+      setBlastBusy(false);
+    }
+  };
+
+  const agent = data?.outreach_agent || {};
+
   const waUrl = (phone, text) => {
     const d = String(phone || '').replace(/\D/g, '');
     if (!d) return null;
@@ -133,8 +166,20 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
 
       {(strike.vendors || []).length ? (
         <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
-          <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6, fontSize: 13 }}>Today&apos;s strike list — call / WhatsApp</div>
-          <div style={{ fontSize: 10, color: C.dim, marginBottom: 10 }}>Household · Wakad/PCMC priority · agent picks these daily</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+            <div style={{ fontWeight: 800, color: C.txt, fontSize: 13 }}>Today&apos;s strike list — call / WhatsApp</div>
+            {agent.whatsapp_configured ? (
+              <Btn v="primary" sm type="button" disabled={blastBusy} onClick={blastStrikeList}>
+                {blastBusy ? 'Sending…' : '🤖 Send all 5 via ScanV WA'}
+              </Btn>
+            ) : (
+              <span style={{ fontSize: 10, color: C.gold, fontWeight: 700 }}>Agent: configure MSG91 WA → auto-send</span>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: C.dim, marginBottom: 10 }}>
+            Household · Wakad/PCMC priority
+            {agent.business_number ? ` · from ${agent.business_number}` : ''}
+          </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {strike.vendors.slice(0, 5).map((v) => (
               <div key={v.lead_id} style={{ padding: 10, borderRadius: 10, border: `1px solid ${C.bdr}`, background: `${C.gold}08` }}>
@@ -145,6 +190,9 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
                   <a href={`tel:${String(v.phone).replace(/\s/g, '')}`} style={{ fontSize: 10, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>Call →</a>
                   {waUrl(v.phone, v.outreach_message) ? (
                     <a href={waUrl(v.phone, v.outreach_message)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color: C.grn, textDecoration: 'none' }}>WhatsApp →</a>
+                  ) : null}
+                  {agent.whatsapp_configured ? (
+                    <Btn v="outline" sm type="button" disabled={busyId === v.lead_id} onClick={() => sendViaScanV(v.lead_id)}>ScanV send</Btn>
                   ) : null}
                   <Btn v="outline" sm type="button" disabled={busyId === v.lead_id} onClick={() => markContacted(v.lead_id)}>Mark contacted</Btn>
                 </div>
