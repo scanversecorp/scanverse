@@ -81,6 +81,8 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   list_external_trips: "hub.stats",
   quote_external_trip: "hub.dispatch",
   create_external_trip: "hub.dispatch",
+  get_business_command: "hub.stats",
+  update_card_business: "hub.settings",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

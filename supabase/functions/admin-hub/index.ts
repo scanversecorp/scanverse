@@ -114,6 +114,10 @@ import {
   quoteExternalTrip,
 } from "../_shared/external-logistics.ts";
 import {
+  getBusinessCommand,
+  updateCardBusiness,
+} from "../_shared/business-command-admin.ts";
+import {
   hasPermission,
   iamWhoamiPayload,
   requireHubPermission,
@@ -1449,6 +1453,22 @@ Deno.serve(async (req) => {
     const result = await createExternalTrip(sb, body);
     if (result.error) return json(result, result.configured ? 501 : 400);
     return json(result);
+  }
+
+  if (action === "get_business_command") {
+    try {
+      const data = await getBusinessCommand(sb);
+      return json(data);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Business command failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "update_card_business") {
+    const result = await updateCardBusiness(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, card: result.card });
   }
 
   return json({ error: "Unknown action" }, 400);

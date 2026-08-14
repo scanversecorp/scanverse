@@ -19,6 +19,7 @@ import QRCode from 'qrcode';
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
 const AdminLogisticsPartnersTab = lazy(() => import('./admin-logistics-partners').then((m) => ({ default: m.AdminLogisticsPartnersTab })));
+const AdminBusinessCommandTab = lazy(() => import('./admin-business-command').then((m) => ({ default: m.AdminBusinessCommandTab })));
 const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
 const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ default: m.AdminAddUserPanel })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
@@ -11425,6 +11426,7 @@ const SB_DASH = `https://supabase.com/dashboard/project/${SB_PROJECT}`;
 
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
+  { id: 'business', label: 'Business HQ', icon: '🎯' },
   { id: 'index', label: 'URL Index', icon: '🔗' },
   { id: 'pricing', label: 'Pricing', icon: '💰' },
   { id: 'support', label: 'Customer Support', icon: '🎧' },
@@ -13547,6 +13549,12 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'go-live' && (
           <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => navigateAdminTab('vendors')} />
+        )}
+
+        {tab === 'business' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading Business HQ…</div>}>
+            <AdminBusinessCommandTab pin={usePin} adminHubFetch={adminHubFetch} onNavigateTab={navigateAdminTab} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
+          </Suspense>
         )}
 
         {tab === 'vendor-leads' && usePin && (
