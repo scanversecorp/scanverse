@@ -1,9 +1,9 @@
 TO: info@qwqer.in
-SUBJECT: QWQER Express API + Pune pilot — ScanV (DCore)
+SUBJECT: QWQER Express API + Pune pilot — ScanV
 
 Dear QWQER Team,
 
-We are ScanV (DCore), building a customer booking portal for Pune and PCMC.
+We are ScanV, building a customer booking portal for Pune and PCMC.
 
 We are interested in QWQER Express API integration for intra-city deliveries: ScanV handles booking and payment; QWQER fulfills; ScanV displays live tracking and status to the customer.
 
@@ -20,11 +20,12 @@ We would appreciate a callback or intro to your API / business development team.
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com
 
 ================================================================================
 
+
+(Operated by DCore)

@@ -2165,7 +2165,8 @@ function FooterLegalLinks({ current, small }) {
 function CopyrightLine({ style }) {
   return (
     <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.45, ...style }}>
-      <div>© All rights reserved. DCore · ScanV</div>
+      <div>© ScanV</div>
+      <div style={{ marginTop: 4, fontSize: 10, color: '#888' }}>Operated by DCore</div>
       <div style={{ marginTop: 4 }}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
@@ -5535,7 +5536,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'-0.02em'}}>
         <span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span>
       </div>
-      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCore · ScanV · {LOCAL_COMMUNITIES}</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:3}}>ScanV · {LOCAL_COMMUNITIES}</div>
       <div style={{fontSize:10,color:C.dim,marginTop:4,lineHeight:1.4}}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
@@ -13797,7 +13798,8 @@ function LegalPage({page}) {
         <div style={{background:`linear-gradient(135deg,${C.surf},${C.card})`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'28px 24px',marginBottom:28}}>
           <div style={{display:'inline-block',background:C.acc,color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,letterSpacing:1,marginBottom:10}}>{pg.badge}</div>
           <div style={{color:C.txt,fontSize:24,fontWeight:800,marginBottom:4}}>{pg.title}</div>
-          <div style={{color:C.sub,fontSize:12}}>DCore · ScanV · Updated: {pg.updated}</div>
+          <div style={{color:C.sub,fontSize:12}}>ScanV · Updated: {pg.updated}</div>
+          <div style={{color:C.dim,fontSize:10,marginTop:4}}>Operated by DCore</div>
         </div>
         {/* Content */}
         {pg.content}

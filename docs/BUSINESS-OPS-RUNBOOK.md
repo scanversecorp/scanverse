@@ -67,7 +67,7 @@ node scripts/post-deploy-validate.mjs
 | Logistics partners | `docs/email-*-plain.txt` |
 | Logistics follow-up | `docs/email-followup-plain.txt` |
 
-Signatory: **ScanV · DCore** · connect@dcoreglobal.com · +91-9270194842
+Signatory: **ScanV** · connect@dcoreglobal.com · +91-9270194842
 
 ## Human-only (cannot automate)
 

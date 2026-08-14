@@ -1,15 +1,15 @@
 ================================================================================
 SCANV LOGISTICS PARTNER OUTREACH — copy each block into Zoho Mail → Send
-From: connect@dcoreglobal.com | Sign: ScanV · DCore | +91-9270194842
+From: connect@dcoreglobal.com | Sign: ScanV | +91-9270194842
 ================================================================================
 
 --- EMAIL 1: PORTER ---
 TO: help@porter.in
-SUBJECT: API integration + Pune pilot — ScanV (DCore)
+SUBJECT: API integration + Pune pilot — ScanV
 
 Dear Porter Enterprise Team,
 
-We are ScanV, a customer-facing services and logistics portal operated by DCore, focused initially on Pune and PCMC.
+We are ScanV, a customer-facing services and logistics portal, focused initially on Pune and PCMC.
 
 We are exploring a Porter Enterprise API integration so customers can book local shipments on ScanV while fulfillment runs on Porter's network — with live driver tracking shown inside the ScanV app (customers would not need to switch to the Porter consumer app).
 
@@ -39,8 +39,7 @@ We would appreciate a callback or introduction to your API / enterprise integrat
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com
@@ -49,11 +48,11 @@ Email: connect@dcoreglobal.com
 
 --- EMAIL 2: BORZO ---
 TO: sales.in@borzodelivery.com
-SUBJECT: Business API + Pune pilot — ScanV (DCore)
+SUBJECT: Business API + Pune pilot — ScanV
 
 Dear Borzo Team,
 
-We are ScanV, a customer-facing logistics portal by DCore, starting in Pune and PCMC.
+We are ScanV, a customer-facing logistics portal, starting in Pune and PCMC.
 
 We want to integrate Borzo Business API 1.8 so customers book on ScanV, we create Borzo trips via API, and show live driver tracking inside ScanV (customers stay on our app).
 
@@ -70,8 +69,7 @@ We have reviewed your API docs (calculate-order, create-order). Happy to share a
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com
@@ -80,11 +78,11 @@ Email: connect@dcoreglobal.com
 
 --- EMAIL 3: SHADOWFAX ---
 TO: hello@shadowfax.in
-SUBJECT: Hyperlocal API + Pune pilot — ScanV (DCore)
+SUBJECT: Hyperlocal API + Pune pilot — ScanV
 
 Dear Shadowfax Team,
 
-We are ScanV (DCore), a customer portal for local deliveries in Pune and PCMC.
+We are ScanV, a customer portal for local deliveries in Pune and PCMC.
 
 We want Shadowfax hyperlocal API integration: customer books on ScanV → we create the trip via API → live rider tracking in ScanV (not a separate consumer app).
 
@@ -102,8 +100,7 @@ Please connect us with your enterprise / API integrations team.
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com
@@ -112,11 +109,11 @@ Email: connect@dcoreglobal.com
 
 --- EMAIL 4: QWQER ---
 TO: info@qwqer.in
-SUBJECT: QWQER Express API + Pune pilot — ScanV (DCore)
+SUBJECT: QWQER Express API + Pune pilot — ScanV
 
 Dear QWQER Team,
 
-We are ScanV (DCore), building a customer booking portal for Pune and PCMC.
+We are ScanV, building a customer booking portal for Pune and PCMC.
 
 We are interested in QWQER Express API integration for intra-city deliveries: ScanV handles booking and payment; QWQER fulfills; ScanV displays live tracking and status to the customer.
 
@@ -133,8 +130,7 @@ We would appreciate a callback or intro to your API / business development team.
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com
@@ -143,11 +139,11 @@ Email: connect@dcoreglobal.com
 
 --- EMAIL 5: DELHIVERY ---
 TO: vendordesk@delhivery.com
-SUBJECT: API partnership + Pune hyperlocal pilot — ScanV (DCore)
+SUBJECT: API partnership + Pune hyperlocal pilot — ScanV
 
 Dear Delhivery Team,
 
-We are ScanV (DCore), a customer-facing delivery portal focused on Pune and PCMC, with plans to scale nationally.
+We are ScanV, a customer-facing delivery portal focused on Pune and PCMC, with plans to scale nationally.
 
 We want Delhivery API integration for:
 - Hyperlocal / same-day (Pune pilot)
@@ -167,8 +163,7 @@ Please assign a business development / integration contact for a Pune pilot.
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com

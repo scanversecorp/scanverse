@@ -57,7 +57,7 @@ const VENDOR_OUTREACH_MSG = (name) => {
   return [
     'नमस्कार / नमस्ते 🙏',
     '',
-    'आम्ही ScanV · DCore — Wakad व PCMC मध्ये local services booking app.',
+    'आम्ही ScanV — Wakad व PCMC मध्ये local services booking app.',
     '',
     `आम्ही verified customers च्या cleaning / home service bookings partners ला पाठवतो. ${n} सोबत partner करू इच्छितो.`,
     '',
@@ -67,7 +67,7 @@ const VENDOR_OUTREACH_MSG = (name) => {
     '',
     'सकाळ 10 — संध्याकाळ 7 (IST) दरम्यान 10 min call होईल का? 📞',
     '',
-    'ScanV · DCore | 9270194842',
+    'ScanV | 9270194842',
   ].join('\n');
 };
 

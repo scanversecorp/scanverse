@@ -1,5 +1,5 @@
 Hi,
 
-Following up on my email regarding ScanV (DCore) API integration and a Pune pilot.
+Following up on my email regarding ScanV API integration and a Pune pilot.
 
 Happy to join a short call or share a one-pager. Please let me know the next step for sandbox access and API documentation.

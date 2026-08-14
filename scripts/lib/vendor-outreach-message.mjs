@@ -1,4 +1,4 @@
-/** Shared vendor outreach copy — Marathi + Hindi (Pune/PCMC). Team voice: ScanV · DCore. */
+/** Shared vendor outreach copy — Marathi + Hindi (Pune/PCMC). Brand: ScanV only. */
 export const SCANV_BUSINESS_PHONE = '9270194842';
 export const SCANV_BUSINESS_PHONE_DISPLAY = '+91-9270194842';
 
@@ -7,7 +7,7 @@ export function vendorOutreachMessage(businessName = 'partner') {
   return [
     'नमस्कार / नमस्ते 🙏',
     '',
-    'आम्ही ScanV · DCore — Wakad व PCMC मध्ये local services booking app.',
+    'आम्ही ScanV — Wakad व PCMC मध्ये local services booking app.',
     '',
     `आम्ही verified customers च्या cleaning / home service bookings partners ला पाठवतो. ${name} सोबत partner करू इच्छितो.`,
     '',
@@ -17,7 +17,7 @@ export function vendorOutreachMessage(businessName = 'partner') {
     '',
     'सकाळ 10 — संध्याकाळ 7 (IST) दरम्यान 10 min call होईल का? 📞',
     '',
-    `ScanV · DCore | ${SCANV_BUSINESS_PHONE}`,
+    `ScanV | ${SCANV_BUSINESS_PHONE}`,
   ].join('\n');
 }
 

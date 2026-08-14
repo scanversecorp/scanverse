@@ -1,9 +1,9 @@
 TO: vendordesk@delhivery.com
-SUBJECT: API partnership + Pune hyperlocal pilot — ScanV (DCore)
+SUBJECT: API partnership + Pune hyperlocal pilot — ScanV
 
 Dear Delhivery Team,
 
-We are ScanV (DCore), a customer-facing delivery portal focused on Pune and PCMC, with plans to scale nationally.
+We are ScanV, a customer-facing delivery portal focused on Pune and PCMC, with plans to scale nationally.
 
 We want Delhivery API integration for:
 - Hyperlocal / same-day (Pune pilot)
@@ -23,10 +23,11 @@ Please assign a business development / integration contact for a Pune pilot.
 
 Thank you,
 
-ScanV · DCore
-ScanV · DCore
+ScanV
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com
 
 ================================================================================
+
+(Operated by DCore)
