@@ -1,7 +1,7 @@
 /**
  * ScanV v5.5 -- Daylight Trust UI
- * DCORE Global Corporation · Global marketplace
  * URL: https://scanv-tau.vercel.app
+ * DCORE Global Corporation · Global marketplace
  * Daylight Trust: #f2efe8 · #d63a56 · Android-first
  *
  * OTP FIX: Using Fast2SMS (India, free tier) directly from client
@@ -12,10 +12,11 @@
 
 import {
   useState, useEffect, useRef, useCallback, useMemo,
-  createContext, useContext, useReducer, Component
+  createContext, useContext, useReducer, Component, lazy, Suspense
 } from 'react';
 import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
+const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
@@ -11540,93 +11541,6 @@ function AdminGpsStatusTab({ pin }) {
   );
 }
 
-const ADMIN_MERMAID_ARCH = `flowchart TB
-    C[Customer] --> PWA[ScanV PWA]
-    PART[Service partner] --> PWA
-    ADM[Leader Admin PIN] --> PWA
-    PWA --> SB[Supabase DB Auth Edge Functions]
-    SB --> OTP[2Factor MSG91 Twilio toggles]
-    SB --> PAY[Vyapar UPI Razorpay toggles]
-    PWA --> UPI[Google Pay PhonePe Paytm Navi BHIM]`;
-
-const ADMIN_MERMAID_DATAFLOW = `sequenceDiagram
-    actor C as Customer
-    participant PWA as ScanV PWA
-    participant OTP as send-otp
-    participant PAY as razorpay-payment
-    participant DISP as booking-dispatch
-    participant P as Partner
-    C->>PWA: Browse book verify OTP
-    C->>PWA: Pay UPI or Razorpay
-    PWA->>PAY: check amount_ok
-    PWA->>DISP: start dispatch
-    DISP->>P: In-app offer plus SMS backup
-    P->>DISP: accept
-    C->>PWA: Track booking`;
-
-function AdminDiagramsTab() {
-  const [view, setView] = useState('architecture');
-  const hostRef = useRef(null);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    setErr('');
-    const run = async () => {
-      try {
-        if (!window.mermaid) {
-          await new Promise((resolve, reject) => {
-            const existing = document.querySelector('script[data-scanv-mermaid]');
-            if (existing) { existing.addEventListener('load', resolve); return; }
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
-            s.dataset.scanvMermaid = '1';
-            s.onload = resolve;
-            s.onerror = reject;
-            document.head.appendChild(s);
-          });
-          window.mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
-        }
-        if (cancelled || !hostRef.current) return;
-        const src = view === 'architecture' ? ADMIN_MERMAID_ARCH : ADMIN_MERMAID_DATAFLOW;
-        hostRef.current.innerHTML = '';
-        const el = document.createElement('div');
-        el.className = 'mermaid';
-        el.textContent = src;
-        hostRef.current.appendChild(el);
-        await window.mermaid.run({ nodes: [el] });
-      } catch (e) {
-        if (!cancelled) setErr(e.message || 'Could not render diagram');
-      }
-    };
-    run();
-    return () => { cancelled = true; };
-  }, [view]);
-
-  const tabBtn = (id, label) => ({
-    padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${view === id ? C.acc : C.bdr}`,
-    background: view === id ? `${C.acc}18` : C.surf, color: view === id ? C.acc : C.sub,
-    fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF,
-  });
-
-  return (
-    <div>
-      <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
-        <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Confidential — Admin only</div>
-        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
-          Architecture and data-flow diagrams are not published on the public site. Provider boundaries may change as integrations are added — use Go-Live vendor toggles. Repo: <code style={{ color: C.acc }}>docs/ARCHITECTURE.md</code> · <code style={{ color: C.acc }}>docs/APP-DATA-FLOW.md</code> · <code style={{ color: C.acc }}>docs/REGULATORY-APPROVALS-INDIA.md</code>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <button type="button" style={tabBtn('architecture', '')} onClick={() => setView('architecture')}>System architecture</button>
-        <button type="button" style={tabBtn('dataflow', '')} onClick={() => setView('dataflow')}>Application data flow</button>
-      </div>
-      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{err}</div>}
-      <div ref={hostRef} style={{ ...S.card(), padding: 16, overflowX: 'auto', minHeight: 280 }} />
-    </div>
-  );
-}
-
 function AdminDeepLinkBtn({ hash, label }) {
   return (
     <a href={adminDeepLink(hash)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
@@ -12755,7 +12669,11 @@ function AdminControlCenter({ onPricesUpdated }) {
           <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => setTab('vendors')} />
         )}
 
-        {tab === 'diagrams' && <AdminDiagramsTab />}
+        {tab === 'diagrams' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading diagram viewer…</div>}>
+            <AdminDiagramsTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} />
+          </Suspense>
+        )}
 
         {tab === 'database' && (
           <div>

@@ -1,0 +1,212 @@
+[
+  {
+    "id": "architecture",
+    "label": "Architecture",
+    "diagrams": [
+      {
+        "id": "sys-context",
+        "title": "System context",
+        "desc": "Customers, partners, agents, leaders · ScanV PWA · Supabase · OTP · UPI · payments · maps.",
+        "mermaid": "flowchart TB\n    subgraph People\n        CU[Customer browse and book]\n        PT[Service partner jobs GPS]\n        AG[Support agent tickets]\n        LD[Leader admin go-live]\n    end\n    PWA[ScanV PWA React Vercel]\n    SB[Supabase Postgres Auth Edge Functions]\n    TF[2Factor.in SMS OTP]\n    M91[MSG91 fallback]\n    TW[Twilio fallback dispatch]\n    VYP[HDFC Vyapar UPI webhooks]\n    UPI[Google Pay PhonePe Paytm Navi BHIM]\n    RZ[Razorpay backup links]\n    DG[Digio partner eKYC optional]\n    MAP[OSM Nominatim geocode]\n    CU --> PWA\n    PT --> PWA\n    AG --> PWA\n    LD --> PWA\n    PWA --> SB\n    SB --> TF\n    SB --> M91\n    SB --> TW\n    SB --> VYP\n    SB --> RZ\n    SB --> DG\n    PWA --> UPI\n    PWA --> MAP"
+      },
+      {
+        "id": "deployment",
+        "title": "Deployment architecture",
+        "desc": "Vercel CDN · PWA · platform-config · Supabase · external providers · pg_cron.",
+        "mermaid": "flowchart TB\n    subgraph Client\n        PWA[ScanV PWA App.js]\n        SW[Service Worker]\n        SS[sessionStorage admin PIN]\n        PC[platform-config vendor flags]\n    end\n    subgraph Vercel\n        CDN[Static CDN]\n        RW[SPA rewrite index.html]\n    end\n    subgraph Supabase\n        AUTH[GoTrue Auth]\n        DB[(PostgreSQL RLS)]\n        EF[Edge Functions x11]\n        RT[Realtime pricing]\n        CRON[pg_cron dispatch]\n        PS[platform_settings]\n    end\n    subgraph Providers\n        OTP[2Factor MSG91 Twilio]\n        PAY[Vyapar UPI Razorpay]\n        UPIA[GPay PhonePe Paytm]\n        EKYC[Digio eKYC]\n    end\n    PWA --> CDN\n    PWA --> PC\n    PC --> EF\n    PWA --> AUTH\n    PWA --> DB\n    PWA --> EF\n    PWA --> RT\n    EF --> DB\n    EF --> PS\n    EF --> OTP\n    EF --> PAY\n    PWA --> UPIA\n    EF --> EKYC\n    CRON --> EF\n    PAY -->|webhook| EF\n    OTP -->|delivery report| EF"
+      },
+      {
+        "id": "edge-functions",
+        "title": "Edge functions map",
+        "desc": "All 11 Supabase edge functions · public vs PIN vs secret auth.",
+        "mermaid": "flowchart LR\n    subgraph Public\n        SO[send-otp]\n        RP[razorpay-payment]\n        VO[vendor-onboard]\n        ST[support-tickets public]\n        PC[platform-config]\n        WA[whatsapp-verify]\n        ODR[otp-delivery-report]\n    end\n    subgraph PIN\n        PA[pricing-admin]\n        AH[admin-hub]\n        CS[customer-support]\n        ST2[support-tickets agent]\n        VO2[vendor-onboard admin]\n    end\n    subgraph Secret\n        BD[booking-dispatch]\n    end\n    PWA[ScanV PWA] --> Public\n    PWA --> PIN\n    CRON[pg_cron] --> BD\n    RZ[Razorpay webhook] --> RP\n    VY[Vyapar webhook] --> RP\n    TF2[2Factor callback] --> ODR\n    INB[MSG91 Twilio inbound] --> WA"
+      },
+      {
+        "id": "vendor-toggles",
+        "title": "Vendor and provider toggles",
+        "desc": "Admin Go-Live writes platform_settings · edge functions and PWA read flags.",
+        "mermaid": "flowchart LR\n    GL[Admin Go-Live UI] --> AH[admin-hub]\n    AH --> PS[(platform_settings)]\n    PS --> SO[send-otp skip routes]\n    PS --> RP[razorpay-payment gates]\n    PS --> WA[whatsapp-verify gate]\n    PS --> PC[platform-config]\n    PC --> PAY[Payment UI UPI buttons]"
+      },
+      {
+        "id": "database",
+        "title": "Database schema core",
+        "desc": "Core Postgres tables and relationships.",
+        "mermaid": "erDiagram\n    profiles ||--o{ bookings : places\n    profiles ||--o{ service_requests : creates\n    bookings ||--o| booking_dispatch : triggers\n    booking_dispatch ||--o{ partner_job_offers : offers\n    vendor_partners ||--o{ vendor_partner_services : offers\n    vendor_partners ||--o{ vendor_live_locations : tracks\n    support_tickets ||--o{ support_ticket_comments : has\n    payment_intents ||--|| bookings : verifies\n    service_pricing ||--|| service_prices_public : publishes\n    platform_settings ||--o{ go_live_checks : ticks\n    otp_delivery_reports ||--o{ send_otp : traces\n    wa_verifications ||--o{ whatsapp_verify : tokens"
+      },
+      {
+        "id": "admin-access",
+        "title": "Admin and support access",
+        "desc": "PIN secrets map to hash routes and edge functions.",
+        "mermaid": "flowchart TD\n    subgraph Secrets\n        AHP[ADMIN_HUB_PIN]\n        SAP[SUPPORT_ADMIN_PIN]\n        SGP[SUPPORT_AGENT_PIN]\n        PAP[PRICING_ADMIN_PIN]\n        VAP[VENDOR_ADMIN_PIN]\n    end\n    subgraph Routes\n        ADM[admin hub go-live]\n        EXE[exec dashboard]\n        PRC[pricing-admin 2FA]\n        SUP[customer-support]\n        VAD[vendor-admin]\n        OTPR[otp-delivery-report]\n    end\n    AHP --> ADM\n    AHP --> EXE\n    SAP --> ADM\n    SAP --> SUP\n    PAP --> ADM\n    PAP --> PRC\n    VAP --> ADM\n    VAP --> VAD\n    SGP --> SUP\n    ADM --> AH[admin-hub]\n    EXE --> AH\n    PRC --> PA[pricing-admin]\n    SUP --> CS[customer-support]"
+      },
+      {
+        "id": "security",
+        "title": "Security layers",
+        "desc": "HTTPS · RLS · edge auth · payment validation · go-live switches · session cache.",
+        "mermaid": "flowchart TB\n    L1[Vercel HTTPS CDN]\n    L2[Supabase RLS tables]\n    L3[Edge PIN webhook dispatch secret]\n    L4[Payment amount_ok server check]\n    L5[Go-Live otp_dev_mode OFF prod]\n    L6[sessionStorage admin PIN 24h]\n    L1 --> L2 --> L3 --> L4 --> L5 --> L6"
+      }
+    ]
+  },
+  {
+    "id": "dataflow",
+    "label": "Data flows",
+    "diagrams": [
+      {
+        "id": "booking-e2e",
+        "title": "Customer booking end-to-end",
+        "desc": "Browse · OTP · payment · booking · dispatch · track.",
+        "mermaid": "sequenceDiagram\n    actor C as Customer\n    participant PWA as ScanV PWA\n    participant PC as platform-config\n    participant SB as Supabase DB\n    participant OTP as send-otp\n    participant TF as 2Factor MSG91 Twilio\n    participant PAY as razorpay-payment\n    participant UPI as UPI Vyapar GPay\n    participant DISP as booking-dispatch\n    participant P as Partner\n    C->>PWA: Open app or QR browse\n    PWA->>PC: GET vendor flags\n    PWA->>SB: pricing Realtime\n    C->>PWA: Book form mobile terms\n    PWA->>OTP: send OTP\n    OTP->>TF: SMS enabled providers\n    C->>PWA: Verify OTP\n    C->>PWA: Payment screen\n    PWA->>UPI: QR or deep link\n    UPI->>PAY: webhook or poll\n    loop Every 3s\n        PWA->>PAY: check amount_ok\n    end\n    PWA->>SB: INSERT booking\n    PWA->>DISP: start dispatch\n    DISP->>P: in-app offer SMS backup\n    P->>DISP: accept\n    C->>PWA: track screen"
+      },
+      {
+        "id": "payment",
+        "title": "Payment flow",
+        "desc": "Vyapar QR · UPI apps · Razorpay backup · server amount_ok check.",
+        "mermaid": "flowchart TD\n    A[Payment screen] --> B[Load platform-config]\n    B --> C[TXN ref amount_paise]\n    C --> D{vyapar_upi ON?}\n    D -->|Yes| E[Vyapar dynamic QR]\n    D -->|No| F[Skip Vyapar]\n    E --> G{UPI apps enabled?}\n    F --> G\n    G --> H[GPay PhonePe deep links]\n    H --> J[Customer pays]\n    J --> K[Poll check every 3s]\n    K --> L{verified amount_ok?}\n    L -->|No| K\n    L -->|Yes| M[Continue booking]\n    C --> N{razorpay ON?}\n    N -->|Yes| O[Razorpay webhook]\n    O --> K"
+      },
+      {
+        "id": "otp",
+        "title": "OTP and identity",
+        "desc": "2Factor primary · MSG91 Twilio fallback · WhatsApp backup · GoTrue profile.",
+        "mermaid": "flowchart LR\n    B1[Home browse] --> V1[Mobile terms]\n    V1 --> V2[send-otp]\n    V2 --> V3[2Factor India]\n    V3 --> V4[MSG91 Twilio fallback]\n    V4 --> V5[Verify OTP]\n    V5 --> V6[GoTrue session profiles]\n    V1 -.-> W1[whatsapp-verify]\n    W1 --> W2[user replies token]\n    W2 --> V6\n    V3 --> RPT[otp-delivery-report]"
+      },
+      {
+        "id": "dispatch",
+        "title": "Partner dispatch",
+        "desc": "Nearest GPS · in-app offer 60s · SMS call WhatsApp backup · pg_cron.",
+        "mermaid": "sequenceDiagram\n    participant PWA as ScanV PWA\n    participant DISP as booking-dispatch\n    participant DB as PostgreSQL\n    participant P1 as Partner 1\n    participant P2 as Partner 2\n    participant N as SMS call WhatsApp\n    PWA->>DISP: start after paid booking\n    DISP->>DB: nearest vendors GPS\n    DISP->>P1: in-app offer 60s\n    DISP->>N: backup alert\n    alt Accept\n        P1->>DISP: accept\n    else Timeout\n        DISP->>P2: next partner\n    end"
+      },
+      {
+        "id": "go-live",
+        "title": "Admin Go-Live config",
+        "desc": "Runtime switches · vendor toggles · secrets · manual checklist.",
+        "mermaid": "flowchart TD\n    L[Leader Go-Live tab] --> AH[admin-hub get_go_live_config]\n    AH --> R[Runtime switches]\n    AH --> V[12 vendor toggles]\n    AH --> S[Secret status]\n    AH --> M[Manual checklist]\n    L --> U1[update_go_live_switch]\n    U1 --> PS[(platform_settings)]\n    PS --> EF[Edge functions]\n    PS --> PC[platform-config]\n    PC --> PWA[Customer UI]"
+      },
+      {
+        "id": "support",
+        "title": "Support tickets",
+        "desc": "Public report and track · agent desk resolve.",
+        "mermaid": "flowchart TD\n    R1[report form] --> R2[support-tickets create]\n    T1[track-ticket] --> R2\n    A1[customer-support] --> A2[search timeline]\n    R2 -.-> A2\n    A2 --> A3[resolve]"
+      },
+      {
+        "id": "pricing",
+        "title": "Pricing admin",
+        "desc": "PIN plus TOTP 2FA · service_pricing · Realtime to all clients.",
+        "mermaid": "flowchart LR\n    A[pricing-admin] --> B{PIN and TOTP}\n    B -->|OK| D[GET pricing rows]\n    D --> E[Edit UI save]\n    E --> G[service_pricing]\n    G --> H[service_prices_public]\n    H --> I[Realtime broadcast]\n    I --> J[All PWAs refetch]"
+      },
+      {
+        "id": "tracking",
+        "title": "Live tracking",
+        "desc": "Partner GPS · dispatch status · customer track screen.",
+        "mermaid": "flowchart LR\n    PG[Partner GPS] --> VL[vendor_live_locations]\n    CT[Customer track] --> BK[bookings dispatch]\n    VL -.-> UI[Track UI map status]\n    BK --> UI"
+      },
+      {
+        "id": "vendor-onboard",
+        "title": "Vendor onboarding",
+        "desc": "Partner signup · OTP · optional Digio eKYC · admin approval.",
+        "mermaid": "flowchart TD\n    P[vendor-onboard] --> OTP[send-otp verify]\n    OTP --> FORM[services city docs]\n    FORM --> EKYC{Digio eKYC?}\n    EKYC -->|Yes| DG[Digio verify]\n    EKYC -->|No| DB[(vendor_partners)]\n    DG --> DB\n    ADM[vendor-admin PIN] --> ACT[Activate partner]"
+      },
+      {
+        "id": "otp-report",
+        "title": "OTP delivery reporting",
+        "desc": "2Factor callback · otp_delivery_reports · admin OTP tab.",
+        "mermaid": "flowchart LR\n    SO[send-otp] --> TF[2Factor SMS]\n    TF --> CB[otp-delivery-report]\n    CB --> DB[(otp_delivery_reports)]\n    ADM[Admin OTP tab] --> DB"
+      },
+      {
+        "id": "whatsapp",
+        "title": "WhatsApp verification",
+        "desc": "Outbound token · user reply · poll check verified.",
+        "mermaid": "sequenceDiagram\n    participant U as User\n    participant PWA as ScanV PWA\n    participant WA as whatsapp-verify\n    participant PR as MSG91 Twilio\n    PWA->>WA: generate mobile\n    WA->>PR: outbound VERIFY token\n    U->>PR: Reply token\n    PR->>WA: inbound webhook\n    loop Poll 3s\n        PWA->>WA: check token\n    end\n    WA-->>PWA: verified"
+      },
+      {
+        "id": "refunds",
+        "title": "Cancellation and refunds",
+        "desc": "Customer cancel fee · admin refund desk.",
+        "mermaid": "flowchart TD\n    C[Customer cancel] --> CALC[fee and refund calc]\n    CALC --> REQ[cancellation request]\n    REQ --> ADM[Admin Refunds tab]\n    ADM --> MAN[Manual refund]\n    MAN --> UPD[booking cancelled]"
+      }
+    ]
+  },
+  {
+    "id": "journeys",
+    "label": "User journeys",
+    "diagrams": [
+      {
+        "id": "app-states",
+        "title": "App state machine",
+        "desc": "boot · legal · browse · qr · register · app · admin routes.",
+        "mermaid": "stateDiagram-v2\n    [*] --> boot\n    boot --> legal: privacy terms\n    boot --> browse: default\n    boot --> qr: qr param\n    boot --> app: session\n    boot --> adminRoutes: admin exec\n    legal --> [*]\n    qr --> browse\n    browse --> register: booking OTP\n    register --> app: verified\n    app --> browse: sign out"
+      },
+      {
+        "id": "browse-book",
+        "title": "Browse-first booking journey",
+        "desc": "Guest browse to paid booking without upfront login wall.",
+        "mermaid": "flowchart TD\n    A[Open ScanV or QR] --> B[GPS device capture]\n    B --> C[Services pricing]\n    C --> D[Service detail book]\n    D --> E[Mobile OTP terms]\n    E --> F[Payment UPI Razorpay]\n    F --> G{amount_ok server}\n    G -->|OK| H[Booking dispatch]\n    H --> I[Track or home]"
+      },
+      {
+        "id": "qr",
+        "title": "QR entry flow",
+        "desc": "Printed QR opens browse immediately.",
+        "mermaid": "flowchart LR\n    Q[scanv-qr.png] --> U[URL qr=1]\n    U --> B[Browse home]\n    U --> V[visitor_sessions]\n    B --> F[Booking flow]"
+      },
+      {
+        "id": "payment-ui",
+        "title": "Payment method selection UI",
+        "desc": "platform-config vendor flags control visible buttons.",
+        "mermaid": "flowchart TD\n    P[Payment screen] --> V{vendor flags}\n    V --> Vy[Vyapar QR]\n    V --> Apps[GPay PhonePe Paytm]\n    V --> Any[Pay via UPI]\n    V --> RZ[Razorpay link]\n    Vy --> Poll[payment check]\n    Apps --> Poll\n    Any --> Poll\n    RZ --> Poll\n    Poll --> Done[Continue]"
+      },
+      {
+        "id": "nav",
+        "title": "Logged-in navigation",
+        "desc": "Bottom nav tabs by role.",
+        "mermaid": "flowchart TB\n    subgraph Nav\n        H[Home]\n        S[Services]\n        BK[Bookings]\n        CRM[CRM partners]\n        PR[Profile]\n    end\n    H --> Recent\n    S --> Search book\n    BK --> History track\n    CRM --> Partner jobs\n    PR --> Account logout"
+      },
+      {
+        "id": "roles",
+        "title": "Roles and access",
+        "desc": "Customer · partner · support agent · leader.",
+        "mermaid": "flowchart TD\n    CU[Customer] --> BROWSE[Browse book pay]\n    PT[Partner] --> ONB[vendor-onboard]\n    PT --> JOBS[CRM jobs GPS]\n    AG[Support agent] --> DESK[support desk]\n    LD[Leader] --> HUB[admin go-live pricing]"
+      }
+    ]
+  },
+  {
+    "id": "components",
+    "label": "Components",
+    "diagrams": [
+      {
+        "id": "pwa-shell",
+        "title": "PWA client components",
+        "desc": "React App.js modules and routing priority.",
+        "mermaid": "flowchart TB\n    ROOT[App.js] --> LEGAL[LegalPage]\n    ROOT --> ADMIN[AdminControlCenter]\n    ROOT --> EXEC[ExecDashboard]\n    ROOT --> BROWSE[BrowseFlow]\n    ROOT --> APP[Logged-in screens]\n    APP --> HOME[Home Services]\n    APP --> BOOK[BookScreen payment]\n    APP --> TRACK[TrackServiceScreen]"
+      },
+      {
+        "id": "payment-module",
+        "title": "Payment module components",
+        "desc": "usePaymentVerification · UpiPaymentPanel · VyaparQr · RazorpayPayButton.",
+        "mermaid": "flowchart LR\n    BOOK[BookScreen] --> HOOK[usePaymentVerification]\n    HOOK --> PC[loadPlatformVendors]\n    HOOK --> REG[razorpay-payment register]\n    HOOK --> CHK[check poll 3s]\n    HOOK --> PANEL[UpiPaymentPanel]\n    PANEL --> VQR[VyaparQrSection]\n    PANEL --> UPIB[UPI app buttons]\n    PANEL --> RZBTN[RazorpayPayButton]"
+      },
+      {
+        "id": "admin-tabs",
+        "title": "Admin hub tabs",
+        "desc": "All Admin Control Center tabs and backends.",
+        "mermaid": "flowchart TB\n    HUB[AdminControlCenter] --> OV[Overview]\n    HUB --> PR[Pricing 2FA]\n    HUB --> SU[Support]\n    HUB --> TK[Tickets]\n    HUB --> AG[Agents]\n    HUB --> VN[Vendors dispatch]\n    HUB --> GPS[GPS status]\n    HUB --> BK[Bookings payments]\n    HUB --> RF[Refunds]\n    HUB --> OTP[OTP delivery]\n    HUB --> GL[Go-Live]\n    HUB --> DG[Architecture diagrams]\n    HUB --> DB[Database links]\n    HUB --> ST[Settings]\n    HUB --> AH[admin-hub API]"
+      },
+      {
+        "id": "notify",
+        "title": "OTP notification stack",
+        "desc": "notify.ts provider chain · vendor toggles.",
+        "mermaid": "flowchart TD\n    EF[send-otp vendor-onboard] --> N[notify.ts]\n    N --> T1{2Factor ON?}\n    T1 -->|Yes| TF[2Factor API]\n    T1 -->|No| T2{MSG91 ON?}\n    T2 -->|Yes| M91[MSG91 SMS]\n    T2 -->|No| T3{Twilio ON?}\n    T3 -->|Yes| TW[Twilio SMS voice]\n    TF --> RPT[otp-delivery-report]"
+      },
+      {
+        "id": "realtime-pricing",
+        "title": "Realtime pricing pipeline",
+        "desc": "service_pricing to public view to client refetch.",
+        "mermaid": "flowchart LR\n    PA[pricing-admin save] --> SP[service_pricing]\n    SP --> VIEW[service_prices_public]\n    VIEW --> RT[Supabase Realtime]\n    RT --> PWA[fetchLivePricing all clients]"
+      },
+      {
+        "id": "exec-dashboard",
+        "title": "Executive dashboard",
+        "desc": "Owner PIN · exec_stats KPIs.",
+        "mermaid": "flowchart LR\n    EXE[exec route PIN] --> AH[admin-hub exec_stats]\n    AH --> KPI[Bookings revenue vendors tickets]\n    KPI --> UI[ExecDashboard charts]"
+      }
+    ]
+  }
+]

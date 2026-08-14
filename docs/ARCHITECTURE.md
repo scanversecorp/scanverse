@@ -60,7 +60,7 @@ flowchart TB
     end
 
     subgraph Vercel["Vercel CDN"]
-        CDN["Static assets + /docs/*.html"]
+        CDN["Static assets PWA only — no public /docs/"]
         RW["SPA rewrites to index.html"]
         HC["no-cache index · immutable /static"]
     end
