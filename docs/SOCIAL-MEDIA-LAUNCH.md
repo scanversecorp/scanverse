@@ -59,4 +59,8 @@ Set **Week 1 start date** in dashboard when you begin posting (defaults to today
 
 ## What agent cannot do
 
-Creating Meta/TikTok/YouTube accounts requires **your login + phone verification**. After you create `@scanvapp`, tell the agent — we can add verified links to admin URL index and run ad-ready UTM campaigns.
+Creating Meta/TikTok/YouTube accounts requires **your login + phone verification**. Agent cannot receive OTP or store passwords.
+
+**You:** follow `docs/social/ACCOUNT-SETUP-RUNBOOK.md` · run `bash scripts/open-social-signup.sh` · save secrets in `docs/social/credentials.env` (gitignored, never commit).
+
+After accounts exist, send **public profile URLs only** — agent updates `src/social-links.js` and admin index.
