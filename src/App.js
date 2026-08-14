@@ -22,10 +22,9 @@ const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
 /** Scan this URL — opens ScanV in the browser; no “Add to Home Screen” step. */
 const SCANV_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
-const UPI_PA   = 'Vyapar.172928067841@hdfcbank';
+const UPI_PA   = 'dcoreglobalcorporati.82037575@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const HDFC_VYAPAR_MERCHANT_ID = '82037575';
-const HDFC_VYAPAR_QR_PATH = '/hdfc-vyapar-qr.png';
 const ASSIST   = '+91-9270194842';
 const LOCAL_COMMUNITIES = 'Local Communities';
 const INCORPORATION_ORIGIN = 'Designed & Developed with Incorporation, San Francisco, California, USA';
@@ -269,12 +268,7 @@ function VyaparQrSection({ amountPaise, txnId, onScannedPaid, paymentVerified, c
   return (
     <div style={{ ...S.card(), padding: '14px 14px 16px', marginBottom: 14, textAlign: 'center' }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: C.txt, marginBottom: 4 }}>Scan &amp; Pay · HDFC SmartHub Vyapar</div>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{UPI_PN} · Merchant {HDFC_VYAPAR_MERCHANT_ID}</div>
-      <img
-        src={HDFC_VYAPAR_QR_PATH}
-        alt="DCORE GLOBAL CORPORATION HDFC Vyapar QR — Scan and Pay"
-        style={{ width: '100%', maxWidth: 280, height: 'auto', borderRadius: 12, border: `1px solid ${C.bdr}`, display: 'block', margin: '0 auto 12px', background: '#fff' }}
-      />
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{UPI_PN} · Merchant {HDFC_VYAPAR_MERCHANT_ID} · {UPI_PA}</div>
       <div style={{ background: `${C.acc}10`, border: `1px solid ${C.acc}33`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, textAlign: 'left' }}>
         <div style={{ fontSize: 12, color: C.txt, fontWeight: 700, marginBottom: 4 }}>Pay exactly ₹{amountRu}</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
@@ -12988,7 +12982,7 @@ function LegalPage({page}) {
           {[
             ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks)'],
             ['How It Works','Platform fee (10%) paid online at booking via UPI. GST added to total. Tax invoice auto-generated for every booking.'],
-            ['UPI Payment','Pay to: Vyapar.172928067841@hdfcbank · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
+            ['UPI Payment','Pay to: dcoreglobalcorporati.82037575@hdfcbank · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
             ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
             ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner’s registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],

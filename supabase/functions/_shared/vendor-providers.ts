@@ -17,7 +17,7 @@ export const VENDOR_PROVIDER_DEFS: VendorProviderDef[] = [
   { key: "vendor_enable_twilio", label: "Twilio", functions: "send-otp · dispatch", description: "International SMS / voice fallback", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_whatsapp", label: "WhatsApp", functions: "whatsapp-verify", description: "WhatsApp OTP backup (+91-9270194842)", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_razorpay", label: "Razorpay", functions: "razorpay-payment", description: "Payment links — card / UPI via Razorpay checkout", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_vyapar_upi", label: "HDFC Vyapar UPI", functions: "UPI QR · collect", description: "Vyapar.172928067841@hdfcbank — static QR + dynamic amount QR", defaultOn: true, production_recommendation: "on" },
+  { key: "vendor_enable_vyapar_upi", label: "HDFC Vyapar UPI", functions: "UPI QR · collect", description: "dcoreglobalcorporati.82037575@hdfcbank — static QR + dynamic amount QR", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_upi_gpay", label: "Google Pay", functions: "UPI deep link", description: "GPay button — Android intent / gpay:// on iOS", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_upi_phonepe", label: "PhonePe", functions: "UPI deep link", description: "PhonePe button — phonepe:// payment", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_upi_paytm", label: "Paytm", functions: "UPI deep link", description: "Paytm button — paytmmp:// payment", defaultOn: true, production_recommendation: "on" },

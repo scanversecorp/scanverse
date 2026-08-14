@@ -37,7 +37,7 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
 
 | Field | Value |
 |-------|-------|
-| UPI ID | `Vyapar.172928067841@hdfcbank` |
+| UPI ID | `dcoreglobalcorporati.82037575@hdfcbank` |
 | Payee | DCORE GLOBAL CORPORATION |
 | Merchant ID | `82037575` |
 | Static QR | `/hdfc-vyapar-qr.png` on production site |
