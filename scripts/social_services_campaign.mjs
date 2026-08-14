@@ -6,7 +6,7 @@ const USER_URL = `${APP_URL}?utm_source=social&utm_medium=user_register`;
 const PARTNER_URL = `${APP_URL}/#vendor-onboard?utm_source=social&utm_medium=partner_register`;
 
 const SERVICES = [
-  { icon: '🧹', name: 'Household', hook: 'Flat messy? Deep clean + home help on ScanV. Your mess. Our problem. 😉' },
+  { icon: '🧹', name: 'Household', hook: '🚀 COMING SOON — Flat messy? Deep clean + home help on ScanV. Your mess. Our problem. 😉' },
   { icon: '📦', name: 'Delivery', hook: 'Pickup, drop, same-day — stop begging courier bhaiya on WhatsApp.' },
   { icon: '🍱', name: 'Food', hook: 'Tiffin, restaurants, catering — hunger is urgent. ScanV gets it.' },
   { icon: '🛵', name: 'Two Wheeler', hook: 'Bike broke? Mechanic, battery, towing — book verified help.' },
@@ -35,16 +35,16 @@ console.log('══════════════════════�
 
 console.log('TODAY SERVICE AD (post everywhere)\n');
 console.log(svc.hook);
-console.log('\n10 services on one app — Pune & PCMC');
+console.log('\n10 services · one app · 🚀 COMING SOON to Pune & PCMC');
 console.log(USER_URL);
 console.log('\n#ScanV #Pune #PCMC #' + svc.name.replace(/\s/g, ''));
 
 console.log('\n--- REGISTER AS USER ---\n');
-console.log('Open ScanV → pick service → OTP → book. First booking = you\'re in.');
+console.log('Open ScanV → pick service → OTP → join waitlist. Launch first.');
 console.log(USER_URL);
 
 console.log('\n--- REGISTER AS SERVICE PROVIDER ---\n');
-console.log('Got skills? Join ScanV — listing fee nahi on launch 😏');
+console.log('Got skills? Join ScanV waitlist — listing fee nahi on launch 😏');
 console.log(PARTNER_URL);
 console.log('WhatsApp: 9270194842');
 

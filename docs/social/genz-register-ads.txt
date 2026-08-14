@@ -6,9 +6,9 @@ USER REGISTRATION (no separate signup — OTP on first book)
 Hook: "No forms. No drama. OTP → book → done."
 
 POST 1
-New to ScanV? Perfect.
-Open app → choose any of 10 services → verify mobile OTP → book.
-You're registered. That was easy 😏
+🚀 COMING SOON — New to ScanV? Perfect.
+Open app → choose any of 10 services → verify mobile OTP → join the waitlist.
+Launch first. That was easy 😏
 scanv-tau.vercel.app
 
 POST 2
@@ -33,9 +33,9 @@ URL: scanv-tau.vercel.app/#vendor-onboard
 WhatsApp: 9270194842
 
 POST 1
-Local vendor? Freelancer? Garage? Clinic?
-Join ScanV — digital bookings, verified badge, UPI payouts.
-Launch listing fee: nahi 😏
+🚀 COMING SOON — Local vendor? Freelancer? Garage? Clinic?
+Join ScanV waitlist — digital bookings, verified badge, UPI payouts at launch.
+Listing fee on launch: nahi 😏
 #vendor-onboard
 
 POST 2

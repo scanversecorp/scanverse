@@ -25,7 +25,7 @@ const ps = bundle?.platform_status || {};
 
 console.log('═══════════════════════════════════════════════════');
 console.log('  SCANV SOCIAL PULSE — POST EVERYWHERE (India)');
-console.log('  FB · IG · Threads · YouTube · Shorts (TikTok banned IN)');
+console.log('  🚀 COMING SOON · FB · IG · Threads · YouTube · Shorts');
 console.log('  ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST');
 console.log('  @' + (cfg.handle || 'scanvapp') + ' · Day ' + (cfg.today_day_number || '?') +
   (cfg.calendar_week > 1 ? ' week ' + cfg.calendar_week : ''));
