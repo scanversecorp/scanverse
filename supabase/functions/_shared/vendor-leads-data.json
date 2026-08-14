@@ -1,0 +1,914 @@
+{
+  "meta": {
+    "captured_at": "2026-08-15",
+    "market": "Pune / PCMC",
+    "version": 1,
+    "vendor_count": 21,
+    "service_count": 14
+  },
+  "cards": [
+    {
+      "id": "household",
+      "label": "Household services",
+      "icon": "🧹",
+      "sub_cards": [
+        {
+          "id": "deep-cleaning",
+          "label": "Deep cleaning",
+          "theme": "pink"
+        },
+        {
+          "id": "home-help",
+          "label": "Home help",
+          "theme": "green"
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "id": "hh-bathroom-deep",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Bathroom Deep Clean",
+      "price_inr": 499
+    },
+    {
+      "id": "hh-kitchen-deep",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Kitchen Deep Clean",
+      "price_inr": 599
+    },
+    {
+      "id": "hh-flat-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Full Flat Cleaning",
+      "price_inr": 1999
+    },
+    {
+      "id": "hh-care-plan",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Bathroom Care Plan",
+      "price_inr": 1499
+    },
+    {
+      "id": "hh-quick-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Quick Clean",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-sofa-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Sofa & Upholstery Clean",
+      "price_inr": 249
+    },
+    {
+      "id": "hh-house-help",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "House Help",
+      "price_inr": 182
+    },
+    {
+      "id": "hh-dishwashing",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Dishwashing",
+      "price_inr": 99
+    },
+    {
+      "id": "hh-kitchen-help",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Kitchen Tidy-Up",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-fan-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Fan Cleaning",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-window-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Window Cleaning",
+      "price_inr": 199
+    },
+    {
+      "id": "hh-laundry",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Laundry Help",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-bathroom-help",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Bathroom Refresh",
+      "price_inr": 199
+    },
+    {
+      "id": "hh-ironing",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Ironing & Pressing",
+      "price_inr": 149
+    }
+  ],
+  "vendors": [
+    {
+      "id": "shreyash-deep-cleaning",
+      "business_name": "Shreyash Deep Cleaning",
+      "contact_person": "Ravindra Fodse",
+      "shop_office": "Shreyash Deep Cleaning",
+      "address": {
+        "building": "Dudhal Building",
+        "street": "Near Sonai Mangal Karayalaya, 16 No. Bus Stop, Kaveri Nagar, Kalewadi Phata",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Dudhal Building, Near Sonai Mangal Karayalaya, 16 No. Bus Stop, Kaveri Nagar, Kalewadi Phata, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8805839885",
+        "+91 9637913676"
+      ],
+      "emails": [
+        "service@shreyashdeepcleaning.com",
+        "shreyashdeepcleanig@gmail.com"
+      ],
+      "website": "https://www.shreyashdeepcleaning.com/",
+      "maps_name": "Shreyash Deep Cleaning Wakad",
+      "services_offered": "Home deep clean, bathroom, kitchen, sofa, office cleaning",
+      "rating": "",
+      "hours": "Mon-Sun 8:00 AM - 8:00 PM",
+      "service_areas": "Wakad, Kalewadi, PCMC",
+      "source": "Website contact page",
+      "notes": "Owner listed on website",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-quick-clean",
+        "hh-sofa-clean"
+      ]
+    },
+    {
+      "id": "saaf-makers",
+      "business_name": "Saaf Makers",
+      "contact_person": "",
+      "shop_office": "The Evoq",
+      "address": {
+        "building": "206, The Evoq",
+        "street": "Kalakhadak Road",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "206, The Evoq, Kalakhadak Road, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8484888693"
+      ],
+      "emails": [
+        "saafmakers29@gmail.com"
+      ],
+      "website": "https://saafmakers.com/",
+      "maps_name": "Saaf Makers Wakad",
+      "services_offered": "Deep home cleaning, maintenance, commercial (McDonald's Wakad reference)",
+      "rating": "Top-rated (website claim)",
+      "hours": "",
+      "service_areas": "Wakad, Kothrud, Baner, Hinjewadi, Magarpatta, Hadapsar, PCMC",
+      "source": "Website",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-quick-clean"
+      ]
+    },
+    {
+      "id": "deep-cleaning-pune",
+      "business_name": "Deep Cleaning Pune",
+      "contact_person": "",
+      "shop_office": "Hermes Vishal Co-op Housing Society",
+      "address": {
+        "building": "B-4, Hermes Vishal",
+        "street": "Lane No. 7, North Main Road",
+        "area": "Koregaon Park",
+        "city": "Pune",
+        "pin": "411001",
+        "state": "Maharashtra",
+        "full": "B-4, Hermes Vishal, Lane No. 7, North Main Road, Koregaon Park, Pune, 411001, Maharashtra"
+      },
+      "phones": [
+        "+91 9975708557"
+      ],
+      "emails": [
+        "info@deepcleanpune.com"
+      ],
+      "website": "https://deepcleanpune.com/",
+      "maps_name": "Deep Cleaning Pune - Home Deep Cleaning in Pimpri Chinchwad, Wakad",
+      "services_offered": "Home/office/commercial deep clean, sofa, carpet, kitchen, bathroom, PCMC",
+      "rating": "Google Maps listing (Wakad search)",
+      "hours": "24x7 contact",
+      "service_areas": "Pune, PCMC, Wakad, Hinjewadi, Baner, Kharadi, Aundh, Kothrud",
+      "source": "Website + Google Maps",
+      "notes": "HQ Koregaon Park; serves Wakad/PCMC on-site",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-quick-clean",
+        "hh-care-plan"
+      ]
+    },
+    {
+      "id": "dirt-blaster-cleaning-services",
+      "business_name": "Dirt Blaster Cleaning Services",
+      "contact_person": "",
+      "shop_office": "Shri Nagari Society",
+      "address": {
+        "building": "Shop No D-6, Shri Nagari Society",
+        "street": "Near Tupe Corner, Behind Amanora Mall, Malwadi Road",
+        "area": "Hadapsar",
+        "city": "Pune",
+        "pin": "411028",
+        "state": "Maharashtra",
+        "full": "Shop No D-6, Shri Nagari Society, Near Tupe Corner, Behind Amanora Mall, Malwadi Road, Hadapsar, Pune, 411028, Maharashtra"
+      },
+      "phones": [
+        "+91 7350321321",
+        "+91 8888086179"
+      ],
+      "emails": [
+        "support@dirtblastercleaningservices.com",
+        "customercare@dirtbalster.in"
+      ],
+      "website": "https://www.dirtblastercleaningservices.com/",
+      "maps_name": "Dirt Blaster Cleaning Services Pune",
+      "services_offered": "Home deep clean, sofa, kitchen, bathroom, carpet, mattress, window, pest control",
+      "rating": "4.9 (website claim)",
+      "hours": "",
+      "service_areas": "Pune, Pimpri Chinchwad, Wakad",
+      "source": "Website contact",
+      "notes": "Founded 2015",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-window-clean",
+        "hh-quick-clean"
+      ]
+    },
+    {
+      "id": "as-deep-cleaning-services",
+      "business_name": "AS Deep Cleaning Services",
+      "contact_person": "Rukhsana",
+      "shop_office": "AS Deep Cleaning Services",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pimpri Chinchwad",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pimpri Chinchwad, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 8087100195"
+      ],
+      "emails": [
+        "rukhsana061991@gmail.com"
+      ],
+      "website": "https://www.deepcleaningservices.co.in/",
+      "maps_name": "AS Deep Cleaning Services PCMC",
+      "services_offered": "Home deep clean, office, carpet, bathroom, sofa, housekeeping, floor cleaning",
+      "rating": "",
+      "hours": "Mon-Sun 8:00 AM - 8:00 PM",
+      "service_areas": "Pimpri Chinchwad, Pune",
+      "source": "Website",
+      "notes": "Street address not published — confirm on call",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-house-help"
+      ]
+    },
+    {
+      "id": "b-b-tule-housekeeping-and-deep-cleaning-services",
+      "business_name": "B B Tule Housekeeping And Deep Cleaning Services",
+      "contact_person": "",
+      "shop_office": "World of Mother, Jai Ganesh Vision",
+      "address": {
+        "building": "E-111, World of Mother",
+        "street": "Jai Ganesh Vision",
+        "area": "Akurdi",
+        "city": "Pimpri Chinchwad",
+        "pin": "411035",
+        "state": "Maharashtra",
+        "full": "E-111, World of Mother, Jai Ganesh Vision, Akurdi, Pimpri Chinchwad, 411035, Maharashtra"
+      },
+      "phones": [
+        "+91 9325106205",
+        "+91 9325106205"
+      ],
+      "emails": [],
+      "website": "https://wakad.in/item/b-b-tule-housekeeping-services/",
+      "maps_name": "B B Tule Housekeeping Services",
+      "services_offered": "Housekeeping, deep clean, sofa, carpet, bathroom, kitchen, glass, office",
+      "rating": "5.0/5 (Sulekha, 11 reviews)",
+      "hours": "Mon-Sat 9:00 AM - 6:00 PM",
+      "service_areas": "Akurdi, Pune, PCMC, Wakad",
+      "source": "Sulekha + Wakad.in + LinkedIn",
+      "notes": "Also listed E-111 A, Akurdi",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-window-clean",
+        "hh-house-help"
+      ]
+    },
+    {
+      "id": "malhar-housekeeping",
+      "business_name": "Malhar Housekeeping",
+      "contact_person": "",
+      "shop_office": "Malhar Housekeeping",
+      "address": {
+        "building": "Near Pooja Hospital",
+        "street": "Near Bank of Maharashtra, Gangarde Nagar",
+        "area": "Pimple Gurav",
+        "city": "Pimpri Chinchwad",
+        "pin": "411061",
+        "state": "Maharashtra",
+        "full": "Near Pooja Hospital, Near Bank of Maharashtra, Gangarde Nagar, Pimple Gurav, Pimpri Chinchwad, 411061, Maharashtra"
+      },
+      "phones": [
+        "+91 8668639996"
+      ],
+      "emails": [
+        "malharhousekeeping@gmail.com"
+      ],
+      "website": "https://malharhousekeeping.com/",
+      "maps_name": "Malhar Housekeeping Pimple Gurav",
+      "services_offered": "Housekeeping products & cleaning services (Pune, Pimple Gurav, Sangvi)",
+      "rating": "",
+      "hours": "",
+      "service_areas": "Pimple Gurav, Sangvi, Pune",
+      "source": "Website contact",
+      "notes": "Also sells cleaning products",
+      "confidence": "high",
+      "service_ids": [
+        "hh-house-help",
+        "hh-kitchen-help",
+        "hh-bathroom-help"
+      ]
+    },
+    {
+      "id": "talatkar-cleaning-company-tulip-housekeeping",
+      "business_name": "Talatkar Cleaning Company (Tulip Housekeeping)",
+      "contact_person": "Omkar Talatkar",
+      "shop_office": "Talatkar Cleaning Company",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune & Pimpri Chinchwad",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune & Pimpri Chinchwad, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 8379041683"
+      ],
+      "emails": [
+        "omkar.talatkar@gmail.com"
+      ],
+      "website": "https://talatkarcleaningcompany.com/",
+      "maps_name": "Talatkar / Tulip Cleaning Pune",
+      "services_offered": "Home/office deep clean, sofa, pest control, residential housekeeping",
+      "rating": "",
+      "hours": "",
+      "service_areas": "Pune, Pimpri Chinchwad",
+      "source": "Website",
+      "notes": "Office address not on homepage — confirm on booking",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-window-clean",
+        "hh-house-help"
+      ]
+    },
+    {
+      "id": "s-k-w-enterprises",
+      "business_name": "S K W Enterprises",
+      "contact_person": "Kumar",
+      "shop_office": "S K W Enterprises",
+      "address": {
+        "building": "Sr No 48/4",
+        "street": "Lane No. 12, Ganesh Nagar, Old Mundhwa Road",
+        "area": "Kharadi",
+        "city": "Pune",
+        "pin": "411014",
+        "state": "Maharashtra",
+        "full": "Sr No 48/4, Lane No. 12, Ganesh Nagar, Old Mundhwa Road, Kharadi, Pune, 411014, Maharashtra"
+      },
+      "phones": [
+        "+91 8796477425",
+        "+91 8329161666"
+      ],
+      "emails": [
+        "kumarpune91@gmail.com"
+      ],
+      "website": "https://skwenterprises.in/",
+      "maps_name": "S K W Enterprises Kharadi",
+      "services_offered": "Housekeeping, home deep clean, sofa shampoo, carpet, glass, sanitization",
+      "rating": "",
+      "hours": "",
+      "service_areas": "Kharadi, Pune, PCMC",
+      "source": "Website contact",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-window-clean"
+      ]
+    },
+    {
+      "id": "dailyclean-india-group",
+      "business_name": "DailyClean India Group",
+      "contact_person": "",
+      "shop_office": "Arambha Office",
+      "address": {
+        "building": "Office No. 5, 1st Floor, Arambha",
+        "street": "Datta Mandir Road",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Office No. 5, 1st Floor, Arambha, Datta Mandir Road, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 7709902201",
+        "+91 8460308711"
+      ],
+      "emails": [],
+      "website": "https://dailyclean.co.in/",
+      "maps_name": "DailyClean - Cleaning services in Pune",
+      "services_offered": "Home deep clean, mattress, bathroom, commercial cleaning",
+      "rating": "Google Maps Wakad search",
+      "hours": "Mon-Sat 10:00 AM - 7:00 PM",
+      "service_areas": "Wakad, Pune, PCMC, Hadapsar",
+      "source": "Website + Google Maps + bdir.in",
+      "notes": "Email not public — use phone/WhatsApp",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-quick-clean"
+      ]
+    },
+    {
+      "id": "a3-care-deep-cleaning-housekeeping-services",
+      "business_name": "A3 Care Deep Cleaning & Housekeeping Services",
+      "contact_person": "",
+      "shop_office": "A3 Care (service-area business)",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad / PCMC",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Wakad / PCMC, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 7822954195",
+        "+91 8605166808"
+      ],
+      "emails": [
+        "a3caredeepcleaning@gmail.com"
+      ],
+      "website": "https://a3caredeepcleaningservices.com/",
+      "maps_name": "A3 Care - Home | Office Cleaning Services Wakad PCMC",
+      "services_offered": "Home/flat deep clean, kitchen, toilet, sofa/carpet, housekeeping, marble polish",
+      "rating": "Google Maps Wakad search",
+      "hours": "",
+      "service_areas": "Wakad, Baner, Balewadi, Hinjewadi, Ravet, Akurdi, Nigdi, PCMC",
+      "source": "Website + Google Maps",
+      "notes": "No fixed shop address published",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-care-plan",
+        "hh-house-help"
+      ]
+    },
+    {
+      "id": "hello-help-tidy-troop-private-limited",
+      "business_name": "Hello Help (Tidy Troop Private Limited)",
+      "contact_person": "",
+      "shop_office": "Hello Help (app platform)",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pimpri Chinchwad",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pimpri Chinchwad, Pune, Maharashtra"
+      },
+      "phones": [],
+      "emails": [
+        "service@hellohelp.in"
+      ],
+      "website": "https://hellohelp.in/",
+      "maps_name": "Hello Help maid service PCMC",
+      "services_offered": "On-demand verified maids: broom, mop, dishes, bedding, laundry, dusting, veg chop, 1 bathroom",
+      "rating": "",
+      "hours": "App booking",
+      "service_areas": "Hinjewadi, Wakad, Chinchwad, Akurdi, PCMC",
+      "source": "Website",
+      "notes": "Platform vendor — onboard as partner not shop",
+      "confidence": "high",
+      "service_ids": [
+        "hh-house-help",
+        "hh-dishwashing",
+        "hh-kitchen-help",
+        "hh-laundry",
+        "hh-bathroom-help"
+      ]
+    },
+    {
+      "id": "maid-services-pune",
+      "business_name": "Maid Services Pune",
+      "contact_person": "Jayraj Vastushilp office",
+      "shop_office": "Jayraj Vastushilp Housing Society",
+      "address": {
+        "building": "Jayraj Vastushilp Housing Society",
+        "street": "Wadgaon Bridge, Opposite Abhiruchi Mall",
+        "area": "Wadgaon Budruk",
+        "city": "Pune",
+        "pin": "411041",
+        "state": "Maharashtra",
+        "full": "Jayraj Vastushilp Housing Society, Wadgaon Bridge, Opposite Abhiruchi Mall, Wadgaon Budruk, Pune, 411041, Maharashtra"
+      },
+      "phones": [
+        "+91 6376634479"
+      ],
+      "emails": [
+        "maidserviceinpune@gmail.com"
+      ],
+      "website": "https://maidservicespune.com/",
+      "maps_name": "Maid Services Pune Wakad",
+      "services_offered": "Full-time/part-time/live-in maids, cooking, cleaning, childcare, elderly care",
+      "rating": "",
+      "hours": "Sun-Sat 8:00 AM - 5:00 PM",
+      "service_areas": "Wakad, Hinjewadi, Baner, Balewadi, PCMC, Kharadi, Hadapsar",
+      "source": "Website",
+      "notes": "Agency model — placement not hourly app",
+      "confidence": "high",
+      "service_ids": [
+        "hh-house-help",
+        "hh-dishwashing",
+        "hh-kitchen-help",
+        "hh-laundry",
+        "hh-ironing",
+        "hh-bathroom-help",
+        "hh-fan-clean"
+      ]
+    },
+    {
+      "id": "beyond-home-services",
+      "business_name": "Beyond Home Services",
+      "contact_person": "",
+      "shop_office": "Fortune Business Center",
+      "address": {
+        "building": "505, Fortune Business Center",
+        "street": "Vishnudev Nagar",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "505, Fortune Business Center, Vishnudev Nagar, Wakad, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 8459507288"
+      ],
+      "emails": [],
+      "website": "https://beyondhome.services/",
+      "maps_name": "Beyond Home Services Wakad",
+      "services_offered": "Maids, cooks, nannies, cleaning, patient care — Western Pune",
+      "rating": "",
+      "hours": "Mon-Sat 9:30 AM - 6:30 PM",
+      "service_areas": "Wakad, Baner, Balewadi, Pimple Saudagar, Hinjewadi, Pimple Gurav, Tathawade",
+      "source": "Website",
+      "notes": "PIN not listed — Wakad 411057 area typical",
+      "confidence": "high",
+      "service_ids": [
+        "hh-house-help",
+        "hh-dishwashing",
+        "hh-kitchen-help",
+        "hh-laundry",
+        "hh-ironing",
+        "hh-bathroom-help"
+      ]
+    },
+    {
+      "id": "snabbit",
+      "business_name": "Snabbit",
+      "contact_person": "",
+      "shop_office": "Snabbit (app platform)",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad / Hinjewadi",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Wakad / Hinjewadi, Pune, Maharashtra"
+      },
+      "phones": [],
+      "emails": [],
+      "website": "https://www.snabbit.com/house-help/pune/wakad",
+      "maps_name": "Snabbit house help Wakad",
+      "services_offered": "Hourly verified female helpers: deep clean, mop, dust, dishes, laundry, kitchen, bathroom",
+      "rating": "",
+      "hours": "7:00 AM - 7:45 PM",
+      "service_areas": "Wakad, Hinjewadi, Baner, Kharadi, Hadapsar, Viman Nagar",
+      "source": "Website",
+      "notes": "From ₹99/hr app pricing — competitor/partner reference",
+      "confidence": "verify_maps",
+      "service_ids": [
+        "hh-house-help",
+        "hh-dishwashing",
+        "hh-kitchen-help",
+        "hh-laundry",
+        "hh-bathroom-help",
+        "hh-fan-clean",
+        "hh-window-clean"
+      ]
+    },
+    {
+      "id": "deep-cleaning-services-pune-housekeeping-division",
+      "business_name": "Deep Cleaning Services Pune (Housekeeping division)",
+      "contact_person": "",
+      "shop_office": "",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pimpri Chinchwad",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pimpri Chinchwad, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9960228504"
+      ],
+      "emails": [
+        "info@deepcleaningservicespune.com"
+      ],
+      "website": "https://deepcleaningpune.com/",
+      "maps_name": "Deep cleaning housekeeping PCMC",
+      "services_offered": "Housekeeping, toilet/bathroom deep clean, kitchen deep clean, sofa/carpet, office commercial",
+      "rating": "",
+      "hours": "",
+      "service_areas": "PCMC, Wakad, Hinjewadi, Baner, Balewadi, Pimple Saudagar, Rahatani, Kalewadi",
+      "source": "Website",
+      "notes": "Different entity from deepcleanpune.com — verify legal name on call",
+      "confidence": "high",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean",
+        "hh-care-plan",
+        "hh-house-help"
+      ]
+    },
+    {
+      "id": "varsha-deep-cleaning-service-wakad",
+      "business_name": "Varsha Deep Cleaning Service Wakad",
+      "contact_person": "",
+      "shop_office": "",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [],
+      "emails": [],
+      "website": "",
+      "maps_name": "Varsha deep cleaning service.wakad,pune",
+      "services_offered": "Deep cleaning (Google Maps listing)",
+      "rating": "Google Maps",
+      "hours": "",
+      "service_areas": "Wakad",
+      "source": "Google Maps search: deep cleaning Wakad Pune",
+      "notes": "Phone/address — open listing in Maps and verify",
+      "confidence": "verify_maps",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-quick-clean"
+      ]
+    },
+    {
+      "id": "punekar-deep-cleaning",
+      "business_name": "Punekar Deep Cleaning",
+      "contact_person": "",
+      "shop_office": "",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad / Pune",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Wakad / Pune, Pune, Maharashtra"
+      },
+      "phones": [],
+      "emails": [],
+      "website": "",
+      "maps_name": "Punekar Deep Cleaning",
+      "services_offered": "Deep cleaning (Google Maps + website link in Maps)",
+      "rating": "Google Maps",
+      "hours": "",
+      "service_areas": "Pune",
+      "source": "Google Maps",
+      "notes": "Verify contact from Maps listing",
+      "confidence": "verify_maps",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-sofa-clean"
+      ]
+    },
+    {
+      "id": "sai-facility-and-deep-cleaning-service-wakad",
+      "business_name": "Sai Facility And Deep Cleaning Service Wakad",
+      "contact_person": "",
+      "shop_office": "",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [],
+      "emails": [],
+      "website": "",
+      "maps_name": "Sai facility and Deep cleaning service wakad",
+      "services_offered": "Facility & deep cleaning",
+      "rating": "Google Maps",
+      "hours": "",
+      "service_areas": "Wakad",
+      "source": "Google Maps",
+      "notes": "Has website link in Maps — verify on listing",
+      "confidence": "verify_maps",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean"
+      ]
+    },
+    {
+      "id": "prime-clean-deep-cleaning-housekeeping-services",
+      "business_name": "Prime Clean Deep Cleaning & Housekeeping Services",
+      "contact_person": "",
+      "shop_office": "",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad / PCMC",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Wakad / PCMC, Pune, Maharashtra"
+      },
+      "phones": [],
+      "emails": [],
+      "website": "",
+      "maps_name": "Prime Clean Deep Cleaning & Housekeeping Services",
+      "services_offered": "Deep cleaning & housekeeping",
+      "rating": "Google Maps",
+      "hours": "",
+      "service_areas": "PCMC, Pune",
+      "source": "Google Maps",
+      "notes": "Verify phone/email from Maps listing",
+      "confidence": "verify_maps",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-house-help"
+      ]
+    },
+    {
+      "id": "ts-deep-house-cleaning-wala",
+      "business_name": "TS Deep House Cleaning Wala",
+      "contact_person": "",
+      "shop_office": "",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Wakad, Pune, Maharashtra"
+      },
+      "phones": [],
+      "emails": [],
+      "website": "",
+      "maps_name": "TS Deep House Cleaning Wala",
+      "services_offered": "Home deep cleaning",
+      "rating": "Google Maps",
+      "hours": "",
+      "service_areas": "Wakad, Pune",
+      "source": "Google Maps",
+      "notes": "Verify contact from Maps listing",
+      "confidence": "verify_maps",
+      "service_ids": [
+        "hh-bathroom-deep",
+        "hh-kitchen-deep",
+        "hh-flat-clean",
+        "hh-quick-clean"
+      ]
+    }
+  ]
+}

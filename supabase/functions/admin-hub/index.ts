@@ -20,11 +20,13 @@
  *   get_go_live_config — switches + secret status (no values)
  *   update_go_live_switch — { key, enabled } owner PIN only
  *   update_go_live_check — { key, checked } manual checklist tick
+ *   update_razorpay_route_ticket — { status?, notes?, mark_checked? } Route support ticket tracker
  *   gps_status_report — { audience?, date_from?, date_to?, search?, status_filter? }
  *   pricing_2fa_status — { enrolled, owner_configured, owner_mobile_masked }
  *   pricing_2fa_reset_send — SMS/voice OTP to PRICING_2FA_RESET_MOBILE (exec PIN only)
  *   pricing_2fa_reset_confirm — { otp } clears pricing admin TOTP enrollment
  *   get_admin_diagrams — architecture / data-flow Mermaid catalog (Admin PIN only)
+ *   get_vendor_leads — local vendor research catalog (Admin PIN only; not in public bundle)
  *   get_admin_url_index — confidential bookmark catalog (Admin PIN only)
  *   search_dispatches  — { q?, status?, vendor_id?, date_from?, date_to?, limit? }
  *   dispatch_detail    — { dispatch_id? | booking_id? }
@@ -76,6 +78,7 @@ import {
 import {
   buildGoLiveConfig,
   updateGoLiveCheck,
+  updateRazorpayRouteTicket,
 } from "../_shared/go-live-config.ts";
 import {
   EXEC_ONLY_SWITCH_KEYS,
@@ -83,6 +86,7 @@ import {
 } from "../_shared/vendor-providers.ts";
 import adminDiagramSections from "../_shared/admin-diagrams-data.json" with { type: "json" };
 import adminUrlIndexSections from "../_shared/admin-url-index-data.json" with { type: "json" };
+import { getVendorLeads } from "../_shared/vendor-leads-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -1046,6 +1050,15 @@ async function updateGoLiveCheckAction(
   return json({ success: true, key, checked });
 }
 
+async function updateRazorpayRouteTicketAction(
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const result = await updateRazorpayRouteTicket(sb, body);
+  if (result.error) return json({ error: result.error }, 400);
+  return json({ success: true, ticket: result.ticket });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -1169,6 +1182,10 @@ Deno.serve(async (req) => {
     return updateGoLiveCheckAction(sb, body);
   }
 
+  if (action === "update_razorpay_route_ticket") {
+    return updateRazorpayRouteTicketAction(sb, body);
+  }
+
   if (action === "gps_status_report") {
     try {
       const result = await gpsStatusReport(sb, body);
@@ -1200,6 +1217,10 @@ Deno.serve(async (req) => {
 
   if (action === "get_admin_diagrams") {
     return json({ sections: adminDiagramSections });
+  }
+
+  if (action === "get_vendor_leads") {
+    return json(getVendorLeads(body));
   }
 
   if (action === "get_admin_url_index") {

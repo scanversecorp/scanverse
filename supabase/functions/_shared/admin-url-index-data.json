@@ -168,6 +168,12 @@
         "note": "Switch board · 12 vendors + runtime toggles"
       },
       {
+        "label": "Vendor Leads",
+        "adminTab": "vendor-leads",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=vendor-leads",
+        "note": "Confidential local vendor research · Household card · PIN-gated API"
+      },
+      {
         "label": "Architecture",
         "adminTab": "diagrams",
         "url": "https://scanv-tau.vercel.app/#admin?tab=diagrams",

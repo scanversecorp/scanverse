@@ -26,6 +26,8 @@ export const GO_LIVE_CHECK_KEYS = new Set([
   "go_live_check_razorpay_live_mode",
   "go_live_check_razorpay_webhook_events",
   "go_live_check_razorpay_test_payment",
+  "go_live_check_razorpay_route_enabled",
+  "go_live_check_razorpay_route_transfer_test",
   "go_live_check_2factor_key_rotated",
   "go_live_check_msg91_dlt",
   "go_live_check_whatsapp_template",
@@ -124,6 +126,67 @@ const SECRET_CHECKS: Array<{
   { key: "DIGIO_API_KEY", functions: "vendor-onboard", description: "Digio eKYC (strict vendor verification)", required: false, check: () => envConfigured("DIGIO_API_KEY") },
 ];
 
+export const RAZORPAY_ROUTE_TICKET_KEYS = [
+  "razorpay_route_ticket_id",
+  "razorpay_route_ticket_status",
+  "razorpay_route_ticket_subject",
+  "razorpay_route_ticket_opened_at",
+  "razorpay_route_ticket_notes",
+  "razorpay_route_ticket_last_checked_at",
+] as const;
+
+export type RazorpayRouteTicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+const RAZORPAY_ROUTE_TICKET_STATUSES = new Set<RazorpayRouteTicketStatus>([
+  "open",
+  "in_progress",
+  "resolved",
+  "closed",
+]);
+
+async function loadRazorpayRouteTicket(sb: PlatformSb) {
+  const { data } = await sb
+    .from("platform_settings")
+    .select("key, value, updated_at")
+    .in("key", [...RAZORPAY_ROUTE_TICKET_KEYS]);
+  const map: Record<string, { value: string; updated_at: string | null }> = {};
+  for (const row of data || []) {
+    const r = row as { key: string; value: string; updated_at: string | null };
+    map[r.key] = { value: String(r.value || ""), updated_at: r.updated_at || null };
+  }
+  const statusRaw = (map.razorpay_route_ticket_status?.value || "open").toLowerCase();
+  const status: RazorpayRouteTicketStatus = RAZORPAY_ROUTE_TICKET_STATUSES.has(statusRaw as RazorpayRouteTicketStatus)
+    ? statusRaw as RazorpayRouteTicketStatus
+    : "open";
+  return {
+    ticket_id: map.razorpay_route_ticket_id?.value || "20389531",
+    status,
+    subject: map.razorpay_route_ticket_subject?.value
+      || "Enable Razorpay Route for DCORE Global Corporation / ScanV marketplace",
+    opened_at: map.razorpay_route_ticket_opened_at?.value || null,
+    notes: map.razorpay_route_ticket_notes?.value || "",
+    last_checked_at: map.razorpay_route_ticket_last_checked_at?.value || null,
+    status_updated_at: map.razorpay_route_ticket_status?.updated_at || null,
+    dashboard_url: "https://dashboard.razorpay.com/app/dashboard",
+    support_tickets_url: "https://dashboard.razorpay.com/app/business-settings/ticket-support/tickets",
+    route_url: "https://dashboard.razorpay.com/app/route",
+    route_accounts_url: "https://dashboard.razorpay.com/app/route/accounts",
+    blocked_items: [
+      "Route menu and /app/route redirect until Razorpay resolves the ticket",
+      "Vendor 85% auto-transfers (RAZORPAY_ROUTE_ENABLED stays off)",
+      "transfer.* webhook events may be unavailable until Route is enabled",
+    ],
+    next_steps_when_resolved: [
+      "Confirm /app/route loads in Razorpay dashboard",
+      "Create vendor Linked Accounts (Route → Accounts)",
+      "Paste acc_… IDs in Vendor Admin → Razorpay Route",
+      "Add transfer.processed, transfer.failed, transfer.reversed to webhook",
+      "npx supabase secrets set RAZORPAY_ROUTE_ENABLED=true",
+      "Test Razorpay payment → dispatch assign → 85% transfer",
+    ],
+  };
+}
+
 async function loadManualCheckMap(sb: PlatformSb): Promise<Record<string, boolean>> {
   const keys = [...GO_LIVE_CHECK_KEYS];
   const { data } = await sb.from("platform_settings").select("key, value").in("key", keys);
@@ -174,6 +237,7 @@ export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, 
   const appUrl = Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app";
   const sbProject = "rwlwrmmqtedugcreweut";
   const manualMap = await loadManualCheckMap(sb);
+  const razorpayRouteTicket = await loadRazorpayRouteTicket(sb);
 
   const switches = await Promise.all([
     buildSwitchRow(sb, "otp_dev_mode", "send-otp · vendor-onboard · razorpay-payment", "Dev bypass: OTP without SMS; relaxes webhook checks when secrets missing. Same as legacy OTP_DEV_MODE env.", "off", true),
@@ -372,6 +436,7 @@ export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, 
     production_ready: productionReady,
     progress,
     sections,
+    razorpay_route_ticket: razorpayRouteTicket,
     dispatch_mode: String(dispatchRow?.value || "both"),
     dispatch_mode_updated_at: dispatchRow?.updated_at || null,
     deploy_commands: [
@@ -406,4 +471,42 @@ export async function updateGoLiveCheck(
   }, { onConflict: "key" });
   if (error) return { error: error.message };
   return {};
+}
+
+export async function updateRazorpayRouteTicket(
+  sb: PlatformSb,
+  body: Record<string, unknown>,
+): Promise<{ error?: string; ticket?: Record<string, unknown> }> {
+  const now = new Date().toISOString();
+  const upserts: Array<{ key: string; value: string }> = [];
+
+  if (body.status !== undefined) {
+    const status = String(body.status || "").trim().toLowerCase();
+    if (!RAZORPAY_ROUTE_TICKET_STATUSES.has(status as RazorpayRouteTicketStatus)) {
+      return { error: "Invalid ticket status" };
+    }
+    upserts.push({ key: "razorpay_route_ticket_status", value: status });
+  }
+
+  if (body.notes !== undefined) {
+    upserts.push({ key: "razorpay_route_ticket_notes", value: String(body.notes || "").slice(0, 4000) });
+  }
+
+  if (body.mark_checked === true) {
+    upserts.push({ key: "razorpay_route_ticket_last_checked_at", value: now });
+  }
+
+  if (!upserts.length) return { error: "Nothing to update" };
+
+  for (const row of upserts) {
+    const { error } = await sb.from("platform_settings").upsert({
+      key: row.key,
+      value: row.value,
+      updated_by: "admin-go-live-ui",
+    }, { onConflict: "key" });
+    if (error) return { error: error.message };
+  }
+
+  const ticket = await loadRazorpayRouteTicket(sb);
+  return { ticket };
 }

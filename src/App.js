@@ -17,6 +17,7 @@ import {
 import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
+const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
@@ -11382,6 +11383,7 @@ const ADMIN_TABS = [
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
+  { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
   { id: 'diagrams', label: 'Architecture', icon: '📐' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -11759,6 +11761,47 @@ function AdminGoLiveTab({ pin, onMsg, onErr, onGoVendors }) {
     navigator.clipboard?.writeText(text).then(() => onMsg?.(`Copied ${label || 'URL'}`)).catch(() => {});
   };
 
+  const ticket = cfg?.razorpay_route_ticket;
+  const [ticketNotes, setTicketNotes] = useState('');
+  const [ticketStatus, setTicketStatus] = useState('open');
+
+  useEffect(() => {
+    if (!ticket) return;
+    setTicketNotes(ticket.notes || '');
+    setTicketStatus(ticket.status || 'open');
+  }, [ticket?.notes, ticket?.status]);
+
+  const saveRouteTicket = async (patch, msg) => {
+    setBusyKey('razorpay_route_ticket');
+    setErr('');
+    try {
+      await adminHubFetch('update_razorpay_route_ticket', patch, pin);
+      onMsg?.(msg || 'Route ticket updated');
+      await load();
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const ticketStatusColor = (st) => ({
+    open: C.gold,
+    in_progress: C.acc,
+    resolved: C.grn,
+    closed: C.dim,
+  }[st] || C.gold);
+
+  const fmtWhen = (iso) => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return iso;
+    }
+  };
+
   if (loading) return <div style={{ ...S.card(), padding: 24 }}><Spin size={24} /></div>;
   if (!cfg) return <div style={{ ...S.card(), padding: 16, color: C.red }}>{err || 'Could not load go-live config'}</div>;
 
@@ -11926,6 +11969,104 @@ function AdminGoLiveTab({ pin, onMsg, onErr, onGoVendors }) {
           <button type="button" onClick={() => window.open(`${APP_URL}/scanv-qr.png`, '_blank')} style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.bdr}`, background: C.surf, color: C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>Print QR ↗</button>
         </div>
       </div>
+
+      {ticket ? (
+        <div style={{
+          ...S.card(), padding: 16, marginBottom: 14,
+          border: `1.5px solid ${ticketStatusColor(ticket.status)}44`,
+          background: `${ticketStatusColor(ticket.status)}10`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Razorpay Route ticket #{ticket.ticket_id}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>{ticket.subject}</div>
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase',
+              padding: '6px 10px', borderRadius: 999,
+              background: `${ticketStatusColor(ticket.status)}22`, color: ticketStatusColor(ticket.status),
+            }}>
+              {String(ticket.status || 'open').replace(/_/g, ' ')}
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8, marginBottom: 12 }}>
+            {[
+              ['Opened', fmtWhen(ticket.opened_at)],
+              ['Last checked', fmtWhen(ticket.last_checked_at)],
+              ['Status updated', fmtWhen(ticket.status_updated_at)],
+            ].map(([label, val]) => (
+              <div key={label} style={{ ...S.card({ padding: '8px 10px' }) }}>
+                <div style={{ fontSize: 9, color: C.dim, fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                <div style={{ fontSize: 11, color: C.txt, marginTop: 2 }}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.5, marginBottom: 10 }}>
+            Razorpay dashboard still shows this as <strong style={{ color: C.txt }}>Open</strong> under Key Updates.
+            The Account & Settings → Support Tickets tab may stay empty for activation tickets — use Dashboard Key Updates or Help & Support.
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            {[
+              ['Dashboard', ticket.dashboard_url],
+              ['Support tickets', ticket.support_tickets_url],
+              ['Route', ticket.route_url],
+              ['Linked accounts', ticket.route_accounts_url],
+            ].map(([label, url]) => (
+              <button key={label} type="button" onClick={() => window.open(url, '_blank', 'noopener')}
+                style={{ padding: '7px 12px', borderRadius: 20, border: `1.5px solid ${C.bdr}`, background: C.surf, color: C.acc, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>
+                {label} ↗
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,160px) 1fr', gap: 10, marginBottom: 10, alignItems: 'start' }}>
+            <div>
+              <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, marginBottom: 4 }}>Track status</div>
+              <select value={ticketStatus} onChange={(e) => setTicketStatus(e.target.value)} style={{ ...S.inp(), fontSize: 11 }}>
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, marginBottom: 4 }}>Internal notes</div>
+              <textarea value={ticketNotes} onChange={(e) => setTicketNotes(e.target.value)} rows={3}
+                placeholder="What Razorpay said, ETA, blockers…"
+                style={{ ...S.inp(), resize: 'vertical', fontSize: 11, lineHeight: 1.45 }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <Btn v="primary" sm disabled={busyKey === 'razorpay_route_ticket'}
+              onClick={() => saveRouteTicket({ status: ticketStatus, notes: ticketNotes }, 'Route ticket saved')}>
+              Save ticket
+            </Btn>
+            <Btn v="outline" sm disabled={busyKey === 'razorpay_route_ticket'}
+              onClick={() => saveRouteTicket({ mark_checked: true }, 'Checked Razorpay dashboard')}>
+              Mark checked now
+            </Btn>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
+            <div style={{ ...S.card({ padding: 10 }), background: `${C.gold}08` }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, marginBottom: 6 }}>Blocked until resolved</div>
+              {(ticket.blocked_items || []).map((line) => (
+                <div key={line} style={{ fontSize: 10, color: C.sub, lineHeight: 1.45, padding: '2px 0' }}>• {line}</div>
+              ))}
+            </div>
+            <div style={{ ...S.card({ padding: 10 }), background: `${C.grn}08` }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: C.grn, marginBottom: 6 }}>When Razorpay resolves</div>
+              {(ticket.next_steps_when_resolved || []).map((line) => (
+                <div key={line} style={{ fontSize: 10, color: C.sub, lineHeight: 1.45, padding: '2px 0' }}>• {line}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {(cfg.sections || []).map(renderSection)}
 
@@ -13297,6 +13438,12 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'go-live' && (
           <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => navigateAdminTab('vendors')} />
+        )}
+
+        {tab === 'vendor-leads' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading vendor leads…</div>}>
+            <AdminVendorLeadsTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} />
+          </Suspense>
         )}
 
         {tab === 'diagrams' && usePin && (
