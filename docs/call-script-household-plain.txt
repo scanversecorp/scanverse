@@ -1,10 +1,10 @@
-HOUSEHOLD VENDOR — CALL SCRIPT (Marathi / Hindi / English backup)
+HOUSEHOLD VENDOR — CALL SCRIPT (Marathi / Hindi)
 
 OPEN (Marathi)
-"नमस्कार, [Business] मध्ये बोलतो/बोलते का? मी Jasmeen — ScanV · DCore."
+"नमस्कार, [Business] मध्ये बोलतो/बोलते का? आम्ही ScanV · DCore कडून बोलतो — local booking app."
 
 OPEN (Hindi)
-"नमस्ते, kya main [Business] se baat kar raha/rahi hoon? Main Jasmeen — ScanV · DCore."
+"नमस्ते, kya main [Business] se baat kar raha/rahi hoon? Hum ScanV · DCore se bol rahe hain."
 
 HOOK (30 sec — Marathi)
 "आम्ही Wakad आणि PCMC मध्ये cleaning साठी verified customers ला local partners कडे bookings पाठवतो. Launch वर listing fee नाही — rate तुमची, booking आणि UPI payment app वर."
@@ -12,13 +12,8 @@ HOOK (30 sec — Marathi)
 HOOK (Hindi)
 "Hum Wakad aur PCMC mein cleaning ke verified customers ko local partners par bookings bhejte hain. Launch par koi listing fee nahi — price aapki, booking aur UPI app par."
 
-QUALIFY
-1. "दररोज कोणते areas cover करता?" / "Roz kaunse areas cover karte ho?"
-2. "2BHK deep clean chi / ki typical kitni price?"
-3. "App varun / app se week मध्ये / mein kitne jobs घेऊ / le sakte ho?"
-
 CLOSE
-"WhatsApp var message pathavte / bhejti hoon. Team cha photo ani Aadhaar last 4 share karal / karoge? Ya week madhe / mein live."
+"WhatsApp var message pathavto — team cha photo ani Aadhaar last 4 share karal? Ya week madhe live."
 
 AFTER CALL
 Admin → Vendor Leads → phone + name + address verified → Add to ScanV

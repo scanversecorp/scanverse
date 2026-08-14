@@ -219,7 +219,7 @@ export function AdminLogisticsPartnersTab({ pin, adminHubFetch, C, S, FF, Spin, 
                   Mark replied
                 </Btn>
                 <a
-                  href={`mailto:${p.contact_email}?subject=Follow-up%3A%20ScanV%20API%20Pune%20pilot&body=Hi%2C%0A%0AFollowing%20up%20on%20our%20ScanV%20(DCore)%20API%20integration%20email.%0A%0AJasmeen%20S%20P%0A%2B91-9270194842%0Aconnect%40dcoreglobal.com`}
+                  href={`mailto:${p.contact_email}?subject=Follow-up%3A%20ScanV%20API%20Pune%20pilot&body=Hi%2C%0A%0AFollowing%20up%20on%20our%20ScanV%20(DCore)%20API%20integration%20email.%0A%0AScanV%20%C2%B7%20DCore%0A%2B91-9270194842%0Aconnect%40dcoreglobal.com`}
                   style={{
                     padding: '6px 12px', borderRadius: 10, border: `1px solid ${C.bdr}`, background: C.surf,
                     color: C.acc, fontSize: 10, fontWeight: 700, textDecoration: 'none', fontFamily: FF,

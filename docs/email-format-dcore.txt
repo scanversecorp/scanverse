@@ -12,7 +12,7 @@ ONE-TIME SETUP (5 minutes)
 
 2. Email signature (HTML)
    Settings → Mail → Signatures → + Add Signature
-   Name: Jasmeen · DCORE
+   Name: ScanV · DCore
    · Open docs/email-signature-dcore.html in a browser
    · Select all → Copy → Paste into signature editor
    · Set as default for connect@dcoreglobal.com

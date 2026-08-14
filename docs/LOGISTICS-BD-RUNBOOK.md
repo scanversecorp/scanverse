@@ -24,7 +24,7 @@ Tracks Porter, Borzo, Shadowfax, QWQER, Delhivery. Pre-seeded with email_sent + 
 2. Wire provider client in `external-logistics.ts`
 3. After payment → `create_external_trip` → webhooks → `#track`
 
-## Jasmeen / DCORE outreach
+## ScanV / DCore outreach
 
 - From: connect@dcoreglobal.com
 - Templates: `docs/email-*-plain.txt`
