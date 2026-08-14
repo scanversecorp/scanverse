@@ -102,4 +102,4 @@ Vercel rebuilds automatically (~1–2 min).
 
 ---
 
-*DCORE Global Corporation · ScanV · [scanversecorp/scanverse](https://github.com/scanversecorp/scanverse)*
+*DCore · ScanV · [scanversecorp/scanverse](https://github.com/scanversecorp/scanverse)*

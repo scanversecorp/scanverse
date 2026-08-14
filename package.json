@@ -1,7 +1,7 @@
 {
   "name": "scanv",
   "version": "5.5.3.1786665000000",
-  "description": "ScanV — Professional Services Marketplace · DCORE Global Corporation · PCMC Pune",
+  "description": "ScanV — Professional Services Marketplace · DCore · PCMC Pune",
   "private": true,
   "homepage": "https://scanverse-tau.vercel.app",
   "dependencies": {

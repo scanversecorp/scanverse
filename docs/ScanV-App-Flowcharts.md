@@ -1,6 +1,6 @@
 # ScanV — Application Flow Charts
 
-**Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCORE Global Corporation  
+**Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCore  
 **Live:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)
 
 > Canonical data-flow sequences: [APP-DATA-FLOW.md](./APP-DATA-FLOW.md) · System context: [ARCHITECTURE.md](./ARCHITECTURE.md)  

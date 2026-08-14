@@ -106,4 +106,4 @@ After code changes in this repo, verify QR flow on a real phone:
 
 ## Support
 
-Technical owner: DCORE Global Corporation · [scanversecorp/scanverse](https://github.com/scanversecorp/scanverse)
+Technical owner: DCore · [scanversecorp/scanverse](https://github.com/scanversecorp/scanverse)

@@ -162,7 +162,7 @@ async function loadRazorpayRouteTicket(sb: PlatformSb) {
     ticket_id: map.razorpay_route_ticket_id?.value || "20389531",
     status,
     subject: map.razorpay_route_ticket_subject?.value
-      || "Enable Razorpay Route for DCORE Global Corporation / ScanV marketplace",
+      || "Enable Razorpay Route for DCore / ScanV marketplace",
     opened_at: map.razorpay_route_ticket_opened_at?.value || null,
     notes: map.razorpay_route_ticket_notes?.value || "",
     last_checked_at: map.razorpay_route_ticket_last_checked_at?.value || null,

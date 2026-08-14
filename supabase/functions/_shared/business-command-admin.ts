@@ -14,7 +14,7 @@ export function vendorOutreachMessage(businessName: string): string {
   return [
     "नमस्कार / नमस्ते 🙏",
     "",
-    "मी Jasmeen, DCORE Global — ScanV app (Wakad व PCMC).",
+    "मी Jasmeen — ScanV · DCore (Wakad व PCMC).",
     "",
     `आम्ही verified customers च्या cleaning / home service bookings local partners ला पाठवतो. ${name} सोबत partner करू इच्छितो.`,
     "",

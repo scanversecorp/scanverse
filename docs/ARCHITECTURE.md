@@ -1,6 +1,6 @@
 # ScanV — System Architecture
 
-**Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCORE Global Corporation  
+**Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCore  
 **Production:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)
 
 > **Integration note:** External service providers are pluggable via Admin Go-Live toggles. Diagrams may change as integrations are added.

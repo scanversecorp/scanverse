@@ -1,7 +1,7 @@
 /**
  * ScanV v5.5 -- Daylight Trust UI
  * URL: https://scanv-tau.vercel.app
- * DCORE Global Corporation · Global marketplace
+ * DCore · ScanV marketplace
  * Daylight Trust: #f2efe8 · #d63a56 · Android-first
  *
  * OTP FIX: Using Fast2SMS (India, free tier) directly from client
@@ -2165,7 +2165,7 @@ function FooterLegalLinks({ current, small }) {
 function CopyrightLine({ style }) {
   return (
     <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.45, ...style }}>
-      <div>© All rights reserved. DCore Global Corporation</div>
+      <div>© All rights reserved. DCore · ScanV</div>
       <div style={{ marginTop: 4 }}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
@@ -5535,7 +5535,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{fontSize:32,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'-0.02em'}}>
         <span style={{color:C.txt}}>Scan</span><span style={{color:C.acc}}>V</span>
       </div>
-      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCORE Global Corporation · {LOCAL_COMMUNITIES}</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:3}}>DCore · ScanV · {LOCAL_COMMUNITIES}</div>
       <div style={{fontSize:10,color:C.dim,marginTop:4,lineHeight:1.4}}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
@@ -9895,7 +9895,7 @@ function FaqPage() {
     ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). You will see basic status, subject, and resolution note when closed.'],
     ['Can I change or cancel a booking?', 'Yes — open Bookings or Track my service and tap Cancel booking on any confirmed or in-progress order. You will see a breakdown: 30% cancellation fee (18% GST + 12% platform service of total paid) and 70% refund. See /refund for details.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
-    ['Who operates ScanV?', `DCORE Global Corporation — a global marketplace connecting customers with independent service partners. ${INCORPORATION_ORIGIN}. Call +91-9270194842 for help.`],
+    ['Who operates ScanV?', `ScanV is operated by DCore — connecting customers with independent service partners in ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. Call +91-9270194842 for help.`],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
     ['How are partners assigned?', 'After payment, we offer the job to the 3 nearest active partners one-by-one in the ScanV app. SMS, call & WhatsApp are sent as backup. First partner to accept is assigned and live map tracking starts.'],
     ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Track progress at #track-ticket.'],
@@ -13686,7 +13686,7 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 All data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your data</p>
           </div>
           {[
-            ['Who We Are',`ScanV is operated by DCORE Global Corporation. We connect customers with independent service providers across Local Communities worldwide. ${INCORPORATION_ORIGIN}. DPO: privacy@dcoreglobal.com`],
+            ['Who We Are',`ScanV is operated by DCore. We connect customers with independent service providers across ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. DPO: privacy@dcoreglobal.com`],
             ['Data We Collect','Identity (name), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city), Device (type, OS, browser, timezone, language, battery, canvas fingerprint), Booking details, and session behaviour. We do NOT collect Aadhaar, PAN, passport, card numbers, passwords, or biometrics.'],
             ['How We Use It','Verify identity via OTP before any booking · Match you with nearby service providers · Send booking updates · Process payments for GST compliance · Prevent fraud · Improve platform quality through anonymised analytics · Comply with Indian law'],
             ['Location Data','ScanV requests GPS when you open the app and when you book. Location is used only to show nearby services and enable delivery routing. IP-based location is used as fallback. We never sell location data to advertisers.'],
@@ -13709,7 +13709,7 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By using ScanV or placing a booking, you agree to these terms in full.</p>
           </div>
           {[
-            ['ScanV as Marketplace Intermediary','DCORE Global Corporation operates ScanV as an IT Intermediary under the IT Act 2000. We connect Users with independent Partners. We do not employ Partners, do not deliver services, and are not responsible for service quality, safety, timeliness, or outcomes. DCORE’s maximum liability for any booking is limited to the platform fee collected for that booking.'],
+            ['ScanV as Marketplace Intermediary','DCore operates ScanV as an IT Intermediary under the IT Act 2000. We connect Users with independent Partners. We do not employ Partners, do not deliver services, and are not responsible for service quality, safety, timeliness, or outcomes. DCore’s maximum liability for any booking is limited to the platform fee collected for that booking.'],
             ['Eligibility','Must be 18+ · Valid Indian mobile · Legally capable of contracts under Indian law · Must accept Terms, Privacy Policy, and DPDP Act 2023 compliance before first booking'],
             ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + Terms accepted + unique TXN ID generated + platform fee paid. DCORE may cancel bookings if no Partner is available or fraud is detected.'],
             ['User Responsibilities','Provide accurate booking details · Be present at the agreed time and location · Treat Partners respectfully · Report disputes within 48 hours of service completion · Do not book for unlawful purposes'],
@@ -13797,14 +13797,14 @@ function LegalPage({page}) {
         <div style={{background:`linear-gradient(135deg,${C.surf},${C.card})`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'28px 24px',marginBottom:28}}>
           <div style={{display:'inline-block',background:C.acc,color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,letterSpacing:1,marginBottom:10}}>{pg.badge}</div>
           <div style={{color:C.txt,fontSize:24,fontWeight:800,marginBottom:4}}>{pg.title}</div>
-          <div style={{color:C.sub,fontSize:12}}>DCORE Global Corporation · ScanV · Updated: {pg.updated}</div>
+          <div style={{color:C.sub,fontSize:12}}>DCore · ScanV · Updated: {pg.updated}</div>
         </div>
         {/* Content */}
         {pg.content}
         {/* Footer links */}
         <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:20,marginTop:20,display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center'}}>
           <FooterLegalLinks current={page}/>
-          <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCORE Global ↗</a>
+          <a href="https://www.dcoreglobal.com" target="_blank" rel="noreferrer" style={{color:C.dim,fontSize:12}}>DCore ↗</a>
         </div>
         <CopyrightLine style={{ marginTop: 16 }} />
       </div>

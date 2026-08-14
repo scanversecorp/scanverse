@@ -1,9 +1,9 @@
 TO: help@porter.in
-SUBJECT: API integration + Pune pilot — ScanV (DCORE Global Corporation)
+SUBJECT: API integration + Pune pilot — ScanV (DCore)
 
 Dear Porter Enterprise Team,
 
-We are ScanV, a customer-facing services and logistics portal operated by DCORE Global Corporation, focused initially on Pune and PCMC.
+We are ScanV, a customer-facing services and logistics portal operated by DCore, focused initially on Pune and PCMC.
 
 We are exploring a Porter Enterprise API integration so customers can book local shipments on ScanV while fulfillment runs on Porter's network — with live driver tracking shown inside the ScanV app (customers would not need to switch to the Porter consumer app).
 
@@ -34,7 +34,7 @@ We would appreciate a callback or introduction to your API / enterprise integrat
 Thank you,
 
 Jasmeen S P
-ScanV · DCORE Global Corporation
+ScanV · DCore
 Pune, Maharashtra
 Mobile: +91-9270194842
 Email: connect@dcoreglobal.com

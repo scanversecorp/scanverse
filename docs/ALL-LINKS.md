@@ -12,7 +12,7 @@
 | Alternate alias | https://scanverse-tau.vercel.app | Same Vercel project |
 | Legacy (wrong app) | https://scanverse.vercel.app | Old QR scanner — **not ScanV** |
 | QR landing | https://scanv-tau.vercel.app?qr=1 | Print QR campaigns |
-| Corporate site | https://www.dcoreglobal.com | DCORE Global Corporation (parent entity) |
+| Corporate site | https://www.dcoreglobal.com | DCore (ScanV operator) |
 | Parent engineering | https://www.vanguardnode.com | VanguardNode (Wix) |
 | Beauty brand | https://www.richroyalscorp.com | Rich Royals Corp (Wix) |
 

@@ -192,4 +192,4 @@ Tick these in Admin → **Go-Live** → Manual checklist (section **I. Backup & 
 
 ---
 
-*DCORE Global Corporation · ScanV · [scanversecorp/scanverse](https://github.com/scanversecorp/scanverse)*
+*DCore · ScanV · [scanversecorp/scanverse](https://github.com/scanversecorp/scanverse)*

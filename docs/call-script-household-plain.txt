@@ -1,10 +1,10 @@
 HOUSEHOLD VENDOR — CALL SCRIPT (Marathi / Hindi / English backup)
 
 OPEN (Marathi)
-"नमस्कार, [Business] मध्ये बोलतो/बोलते का? मी Jasmeen — DCORE Global, ScanV app."
+"नमस्कार, [Business] मध्ये बोलतो/बोलते का? मी Jasmeen — ScanV · DCore."
 
 OPEN (Hindi)
-"नमस्ते, kya main [Business] se baat kar raha/rahi hoon? Main Jasmeen — DCORE Global, ScanV app."
+"नमस्ते, kya main [Business] se baat kar raha/rahi hoon? Main Jasmeen — ScanV · DCore."
 
 HOOK (30 sec — Marathi)
 "आम्ही Wakad आणि PCMC मध्ये cleaning साठी verified customers ला local partners कडे bookings पाठवतो. Launch वर listing fee नाही — rate तुमची, booking आणि UPI payment app वर."

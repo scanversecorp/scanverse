@@ -232,7 +232,7 @@ Path-based routes: `privacy`, `terms`, `refund`, `payment`
 
 - Static content blocks per page
 - Footer cross-links
-- DCORE Global branding
+- DCore · ScanV branding
 
 ---
 
