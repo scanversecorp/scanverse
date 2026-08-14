@@ -65,6 +65,11 @@ async function checkFrontendBundle() {
   } else {
     pass('Main bundle has no embedded Mermaid diagram data');
   }
+  if (mainSrc.includes('github.com/scanversecorp/scanverse') || mainSrc.includes('get_admin_url_index')) {
+    fail('Main bundle may expose confidential admin URL catalog');
+  } else {
+    pass('Main bundle has no admin URL index catalog');
+  }
 
   const docsRes = await fetch(`${APP_URL}/docs/architecture.html`);
   const docsBody = await docsRes.text();
@@ -121,6 +126,24 @@ async function checkGoLiveSwitches() {
   else pass('dispatch_open OFF');
 }
 
+async function checkAdminUrlIndex() {
+  const unauth = await fetch(`${SB_URL}/functions/v1/admin-hub`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get_admin_url_index' }),
+  });
+  const unauthBody = await unauth.json();
+  if (unauth.status === 401 || unauthBody.error === 'Unauthorized') {
+    pass('get_admin_url_index blocked without PIN');
+  } else {
+    fail('get_admin_url_index allowed without PIN');
+  }
+  const data = await adminHub('get_admin_url_index');
+  const total = (data.sections || []).reduce((n, s) => n + (s.items?.length || 0), 0);
+  if (total >= 40) pass(`Admin URL index: ${total} links (PIN-gated)`);
+  else fail(`Admin URL index: ${total} links (expected ~45)`);
+}
+
 async function checkDiagrams() {
   const data = await adminHub('get_admin_diagrams');
   const sections = data.sections || [];
@@ -144,6 +167,7 @@ async function main() {
   if (ADMIN_PIN) {
     await checkGoLiveSwitches();
     await checkDiagrams();
+    await checkAdminUrlIndex();
   } else {
     console.warn('\n⚠ Set ADMIN_PIN to validate Go-Live switch board and diagram catalog.\n');
   }

@@ -25,6 +25,7 @@
  *   pricing_2fa_reset_send — SMS/voice OTP to PRICING_2FA_RESET_MOBILE (exec PIN only)
  *   pricing_2fa_reset_confirm — { otp } clears pricing admin TOTP enrollment
  *   get_admin_diagrams — architecture / data-flow Mermaid catalog (Admin PIN only)
+ *   get_admin_url_index — confidential bookmark catalog (Admin PIN only)
  *
  * Auth: x-admin-pin header
  *   ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN
@@ -61,6 +62,7 @@ import {
   otpDeliveryVendorOpts,
 } from "../_shared/vendor-providers.ts";
 import adminDiagramSections from "../_shared/admin-diagrams-data.json" with { type: "json" };
+import adminUrlIndexSections from "../_shared/admin-url-index-data.json" with { type: "json" };
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -1178,6 +1180,10 @@ Deno.serve(async (req) => {
 
   if (action === "get_admin_diagrams") {
     return json({ sections: adminDiagramSections });
+  }
+
+  if (action === "get_admin_url_index") {
+    return json({ sections: adminUrlIndexSections, app_url: Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app" });
   }
 
   if (action === "pricing_2fa_status" || action === "pricing_2fa_reset_send" || action === "pricing_2fa_reset_confirm") {

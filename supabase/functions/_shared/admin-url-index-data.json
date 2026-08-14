@@ -1,0 +1,292 @@
+[
+  {
+    "id": "customer",
+    "title": "Customer & public",
+    "subtitle": "No PIN — safe to share with customers",
+    "items": [
+      {
+        "label": "ScanV Home",
+        "url": "https://scanv-tau.vercel.app/",
+        "note": "Main PWA · browse & book"
+      },
+      {
+        "label": "QR landing",
+        "url": "https://scanv-tau.vercel.app/?qr=1",
+        "note": "Print QR campaigns"
+      },
+      {
+        "label": "FAQ",
+        "url": "https://scanv-tau.vercel.app/#faq",
+        "note": "Help & policies summary"
+      },
+      {
+        "label": "Report issue",
+        "url": "https://scanv-tau.vercel.app/#report",
+        "note": "Create support ticket"
+      },
+      {
+        "label": "Track support ticket",
+        "url": "https://scanv-tau.vercel.app/#track-ticket",
+        "note": "Ticket # + mobile"
+      },
+      {
+        "label": "Track booking",
+        "url": "https://scanv-tau.vercel.app/#track?id=BK-XXXX",
+        "note": "Replace BK-XXXX with booking ID"
+      },
+      {
+        "label": "Partner registration",
+        "url": "https://scanv-tau.vercel.app/#vendor-onboard",
+        "note": "Vendor self-signup"
+      }
+    ]
+  },
+  {
+    "id": "admin-routes",
+    "title": "Admin & ops dashboards",
+    "subtitle": "PIN required — bookmark only, not in public nav",
+    "items": [
+      {
+        "label": "Admin Control Center",
+        "url": "https://scanv-tau.vercel.app/#admin",
+        "note": "ADMIN_HUB_PIN or leader PINs"
+      },
+      {
+        "label": "Executive dashboard",
+        "url": "https://scanv-tau.vercel.app/#exec",
+        "note": "Owner PIN · KPIs & charts"
+      },
+      {
+        "label": "Pricing admin",
+        "url": "https://scanv-tau.vercel.app/#pricing-admin",
+        "note": "PRICING_ADMIN_PIN + 2FA"
+      },
+      {
+        "label": "Customer support desk",
+        "url": "https://scanv-tau.vercel.app/#customer-support",
+        "note": "SUPPORT_AGENT_PIN or admin PINs"
+      },
+      {
+        "label": "Vendor admin",
+        "url": "https://scanv-tau.vercel.app/#vendor-admin",
+        "note": "VENDOR_ADMIN_PIN or admin PINs"
+      },
+      {
+        "label": "OTP delivery reports",
+        "url": "https://scanv-tau.vercel.app/#otp-delivery-report",
+        "note": "2Factor callback stats"
+      }
+    ]
+  },
+  {
+    "id": "admin-tabs",
+    "title": "Admin hub tabs (inside #admin)",
+    "subtitle": "Opens tab after PIN unlock · bookmarkable with ?tab=",
+    "items": [
+      {
+        "label": "Overview",
+        "adminTab": "overview",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=overview",
+        "note": "overview"
+      },
+      {
+        "label": "Pricing",
+        "adminTab": "pricing",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=pricing",
+        "note": "pricing"
+      },
+      {
+        "label": "Customer Support",
+        "adminTab": "support",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=support",
+        "note": "support"
+      },
+      {
+        "label": "Refunds",
+        "adminTab": "refunds",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=refunds",
+        "note": "refunds"
+      },
+      {
+        "label": "Investments",
+        "adminTab": "investments",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=investments",
+        "note": "investments"
+      },
+      {
+        "label": "Tickets",
+        "adminTab": "tickets",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=tickets",
+        "note": "tickets"
+      },
+      {
+        "label": "Support Agents",
+        "adminTab": "agents",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=agents",
+        "note": "agents"
+      },
+      {
+        "label": "Vendors & Dispatch",
+        "adminTab": "vendors",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=vendors",
+        "note": "vendors"
+      },
+      {
+        "label": "GPS Status",
+        "adminTab": "gps",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=gps",
+        "note": "gps"
+      },
+      {
+        "label": "Bookings & Payments",
+        "adminTab": "bookings",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=bookings",
+        "note": "bookings"
+      },
+      {
+        "label": "OTP Delivery",
+        "adminTab": "otp",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=otp",
+        "note": "otp"
+      },
+      {
+        "label": "Go-Live",
+        "adminTab": "go-live",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=go-live",
+        "note": "Switch board · 12 vendors + runtime toggles"
+      },
+      {
+        "label": "Architecture",
+        "adminTab": "diagrams",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=diagrams",
+        "note": "31 architecture & data-flow diagrams"
+      },
+      {
+        "label": "Database / App",
+        "adminTab": "database",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=database",
+        "note": "database"
+      },
+      {
+        "label": "Settings",
+        "adminTab": "settings",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=settings",
+        "note": "settings"
+      }
+    ]
+  },
+  {
+    "id": "legal",
+    "title": "Legal & policy pages",
+    "subtitle": "Public path routes",
+    "items": [
+      {
+        "label": "Privacy Policy",
+        "url": "https://scanv-tau.vercel.app/privacy",
+        "note": "DPDP Act 2023"
+      },
+      {
+        "label": "Terms & Conditions",
+        "url": "https://scanv-tau.vercel.app/terms",
+        "note": "Booking terms"
+      },
+      {
+        "label": "Refund Policy",
+        "url": "https://scanv-tau.vercel.app/refund",
+        "note": "Cancellation & refunds"
+      },
+      {
+        "label": "Payment Policy",
+        "url": "https://scanv-tau.vercel.app/payment",
+        "note": "Fees & UPI"
+      }
+    ]
+  },
+  {
+    "id": "infra",
+    "title": "Infrastructure dashboards",
+    "subtitle": "Supabase · Vercel · GitHub",
+    "items": [
+      {
+        "label": "Supabase project",
+        "url": "https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut",
+        "note": "DB, auth, functions, secrets"
+      },
+      {
+        "label": "SQL Editor",
+        "url": "https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/sql",
+        "note": "Ad-hoc queries"
+      },
+      {
+        "label": "Edge Functions",
+        "url": "https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/functions",
+        "note": "admin-hub, send-otp, razorpay-payment…"
+      },
+      {
+        "label": "Database tables",
+        "url": "https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/editor",
+        "note": "profiles, bookings, vendors…"
+      },
+      {
+        "label": "Secrets & env",
+        "url": "https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/settings/functions",
+        "note": "PINs, API keys"
+      },
+      {
+        "label": "Backups & PITR",
+        "url": "https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut/settings/addons",
+        "note": "Daily backups before go-live"
+      },
+      {
+        "label": "Vercel dashboard",
+        "url": "https://vercel.com/dashboard",
+        "note": "scanv-tau deployments"
+      },
+      {
+        "label": "GitHub repository",
+        "url": "https://github.com/scanversecorp/scanverse",
+        "note": "Source & CI"
+      }
+    ]
+  },
+  {
+    "id": "assets",
+    "title": "Assets & corporate",
+    "subtitle": "QR print · parent entities",
+    "items": [
+      {
+        "label": "Print QR PNG",
+        "url": "https://scanv-tau.vercel.app/scanv-qr.png",
+        "note": "Standee & print"
+      },
+      {
+        "label": "DCORE Global",
+        "url": "https://www.dcoreglobal.com",
+        "note": "Parent corporation"
+      },
+      {
+        "label": "VanguardNode",
+        "url": "https://www.vanguardnode.com",
+        "note": "Engineering (Wix)"
+      },
+      {
+        "label": "Rich Royals Corp",
+        "url": "https://www.richroyalscorp.com",
+        "note": "Beauty brand (Wix)"
+      }
+    ]
+  },
+  {
+    "id": "avoid",
+    "title": "Do not use",
+    "subtitle": "Wrong or deprecated",
+    "items": [
+      {
+        "label": "scanverse.vercel.app",
+        "url": "https://scanverse.vercel.app",
+        "note": "Legacy QR scanner — NOT ScanV",
+        "warn": true
+      }
+    ]
+  }
+]

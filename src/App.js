@@ -11385,109 +11385,50 @@ function adminTabUrl(tabId) {
   return `${APP_URL}/#admin?tab=${encodeURIComponent(tabId)}`;
 }
 
-const ADMIN_URL_INDEX = [
-  {
-    id: 'customer',
-    title: 'Customer & public',
-    subtitle: 'No PIN — safe to share with customers',
-    items: [
-      { label: 'ScanV Home', url: `${APP_URL}/`, note: 'Main PWA · browse & book' },
-      { label: 'QR landing', url: `${APP_URL}/?qr=1`, note: 'Print QR campaigns' },
-      { label: 'FAQ', url: `${APP_URL}/#faq`, note: 'Help & policies summary' },
-      { label: 'Report issue', url: `${APP_URL}/#report`, note: 'Create support ticket' },
-      { label: 'Track support ticket', url: `${APP_URL}/#track-ticket`, note: 'Ticket # + mobile' },
-      { label: 'Track booking', url: `${APP_URL}/#track?id=BK-XXXX`, note: 'Replace BK-XXXX with booking ID' },
-      { label: 'Partner registration', url: `${APP_URL}/#vendor-onboard`, note: 'Vendor self-signup' },
-    ],
-  },
-  {
-    id: 'admin-routes',
-    title: 'Admin & ops dashboards',
-    subtitle: 'PIN required — bookmark only, not in public nav',
-    items: [
-      { label: 'Admin Control Center', url: `${APP_URL}/#admin`, note: 'ADMIN_HUB_PIN or leader PINs' },
-      { label: 'Executive dashboard', url: `${APP_URL}/#exec`, note: 'Owner PIN · KPIs & charts' },
-      { label: 'Pricing admin', url: `${APP_URL}/#pricing-admin`, note: 'PRICING_ADMIN_PIN + 2FA' },
-      { label: 'Customer support desk', url: `${APP_URL}/#customer-support`, note: 'SUPPORT_AGENT_PIN or admin PINs' },
-      { label: 'Vendor admin', url: `${APP_URL}/#vendor-admin`, note: 'VENDOR_ADMIN_PIN or admin PINs' },
-      { label: 'OTP delivery reports', url: `${APP_URL}/#otp-delivery-report`, note: '2Factor callback stats' },
-    ],
-  },
-  {
-    id: 'admin-tabs',
-    title: 'Admin hub tabs (inside #admin)',
-    subtitle: 'Opens tab after PIN unlock · bookmarkable with ?tab=',
-    items: ADMIN_TABS.filter((t) => t.id !== 'index').map((t) => ({
-      label: t.label,
-      adminTab: t.id,
-      url: adminTabUrl(t.id),
-      note: t.id === 'go-live' ? 'Switch board · 12 vendors + runtime toggles' : t.id === 'diagrams' ? '31 architecture & data-flow diagrams' : `${t.icon} ${t.id}`,
-    })),
-  },
-  {
-    id: 'legal',
-    title: 'Legal & policy pages',
-    subtitle: 'Public path routes',
-    items: [
-      { label: 'Privacy Policy', url: `${APP_URL}/privacy`, note: 'DPDP Act 2023' },
-      { label: 'Terms & Conditions', url: `${APP_URL}/terms`, note: 'Booking terms' },
-      { label: 'Refund Policy', url: `${APP_URL}/refund`, note: 'Cancellation & refunds' },
-      { label: 'Payment Policy', url: `${APP_URL}/payment`, note: 'Fees & UPI' },
-    ],
-  },
-  {
-    id: 'infra',
-    title: 'Infrastructure dashboards',
-    subtitle: 'Supabase · Vercel · GitHub',
-    items: [
-      { label: 'Supabase project', url: SB_DASH, note: 'DB, auth, functions, secrets' },
-      { label: 'SQL Editor', url: `${SB_DASH}/sql`, note: 'Ad-hoc queries' },
-      { label: 'Edge Functions', url: `${SB_DASH}/functions`, note: 'admin-hub, send-otp, razorpay-payment…' },
-      { label: 'Database tables', url: `${SB_DASH}/editor`, note: 'profiles, bookings, vendors…' },
-      { label: 'Secrets & env', url: `${SB_DASH}/settings/functions`, note: 'PINs, API keys' },
-      { label: 'Backups & PITR', url: `${SB_DASH}/settings/addons`, note: 'Daily backups before go-live' },
-      { label: 'Vercel dashboard', url: 'https://vercel.com/dashboard', note: 'scanv-tau deployments' },
-      { label: 'GitHub repository', url: 'https://github.com/scanversecorp/scanverse', note: 'Source & CI' },
-    ],
-  },
-  {
-    id: 'assets',
-    title: 'Assets & corporate',
-    subtitle: 'QR print · parent entities',
-    items: [
-      { label: 'Print QR PNG', url: `${APP_URL}/scanv-qr.png`, note: 'Standee & print' },
-      { label: 'DCORE Global', url: 'https://www.dcoreglobal.com', note: 'Parent corporation' },
-      { label: 'VanguardNode', url: 'https://www.vanguardnode.com', note: 'Engineering (Wix)' },
-      { label: 'Rich Royals Corp', url: 'https://www.richroyalscorp.com', note: 'Beauty brand (Wix)' },
-    ],
-  },
-  {
-    id: 'avoid',
-    title: 'Do not use',
-    subtitle: 'Wrong or deprecated',
-    items: [
-      { label: 'scanverse.vercel.app', url: 'https://scanverse.vercel.app', note: 'Legacy QR scanner — NOT ScanV', warn: true },
-    ],
-  },
-];
+function AdminPageIndexTab({ pin, adminHubFetch, onNavigateTab, onCopy, C, S, FF, Spin }) {
+  const [sections, setSections] = useState(null);
+  const [loadErr, setLoadErr] = useState('');
 
-function AdminPageIndexTab({ onNavigateTab, onCopy }) {
+  useEffect(() => {
+    if (!pin || !adminHubFetch) return;
+    let cancelled = false;
+    setLoadErr('');
+    setSections(null);
+    adminHubFetch('get_admin_url_index', {}, pin)
+      .then((r) => {
+        if (cancelled) return;
+        if (r?.error) throw new Error(r.error);
+        if (!Array.isArray(r?.sections) || !r.sections.length) throw new Error('No URLs returned');
+        setSections(r.sections);
+      })
+      .catch((e) => { if (!cancelled) setLoadErr(e.message || 'Could not load URL index'); });
+    return () => { cancelled = true; };
+  }, [pin, adminHubFetch]);
+
   const copy = (text, label) => {
     navigator.clipboard?.writeText(text).then(() => onCopy?.(`Copied ${label || 'URL'}`)).catch(() => {});
   };
+
+  if (loadErr) {
+    return <div style={{ ...S.card(), padding: 16, color: C.red, fontSize: 12 }}>Could not load URL index: {loadErr}</div>;
+  }
+  if (!sections) {
+    return <div style={{ fontSize: 11, color: C.dim, display: 'flex', alignItems: 'center', gap: 8, padding: 16 }}><Spin size={14} /> Loading URL index…</div>;
+  }
 
   return (
     <div>
       <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
         <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>Page index — all ScanV URLs</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
-          Bookmark this tab: <code style={{ color: C.acc }}>{adminTabUrl('index')}</code>
-          · Admin tabs support <code style={{ color: C.acc }}>#admin?tab=go-live</code> deep links
+          Loaded from server after PIN — not in the public app bundle.
+          Bookmark: <code style={{ color: C.acc }}>{adminTabUrl('index')}</code>
+          · Deep links: <code style={{ color: C.acc }}>#admin?tab=go-live</code>
           · Assist: <strong style={{ color: C.txt }}>{ASSIST}</strong>
         </div>
       </div>
 
-      {ADMIN_URL_INDEX.map((section) => (
+      {sections.map((section) => (
         <div key={section.id} style={{ ...S.card(), padding: 0, marginBottom: 14, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: BDR }}>
             <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{section.title}</div>
@@ -12842,8 +12783,8 @@ function AdminControlCenter({ onPricesUpdated }) {
           </div>
         )}
 
-        {tab === 'index' && (
-          <AdminPageIndexTab onNavigateTab={navigateAdminTab} onCopy={setMsg} />
+        {tab === 'index' && usePin && (
+          <AdminPageIndexTab pin={usePin} adminHubFetch={adminHubFetch} onNavigateTab={navigateAdminTab} onCopy={setMsg} C={C} S={S} FF={FF} Spin={Spin} />
         )}
 
         {tab === 'go-live' && (
