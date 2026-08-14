@@ -7,6 +7,8 @@ Profile photo: docs/social/scanv-profile-picture.png
 Link: https://scanv-tau.vercel.app?utm_source=instagram&utm_medium=bio
 
 BIO (copy as-is)
+One App for everything ✨
+Local community · Local support · Global happiness
 🚀 Coming soon everywhere in Pune & PCMC
 Your mess, our problem 😉
 Book cleaning · delivery & more ↓
@@ -26,9 +28,9 @@ PINNED COMMENT
 App link + "Day 1 gang check in 👇"
 
 FIRST CAROUSEL SLIDE TEXT
-Slide 1: "Coming soon everywhere in Pune & PCMC 🚀"
-Slide 2: "Book verified services on one app"
-Slide 3: "UPI · track · zero drama"
+Slide 1: "One App for everything"
+Slide 2: "Local community · Local support · Global happiness"
+Slide 3: "Coming soon everywhere in Pune & PCMC 🚀"
 
 CAPTION STYLE
 See docs/social/genz-week-posts.txt

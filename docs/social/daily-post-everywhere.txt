@@ -1,6 +1,9 @@
 # Daily post everywhere — ScanV (@scanvapp)
 
-**Hero line:** 🚀 Coming soon everywhere in Pune & PCMC
+**Hero lines (use together or rotate):**
+• One App for everything.
+• Local community · Local support · Global happiness.
+• 🚀 Coming soon everywhere in Pune & PCMC
 
 Post the same caption every day on all 5 platforms (9:30 AM – 7 PM IST).
 
@@ -13,6 +16,12 @@ Post the same caption every day on all 5 platforms (9:30 AM – 7 PM IST).
 | 3 | TikTok | [TikTok upload](https://www.tiktok.com/upload) |
 | 4 | YouTube | [YouTube Studio](https://studio.youtube.com/) |
 | 5 | YouTube Shorts | YouTube Studio → Create → Short |
+
+## Pre-launch (grow users + vendors first)
+
+`node scripts/social_prelaunch.mjs` — **I'm coming HOT** caption + user + partner register links.
+
+Full kit: `docs/social/prelaunch-coming-hot.txt` · First posts: `prelaunch-first-posts.txt`
 
 ## Daily workflow
 

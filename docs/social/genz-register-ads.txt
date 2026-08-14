@@ -1,15 +1,20 @@
-GEN-Z REGISTER ADS — ScanV
-==========================
+GEN-Z REGISTER ADS — ScanV · Pre-launch: "I'm coming HOT" 🔥
+=============================================================
 
 USER REGISTRATION (no separate signup — OTP on first book)
 ---------------------------------------------------------
-Hook: "No forms. No drama. OTP → book → done."
+Hook: "Pune, I'm coming. HOT. 🔥 Register now — launch first."
 
 POST 1
-🚀 COMING SOON — New to ScanV? Perfect.
+Pune, I'm coming. HOT. 🔥
+
+One App for everything.
+Local community · Local support · Global happiness.
+
+🚀 Coming soon everywhere in Pune & PCMC.
 Open app → choose any of 10 services → verify mobile OTP → join the waitlist.
-Launch first. That was easy 😏
-scanv-tau.vercel.app
+Your mess. Our problem. 😉
+scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
 
 POST 2
 Still saving random numbers in Notes app?

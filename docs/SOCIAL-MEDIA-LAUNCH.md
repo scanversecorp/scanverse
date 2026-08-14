@@ -24,10 +24,21 @@ Copy kit: `docs/social/` · Week plan: `node scripts/social_content_calendar.mjs
 4. Paste bios from `docs/social/*.txt`
 5. Post Day 1 content from `first-week-posts.txt` (after 9:30 AM IST)
 
+## Pre-launch (no accounts yet)
+
+**Goal:** More users + more vendors before launch.
+
+1. Create accounts — `docs/social/prelaunch-first-posts.txt` (Step 0–3)
+2. Daily content — `node scripts/social_prelaunch.mjs` ("I'm coming HOT" + both register links)
+3. Full 14-day calendar — `docs/social/prelaunch-coming-hot.txt`
+4. Admin Week 3 — run migration `20260816000012_social_prelaunch_hot.sql` → `#admin?tab=social`
+
 ## Content rules
 
 - Say **ScanV** only in captions (not DCore)
+- Always include **One App for everything** + **Local community · Local support · Global happiness**
 - Always include **🚀 Coming soon everywhere in Pune & PCMC** in launch posts
+- Pre-launch hook: **Pune, I'm coming. HOT. 🔥** — always push user + partner register links
 - **Gen-Z voice:** happy, cheeky double meaning — see `docs/social/genz-voice-guide.txt`
 - Full week captions: `docs/social/genz-week-posts.txt`
 - Profile photo: `docs/social/scanv-profile-picture.png` (all platforms)

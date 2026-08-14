@@ -1,0 +1,86 @@
+SCANV — FIRST POSTS (ACCOUNTS NOT CREATED YET)
+==============================================
+Do this once when you create @scanvapp on each platform.
+Post 9:30 AM – 7 PM IST only · Profile pic: docs/social/scanv-profile-picture.png
+
+STEP 0 — CREATE ACCOUNTS (30 min)
+---------------------------------
+1. Facebook Page → ScanV → username scanvapp
+   https://www.facebook.com/pages/create
+2. Instagram → connect to FB Page → scanvapp
+   https://www.instagram.com/accounts/emailsignup/
+3. Threads → link from Instagram → @scanvapp
+   https://www.threads.net/
+4. YouTube channel → ScanV → @scanvapp
+   https://studio.youtube.com/
+
+Paste bios from:
+  docs/social/facebook-page.txt
+  docs/social/instagram-profile.txt
+  docs/social/threads-profile.txt
+  docs/social/youtube-channel.txt
+
+STEP 1 — PIN THESE (before any other post)
+------------------------------------------
+Bio link (IG/FB/Threads): https://scanv-tau.vercel.app?utm_source=social&utm_medium=profile
+YouTube About link: same
+
+Pinned post / featured comment:
+One App for everything.
+Local community · Local support · Global happiness.
+🚀 Coming soon everywhere in Pune & PCMC
+
+Need a service? Register → scanv-tau.vercel.app
+Provide a service? Partner → scanv-tau.vercel.app/#vendor-onboard
+Help: 9270194842
+
+STEP 2 — POST #1 (same caption everywhere)
+------------------------------------------
+Pune, I'm coming. HOT. 🔥
+
+One App for everything.
+Local community · Local support · Global happiness.
+
+ScanV — 10 local services, one app.
+Verified partners · UPI · live tracking.
+
+🚀 Coming soon everywhere in Pune & PCMC.
+Your mess. Our problem. 😉
+
+Register before launch 👇
+Users: https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+Partners: https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+
+#ScanV #Pune #PCMC #ComingSoon #ImComingHot
+
+Image: public/scanv-brand-logo.png or app home screenshot
+
+STEP 3 — POST #2 (next day — user focus)
+----------------------------------------
+Still scrolling WhatsApp for a cleaner? 📱
+
+I'm coming HOT. Register on ScanV now — launch first.
+https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+
+STEP 4 — POST #3 (vendor focus)
+-------------------------------
+Local vendor? Freelancer? Shop owner?
+
+Join ScanV partner waitlist — listing fee nahi on launch 😏
+https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+9270194842
+
+STEP 5 — STORIES (daily from day 1)
+-----------------------------------
+Story 1: Logo + "I'm coming HOT 🔥"
+Story 2: Link sticker → user register URL
+Story 3: Link sticker → partner URL
+Story 4: Poll — "Need service or provide?" · Book / Partner
+
+STEP 6 — HAND OFF TO CALENDAR
+-----------------------------
+After first 3 posts:
+  node scripts/social_prelaunch.mjs   ← today's HOT caption + both CTAs
+  node scripts/social_pulse.mjs       ← admin dashboard queue
+  Full 14-day plan: docs/social/prelaunch-coming-hot.txt
+  Admin: https://scanv-tau.vercel.app/#admin?tab=social

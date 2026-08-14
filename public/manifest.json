@@ -5,9 +5,9 @@
   "description": "Find and book verified services in Local Communities — Legal, Health, Cloud, Property, Food & more. Designed & Developed with Incorporation, San Francisco, California, USA.",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "favicon-32.png",
       "sizes": "32x32",
-      "type": "image/x-icon"
+      "type": "image/png"
     },
     {
       "src": "apple-touch-icon.png",

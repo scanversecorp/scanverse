@@ -1,11 +1,17 @@
 ScanV social media kit — @scanvapp
 ====================================
 
-SETUP ORDER
-1. Upload profile photo: scanv-profile-picture.png (all platforms)
-2. Paste bios from facebook-page.txt, instagram-profile.txt, tiktok-profile.txt, youtube-channel.txt
-3. Post Day 1 from genz-week-posts.txt (after 9:30 AM IST)
-4. Track on #admin?tab=social — mark each platform posted
+SETUP ORDER (no accounts yet?)
+1. prelaunch-first-posts.txt — create @scanvapp + first 3 posts
+2. Upload profile photo: scanv-profile-picture.png (all platforms)
+3. Paste bios from facebook-page.txt, instagram-profile.txt, threads-profile.txt, youtube-channel.txt
+4. Daily: node scripts/social_prelaunch.mjs — "I'm coming HOT" + user + vendor CTAs
+5. Track on #admin?tab=social — mark each platform posted
+
+PRE-LAUNCH (users + vendors before launch)
+- prelaunch-coming-hot.txt — 14-day "I'm coming HOT" calendar
+- prelaunch-first-posts.txt — account setup + posts #1–#3
+- node scripts/social_prelaunch.mjs — today's caption + both register links
 
 GEN-Z CONTENT (primary)
 - genz-voice-guide.txt — tone rules
@@ -23,10 +29,12 @@ BRAND ASSETS
 
 RULES
 - ScanV only in posts (not DCore)
+- Brand lines: One App for everything · Local community · Local support · Global happiness
 - 9:30 AM – 7 PM IST only
 - Link: https://scanv-tau.vercel.app?utm_source=social&utm_medium=genz
 
 CLI
+node scripts/social_prelaunch.mjs          — pre-launch HOT waitlist (users + partners)
 node scripts/social_pulse.mjs
 node scripts/social_services_campaign.mjs  — today's service ad + register CTAs
 

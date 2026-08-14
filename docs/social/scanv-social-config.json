@@ -3,6 +3,9 @@
   "handle": "scanvapp",
   "market": "Pune & PCMC, India",
   "brand_tagline": "🚀 Coming soon everywhere in Pune & PCMC",
+  "brand_promise": "One App for everything",
+  "brand_values": "Local community · Local support · Global happiness",
+  "prelaunch_hook": "Pune, I'm coming. HOT. 🔥",
   "app_url": "https://scanv-tau.vercel.app?utm_source=social&utm_medium=coming_soon",
   "business_phone": "+91-9270194842",
   "business_email": "connect@dcoreglobal.com",
@@ -68,7 +71,10 @@
     "shorts": "docs/social/genz-shorts-scripts.txt",
     "all_services": "docs/social/ad-campaign-all-services.txt",
     "register_ads": "docs/social/genz-register-ads.txt",
-    "services_campaign_script": "node scripts/social_services_campaign.mjs"
+    "prelaunch_hot": "docs/social/prelaunch-coming-hot.txt",
+    "prelaunch_first_posts": "docs/social/prelaunch-first-posts.txt",
+    "services_campaign_script": "node scripts/social_services_campaign.mjs",
+    "prelaunch_script": "node scripts/social_prelaunch.mjs"
   },
   "dashboard": "https://scanv-tau.vercel.app/#admin?tab=social",
   "account_status_script": "node scripts/social_account_status.mjs"

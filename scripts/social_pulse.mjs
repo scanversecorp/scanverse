@@ -25,6 +25,7 @@ const ps = bundle?.platform_status || {};
 
 console.log('═══════════════════════════════════════════════════');
 console.log('  SCANV SOCIAL PULSE — POST EVERYWHERE (India)');
+console.log('  One App for everything · Local community · Local support · Global happiness');
 console.log('  🚀 Coming soon everywhere in Pune & PCMC');
 console.log('  ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST');
 console.log('  @' + (cfg.handle || 'scanvapp') + ' · Day ' + (cfg.today_day_number || '?') +

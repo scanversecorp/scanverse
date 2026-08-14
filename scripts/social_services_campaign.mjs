@@ -6,7 +6,7 @@ const USER_URL = `${APP_URL}?utm_source=social&utm_medium=user_register`;
 const PARTNER_URL = `${APP_URL}/#vendor-onboard?utm_source=social&utm_medium=partner_register`;
 
 const SERVICES = [
-  { icon: '🧹', name: 'Household', hook: '🚀 Coming soon everywhere in Pune — flat messy? Deep clean on ScanV. Your mess. Our problem. 😉' },
+  { icon: '🧹', name: 'Household', hook: 'One App for everything — flat messy? Deep clean on ScanV. Local community · Local support · Global happiness. Your mess. Our problem. 😉' },
   { icon: '📦', name: 'Delivery', hook: 'Pickup, drop, same-day — stop begging courier bhaiya on WhatsApp.' },
   { icon: '🍱', name: 'Food', hook: 'Tiffin, restaurants, catering — hunger is urgent. ScanV gets it.' },
   { icon: '🛵', name: 'Two Wheeler', hook: 'Bike broke? Mechanic, battery, towing — book verified help.' },
@@ -35,7 +35,7 @@ console.log('══════════════════════�
 
 console.log('TODAY SERVICE AD (post everywhere)\n');
 console.log(svc.hook);
-console.log('\n10 services · one app · coming soon everywhere in Pune & PCMC');
+console.log('\n10 services · One App for everything · coming soon everywhere in Pune & PCMC');
 console.log(USER_URL);
 console.log('\n#ScanV #Pune #PCMC #' + svc.name.replace(/\s/g, ''));
 
