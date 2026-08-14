@@ -89,6 +89,8 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   update_social_content: "hub.settings",
   add_social_content: "hub.settings",
   update_social_config: "hub.settings",
+  update_social_platform: "hub.settings",
+  mark_social_everywhere: "hub.settings",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

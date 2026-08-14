@@ -58,6 +58,83 @@ function StatPill({ label, value, warn, C }) {
   );
 }
 
+function PostEverywherePanel({ bundle, videoBundle, platforms, progress, busy, onCopy, onMarkPlatform, onMarkAll, C, S, FF, Btn }) {
+  if (!bundle) {
+    return (
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
+        <div style={{ fontWeight: 800, color: C.txt }}>Post everywhere today</div>
+        <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>Set week start date — no daily bundle for today.</div>
+      </div>
+    );
+  }
+
+  const pct = progress?.total ? Math.round((progress.posted / progress.total) * 100) : 0;
+  const ps = bundle.platform_status || {};
+
+  return (
+    <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `2px solid ${progress?.complete ? C.green : C.gold}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+        <div>
+          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>Post everywhere today — 5 platforms</div>
+          <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{bundle.title} · Copy once → paste on all</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: progress?.complete ? C.green : C.acc }}>
+            {progress?.posted || 0}/{progress?.total || 5}
+          </div>
+          <div style={{ fontSize: 10, color: C.dim }}>{pct}% complete</div>
+        </div>
+      </div>
+
+      <div style={{ height: 6, borderRadius: 3, background: C.bdr, marginBottom: 12, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: progress?.complete ? C.green : C.acc, transition: 'width 0.3s' }} />
+      </div>
+
+      {bundle.caption ? (
+        <div style={{ fontSize: 12, color: C.txt, lineHeight: 1.6, marginBottom: 10, padding: 12, background: C.deep, borderRadius: 8, border: `1px solid ${C.bdr}`, whiteSpace: 'pre-wrap' }}>
+          {bundle.caption}
+        </div>
+      ) : null}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <Btn sm type="button" disabled={busy} onClick={() => onCopy(bundle.caption || bundle.title)}>Copy caption</Btn>
+        <Btn v="outline" sm type="button" disabled={busy || progress?.complete} onClick={() => onMarkAll(bundle.id)}>Mark all 5 posted</Btn>
+        {videoBundle ? (
+          <span style={{ fontSize: 10, color: C.dim, alignSelf: 'center' }}>+ video: {videoBundle.title}</span>
+        ) : null}
+      </div>
+
+      {(platforms || []).map((p) => {
+        const done = ps[p.id]?.posted;
+        return (
+          <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(0,1fr) minmax(0,1.2fr) auto auto', gap: 8, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.bdr}` }}>
+            <span style={{ fontSize: 14 }}>{done ? '✓' : '○'}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 12, color: done ? C.green : C.txt }}>{p.label}</div>
+              {done && ps[p.id]?.posted_at ? (
+                <div style={{ fontSize: 9, color: C.dim }}>{fmtDt(ps[p.id].posted_at)}</div>
+              ) : null}
+            </div>
+            <input
+              defaultValue={ps[p.id]?.url || ''}
+              placeholder="Post URL (optional)"
+              id={`plat-url-${p.id}`}
+              style={{ fontSize: 10, padding: '6px 8px', borderRadius: 8, border: `1px solid ${C.bdr}`, background: C.deep, color: C.txt, fontFamily: FF }}
+            />
+            <a href={p.studio} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: C.acc, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open ↗</a>
+            <Btn v="outline" sm type="button" disabled={busy} onClick={() => {
+              const el = document.getElementById(`plat-url-${p.id}`);
+              onMarkPlatform(bundle.id, p.id, el?.value || '');
+            }}>
+              {done ? 'Update' : 'Posted'}
+            </Btn>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ContentRow({ item, busy, onSave, onCopy, C, S, FF, Btn }) {
   const [url, setUrl] = useState(item.post_url || '');
   const [notes, setNotes] = useState(item.notes || '');
@@ -208,6 +285,34 @@ export function AdminSocialContentTab({ pin, adminHubFetch, C, S, FF, Spin, Btn 
     setMsg('Copied to clipboard');
   };
 
+  const markPlatform = async (id, platform, url) => {
+    setBusyId(id);
+    setMsg('');
+    try {
+      await adminHubFetch('update_social_platform', { id, platform, posted: true, url: url || undefined }, pin);
+      setMsg(`${platform} marked posted`);
+      await load();
+    } catch (e) {
+      setMsg(e.message || 'Update failed');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const markAllEverywhere = async (id) => {
+    setBusyId(id);
+    setMsg('');
+    try {
+      await adminHubFetch('mark_social_everywhere', { id }, pin);
+      setMsg('All 5 platforms marked posted');
+      await load();
+    } catch (e) {
+      setMsg(e.message || 'Mark all failed');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   if (loading && !data) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, color: C.dim, fontSize: 11 }}>
@@ -265,11 +370,9 @@ export function AdminSocialContentTab({ pin, adminHubFetch, C, S, FF, Spin, Btn 
           Kit: <code>docs/social/</code> · Schedule via Meta Business Suite.
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <StatPill label="Everywhere today" value={`${s.everywhere_posted || 0}/${s.everywhere_total || 5}`} warn={!s.everywhere_complete && (s.everywhere_posted || 0) < 5} C={C} />
           <StatPill label="Due today" value={s.due_today || 0} warn={s.due_today > 0} C={C} />
-          <StatPill label="Posted today" value={`${s.posted_today || 0}/${s.total_today || 0}`} C={C} />
-          <StatPill label="Week progress" value={`${s.week_posted || 0}/${s.week_total || 0}`} C={C} />
           <StatPill label="Streak (days)" value={s.streak_days || 0} C={C} />
-          <StatPill label="Videos pending" value={s.videos_pending || 0} warn={s.videos_pending > 0} C={C} />
           <StatPill label="Stories pending" value={s.stories_pending || 0} C={C} />
           <StatPill label="Emotional pending" value={s.emotional_pending || 0} C={C} />
         </div>
@@ -283,12 +386,29 @@ export function AdminSocialContentTab({ pin, adminHubFetch, C, S, FF, Spin, Btn 
           />
           <Btn v="outline" sm type="button" disabled={busyId === 'config'} onClick={saveWeekStart}>Set week start</Btn>
           {cfg.today_day_number ? (
-            <span style={{ fontSize: 10, color: C.acc, fontWeight: 700 }}>Today = Day {cfg.today_day_number}</span>
+            <span style={{ fontSize: 10, color: C.acc, fontWeight: 700 }}>
+              Today = Day {cfg.today_day_number}{cfg.calendar_week > 1 ? ` (week ${cfg.calendar_week})` : ''} · themes repeat every 7 days
+            </span>
           ) : null}
           <a href="https://business.facebook.com/" target="_blank" rel="noreferrer" style={{ fontSize: 10, color: C.acc, marginLeft: 'auto' }}>Meta Business Suite ↗</a>
         </div>
         {msg ? <div style={{ fontSize: 11, color: C.green, marginTop: 8 }}>{msg}</div> : null}
       </div>
+
+      <PostEverywherePanel
+        bundle={data?.today_everywhere}
+        videoBundle={data?.today_video_everywhere}
+        platforms={data?.everywhere_platforms}
+        progress={data?.everywhere_progress}
+        busy={!!busyId}
+        onCopy={copy}
+        onMarkPlatform={markPlatform}
+        onMarkAll={markAllEverywhere}
+        C={C}
+        S={S}
+        FF={FF}
+        Btn={Btn}
+      />
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         {[

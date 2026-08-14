@@ -1,0 +1,47 @@
+# Daily post everywhere — ScanV (@scanvapp)
+
+Post the **same content every day on all 5 platforms** (9:30 AM – 7 PM IST).
+
+## Platforms (every day)
+
+| # | Platform | Where to post |
+|---|----------|---------------|
+| 1 | Facebook Page | [Meta Business Suite](https://business.facebook.com/) |
+| 2 | Instagram | Meta Business Suite (Reel or feed) |
+| 3 | TikTok | [TikTok upload](https://www.tiktok.com/upload) |
+| 4 | YouTube | [YouTube Studio](https://studio.youtube.com/) |
+| 5 | YouTube Shorts | YouTube Studio → Create → Short |
+
+## Daily workflow
+
+1. `node scripts/social_pulse.mjs` — see today's caption + checklist
+2. Open `#admin?tab=social` — **Post everywhere today** panel
+3. Copy caption once → paste on all 5 platforms
+4. For video days: record once → upload as Reel + Short + TikTok
+5. Mark each platform ✓ in dashboard (saves URL + timestamp)
+6. When 5/5 done → day counts toward streak
+
+## Content rotation
+
+Week 1 themes repeat every 7 days until Week 2 calendar is added.
+
+| Day | Theme |
+|-----|-------|
+| 1 | Launch — ScanV for Pune & PCMC |
+| 2 | Household — deep cleaning Wakad |
+| 3 | How it works — Browse → Book → UPI → Track |
+| 4 | PCMC coverage map |
+| 5 | Partner recruitment — 9270194842 |
+| 6 | Trust — verified partners, OTP, secure pay |
+| 7 | Week recap + thank you |
+
+## Link (always include)
+
+https://scanv-tau.vercel.app?utm_source=social&utm_medium=organic
+
+## Also post daily (optional)
+
+- **Stories** (IG + FB): poll, tip, or link sticker
+- **Emotional story** (1× per week minimum): founder / vendor / customer angle
+
+Tracked separately in admin dashboard.

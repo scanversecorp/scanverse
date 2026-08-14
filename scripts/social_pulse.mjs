@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * ScanV Social Pulse — today's posting queue from admin dashboard.
+ * ScanV Social Pulse — daily post everywhere checklist (5 platforms).
  * Run: node scripts/social_pulse.mjs
- * Cron: 9:30 AM IST daily (with business growth agent)
+ * Cron: 9:30 AM IST daily
  */
 import { adminHubPost, APP_URL } from './lib/scanv-admin.mjs';
 import { isOutreachWindowOpen, outsideHoursMessage, outreachWindowLabel } from './lib/business-hours.mjs';
@@ -10,57 +10,63 @@ import { isOutreachWindowOpen, outsideHoursMessage, outreachWindowLabel } from '
 const r = await adminHubPost('get_social_dashboard');
 if (r.error) {
   console.error('Social pulse failed:', r.error);
-  console.error('Run migration 20260816000005_social_content_dashboard.sql if tables missing.');
+  console.error('Run migrations 20260816000005 + 000006 if tables/columns missing.');
   process.exit(1);
 }
 
 const cfg = r.config || {};
 const s = r.summary || {};
-const queue = r.today_queue || [];
+const bundle = r.today_everywhere;
+const video = r.today_video_everywhere;
+const platforms = r.everywhere_platforms || [];
+const progress = r.everywhere_progress || {};
+const queue = (r.today_queue || []).filter((i) => !i.is_daily_everywhere);
+const ps = bundle?.platform_status || {};
 
 console.log('═══════════════════════════════════════════════════');
-console.log('  SCANV SOCIAL PULSE');
+console.log('  SCANV SOCIAL PULSE — POST EVERYWHERE');
 console.log('  ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST');
-console.log('  @' + (cfg.handle || 'scanvapp') + ' · Day ' + (cfg.today_day_number || '?'));
+console.log('  @' + (cfg.handle || 'scanvapp') + ' · Day ' + (cfg.today_day_number || '?') +
+  (cfg.calendar_week > 1 ? ' week ' + cfg.calendar_week : ''));
 console.log('═══════════════════════════════════════════════════\n');
 
 if (!isOutreachWindowOpen()) {
   console.log(outsideHoursMessage());
-  console.log(`Queue ready — post during ${outreachWindowLabel()}.\n`);
+  console.log(`Post during ${outreachWindowLabel()}.\n`);
 }
 
-console.log('SNAPSHOT');
-console.log(`  Due today: ${s.due_today} | Posted: ${s.posted_today}/${s.total_today}`);
-console.log(`  Week: ${s.week_posted}/${s.week_total} | Streak: ${s.streak_days} days`);
-console.log(`  Videos pending: ${s.videos_pending} | Stories: ${s.stories_pending} | Emotional: ${s.emotional_pending}`);
-console.log(`  Dashboard: ${APP_URL}/#admin?tab=social\n`);
+console.log('EVERYWHERE PROGRESS: ' + (progress.posted || 0) + '/5 platforms · streak ' + (s.streak_days || 0) + ' days');
+console.log('Dashboard: ' + APP_URL + '/#admin?tab=social\n');
 
-if (!queue.length) {
-  console.log('TODAY QUEUE: nothing scheduled (check week start date in dashboard)\n');
+if (!bundle) {
+  console.log('No daily bundle — set week start date in admin social tab.\n');
 } else {
-  console.log('TODAY QUEUE — post in this order\n');
+  console.log('TODAY CAPTION (copy → paste on all 5)\n');
+  console.log('─'.repeat(50));
+  console.log(bundle.caption || bundle.title);
+  console.log('─'.repeat(50));
+  if (video) console.log('\n+ VIDEO: ' + video.title + (video.format_notes ? ' · ' + video.format_notes : ''));
+  console.log('\nPOST EVERYWHERE CHECKLIST\n');
+  for (const p of platforms) {
+    const done = ps[p.id]?.posted;
+    console.log('  ' + (done ? '✓' : '○') + ' ' + p.label.padEnd(16) + p.studio);
+  }
+  console.log('');
+}
+
+if (queue.length) {
+  console.log('ALSO TODAY (Stories · emotional · extras)\n');
   for (const item of queue) {
     const done = item.post_status === 'posted' ? '✓' : '○';
-    const type = item.content_type.toUpperCase();
-    console.log(`  ${done} [${type}] ${item.title}`);
-    if (item.caption) console.log(`      Caption: ${item.caption.slice(0, 120)}${item.caption.length > 120 ? '…' : ''}`);
-    if (item.format_notes) console.log(`      Format: ${item.format_notes}`);
-    if (item.script_ref) console.log(`      Script: docs/social/shorts-scripts.txt ${item.script_ref}`);
-    console.log('');
+    console.log('  ' + done + ' [' + item.content_type + '] ' + item.title);
+    if (item.caption) console.log('      ' + item.caption.slice(0, 100) + (item.caption.length > 100 ? '…' : ''));
   }
+  console.log('');
 }
 
-const emotional = (r.emotional_stories || []).filter((i) => i.post_status !== 'posted' && i.effective_date === cfg.today);
-if (emotional.length) {
-  console.log('EMOTIONAL STORIES TODAY\n');
-  for (const item of emotional) {
-    console.log(`  • ${item.title}`);
-    if (item.caption) console.log(`    ${item.caption.slice(0, 140)}`);
-    console.log('');
-  }
-}
-
-console.log('TOOLS');
-console.log('  Meta Business Suite: https://business.facebook.com/');
-console.log('  Copy kit: docs/social/ · node scripts/social_content_calendar.mjs');
+console.log('PLATFORMS');
+console.log('  1. Facebook + Instagram → https://business.facebook.com/');
+console.log('  2. TikTok               → https://www.tiktok.com/upload');
+console.log('  3. YouTube + Shorts     → https://studio.youtube.com/');
+console.log('  Guide: docs/social/daily-post-everywhere.txt');
 console.log('═══════════════════════════════════════════════════\n');

@@ -107,8 +107,10 @@ import {
 import {
   addSocialContent,
   getSocialDashboard,
+  markSocialEverywhere,
   updateSocialConfig,
   updateSocialContent,
+  updateSocialPlatform,
 } from "../_shared/social-content-admin.ts";
 import {
   listExternalTrips,
@@ -1524,6 +1526,18 @@ Deno.serve(async (req) => {
     const result = await updateSocialConfig(sb, body);
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, config: result.config });
+  }
+
+  if (action === "update_social_platform") {
+    const result = await updateSocialPlatform(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, item: result.item });
+  }
+
+  if (action === "mark_social_everywhere") {
+    const result = await markSocialEverywhere(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, item: result.item });
   }
 
   return json({ error: "Unknown action" }, 400);

@@ -38,19 +38,19 @@ Footer social icons: `src/social-links.js` — update URLs if handles differ.
 
 ## Daily tracking dashboard
 
-**Admin tab:** `#admin?tab=social` — track every post, Reel/Short, Story, and emotional story.
+**Admin tab:** `#admin?tab=social` — **Post everywhere today** panel (5-platform checklist).
 
 | Feature | Detail |
 |---------|--------|
-| Today queue | What to post today (by week start date) |
-| Week view | Days 1–7 calendar with captions |
-| Videos | Reels, Shorts, TikTok pipeline |
-| Stories | IG/FB daily stories |
-| Emotional | Founder/vendor/customer story posts |
-| Mark posted | Save post URL + timestamp |
-| Streak | Consecutive days with at least one post |
+| Post everywhere | One caption → Facebook, Instagram, TikTok, YouTube, Shorts |
+| Platform checklist | Mark each platform posted + save URL |
+| Streak | Counts when 5/5 platforms done that day |
+| Rolling calendar | Week 1 themes repeat every 7 days |
+| Stories / emotional | Extra items tracked separately |
 
-**CLI:** `node scripts/social_pulse.mjs` — prints today's queue (9:30 AM–7 PM IST).
+**CLI:** `node scripts/social_pulse.mjs` — today's caption + 5-platform checklist.
+
+**Guide:** `docs/social/daily-post-everywhere.txt`
 
 Set **Week 1 start date** in dashboard when you begin posting (defaults to today on migration).
 
