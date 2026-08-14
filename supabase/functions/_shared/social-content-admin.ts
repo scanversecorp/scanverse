@@ -79,8 +79,19 @@ function enrichItem<T extends Record<string, unknown>>(item: T, today: string, d
   };
 }
 
-function matchesToday(item: Record<string, unknown>, calendarDay: number): boolean {
-  return Number(item.day_number) === calendarDay && Number(item.week_number) === 1;
+function resolveContentWeek(calendarWeek: number, allItems: Array<Record<string, unknown>>): number {
+  if (allItems.some((i) => Number(i.week_number) === calendarWeek)) return calendarWeek;
+  return 1;
+}
+
+function matchesToday(
+  item: Record<string, unknown>,
+  calendarDay: number,
+  calendarWeek: number,
+  allItems: Array<Record<string, unknown>>,
+): boolean {
+  const contentWeek = resolveContentWeek(calendarWeek, allItems);
+  return Number(item.day_number) === calendarDay && Number(item.week_number) === contentWeek;
 }
 
 function computeStreak(
@@ -94,8 +105,11 @@ function computeStreak(
 
   for (let offset = dayOffset; offset >= 1; offset--) {
     const calDay = calendarDayFromOffset(offset);
-    const date = addDaysYmd(weekStart, offset - 1);
-    const bundle = bundles.find((b) => Number(b.day_number) === calDay);
+    const calWeek = calendarWeekFromOffset(offset);
+    const contentWeek = resolveContentWeek(calWeek, items);
+    const bundle = bundles.find((b) =>
+      Number(b.day_number) === calDay && Number(b.week_number) === contentWeek
+    ) || bundles.find((b) => Number(b.day_number) === calDay && Number(b.week_number) === 1);
     if (!bundle) break;
     const ps = parsePlatformStatus(bundle.platform_status);
     const { complete } = platformProgress(ps);
@@ -123,8 +137,9 @@ export async function getSocialDashboard(sb: SupabaseClient) {
   if (error) throw new Error(error.message);
 
   const allItems = rows || [];
+  const contentWeek = resolveContentWeek(calendarWeek || 1, allItems);
   const todayRaw = calendarDay
-    ? allItems.filter((i) => matchesToday(i, calendarDay) && i.post_status !== "skipped")
+    ? allItems.filter((i) => matchesToday(i, calendarDay, calendarWeek || 1, allItems) && i.post_status !== "skipped")
     : [];
 
   const todayItems = todayRaw.map((i) => enrichItem(i, today, dayOffset));
@@ -139,7 +154,7 @@ export async function getSocialDashboard(sb: SupabaseClient) {
     ["reel", "short", "video"].includes(String(i.content_type))
   ) || null;
 
-  const weekItems = allItems.filter((i) => Number(i.week_number) === 1);
+  const weekItems = allItems.filter((i) => Number(i.week_number) === contentWeek);
   const videos = allItems.filter((i) => ["video", "reel", "short"].includes(String(i.content_type)));
   const stories = allItems.filter((i) => i.content_type === "story");
   const emotional = allItems.filter((i) => i.emotional || i.content_type === "emotional_story");
@@ -151,8 +166,8 @@ export async function getSocialDashboard(sb: SupabaseClient) {
   const byDay: Record<number, typeof todayItems> = {};
   for (let d = 1; d <= 7; d++) {
     byDay[d] = allItems
-      .filter((i) => Number(i.day_number) === d && Number(i.week_number) === 1)
-      .map((i) => enrichItem(i, addDaysYmd(weekStart, d - 1), d));
+      .filter((i) => Number(i.day_number) === d && Number(i.week_number) === contentWeek)
+      .map((i) => enrichItem(i, addDaysYmd(weekStart, dayOffset - 1), dayOffset));
   }
 
   return {

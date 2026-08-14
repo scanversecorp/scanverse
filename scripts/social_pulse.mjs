@@ -70,5 +70,7 @@ console.log('  1. Facebook + Instagram → https://business.facebook.com/');
 console.log('  2. Threads              → https://www.threads.net/');
 console.log('  3. YouTube + Shorts     → https://studio.youtube.com/');
 console.log('  TikTok: banned in India — use Reels instead');
-console.log('  Setup: node scripts/social_setup_agent.mjs');
+console.log('\nSERVICES AD: node scripts/social_services_campaign.mjs');
+console.log('  User register: ' + APP_URL + '?utm_source=social&utm_medium=user_register');
+console.log('  Partner register: ' + APP_URL + '/#vendor-onboard?utm_source=social&utm_medium=partner_register');
 console.log('═══════════════════════════════════════════════════\n');

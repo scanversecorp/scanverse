@@ -1,0 +1,67 @@
+GEN-Z REGISTER ADS — ScanV
+==========================
+
+USER REGISTRATION (no separate signup — OTP on first book)
+---------------------------------------------------------
+Hook: "No forms. No drama. OTP → book → done."
+
+POST 1
+New to ScanV? Perfect.
+Open app → choose any of 10 services → verify mobile OTP → book.
+You're registered. That was easy 😏
+scanv-tau.vercel.app
+
+POST 2
+Still saving random numbers in Notes app?
+10 services · verified partners · UPI · track
+ScanV — Pune & PCMC's "why didn't this exist before" app
+Link in bio
+
+POST 3 (Marathi)
+Pune madhe services pahijet? ScanV ughda → OTP → book.
+Ekach app. Sagli services. Zero drama.
+
+STORY
+Sticker: "First time?" → "Just open & book"
+Countdown: "Your flat won't clean itself"
+
+---
+
+PARTNER / SERVICE PROVIDER REGISTRATION
+---------------------------------------
+URL: scanv-tau.vercel.app/#vendor-onboard
+WhatsApp: 9270194842
+
+POST 1
+Local vendor? Freelancer? Garage? Clinic?
+Join ScanV — digital bookings, verified badge, UPI payouts.
+Launch listing fee: nahi 😏
+#vendor-onboard
+
+POST 2
+Still taking bookings on 4 WhatsApp groups?
+Upgrade your life. Register as ScanV partner.
+Deep clean · delivery · food · mechanics · legal · more
+9270194842
+
+POST 3 (Hindi)
+PCMC mein service dete ho? ScanV partner bano.
+Customers app se aayenge. Listing free on launch.
+
+POST 4 (cheeky)
+We don't do random uncle referrals.
+We do verified partners with GPS, OTP, and actual payments.
+Want in? #vendor-onboard
+
+STORY
+"Partner?" → swipe up vendor-onboard
+"Questions?" → WhatsApp sticker 9270194842
+
+---
+
+PIN BOTH (carousel slide 1 / slide 2)
+Slide 1: NEED SERVICE? → scanv-tau.vercel.app
+Slide 2: PROVIDE SERVICE? → #vendor-onboard
+
+COMMENT TO PIN
+Users book here 👇 Partners join here 👇 [both links]

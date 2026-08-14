@@ -28,3 +28,8 @@ RULES
 
 CLI
 node scripts/social_pulse.mjs
+node scripts/social_services_campaign.mjs  — today's service ad + register CTAs
+
+REGISTER LINKS
+User (OTP on first book): https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+Partner: https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register

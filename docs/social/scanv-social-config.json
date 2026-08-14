@@ -57,10 +57,17 @@
     }
   },
   "post_everywhere_daily": ["facebook", "instagram", "threads", "youtube", "youtube_shorts"],
+  "register_urls": {
+    "user": "https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register",
+    "partner": "https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register"
+  },
   "content_files": {
     "voice": "docs/social/genz-voice-guide.txt",
     "week_posts": "docs/social/genz-week-posts.txt",
-    "shorts": "docs/social/genz-shorts-scripts.txt"
+    "shorts": "docs/social/genz-shorts-scripts.txt",
+    "all_services": "docs/social/ad-campaign-all-services.txt",
+    "register_ads": "docs/social/genz-register-ads.txt",
+    "services_campaign_script": "node scripts/social_services_campaign.mjs"
   },
   "dashboard": "https://scanv-tau.vercel.app/#admin?tab=social",
   "account_status_script": "node scripts/social_account_status.mjs"

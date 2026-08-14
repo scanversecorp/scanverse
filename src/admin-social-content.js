@@ -9,6 +9,7 @@ const TYPE_LABELS = {
   story: 'Story',
   carousel: 'Carousel',
   emotional_story: 'Emotional',
+  campaign: 'Campaign',
 };
 
 const TYPE_COLOR = {
@@ -19,6 +20,7 @@ const TYPE_COLOR = {
   story: '#D97706',
   carousel: '#0891B2',
   emotional_story: '#BE185D',
+  campaign: '#059669',
 };
 
 const PLATFORM_LABELS = {
@@ -344,6 +346,7 @@ export function AdminSocialContentTab({ pin, adminHubFetch, C, S, FF, Spin, Btn 
   const viewItems = (() => {
     if (view === 'today') return todayQueue;
     if (view === 'emotional') return emotional;
+    if (view === 'campaign') return (data?.items || []).filter((i) => i.content_type === 'campaign');
     if (view === 'videos') return videos;
     if (view === 'stories') return stories;
     if (view === 'week') return data?.items || [];
@@ -418,6 +421,7 @@ export function AdminSocialContentTab({ pin, adminHubFetch, C, S, FF, Spin, Btn 
           ['videos', `Videos (${videos.length})`],
           ['stories', `Stories (${stories.length})`],
           ['emotional', `Emotional (${emotional.length})`],
+          ['campaign', `Campaign (${(data?.items || []).filter((i) => i.content_type === 'campaign').length})`],
         ].map(([id, label]) => (
           <button key={id} type="button" onClick={() => setView(id)} style={pill(view === id)}>{label}</button>
         ))}
