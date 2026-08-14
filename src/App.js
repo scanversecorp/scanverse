@@ -2176,7 +2176,7 @@ const ADMIN_AUTH_KEY = 'scanv_admin_auth';
 const ADMIN_FN = `${SB_URL}/functions/v1/admin-hub`;
 
 function isAdminHubRoute() {
-  return ADMIN_HUB_ALIASES.has(window.location.hash.replace(/^#/, ''));
+  return ADMIN_HUB_ALIASES.has(hashBase());
 }
 
 function adminAuthOk() {
@@ -11350,8 +11350,12 @@ function OtpDeliveryReportPage() {
 /* ================================================================
    ADMIN CONTROL CENTER — #admin (legacy #admin-hub redirects here)
 ================================================================ */
+const SB_PROJECT = 'rwlwrmmqtedugcreweut';
+const SB_DASH = `https://supabase.com/dashboard/project/${SB_PROJECT}`;
+
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
+  { id: 'index', label: 'URL Index', icon: '🔗' },
   { id: 'pricing', label: 'Pricing', icon: '💰' },
   { id: 'support', label: 'Customer Support', icon: '🎧' },
   { id: 'refunds', label: 'Refunds', icon: '💸' },
@@ -11367,6 +11371,158 @@ const ADMIN_TABS = [
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
+
+function adminTabFromHash() {
+  const raw = window.location.hash.replace(/^#/, '');
+  const base = raw.split('?')[0].split('/')[0];
+  if (base !== 'admin' && base !== 'admin-hub') return null;
+  const q = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+  const tab = new URLSearchParams(q).get('tab');
+  return ADMIN_TABS.some((t) => t.id === tab) ? tab : null;
+}
+
+function adminTabUrl(tabId) {
+  return `${APP_URL}/#admin?tab=${encodeURIComponent(tabId)}`;
+}
+
+const ADMIN_URL_INDEX = [
+  {
+    id: 'customer',
+    title: 'Customer & public',
+    subtitle: 'No PIN — safe to share with customers',
+    items: [
+      { label: 'ScanV Home', url: `${APP_URL}/`, note: 'Main PWA · browse & book' },
+      { label: 'QR landing', url: `${APP_URL}/?qr=1`, note: 'Print QR campaigns' },
+      { label: 'FAQ', url: `${APP_URL}/#faq`, note: 'Help & policies summary' },
+      { label: 'Report issue', url: `${APP_URL}/#report`, note: 'Create support ticket' },
+      { label: 'Track support ticket', url: `${APP_URL}/#track-ticket`, note: 'Ticket # + mobile' },
+      { label: 'Track booking', url: `${APP_URL}/#track?id=BK-XXXX`, note: 'Replace BK-XXXX with booking ID' },
+      { label: 'Partner registration', url: `${APP_URL}/#vendor-onboard`, note: 'Vendor self-signup' },
+    ],
+  },
+  {
+    id: 'admin-routes',
+    title: 'Admin & ops dashboards',
+    subtitle: 'PIN required — bookmark only, not in public nav',
+    items: [
+      { label: 'Admin Control Center', url: `${APP_URL}/#admin`, note: 'ADMIN_HUB_PIN or leader PINs' },
+      { label: 'Executive dashboard', url: `${APP_URL}/#exec`, note: 'Owner PIN · KPIs & charts' },
+      { label: 'Pricing admin', url: `${APP_URL}/#pricing-admin`, note: 'PRICING_ADMIN_PIN + 2FA' },
+      { label: 'Customer support desk', url: `${APP_URL}/#customer-support`, note: 'SUPPORT_AGENT_PIN or admin PINs' },
+      { label: 'Vendor admin', url: `${APP_URL}/#vendor-admin`, note: 'VENDOR_ADMIN_PIN or admin PINs' },
+      { label: 'OTP delivery reports', url: `${APP_URL}/#otp-delivery-report`, note: '2Factor callback stats' },
+    ],
+  },
+  {
+    id: 'admin-tabs',
+    title: 'Admin hub tabs (inside #admin)',
+    subtitle: 'Opens tab after PIN unlock · bookmarkable with ?tab=',
+    items: ADMIN_TABS.filter((t) => t.id !== 'index').map((t) => ({
+      label: t.label,
+      adminTab: t.id,
+      url: adminTabUrl(t.id),
+      note: t.id === 'go-live' ? 'Switch board · 12 vendors + runtime toggles' : t.id === 'diagrams' ? '31 architecture & data-flow diagrams' : `${t.icon} ${t.id}`,
+    })),
+  },
+  {
+    id: 'legal',
+    title: 'Legal & policy pages',
+    subtitle: 'Public path routes',
+    items: [
+      { label: 'Privacy Policy', url: `${APP_URL}/privacy`, note: 'DPDP Act 2023' },
+      { label: 'Terms & Conditions', url: `${APP_URL}/terms`, note: 'Booking terms' },
+      { label: 'Refund Policy', url: `${APP_URL}/refund`, note: 'Cancellation & refunds' },
+      { label: 'Payment Policy', url: `${APP_URL}/payment`, note: 'Fees & UPI' },
+    ],
+  },
+  {
+    id: 'infra',
+    title: 'Infrastructure dashboards',
+    subtitle: 'Supabase · Vercel · GitHub',
+    items: [
+      { label: 'Supabase project', url: SB_DASH, note: 'DB, auth, functions, secrets' },
+      { label: 'SQL Editor', url: `${SB_DASH}/sql`, note: 'Ad-hoc queries' },
+      { label: 'Edge Functions', url: `${SB_DASH}/functions`, note: 'admin-hub, send-otp, razorpay-payment…' },
+      { label: 'Database tables', url: `${SB_DASH}/editor`, note: 'profiles, bookings, vendors…' },
+      { label: 'Secrets & env', url: `${SB_DASH}/settings/functions`, note: 'PINs, API keys' },
+      { label: 'Backups & PITR', url: `${SB_DASH}/settings/addons`, note: 'Daily backups before go-live' },
+      { label: 'Vercel dashboard', url: 'https://vercel.com/dashboard', note: 'scanv-tau deployments' },
+      { label: 'GitHub repository', url: 'https://github.com/scanversecorp/scanverse', note: 'Source & CI' },
+    ],
+  },
+  {
+    id: 'assets',
+    title: 'Assets & corporate',
+    subtitle: 'QR print · parent entities',
+    items: [
+      { label: 'Print QR PNG', url: `${APP_URL}/scanv-qr.png`, note: 'Standee & print' },
+      { label: 'DCORE Global', url: 'https://www.dcoreglobal.com', note: 'Parent corporation' },
+      { label: 'VanguardNode', url: 'https://www.vanguardnode.com', note: 'Engineering (Wix)' },
+      { label: 'Rich Royals Corp', url: 'https://www.richroyalscorp.com', note: 'Beauty brand (Wix)' },
+    ],
+  },
+  {
+    id: 'avoid',
+    title: 'Do not use',
+    subtitle: 'Wrong or deprecated',
+    items: [
+      { label: 'scanverse.vercel.app', url: 'https://scanverse.vercel.app', note: 'Legacy QR scanner — NOT ScanV', warn: true },
+    ],
+  },
+];
+
+function AdminPageIndexTab({ onNavigateTab, onCopy }) {
+  const copy = (text, label) => {
+    navigator.clipboard?.writeText(text).then(() => onCopy?.(`Copied ${label || 'URL'}`)).catch(() => {});
+  };
+
+  return (
+    <div>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>Page index — all ScanV URLs</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
+          Bookmark this tab: <code style={{ color: C.acc }}>{adminTabUrl('index')}</code>
+          · Admin tabs support <code style={{ color: C.acc }}>#admin?tab=go-live</code> deep links
+          · Assist: <strong style={{ color: C.txt }}>{ASSIST}</strong>
+        </div>
+      </div>
+
+      {ADMIN_URL_INDEX.map((section) => (
+        <div key={section.id} style={{ ...S.card(), padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 16px', borderBottom: BDR }}>
+            <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{section.title}</div>
+            {section.subtitle ? <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{section.subtitle}</div> : null}
+          </div>
+          {section.items.map((item) => (
+            <div key={item.label + (item.url || item.adminTab)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,2fr) auto auto', gap: 10, padding: '12px 16px', borderBottom: BDR, alignItems: 'center' }}>
+              <div style={{ fontWeight: 700, color: item.warn ? C.red : C.txt, fontSize: 13 }}>{item.label}</div>
+              <div>
+                <div style={{ fontSize: 10, color: C.dim, lineHeight: 1.45, marginBottom: item.url ? 4 : 0 }}>{item.note}</div>
+                {item.url ? (
+                  <code style={{ fontSize: 10, color: C.acc, wordBreak: 'break-all', lineHeight: 1.4 }}>{item.url}</code>
+                ) : null}
+              </div>
+              {item.adminTab ? (
+                <button type="button" onClick={() => onNavigateTab(item.adminTab)} style={{ padding: '6px 10px', borderRadius: 16, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FF, whiteSpace: 'nowrap' }}>
+                  Open tab
+                </button>
+              ) : item.url ? (
+                <a href={item.url} target="_blank" rel="noreferrer" style={{ padding: '6px 10px', borderRadius: 16, border: `1.5px solid ${C.bdr}`, background: C.surf, color: C.sub, fontSize: 10, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  Open ↗
+                </a>
+              ) : null}
+              {item.url ? (
+                <button type="button" title="Copy URL" onClick={() => copy(item.url, item.label)} style={{ background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 8, padding: '4px 8px', fontSize: 10, color: C.acc, cursor: 'pointer', fontWeight: 700 }}>
+                  Copy
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function istDateYmd(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -12442,13 +12598,33 @@ function AdminBookingsTab({ pin }) {
 function AdminControlCenter({ onPricesUpdated }) {
   const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
   const [authed, setAuthed] = useState(adminAuthOk());
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState(() => adminTabFromHash() || 'overview');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [stats, setStats] = useState(null);
 
   const usePin = pin || getAdminAuth()?.pin;
+
+  const navigateAdminTab = useCallback((id) => {
+    setTab(id);
+    setMsg('');
+    setErr('');
+    if (ADMIN_TABS.some((t) => t.id === id)) {
+      window.history.replaceState({}, '', adminTabUrl(id));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authed) return;
+    const syncTabFromHash = () => {
+      const t = adminTabFromHash();
+      if (t) setTab(t);
+    };
+    syncTabFromHash();
+    window.addEventListener('hashchange', syncTabFromHash);
+    return () => window.removeEventListener('hashchange', syncTabFromHash);
+  }, [authed]);
 
   const login = async () => {
     if (!pin) { setErr('Enter admin PIN'); return; }
@@ -12528,7 +12704,7 @@ function AdminControlCenter({ onPricesUpdated }) {
         </div>
         <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap', alignItems: 'center', maxWidth: 1200, margin: '12px auto 0', paddingBottom: 4, width: '100%', boxSizing: 'border-box' }}>
           {ADMIN_TABS.map(t => (
-            <button key={t.id} type="button" onClick={() => { setTab(t.id); setMsg(''); setErr(''); }} style={tabBtn(t)}>
+            <button key={t.id} type="button" onClick={() => navigateAdminTab(t.id)} style={tabBtn(t)}>
               {t.icon} {t.label}
             </button>
           ))}
@@ -12557,14 +12733,15 @@ function AdminControlCenter({ onPricesUpdated }) {
             <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Quick links</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => navigateAdminTab('index')} style={{ ...tabBtn({ id: 'index' }), border: `1.5px solid ${C.gold}` }}>🔗 URL Index →</button>
                 <AdminDeepLinkBtn hash="exec" label="Executive Dashboard →" />
                 <AdminDeepLinkBtn hash="pricing-admin" label="Pricing admin →" />
                 <AdminDeepLinkBtn hash="customer-support" label="Support desk →" />
-                <button type="button" onClick={() => setTab('bookings')} style={{ ...tabBtn({ id: 'bookings' }), border: `1.5px solid ${C.bdr}` }}>Bookings →</button>
+                <button type="button" onClick={() => navigateAdminTab('bookings')} style={{ ...tabBtn({ id: 'bookings' }), border: `1.5px solid ${C.bdr}` }}>Bookings →</button>
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
                 <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />
-                <button type="button" onClick={() => setTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
+                <button type="button" onClick={() => navigateAdminTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
               </div>
             </div>
             <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
@@ -12573,8 +12750,8 @@ function AdminControlCenter({ onPricesUpdated }) {
                 System diagrams v5.5.3 — updated for Vyapar UPI, Go-Live vendor toggles, and service-provider integrations. Diagrams may change as providers are onboarded.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => setTab('diagrams')} style={{ ...tabBtn({ id: 'diagrams' }), border: `1.5px solid ${C.acc}` }}>📐 Architecture diagrams →</button>
-                <button type="button" onClick={() => setTab('database')} style={{ ...tabBtn({ id: 'database' }), border: `1.5px solid ${C.bdr}` }}>Database tab →</button>
+                <button type="button" onClick={() => navigateAdminTab('diagrams')} style={{ ...tabBtn({ id: 'diagrams' }), border: `1.5px solid ${C.acc}` }}>📐 Architecture diagrams →</button>
+                <button type="button" onClick={() => navigateAdminTab('database')} style={{ ...tabBtn({ id: 'database' }), border: `1.5px solid ${C.bdr}` }}>Database tab →</button>
               </div>
             </div>
           </div>
@@ -12665,8 +12842,12 @@ function AdminControlCenter({ onPricesUpdated }) {
           </div>
         )}
 
+        {tab === 'index' && (
+          <AdminPageIndexTab onNavigateTab={navigateAdminTab} onCopy={setMsg} />
+        )}
+
         {tab === 'go-live' && (
-          <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => setTab('vendors')} />
+          <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => navigateAdminTab('vendors')} />
         )}
 
         {tab === 'diagrams' && usePin && (
@@ -12684,7 +12865,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 Mermaid diagrams — system context, deployment, payments (Vyapar UPI · GPay · PhonePe · Razorpay), OTP, dispatch. Provider boundaries may change; live toggles in Go-Live tab.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => setTab('diagrams')} style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>📐 Architecture diagrams</button>
+                <button type="button" onClick={() => navigateAdminTab('diagrams')} style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>📐 Architecture diagrams</button>
               </div>
             </div>
             <div style={{ display: 'grid', gap: 10 }}>
