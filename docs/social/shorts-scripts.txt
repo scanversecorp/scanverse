@@ -1,0 +1,27 @@
+YOUTUBE SHORTS / REELS / TIKTOK SCRIPTS (ScanV only)
+====================================================
+
+#1 — 30 sec app demo
+[0-3s] Text: "Pune madhe services book karaycha ekach app?"
+[3-15s] Screen record: ScanV home → tap Household → pick service
+[15-25s] Text: "UPI payment · track booking"
+[25-30s] Logo + scanv-tau.vercel.app
+
+#2 — Marathi hook
+Voice: "Wakad madhe deep cleaning pahije? ScanV var 2 minute."
+Show booking flow. End: "Link description madhe."
+
+#3 — Hindi hook
+Voice: "PCMC mein ghar ki safai — ScanV app se book karo."
+Show price screen. End: "App link bio mein."
+
+#4 — Partner CTA
+Text: "Local vendor? ScanV var partner vha — launch var listing fee nahi"
+WhatsApp: 9270194842
+
+#5 — Delivery tease
+Text: "Pickup + drop — ScanV var book kara"
+Show delivery card (when live)
+
+THUMBNAIL TEXT (bold)
+"ScanV" + "Pune & PCMC" + arrow to phone

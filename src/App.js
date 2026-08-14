@@ -15,6 +15,7 @@ import {
   createContext, useContext, useReducer, Component, lazy, Suspense
 } from 'react';
 import QRCode from 'qrcode';
+import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -2144,6 +2145,29 @@ const FOOTER_LINKS = [
   ['faq', 'FAQ', 'hash'],
   ['report', 'Report', 'hash'],
 ];
+
+function FooterSocialLinks({ small }) {
+  const fs = small ? 10 : 11;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: small ? 8 : 10, marginTop: 8 }}>
+      {SOCIAL_LABELS.map(({ key, label, icon }) => (
+        <a
+          key={key}
+          href={SOCIAL_LINKS[key]}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`ScanV on ${label}`}
+          style={{
+            color: C.acc, fontSize: fs, fontWeight: 700, textDecoration: 'none',
+            padding: '4px 10px', borderRadius: 999, border: `1px solid ${C.acc}44`, background: `${C.acc}08`,
+          }}
+        >
+          {icon} {label}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 function FooterLegalLinks({ current, small }) {
   const fs = small ? 10 : 12;
@@ -4838,6 +4862,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         <AssistBanner/>
         <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
           <FooterLegalLinks small current={null}/>
+          <FooterSocialLinks small />
         </div>
         <CopyrightLine style={{ padding: '0 0 8px' }} />
       </div>

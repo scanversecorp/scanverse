@@ -206,6 +206,43 @@
     ]
   },
   {
+    "id": "social",
+    "title": "ScanV social media (@scanvapp)",
+    "subtitle": "Create accounts · copy bios from docs/social/",
+    "items": [
+      {
+        "label": "Social launch runbook",
+        "url": "https://github.com/scanversecorp/scanverse/blob/main/docs/SOCIAL-MEDIA-LAUNCH.md",
+        "note": "Setup order + week 1 calendar"
+      },
+      {
+        "label": "Facebook Page",
+        "url": "https://www.facebook.com/scanvapp",
+        "note": "docs/social/facebook-page.txt"
+      },
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/scanvapp",
+        "note": "docs/social/instagram-profile.txt"
+      },
+      {
+        "label": "TikTok",
+        "url": "https://www.tiktok.com/@scanvapp",
+        "note": "docs/social/tiktok-profile.txt"
+      },
+      {
+        "label": "YouTube + Shorts",
+        "url": "https://www.youtube.com/@scanvapp",
+        "note": "docs/social/youtube-channel.txt"
+      },
+      {
+        "label": "Meta Business Suite",
+        "url": "https://business.facebook.com/",
+        "note": "Schedule FB + IG posts"
+      }
+    ]
+  },
+  {
     "id": "legal",
     "title": "Legal & policy pages",
     "subtitle": "Public path routes",
