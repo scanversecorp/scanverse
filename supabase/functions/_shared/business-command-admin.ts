@@ -7,6 +7,8 @@ import { ONBOARD_STATUSES } from "./vendor-leads-admin.ts";
 
 const PRIORITY_AREAS = ["wakad", "hinjewadi", "baner", "kalewadi", "akurdi", "pcm", "pimpri", "chinchwad"];
 
+export const SCANV_BUSINESS_PHONE = "9270194842";
+
 export function vendorOutreachMessage(businessName: string): string {
   const name = businessName.trim() || "partner";
   return [
@@ -22,7 +24,7 @@ export function vendorOutreachMessage(businessName: string): string {
     "",
     "आज 10 min चा छोटा call होईल का? 📞",
     "",
-    "Jasmeen S P | 8484850288",
+    `Jasmeen S P | ${SCANV_BUSINESS_PHONE}`,
   ].join("\n");
 }
 

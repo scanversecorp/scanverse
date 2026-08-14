@@ -67,7 +67,7 @@ const VENDOR_OUTREACH_MSG = (name) => {
     '',
     'आज 10 min चा छोटा call होईल का? 📞',
     '',
-    'Jasmeen S P | 8484850288',
+    'Jasmeen S P | 9270194842',
   ].join('\n');
 };
 

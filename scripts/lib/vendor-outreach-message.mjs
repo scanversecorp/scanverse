@@ -1,4 +1,7 @@
 /** Shared vendor outreach copy — Marathi + Hindi (Pune/PCMC). */
+export const SCANV_BUSINESS_PHONE = '9270194842';
+export const SCANV_BUSINESS_PHONE_DISPLAY = '+91-9270194842';
+
 export function vendorOutreachMessage(businessName = 'partner') {
   const name = String(businessName || 'partner').trim() || 'partner';
   return [
@@ -14,7 +17,7 @@ export function vendorOutreachMessage(businessName = 'partner') {
     '',
     'आज 10 min चा छोटा call होईल का? 📞',
     '',
-    'Jasmeen S P | 8484850288',
+    `Jasmeen S P | ${SCANV_BUSINESS_PHONE}`,
   ].join('\n');
 }
 

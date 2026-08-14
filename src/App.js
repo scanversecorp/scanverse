@@ -13642,7 +13642,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 ['SUPPORT_AGENT_PIN', 'Read-only support desk (not hub access)'],
                 ['PRICING_ADMIN_PIN', 'Pricing admin + hub access (cannot reset 2FA alone)'],
                 ['VENDOR_ADMIN_PIN', 'Vendor admin + hub access'],
-                ['PRICING_2FA_RESET_MOBILE', 'Owner mobile for pricing 2FA reset OTP (10 digits, e.g. 8484850288)'],
+                ['PRICING_2FA_RESET_MOBILE', 'Owner mobile for pricing 2FA reset OTP (10 digits, e.g. 9270194842)'],
               ].map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.bdr}`, fontSize: 12 }}>
                   <code style={{ color: C.acc }}>{key}</code>
@@ -13653,7 +13653,7 @@ function AdminControlCenter({ onPricesUpdated }) {
             <div style={{ ...S.card(), padding: 16 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Deploy checklist</div>
               <pre style={{ fontSize: 11, color: C.sub, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.6 }}>{`npx supabase secrets set ADMIN_HUB_PIN=YourHubPin123
-npx supabase secrets set PRICING_2FA_RESET_MOBILE=8484850288
+npx supabase secrets set PRICING_2FA_RESET_MOBILE=9270194842
 npx supabase functions deploy admin-hub --no-verify-jwt
 npx supabase functions deploy customer-support --no-verify-jwt
 npx supabase functions deploy support-tickets --no-verify-jwt

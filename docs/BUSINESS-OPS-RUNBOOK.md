@@ -63,7 +63,7 @@ node scripts/post-deploy-validate.mjs
 | Logistics partners | `docs/email-*-plain.txt` |
 | Logistics follow-up | `docs/email-followup-plain.txt` |
 
-Signatory: **Jasmeen S P** · connect@dcoreglobal.com · +91-8484850288
+Signatory: **Jasmeen S P** · connect@dcoreglobal.com · +91-9270194842
 
 ## Human-only (cannot automate)
 
