@@ -19,6 +19,7 @@ import QRCode from 'qrcode';
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
 const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
+const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ default: m.AdminAddUserPanel })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
@@ -11389,6 +11390,7 @@ const ADMIN_TABS = [
   { id: 'investments', label: 'Investments', icon: '📈' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'agents', label: 'Support Agents', icon: '👥' },
+  { id: 'users', label: 'Add user', icon: '👤' },
   { id: 'dispatch', label: 'Dispatch Desk', icon: '📦' },
   { id: 'directory', label: 'Users & Vendors', icon: '👤' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
@@ -13333,6 +13335,21 @@ function AdminControlCenter({ onPricesUpdated }) {
               <AdminStatCard label="Open tickets" value={stats?.open_tickets ?? '—'} color={C.gold} sub={stats?.avg_ticket_resolution_hours != null ? `Avg resolve ${stats.avg_ticket_resolution_hours}h` : ''} />
               <AdminStatCard label="Profiles" value={stats?.profiles_count ?? '—'} />
             </div>
+            <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 8 }}>Loading add user…</div>}>
+              <AdminAddUserPanel
+                pin={usePin}
+                adminHubFetch={adminHubFetch}
+                iam={iam}
+                onMsg={setMsg}
+                onErr={setErr}
+                onOpenIam={() => navigateAdminTab('iam')}
+                C={C}
+                S={S}
+                FF={FF}
+                Btn={Btn}
+                Spin={Spin}
+              />
+            </Suspense>
             <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
               <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Quick links</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -13394,6 +13411,24 @@ function AdminControlCenter({ onPricesUpdated }) {
         )}
 
         {tab === 'agents' && <AdminAgentsTab pin={usePin} />}
+
+        {tab === 'users' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading…</div>}>
+            <AdminAddUserPanel
+              pin={usePin}
+              adminHubFetch={adminHubFetch}
+              iam={iam}
+              onMsg={setMsg}
+              onErr={setErr}
+              onOpenIam={() => navigateAdminTab('iam')}
+              C={C}
+              S={S}
+              FF={FF}
+              Btn={Btn}
+              Spin={Spin}
+            />
+          </Suspense>
+        )}
 
         {tab === 'dispatch' && <AdminDispatchDeskTab pin={usePin} />}
 
