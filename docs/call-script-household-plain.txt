@@ -1,26 +1,24 @@
-HOUSEHOLD VENDOR — 10-MIN CALL SCRIPT (Jasmeen / DCORE)
+HOUSEHOLD VENDOR — CALL SCRIPT (Marathi / Hindi / English backup)
 
-OPEN
-"Namaste, am I speaking with [Name] from [Business]? I'm Jasmeen from DCORE Global — we run ScanV, a local booking app for Wakad and PCMC."
+OPEN (Marathi)
+"नमस्कार, [Business] मध्ये बोलतो/बोलते का? मी Jasmeen — DCORE Global, ScanV app."
 
-HOOK (30 sec)
-"Customers search on ScanV for deep cleaning, home help, sofa cleaning — we send them verified local partners. Launch partners pay zero listing fee. You keep your price; we send bookings and collect UPI payment on the app."
+OPEN (Hindi)
+"नमस्ते, kya main [Business] se baat kar raha/rahi hoon? Main Jasmeen — DCORE Global, ScanV app."
+
+HOOK (30 sec — Marathi)
+"आम्ही Wakad आणि PCMC मध्ये cleaning साठी verified customers ला local partners कडे bookings पाठवतो. Launch वर listing fee नाही — rate तुमची, booking आणि UPI payment app वर."
+
+HOOK (Hindi)
+"Hum Wakad aur PCMC mein cleaning ke verified customers ko local partners par bookings bhejte hain. Launch par koi listing fee nahi — price aapki, booking aur UPI app par."
 
 QUALIFY
-1. "Which areas do you cover daily?" → note Wakad / Hinjewadi / PCMC
-2. "Typical 2BHK deep clean price?" → note for ScanV pricing admin
-3. "How many jobs per week can you take from the app?" → capacity
-
-TRUST
-"We verify phone, address, and Aadhaar before listing. You appear under Household services on the app."
+1. "दररोज कोणते areas cover करता?" / "Roz kaunse areas cover karte ho?"
+2. "2BHK deep clean chi / ki typical kitni price?"
+3. "App varun / app se week मध्ये / mein kitne jobs घेऊ / le sakte ho?"
 
 CLOSE
-"I'll send a WhatsApp with our partner link. Can you share Aadhaar last-4 and one photo of your team or shop for verification? We can go live this week."
-
-OBJECTIONS
-- "We already have Urban Company" → "ScanV is local-first, lower commission, your brand name on the listing."
-- "No time" → "10 minutes now or I'll WhatsApp the one-pager — reply when free."
-- "What commission?" → "Launch: no listing fee; we agree a small platform fee per completed booking before first job."
+"WhatsApp var message pathavte / bhejti hoon. Team cha photo ani Aadhaar last 4 share karal / karoge? Ya week madhe / mein live."
 
 AFTER CALL
-Admin → Vendor Leads → mark Phone + Name + Address verified → Add to ScanV
+Admin → Vendor Leads → phone + name + address verified → Add to ScanV

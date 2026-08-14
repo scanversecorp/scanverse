@@ -52,8 +52,24 @@ function waHref(phone, text) {
   return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
 }
 
-const VENDOR_OUTREACH_MSG = (name) =>
-  `Namaste, I'm Jasmeen from DCORE Global (ScanV — scanv-tau.vercel.app). We send verified bookings in Wakad/PCMC to partners like ${name || 'you'}. Zero listing fee for launch — you keep your pricing, we handle booking + UPI payment. Can we do a 10-minute call today?`;
+const VENDOR_OUTREACH_MSG = (name) => {
+  const n = name || 'partner';
+  return [
+    'नमस्कार / नमस्ते 🙏',
+    '',
+    'मी Jasmeen, DCORE Global — ScanV app (Wakad व PCMC).',
+    '',
+    `आम्ही verified customers च्या cleaning / home service bookings local partners ला पाठवतो. ${n} सोबत partner करू इच्छितो.`,
+    '',
+    '• Launch वर listing fee नाही / कोई listing fee नहीं',
+    '• Price तुमची / आपकी — तुम्ही / आप ठरवता',
+    '• Booking + UPI payment — app वर',
+    '',
+    'आज 10 min चा छोटा call होईल का? 📞',
+    '',
+    'Jasmeen S P | 8484850288',
+  ].join('\n');
+};
 
 function mailHref(email) {
   const e = String(email || '').trim();

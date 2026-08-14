@@ -8,13 +8,22 @@ import { ONBOARD_STATUSES } from "./vendor-leads-admin.ts";
 const PRIORITY_AREAS = ["wakad", "hinjewadi", "baner", "kalewadi", "akurdi", "pcm", "pimpri", "chinchwad"];
 
 export function vendorOutreachMessage(businessName: string): string {
-  const name = businessName.trim() || "service partner";
+  const name = businessName.trim() || "partner";
   return [
-    "Namaste, I'm Jasmeen from DCORE Global (ScanV — scanv-tau.vercel.app).",
-    `We send verified bookings in Wakad/PCMC to partners like ${name}.`,
-    "Zero listing fee for launch — you keep your pricing, we handle booking + UPI payment.",
-    "Can we do a 10-minute call today?",
-  ].join(" ");
+    "नमस्कार / नमस्ते 🙏",
+    "",
+    "मी Jasmeen, DCORE Global — ScanV app (Wakad व PCMC).",
+    "",
+    `आम्ही verified customers च्या cleaning / home service bookings local partners ला पाठवतो. ${name} सोबत partner करू इच्छितो.`,
+    "",
+    "• Launch वर listing fee नाही / कोई listing fee नहीं",
+    "• Price तुमची / आपकी — तुम्ही / आप ठरवता",
+    "• Booking + UPI payment — app वर",
+    "",
+    "आज 10 min चा छोटा call होईल का? 📞",
+    "",
+    "Jasmeen S P | 8484850288",
+  ].join("\n");
 }
 
 function areaScore(area: string, serviceAreas: string): number {
