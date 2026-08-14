@@ -26,6 +26,14 @@
  *   pricing_2fa_reset_confirm — { otp } clears pricing admin TOTP enrollment
  *   get_admin_diagrams — architecture / data-flow Mermaid catalog (Admin PIN only)
  *   get_admin_url_index — confidential bookmark catalog (Admin PIN only)
+ *   search_dispatches  — { q?, status?, vendor_id?, date_from?, date_to?, limit? }
+ *   dispatch_detail    — { dispatch_id? | booking_id? }
+ *   update_dispatch    — { dispatch_id, patch }
+ *   dispatch_control   — { op: create|pause|resume|stop|restart|delete|assign_vendor, dispatch_id?, booking_id?, vendor_id?, force? }
+ *   search_directory   — { q, kind?: all|users|vendors, status?, limit? }
+ *   directory_detail   — { profile_id? | vendor_id? }
+ *   update_profile     — { profile_id, patch }
+ *   list_vendors_brief — { status?, limit? } active vendors for assign dropdown
  *
  * Auth: x-admin-pin header
  *   ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN
@@ -39,6 +47,18 @@ import {
   searchBookingsAdmin,
   updateBookingAdmin,
 } from "../_shared/bookings-admin.ts";
+import {
+  dispatchControlAdmin,
+  dispatchDetailAdmin,
+  searchDispatchesAdmin,
+  updateDispatchAdmin,
+} from "../_shared/dispatch-admin.ts";
+import {
+  directoryDetailAdmin,
+  listVendorsBriefAdmin,
+  searchDirectoryAdmin,
+  updateProfileAdmin,
+} from "../_shared/directory-admin.ts";
 import {
   listInvestmentRequests,
   respondInvestmentRequest,
@@ -1184,6 +1204,86 @@ Deno.serve(async (req) => {
 
   if (action === "get_admin_url_index") {
     return json({ sections: adminUrlIndexSections, app_url: Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app" });
+  }
+
+  if (action === "search_dispatches") {
+    try {
+      const dispatches = await searchDispatchesAdmin(sb, body);
+      return json({ dispatches, count: dispatches.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Search failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "dispatch_detail") {
+    try {
+      const detail = await dispatchDetailAdmin(sb, body);
+      return json(detail);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Not found";
+      return json({ error: msg }, msg.includes("not found") ? 404 : 500);
+    }
+  }
+
+  if (action === "update_dispatch") {
+    try {
+      const dispatch = await updateDispatchAdmin(sb, body);
+      return json({ success: true, dispatch });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "dispatch_control") {
+    try {
+      const result = await dispatchControlAdmin(sb, body);
+      return json({ success: true, ...result });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Action failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "search_directory") {
+    try {
+      const results = await searchDirectoryAdmin(sb, body);
+      return json({ results, count: results.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Search failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "directory_detail") {
+    try {
+      const detail = await directoryDetailAdmin(sb, body);
+      return json(detail);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Not found";
+      return json({ error: msg }, msg.includes("not found") ? 404 : 500);
+    }
+  }
+
+  if (action === "update_profile") {
+    try {
+      const profile = await updateProfileAdmin(sb, body);
+      return json({ success: true, profile });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "list_vendors_brief") {
+    try {
+      const vendors = await listVendorsBriefAdmin(sb, body);
+      return json({ vendors, count: vendors.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "List failed";
+      return json({ error: msg }, 500);
+    }
   }
 
   if (action === "pricing_2fa_status" || action === "pricing_2fa_reset_send" || action === "pricing_2fa_reset_confirm") {

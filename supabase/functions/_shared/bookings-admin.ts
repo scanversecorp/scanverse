@@ -105,6 +105,8 @@ const BOOKING_PATCH_FIELDS = [
   "date",
   "time",
   "location_text",
+  "customer_lat",
+  "customer_lng",
 ] as const;
 
 const BOOKING_STATUSES = new Set([
@@ -148,6 +150,45 @@ export async function updateBookingAdmin(
     .select()
     .single();
   if (error) throw new Error(error.message);
+
+  const dispatchPatch: Record<string, unknown> = {};
+  if (row.location_text !== undefined) {
+    dispatchPatch.customer_location = row.location_text;
+  }
+  if (row.date !== undefined) dispatchPatch.scheduled_date = row.date;
+  if (row.time !== undefined) dispatchPatch.scheduled_time = row.time;
+  if (row.customer_lat !== undefined) dispatchPatch.customer_lat = row.customer_lat;
+  if (row.customer_lng !== undefined) dispatchPatch.customer_lng = row.customer_lng;
+
+  if (Object.keys(dispatchPatch).length) {
+    await sb.from("booking_dispatch").update({
+      ...dispatchPatch,
+      updated_at: new Date().toISOString(),
+    }).eq("booking_id", bookingId);
+  }
+
+  if (row.partner_id !== undefined) {
+    const partnerId = row.partner_id ? String(row.partner_id) : null;
+    if (partnerId) {
+      const { data: vendor } = await sb
+        .from("vendor_partners")
+        .select("id, profile_id, status")
+        .or(`profile_id.eq.${partnerId},id.eq.${partnerId}`)
+        .maybeSingle();
+      if (vendor?.id && vendor.status === "active") {
+        const now = new Date().toISOString();
+        await sb.from("booking_dispatch").update({
+          status: "assigned",
+          assigned_vendor_id: vendor.id,
+          assigned_at: now,
+          accepted_at: now,
+          next_action_at: null,
+          updated_at: now,
+        }).eq("booking_id", bookingId);
+      }
+    }
+  }
+
   return data;
 }
 

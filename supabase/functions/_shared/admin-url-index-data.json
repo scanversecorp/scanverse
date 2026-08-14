@@ -126,6 +126,18 @@
         "note": "agents"
       },
       {
+        "label": "Dispatch Desk",
+        "adminTab": "dispatch",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=dispatch",
+        "note": "Full dispatch queue · pause · assign · location"
+      },
+      {
+        "label": "Users & Vendors",
+        "adminTab": "directory",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=directory",
+        "note": "Customers · partners · bookings · vendor assign"
+      },
+      {
         "label": "Vendors & Dispatch",
         "adminTab": "vendors",
         "url": "https://scanv-tau.vercel.app/#admin?tab=vendors",

@@ -11356,6 +11356,8 @@ const ADMIN_TABS = [
   { id: 'investments', label: 'Investments', icon: '📈' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'agents', label: 'Support Agents', icon: '👥' },
+  { id: 'dispatch', label: 'Dispatch Desk', icon: '📦' },
+  { id: 'directory', label: 'Users & Vendors', icon: '👤' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
   { id: 'gps', label: 'GPS Status', icon: '📍' },
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
@@ -12279,6 +12281,484 @@ function AdminAgentsTab({ pin }) {
   );
 }
 
+function AdminDispatchDeskTab({ pin }) {
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('all');
+  const [dispatches, setDispatches] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [editPatch, setEditPatch] = useState({});
+  const [assignVendorId, setAssignVendorId] = useState('');
+  const [createBookingId, setCreateBookingId] = useState('');
+  const dispatchStatusColor = { pending: C.dim, dispatching: C.gold, assigned: C.grn, exhausted: C.red, cancelled: C.sub };
+
+  const search = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true); setErr(''); setMsg('');
+    try {
+      const { dispatches: data } = await adminHubFetch('search_dispatches', {
+        q: q.trim() || undefined,
+        status,
+        limit: 80,
+      }, pin);
+      setDispatches(data || []);
+    } catch (e) { setErr(e.message); setDispatches([]); }
+    finally { setLoading(false); }
+  }, [pin, q, status]);
+
+  const loadDetail = useCallback(async (dispatchId) => {
+    if (!pin || !dispatchId) return;
+    setLoading(true); setErr('');
+    try {
+      const [data, vendorRes] = await Promise.all([
+        adminHubFetch('dispatch_detail', { dispatch_id: dispatchId }, pin),
+        adminHubFetch('list_vendors_brief', { status: 'active', limit: 150 }, pin),
+      ]);
+      setDetail(data);
+      setSelectedId(dispatchId);
+      setVendors(vendorRes?.vendors || []);
+      const d = data.dispatch || {};
+      setEditPatch({
+        customer_location: d.customer_location || data.booking?.location_text || '',
+        customer_lat: d.customer_lat ?? data.booking?.customer_lat ?? '',
+        customer_lng: d.customer_lng ?? data.booking?.customer_lng ?? '',
+        scheduled_date: d.scheduled_date ? String(d.scheduled_date).slice(0, 10) : '',
+        scheduled_time: d.scheduled_time || data.booking?.time || '',
+        status: d.status || 'pending',
+      });
+      setAssignVendorId(d.assigned_vendor_id || '');
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [pin]);
+
+  useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runControl = async (op, extra = {}) => {
+    if (!selectedId && op !== 'create') return;
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('dispatch_control', { op, dispatch_id: selectedId, ...extra }, pin);
+      setMsg(`Dispatch ${op.replace('_', ' ')} OK`);
+      if (op === 'delete') {
+        setSelectedId(null); setDetail(null);
+        await search();
+      } else if (selectedId) {
+        await loadDetail(selectedId);
+        await search();
+      }
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const saveDispatch = async () => {
+    if (!selectedId) return;
+    setLoading(true); setErr('');
+    try {
+      const patch = { ...editPatch };
+      if (patch.customer_lat === '') patch.customer_lat = null;
+      else if (patch.customer_lat !== '') patch.customer_lat = Number(patch.customer_lat);
+      if (patch.customer_lng === '') patch.customer_lng = null;
+      else if (patch.customer_lng !== '') patch.customer_lng = Number(patch.customer_lng);
+      await adminHubFetch('update_dispatch', { dispatch_id: selectedId, patch }, pin);
+      setMsg('Dispatch updated');
+      await loadDetail(selectedId);
+      await search();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const createDispatch = async () => {
+    const bk = createBookingId.trim();
+    if (!bk) return setErr('Enter booking ID (BK-…)');
+    setLoading(true); setErr('');
+    try {
+      const r = await adminHubFetch('dispatch_control', { op: 'create', booking_id: bk }, pin);
+      setMsg('Dispatch created');
+      setCreateBookingId('');
+      await search();
+      if (r?.dispatch?.id) await loadDetail(r.dispatch.id);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const d = detail?.dispatch;
+  const bk = detail?.booking;
+
+  return (
+    <div>
+      <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.acc}33` }}>
+        <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Dispatch Desk</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
+          Full dispatch queue · orders · pause / resume / stop / restart · assign vendor · update delivery location.
+          Bookmark: <code style={{ color: C.acc }}>{adminTabUrl('dispatch')}</code>
+        </div>
+      </div>
+      {!selectedId ? (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {['all', 'pending', 'dispatching', 'assigned', 'exhausted', 'cancelled'].map(s => (
+              <button key={s} type="button" onClick={() => setStatus(s)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${status === s ? C.acc : C.bdr}`, background: status === s ? `${C.acc}18` : C.surf, color: status === s ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{s}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Booking ID, service, location, accept code…" style={{ ...S.inp(), flex: '1 1 180px' }} />
+            <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+          </div>
+          <div style={{ ...S.card(), padding: 12, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Create dispatch for booking</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input value={createBookingId} onChange={e => setCreateBookingId(e.target.value)} placeholder="BK-XXXXXXXX" style={{ ...S.inp(), flex: '1 1 160px' }} />
+              <Btn v="outline" onClick={createDispatch} disabled={loading}>Add dispatch →</Btn>
+            </div>
+          </div>
+          {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {loading && !dispatches.length ? <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div> : dispatches.map(row => (
+            <div key={row.id} onClick={() => loadDetail(row.id)} style={{ ...S.card(), marginBottom: 8, padding: 12, cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.txt }}>{row.service_name}</div>
+                  <div style={{ fontSize: 11, color: C.sub }}>{row.booking_id} · {row.customer_location || '—'}</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                    {row.booking?.customer_name || row.booking?.customer_id || '—'} · {fmtDt(row.scheduled_date)} {row.scheduled_time || ''}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <Badge label={row.paused ? 'paused' : row.status} color={dispatchStatusColor[row.status] || C.sub} />
+                  {row.assigned_vendor_id && <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>Vendor {String(row.assigned_vendor_id).slice(0, 8)}…</div>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {!loading && !dispatches.length && <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>No dispatches match filters</div>}
+        </>
+      ) : (
+        <>
+          <Btn v="outline" sm onClick={() => { setSelectedId(null); setDetail(null); setMsg(''); }} style={{ marginBottom: 12 }}>← All dispatches</Btn>
+          {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {d && (
+            <>
+              <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>{d.service_name}</div>
+                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.65 }}>
+                  <div>Dispatch ID: <code style={{ fontSize: 10 }}>{d.id}</code></div>
+                  <div>Booking: <code style={{ fontSize: 10 }}>{d.booking_id}</code> · Status booking: {bk?.status || '—'}</div>
+                  <div>Customer: {detail?.customer?.name || bk?.customer_name || bk?.customer_id || '—'} · {detail?.customer?.phone || '—'}</div>
+                  <div>Location: {d.customer_location || bk?.location_text || '—'}</div>
+                  <div>Scheduled: {fmtDt(d.scheduled_date || bk?.date)} {d.scheduled_time || bk?.time || ''}</div>
+                  <div>Dispatch: <Badge label={d.paused ? 'paused' : d.status} color={dispatchStatusColor[d.status] || C.sub} /> · Accept {d.accept_code}</div>
+                  <div>Rank {d.vendor_rank} · Attempt {d.attempt_num}</div>
+                  {detail?.assigned_vendor && <div>Assigned: {detail.assigned_vendor.business_name} · {detail.assigned_vendor.phone}</div>}
+                  {detail?.partner && <div>Partner profile: {detail.partner.name || detail.partner.id}</div>}
+                  {(d.booking_dispatch_attempts || []).length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontWeight: 700, color: C.txt, marginBottom: 4 }}>Attempts ({d.booking_dispatch_attempts.length})</div>
+                      {(d.booking_dispatch_attempts || []).slice(0, 8).map(a => (
+                        <div key={a.id} style={{ fontSize: 10, color: C.dim }}>#{a.attempt_num} {a.channel} · {a.status} · vendor {String(a.vendor_id).slice(0, 8)}…</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                  {['pending', 'dispatching'].includes(d.status) && !d.paused && (
+                    <Btn v="outline" sm onClick={() => runControl('pause')} disabled={loading}>Pause</Btn>
+                  )}
+                  {d.paused && ['pending', 'dispatching'].includes(d.status) && (
+                    <Btn v="outline" sm onClick={() => runControl('resume')} disabled={loading}>Resume</Btn>
+                  )}
+                  {!['cancelled', 'assigned'].includes(d.status) && (
+                    <Btn v="danger" sm onClick={() => window.confirm('Stop this dispatch?') && runControl('stop')} disabled={loading}>Stop</Btn>
+                  )}
+                  {['cancelled', 'exhausted', 'assigned'].includes(d.status) && (
+                    <Btn v="outline" sm onClick={() => window.confirm('Restart dispatch from rank 1? Clears assigned vendor.') && runControl('restart')} disabled={loading}>Restart</Btn>
+                  )}
+                  {['cancelled', 'exhausted'].includes(d.status) && (
+                    <Btn v="danger" sm onClick={() => window.confirm('Delete dispatch record?') && runControl('delete')} disabled={loading}>Delete</Btn>
+                  )}
+                </div>
+              </div>
+              <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Update delivery &amp; schedule</div>
+                <Field label="Delivery location">
+                  <input value={editPatch.customer_location || ''} onChange={e => setEditPatch(p => ({ ...p, customer_location: e.target.value }))} style={S.inp()} />
+                </Field>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="Lat"><input value={editPatch.customer_lat ?? ''} onChange={e => setEditPatch(p => ({ ...p, customer_lat: e.target.value }))} style={S.inp()} /></Field>
+                  <Field label="Lng"><input value={editPatch.customer_lng ?? ''} onChange={e => setEditPatch(p => ({ ...p, customer_lng: e.target.value }))} style={S.inp()} /></Field>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="Date"><input type="date" value={editPatch.scheduled_date || ''} onChange={e => setEditPatch(p => ({ ...p, scheduled_date: e.target.value }))} style={S.inp()} /></Field>
+                  <Field label="Time"><input value={editPatch.scheduled_time || ''} onChange={e => setEditPatch(p => ({ ...p, scheduled_time: e.target.value }))} style={S.inp()} /></Field>
+                </div>
+                <Field label="Dispatch status">
+                  <select value={editPatch.status || ''} onChange={e => setEditPatch(p => ({ ...p, status: e.target.value }))} style={S.inp()}>
+                    {['pending', 'dispatching', 'assigned', 'exhausted', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </Field>
+                <Btn onClick={saveDispatch} disabled={loading} style={{ marginTop: 8 }}>{loading ? 'Saving…' : 'Save changes'}</Btn>
+              </div>
+              <div style={{ ...S.card(), padding: 14 }}>
+                <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Assign / change vendor</div>
+                <Field label="Active vendor">
+                  <select value={assignVendorId} onChange={e => setAssignVendorId(e.target.value)} style={S.inp()}>
+                    <option value="">— Select vendor —</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>{v.business_name} · {v.city} · {v.phone}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Btn v="outline" onClick={() => assignVendorId && runControl('assign_vendor', { vendor_id: assignVendorId })} disabled={loading || !assignVendorId}>
+                  Assign vendor →
+                </Btn>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function AdminDirectoryTab({ pin }) {
+  const [q, setQ] = useState('');
+  const [kind, setKind] = useState('all');
+  const [results, setResults] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [profilePatch, setProfilePatch] = useState({});
+  const [vendors, setVendors] = useState([]);
+
+  const search = useCallback(async () => {
+    if (!pin || q.trim().length < 2) return setErr('Enter at least 2 characters');
+    setLoading(true); setErr(''); setMsg('');
+    try {
+      const { results: data } = await adminHubFetch('search_directory', { q: q.trim(), kind }, pin);
+      setResults(data || []);
+      setSelected(null);
+      setDetail(null);
+    } catch (e) { setErr(e.message); setResults([]); }
+    finally { setLoading(false); }
+  }, [pin, q, kind]);
+
+  const loadDetail = useCallback(async (item) => {
+    if (!pin || !item) return;
+    setLoading(true); setErr('');
+    try {
+      const payload = item.kind === 'vendor'
+        ? { vendor_id: item.id }
+        : { profile_id: item.id };
+      const [data, vendorList] = await Promise.all([
+        adminHubFetch('directory_detail', payload, pin),
+        adminHubFetch('list_vendors_brief', { status: 'active', limit: 150 }, pin),
+      ]);
+      setDetail(data);
+      setSelected(item);
+      setVendors(vendorList?.vendors || []);
+      const p = data.profile || {};
+      setProfilePatch({
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        phone: p.phone || '',
+        email: p.email || '',
+        address: p.address || '',
+        city: p.city || '',
+        pincode: p.pincode || '',
+        status: p.status || 'active',
+        notes: p.notes || '',
+      });
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, [pin]);
+
+  const saveProfile = async () => {
+    const profileId = detail?.profile?.id;
+    if (!profileId) return setErr('No profile to update');
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('update_profile', { profile_id: profileId, patch: profilePatch }, pin);
+      setMsg('Profile updated');
+      await loadDetail(selected);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const vendorAction = async (action, vendorId) => {
+    const confirms = {
+      activate: 'Activate this partner?',
+      pause: 'Pause partner — no new bookings?',
+      unpause: 'Unpause partner?',
+      offboard: 'Offboard partner permanently until re-activated?',
+      delete: 'Delete partner record (no dispatch history)?',
+    };
+    if (confirms[action] && !window.confirm(confirms[action])) return;
+    setLoading(true); setErr('');
+    try {
+      await vendorOnboardFetch(action, { vendor_id: vendorId }, pin);
+      setMsg(`Vendor ${action} OK`);
+      await loadDetail(selected);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const updateBookingFromDirectory = async (bookingId, patch) => {
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('update_booking', { booking_id: bookingId, patch }, pin);
+      setMsg('Booking updated');
+      await loadDetail(selected);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const assignBookingVendor = async (bookingId, vendorId) => {
+    if (!vendorId) return;
+    const v = vendors.find(x => x.id === vendorId);
+    const partnerId = v?.profile_id || vendorId;
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('update_booking', {
+        booking_id: bookingId,
+        patch: { partner_id: partnerId, status: 'confirmed' },
+      }, pin);
+      const disp = (detail?.dispatches_as_customer || []).find(d => d.booking_id === bookingId);
+      if (disp?.id) {
+        await adminHubFetch('dispatch_control', { op: 'assign_vendor', dispatch_id: disp.id, vendor_id: vendorId }, pin);
+      }
+      setMsg('Vendor assigned to booking');
+      await loadDetail(selected);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const v = detail?.vendor;
+  const p = detail?.profile;
+
+  return (
+    <div>
+      <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.gold}44` }}>
+        <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Users &amp; Vendors Directory</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
+          All registered customers and partners · bookings · dispatch history · edit / pause / assign vendor.
+          Bookmark: <code style={{ color: C.acc }}>{adminTabUrl('directory')}</code>
+        </div>
+      </div>
+      {!selected ? (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {['all', 'users', 'vendors'].map(k => (
+              <button key={k} type="button" onClick={() => setKind(k)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${kind === k ? C.acc : C.bdr}`, background: kind === k ? `${C.acc}18` : C.surf, color: kind === k ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{k}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Name, mobile, email, city, business…" style={{ ...S.inp(), flex: '1 1 180px' }} />
+            <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+          </div>
+          {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {results.map(row => (
+            <div key={`${row.kind}-${row.id}`} onClick={() => loadDetail(row)} style={{ ...S.card(), marginBottom: 8, padding: 12, cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.txt }}>{row.label}</div>
+                  <div style={{ fontSize: 11, color: C.sub }}>{row.phone || '—'} · {row.city || '—'}</div>
+                  <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>{row.kind} · {row.id}</div>
+                </div>
+                <Badge label={row.status || row.role || '—'} color={C.acc} />
+              </div>
+            </div>
+          ))}
+          {!loading && q.length >= 2 && !results.length && <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>No matches</div>}
+        </>
+      ) : (
+        <>
+          <Btn v="outline" sm onClick={() => { setSelected(null); setDetail(null); setMsg(''); }} style={{ marginBottom: 12 }}>← Search results</Btn>
+          {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {p && (
+            <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, color: C.txt, marginBottom: 8 }}>Profile · {p.name || p.id}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{p.phone} · {p.email || '—'} · {p.city || '—'} · role {p.role}</div>
+              <Field label="First name"><input value={profilePatch.first_name || ''} onChange={e => setProfilePatch(x => ({ ...x, first_name: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Last name"><input value={profilePatch.last_name || ''} onChange={e => setProfilePatch(x => ({ ...x, last_name: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Phone"><input value={profilePatch.phone || ''} onChange={e => setProfilePatch(x => ({ ...x, phone: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Email"><input value={profilePatch.email || ''} onChange={e => setProfilePatch(x => ({ ...x, email: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Address"><input value={profilePatch.address || ''} onChange={e => setProfilePatch(x => ({ ...x, address: e.target.value }))} style={S.inp()} /></Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <Field label="City"><input value={profilePatch.city || ''} onChange={e => setProfilePatch(x => ({ ...x, city: e.target.value }))} style={S.inp()} /></Field>
+                <Field label="Pincode"><input value={profilePatch.pincode || ''} onChange={e => setProfilePatch(x => ({ ...x, pincode: e.target.value }))} style={S.inp()} /></Field>
+              </div>
+              <Field label="Status"><input value={profilePatch.status || ''} onChange={e => setProfilePatch(x => ({ ...x, status: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Notes"><textarea value={profilePatch.notes || ''} onChange={e => setProfilePatch(x => ({ ...x, notes: e.target.value }))} rows={2} style={{ ...S.inp(), resize: 'vertical' }} /></Field>
+              <Btn onClick={saveProfile} disabled={loading}>Save profile</Btn>
+            </div>
+          )}
+          {v && (
+            <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, color: C.txt, marginBottom: 8 }}>Vendor · {v.business_name}</div>
+              <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
+                <div>{v.contact_name || `${v.first_name || ''} ${v.last_name || ''}`.trim()} · {v.phone}</div>
+                <div>{v.shop_or_flat}, {v.street_name}, {v.city} {v.pincode}</div>
+                <div>Status: <Badge label={v.status} color={C.acc} /> · Vehicle {v.vehicle_number || '—'}</div>
+                <div>Services: {(v.vendor_partner_services || []).filter(s => s.is_active).map(s => s.service_id).slice(0, 6).join(', ') || '—'}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {v.status !== 'active' && <Btn v="outline" sm onClick={() => vendorAction('activate', v.id)} disabled={loading}>Activate</Btn>}
+                {v.status === 'active' && <Btn v="outline" sm onClick={() => vendorAction('pause', v.id)} disabled={loading}>Pause</Btn>}
+                {v.status === 'paused' && <Btn v="outline" sm onClick={() => vendorAction('unpause', v.id)} disabled={loading}>Unpause</Btn>}
+                {v.status === 'active' && <Btn v="danger" sm onClick={() => vendorAction('offboard', v.id)} disabled={loading}>Offboard</Btn>}
+                {['pending', 'offboarded'].includes(v.status) && <Btn v="danger" sm onClick={() => vendorAction('delete', v.id)} disabled={loading}>Delete</Btn>}
+                <AdminDeepLinkBtn hash="vendor-admin" label="Full vendor portal →" />
+              </div>
+            </div>
+          )}
+          {(detail?.bookings || []).length > 0 && (
+            <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 10 }}>Bookings ({detail.bookings.length})</div>
+              {(detail.bookings || []).map(b => {
+                const disp = (detail.dispatches_as_customer || []).find(d => d.booking_id === b.id);
+                return (
+                  <div key={b.id} style={{ borderTop: `1px solid ${C.bdr}`, paddingTop: 10, marginTop: 10 }}>
+                    <div style={{ fontWeight: 600, color: C.txt, fontSize: 13 }}>{b.service_name}</div>
+                    <div style={{ fontSize: 11, color: C.sub }}>{b.id} · {b.status} · ₹{fmtRs(b.total)} · {fmtDt(b.date)} {b.time}</div>
+                    {disp && <div style={{ fontSize: 10, color: C.dim }}>Dispatch: {disp.status}{disp.assigned_vendor_id ? ` · vendor ${String(disp.assigned_vendor_id).slice(0, 8)}…` : ''}</div>}
+                    <Field label="Delivery location">
+                      <input defaultValue={b.location_text || ''} onBlur={e => { if (e.target.value !== (b.location_text || '')) updateBookingFromDirectory(b.id, { location_text: e.target.value }); }} style={S.inp()} />
+                    </Field>
+                    <Field label="Change vendor">
+                      <select defaultValue="" onChange={e => { if (e.target.value) assignBookingVendor(b.id, e.target.value); e.target.value = ''; }} style={S.inp()}>
+                        <option value="">— Assign vendor —</option>
+                        {vendors.map(vn => <option key={vn.id} value={vn.id}>{vn.business_name}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {(detail?.dispatches_as_vendor || []).length > 0 && (
+            <div style={{ ...S.card(), padding: 14 }}>
+              <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>Dispatches as assigned vendor ({detail.dispatches_as_vendor.length})</div>
+              {(detail.dispatches_as_vendor || []).map(d => (
+                <div key={d.id} style={{ fontSize: 11, color: C.sub, marginBottom: 6 }}>
+                  {d.booking_id} · {d.service_name} · {d.status} · {d.customer_location || '—'}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings management' }) {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('all');
@@ -12328,6 +12808,8 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
         date: b.date ? String(b.date).slice(0, 10) : '',
         time: b.time || '',
         location_text: b.location_text || '',
+        customer_lat: b.customer_lat ?? '',
+        customer_lng: b.customer_lng ?? '',
       });
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
@@ -12339,7 +12821,12 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
     if (!canEdit || !selectedId) return;
     setSaving(true); setErr('');
     try {
-      await fetchFn('update_booking', { booking_id: selectedId, patch: editPatch }, pin);
+      const patch = { ...editPatch };
+      if (patch.customer_lat === '') patch.customer_lat = null;
+      else if (patch.customer_lat !== '') patch.customer_lat = Number(patch.customer_lat);
+      if (patch.customer_lng === '') patch.customer_lng = null;
+      else if (patch.customer_lng !== '') patch.customer_lng = Number(patch.customer_lng);
+      await fetchFn('update_booking', { booking_id: selectedId, patch }, pin);
       setMsg('Booking updated');
       await loadDetail(selectedId);
       await search();
@@ -12449,6 +12936,10 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                   <Field label="Location">
                     <input value={editPatch.location_text || ''} onChange={e => setEditPatch(p => ({ ...p, location_text: e.target.value }))} style={S.inp()} />
                   </Field>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <Field label="Lat"><input value={editPatch.customer_lat ?? ''} onChange={e => setEditPatch(p => ({ ...p, customer_lat: e.target.value }))} style={S.inp()} /></Field>
+                    <Field label="Lng"><input value={editPatch.customer_lng ?? ''} onChange={e => setEditPatch(p => ({ ...p, customer_lng: e.target.value }))} style={S.inp()} /></Field>
+                  </div>
                   <Field label="Notes">
                     <textarea value={editPatch.notes || ''} onChange={e => setEditPatch(p => ({ ...p, notes: e.target.value }))} rows={3} style={{ ...S.inp(), resize: 'vertical' }} />
                   </Field>
@@ -12726,6 +13217,10 @@ function AdminControlCenter({ onPricesUpdated }) {
         )}
 
         {tab === 'agents' && <AdminAgentsTab pin={usePin} />}
+
+        {tab === 'dispatch' && <AdminDispatchDeskTab pin={usePin} />}
+
+        {tab === 'directory' && <AdminDirectoryTab pin={usePin} />}
 
         {tab === 'vendors' && (
           <div>
