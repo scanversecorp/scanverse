@@ -105,6 +105,12 @@ import {
   upsertStaffUser,
 } from "../_shared/iam-admin.ts";
 import {
+  addSocialContent,
+  getSocialDashboard,
+  updateSocialConfig,
+  updateSocialContent,
+} from "../_shared/social-content-admin.ts";
+import {
   listExternalTrips,
   listLogisticsPipeline,
   updateLogisticsPartner,
@@ -1490,6 +1496,34 @@ Deno.serve(async (req) => {
     const result = await sendStrikeListOutreach(sb, body, iam.actor);
     if (result.error && !result.results) return json(result, result.configured === false ? 503 : 400);
     return json(result);
+  }
+
+  if (action === "get_social_dashboard") {
+    try {
+      const data = await getSocialDashboard(sb);
+      return json(data);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Social dashboard failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "update_social_content") {
+    const result = await updateSocialContent(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, item: result.item });
+  }
+
+  if (action === "add_social_content") {
+    const result = await addSocialContent(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, item: result.item });
+  }
+
+  if (action === "update_social_config") {
+    const result = await updateSocialConfig(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, config: result.config });
   }
 
   return json({ error: "Unknown action" }, 400);

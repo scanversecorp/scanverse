@@ -71,4 +71,5 @@ for (const a of queue.slice(0, 5)) {
 console.log('NEXT HUMAN-ONLY (you)');
 console.log('  • Forward any 3PL reply → agent wires sandbox API same day');
 console.log('  • Sign partner / fund Razorpay wallet when first booking lands');
+console.log('  • Social posts: node scripts/social_pulse.mjs · mark posted in #admin?tab=social');
 console.log('═══════════════════════════════════════════════════\n');

@@ -186,6 +186,12 @@
         "note": "Porter/Borzo/Delhivery outreach · follow-ups · sandbox keys"
       },
       {
+        "label": "Social Media",
+        "adminTab": "social",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=social",
+        "note": "Daily posts · videos · stories · emotional tracker"
+      },
+      {
         "label": "Architecture",
         "adminTab": "diagrams",
         "url": "https://scanv-tau.vercel.app/#admin?tab=diagrams",
@@ -239,6 +245,11 @@
         "label": "Meta Business Suite",
         "url": "https://business.facebook.com/",
         "note": "Schedule FB + IG posts"
+      },
+      {
+        "label": "Social dashboard (admin)",
+        "adminTab": "social",
+        "note": "Daily posts · videos · stories · emotional tracker"
       }
     ]
   },

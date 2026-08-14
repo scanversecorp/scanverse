@@ -20,6 +20,7 @@ import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
 const AdminLogisticsPartnersTab = lazy(() => import('./admin-logistics-partners').then((m) => ({ default: m.AdminLogisticsPartnersTab })));
+const AdminSocialContentTab = lazy(() => import('./admin-social-content').then((m) => ({ default: m.AdminSocialContentTab })));
 const AdminBusinessCommandTab = lazy(() => import('./admin-business-command').then((m) => ({ default: m.AdminBusinessCommandTab })));
 const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
 const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ default: m.AdminAddUserPanel })));
@@ -11470,6 +11471,7 @@ const ADMIN_TABS = [
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
   { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
   { id: 'logistics', label: 'Logistics API', icon: '🚛' },
+  { id: 'social', label: 'Social Media', icon: '📱' },
   { id: 'iam', label: 'Roles & IAM', icon: '🛡️' },
   { id: 'diagrams', label: 'Architecture', icon: '📐' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
@@ -13592,6 +13594,12 @@ function AdminControlCenter({ onPricesUpdated }) {
         {tab === 'logistics' && usePin && (
           <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading logistics pipeline…</div>}>
             <AdminLogisticsPartnersTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
+          </Suspense>
+        )}
+
+        {tab === 'social' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading social dashboard…</div>}>
+            <AdminSocialContentTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
           </Suspense>
         )}
 

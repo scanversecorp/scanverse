@@ -85,6 +85,10 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   update_card_business: "hub.settings",
   send_vendor_outreach: "hub.vendor_leads",
   send_strike_list_outreach: "hub.vendor_leads",
+  get_social_dashboard: "hub.stats",
+  update_social_content: "hub.settings",
+  add_social_content: "hub.settings",
+  update_social_config: "hub.settings",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

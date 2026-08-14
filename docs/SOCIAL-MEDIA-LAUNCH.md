@@ -36,6 +36,24 @@ Copy kit: `docs/social/` · Week plan: `node scripts/social_content_calendar.mjs
 
 Footer social icons: `src/social-links.js` — update URLs if handles differ.
 
+## Daily tracking dashboard
+
+**Admin tab:** `#admin?tab=social` — track every post, Reel/Short, Story, and emotional story.
+
+| Feature | Detail |
+|---------|--------|
+| Today queue | What to post today (by week start date) |
+| Week view | Days 1–7 calendar with captions |
+| Videos | Reels, Shorts, TikTok pipeline |
+| Stories | IG/FB daily stories |
+| Emotional | Founder/vendor/customer story posts |
+| Mark posted | Save post URL + timestamp |
+| Streak | Consecutive days with at least one post |
+
+**CLI:** `node scripts/social_pulse.mjs` — prints today's queue (9:30 AM–7 PM IST).
+
+Set **Week 1 start date** in dashboard when you begin posting (defaults to today on migration).
+
 ## What agent cannot do
 
 Creating Meta/TikTok/YouTube accounts requires **your login + phone verification**. After you create `@scanvapp`, tell the agent — we can add verified links to admin URL index and run ad-ready UTM campaigns.
