@@ -65,7 +65,7 @@ const VENDOR_OUTREACH_MSG = (name) => {
     '• Price तुमची / आपकी — तुम्ही / आप ठरवता',
     '• Booking + UPI payment — app वर',
     '',
-    'आज 10 min चा छोटा call होईल का? 📞',
+    'सकाळ 10 — संध्याकाळ 7 (IST) दरम्यान 10 min call होईल का? 📞',
     '',
     'Jasmeen S P | 9270194842',
   ].join('\n');

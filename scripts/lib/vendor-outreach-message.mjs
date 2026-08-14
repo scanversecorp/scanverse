@@ -15,7 +15,7 @@ export function vendorOutreachMessage(businessName = 'partner') {
     '• Price तुमची / आपकी — तुम्ही / आप ठरवता',
     '• Booking + UPI payment — app वर',
     '',
-    'आज 10 min चा छोटा call होईल का? 📞',
+    'सकाळ 10 — संध्याकाळ 7 (IST) दरम्यान 10 min call होईल का? 📞',
     '',
     `Jasmeen S P | ${SCANV_BUSINESS_PHONE}`,
   ].join('\n');

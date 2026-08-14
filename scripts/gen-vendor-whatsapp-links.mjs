@@ -7,6 +7,10 @@ const lines = [
   '#!/bin/bash',
   '# Mac fallback — opens pre-filled WhatsApp chats in Safari (Marathi + Hindi).',
   '# Auto-generated: node scripts/gen-vendor-whatsapp-links.mjs',
+  '# Blocked outside 9:30 AM – 7 PM IST.',
+  '',
+  'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+  'node "$SCRIPT_DIR/check-outreach-hours.mjs" || exit 1',
   '',
 ];
 

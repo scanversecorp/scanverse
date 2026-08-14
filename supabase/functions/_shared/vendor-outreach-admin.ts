@@ -5,6 +5,11 @@ import { sendWhatsAppText } from "./notify.ts";
 import { vendorOutreachMessage, getBusinessCommand } from "./business-command-admin.ts";
 import { updateVendorLead } from "./vendor-leads-admin.ts";
 import catalog from "./vendor-leads-data.json" with { type: "json" };
+import {
+  isOutreachWindowOpen,
+  outsideHoursError,
+  outreachHoursLabel,
+} from "./business-hours.ts";
 
 function whatsAppConfigured(): boolean {
   const msg91 = Deno.env.get("MSG91_WHATSAPP_INTEGRATED_NUMBER") &&
@@ -20,6 +25,10 @@ export async function sendVendorOutreach(
   body: Record<string, unknown>,
   updatedBy: string,
 ) {
+  if (!body.force && !isOutreachWindowOpen()) {
+    return { error: outsideHoursError(), outside_hours: true, outreach_hours: outreachHoursLabel() };
+  }
+
   if (!whatsAppConfigured()) {
     return {
       error: "ScanV WhatsApp not configured — set MSG91_WHATSAPP_INTEGRATED_NUMBER + MSG91_AUTH_KEY (see docs/DEPLOY-WHATSAPP-VERIFY.md). Use wa.me links on phone until then.",
@@ -89,6 +98,10 @@ export async function sendStrikeListOutreach(
   body: Record<string, unknown>,
   updatedBy: string,
 ) {
+  if (!body.force && !isOutreachWindowOpen()) {
+    return { error: outsideHoursError(), outside_hours: true, outreach_hours: outreachHoursLabel() };
+  }
+
   if (!whatsAppConfigured()) {
     return {
       error: "ScanV WhatsApp not configured",
@@ -130,12 +143,17 @@ export async function sendStrikeListOutreach(
 }
 
 export function outreachAgentStatus() {
+  const open = isOutreachWindowOpen();
   return {
     whatsapp_configured: whatsAppConfigured(),
     business_number: Deno.env.get("MSG91_WHATSAPP_INTEGRATED_NUMBER") || null,
     template_name: Deno.env.get("MSG91_WHATSAPP_TEMPLATE_NAME") || null,
-    note: whatsAppConfigured()
-      ? "Agent can send from ScanV business WhatsApp via admin or scripts/send_vendor_outreach.mjs"
-      : "Configure MSG91 WhatsApp secrets to enable autonomous outreach",
+    outreach_hours: outreachHoursLabel(),
+    outreach_window_open: open,
+    note: open
+      ? (whatsAppConfigured()
+        ? "Agent can send from ScanV business WhatsApp via admin or scripts/send_vendor_outreach.mjs"
+        : "Configure MSG91 WhatsApp secrets to enable autonomous outreach")
+      : outsideHoursError(),
   };
 }

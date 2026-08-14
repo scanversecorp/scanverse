@@ -5,11 +5,17 @@
  * Cron: 9:00 AM IST daily (see Cursor automation)
  */
 import { adminHubPost, APP_URL, whatsAppUrl } from './lib/scanv-admin.mjs';
+import { isOutreachWindowOpen, outsideHoursMessage, outreachWindowLabel } from './lib/business-hours.mjs';
 
 const r = await adminHubPost('get_business_command');
 if (r.error) {
   console.error('Business agent failed:', r.error);
   process.exit(1);
+}
+
+if (!isOutreachWindowOpen()) {
+  console.log(outsideHoursMessage());
+  console.log(`Strike list queued — run again during ${outreachWindowLabel()}.`);
 }
 
 const s = r.summary || {};

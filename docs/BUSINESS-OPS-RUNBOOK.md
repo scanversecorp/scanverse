@@ -12,11 +12,15 @@
 
 ## Daily agent (no Mac mail needed)
 
+**Outreach hours: 9:30 AM – 7:00 PM IST only.** Scripts and admin auto-send are blocked at night.
+
 ```bash
 node scripts/business_growth_agent.mjs
-node scripts/send_vendor_outreach.mjs    # ScanV MSG91 WhatsApp agent (autonomous)
-bash scripts/open-vendor-whatsapp-links.sh   # Mac fallback — opens 5 chats in Safari
+node scripts/send_vendor_outreach.mjs    # ScanV MSG91 WhatsApp agent (daytime only)
+bash scripts/open-vendor-whatsapp-links.sh   # Mac fallback — also daytime only
 ```
+
+Cursor automation should run at **10:00 AM IST** (not overnight).
 
 Reads `.env` for `ADMIN_HUB_PIN` / `SUPPORT_ADMIN_PIN`. Outputs:
 - Top 5 household vendors to call/WhatsApp (Wakad/PCMC priority)

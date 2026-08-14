@@ -127,6 +127,7 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
   };
 
   const agent = data?.outreach_agent || {};
+  const canOutreach = agent.outreach_window_open !== false;
 
   const waUrl = (phone, text) => {
     const d = String(phone || '').replace(/\D/g, '');
@@ -166,18 +167,21 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
 
       {(strike.vendors || []).length ? (
         <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
+          {!canOutreach ? (
+            <div style={{ fontSize: 11, color: C.gold, fontWeight: 700, marginBottom: 10, padding: 10, borderRadius: 8, background: `${C.gold}12` }}>
+              ⏸ Outreach paused — {agent.outreach_hours || '9:30 AM – 7 PM IST'}. Vendors are sleeping; queue for daytime.
+            </div>
+          ) : null}
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
             <div style={{ fontWeight: 800, color: C.txt, fontSize: 13 }}>Today&apos;s strike list — call / WhatsApp</div>
-            {agent.whatsapp_configured ? (
+            {agent.whatsapp_configured && canOutreach ? (
               <Btn v="primary" sm type="button" disabled={blastBusy} onClick={blastStrikeList}>
                 {blastBusy ? 'Sending…' : '🤖 Send all 5 via ScanV WA'}
               </Btn>
-            ) : (
-              <span style={{ fontSize: 10, color: C.gold, fontWeight: 700 }}>Agent: configure MSG91 WA → auto-send</span>
-            )}
+            ) : null}
           </div>
           <div style={{ fontSize: 10, color: C.dim, marginBottom: 10 }}>
-            Household · Wakad/PCMC priority
+            Household · Wakad/PCMC · {agent.outreach_hours || '9:30 AM – 7 PM IST'}
             {agent.business_number ? ` · from ${agent.business_number}` : ''}
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
@@ -187,13 +191,19 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
                 <div style={{ fontSize: 10, color: C.sub, marginTop: 4 }}>{v.area} · {v.phone} · {v.onboard_status}</div>
                 <div style={{ fontSize: 10, color: C.dim, marginTop: 6, lineHeight: 1.45 }}>{v.outreach_message}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  <a href={`tel:${String(v.phone).replace(/\s/g, '')}`} style={{ fontSize: 10, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>Call →</a>
-                  {waUrl(v.phone, v.outreach_message) ? (
-                    <a href={waUrl(v.phone, v.outreach_message)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color: C.grn, textDecoration: 'none' }}>WhatsApp →</a>
-                  ) : null}
-                  {agent.whatsapp_configured ? (
-                    <Btn v="outline" sm type="button" disabled={busyId === v.lead_id} onClick={() => sendViaScanV(v.lead_id)}>ScanV send</Btn>
-                  ) : null}
+                  {canOutreach ? (
+                    <>
+                      <a href={`tel:${String(v.phone).replace(/\s/g, '')}`} style={{ fontSize: 10, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>Call →</a>
+                      {waUrl(v.phone, v.outreach_message) ? (
+                        <a href={waUrl(v.phone, v.outreach_message)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color: C.grn, textDecoration: 'none' }}>WhatsApp →</a>
+                      ) : null}
+                      {agent.whatsapp_configured ? (
+                        <Btn v="outline" sm type="button" disabled={busyId === v.lead_id} onClick={() => sendViaScanV(v.lead_id)}>ScanV send</Btn>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 10, color: C.dim }}>Call/WhatsApp after 9:30 AM IST</span>
+                  )}
                   <Btn v="outline" sm type="button" disabled={busyId === v.lead_id} onClick={() => markContacted(v.lead_id)}>Mark contacted</Btn>
                 </div>
               </div>
