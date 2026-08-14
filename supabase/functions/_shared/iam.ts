@@ -76,6 +76,11 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   upsert_staff_user: "hub.iam",
   assign_staff_roles: "hub.iam",
   delete_staff_user: "hub.iam",
+  get_logistics_pipeline: "hub.stats",
+  update_logistics_partner: "hub.settings",
+  list_external_trips: "hub.stats",
+  quote_external_trip: "hub.dispatch",
+  create_external_trip: "hub.dispatch",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

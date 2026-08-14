@@ -105,6 +105,15 @@ import {
   upsertStaffUser,
 } from "../_shared/iam-admin.ts";
 import {
+  listExternalTrips,
+  listLogisticsPipeline,
+  updateLogisticsPartner,
+} from "../_shared/logistics-partners-admin.ts";
+import {
+  createExternalTrip,
+  quoteExternalTrip,
+} from "../_shared/external-logistics.ts";
+import {
   hasPermission,
   iamWhoamiPayload,
   requireHubPermission,
@@ -1401,6 +1410,45 @@ Deno.serve(async (req) => {
     const result = await deleteStaffUser(sb, body);
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, deleted: result.deleted });
+  }
+
+  if (action === "get_logistics_pipeline") {
+    try {
+      const partners = await listLogisticsPipeline(sb);
+      const dueFollowUp = partners.filter((p) =>
+        p.follow_up_at && new Date(String(p.follow_up_at)) <= new Date()
+      );
+      return json({ partners, due_follow_up: dueFollowUp.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Pipeline load failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "update_logistics_partner") {
+    const result = await updateLogisticsPartner(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, partner: result.partner });
+  }
+
+  if (action === "list_external_trips") {
+    try {
+      const trips = await listExternalTrips(sb, body);
+      return json({ trips, count: trips.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Trips load failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "quote_external_trip") {
+    return json(await quoteExternalTrip(sb, body));
+  }
+
+  if (action === "create_external_trip") {
+    const result = await createExternalTrip(sb, body);
+    if (result.error) return json(result, result.configured ? 501 : 400);
+    return json(result);
   }
 
   return json({ error: "Unknown action" }, 400);

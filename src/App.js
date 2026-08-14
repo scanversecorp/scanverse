@@ -18,6 +18,7 @@ import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
+const AdminLogisticsPartnersTab = lazy(() => import('./admin-logistics-partners').then((m) => ({ default: m.AdminLogisticsPartnersTab })));
 const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
 const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ default: m.AdminAddUserPanel })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
@@ -4507,13 +4508,22 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       const gst   = Math.round((price+fee)*GST_RATE);
       const total = price+fee+gst;
       const loc   = bookingDetail.loc||`${village}, ${city} ${pincode}`.trim();
+      const isDeliveryShipment = svc.parent === 'delivery';
+      const pickupText = (bookingDetail.pickup || loc).trim();
+      const dropText = (bookingDetail.drop || loc).trim();
+      if (isDeliveryShipment && (!pickupText || !dropText)) {
+        return setErr('Enter pickup and drop addresses');
+      }
+      const locationLabel = isDeliveryShipment
+        ? `Pickup: ${pickupText} → Drop: ${dropText}`
+        : loc;
       const custLat = silentGeo?.lat || bookingDetail.lat || null;
       const custLng = silentGeo?.lng || bookingDetail.lng || null;
       const svcId = svc.id || svc.parent || null;
       const dup = await findDuplicateBooking({
         customerId: userId, serviceId: svcId,
         date: bookingDetail.date, time: bookingDetail.time || '10:00', txnId,
-        location: loc, lat: custLat, lng: custLng,
+        location: locationLabel, lat: custLat, lng: custLng,
       });
       if (dup) {
         const dupAction = await handleDuplicateBooking(dup, {
@@ -4540,7 +4550,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         customer_name:`${firstName} ${lastName}`.trim(),
         customer_email:`${mobile}@scanv.app`,
         date:bookingDetail.date, time:bookingDetail.time||'10:00',
-        notes:bookingDetail.notes||'', location_text:loc,
+        notes:bookingDetail.notes||'', location_text:locationLabel,
+        pickup_text: isDeliveryShipment ? pickupText : null,
+        drop_text: isDeliveryShipment ? dropText : null,
         customer_lat: custLat, customer_lng: custLng,
         price, platform_fee:fee, gst_amt:gst, total,
         status:'confirmed', txn_id:txnId,
@@ -4570,7 +4582,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       await sb().from('service_requests').insert({
         customer_id:userId, service_name:svc.name, service_type:svc.cat,
         preferred_date:bookingDetail.date, preferred_time:bookingDetail.time||'10:00',
-        notes:bookingDetail.notes||'', location_text:loc,
+        notes:bookingDetail.notes||'', location_text:locationLabel,
+        pickup_text: isDeliveryShipment ? pickupText : null,
+        drop_text: isDeliveryShipment ? dropText : null,
         price, platform_fee:fee, gst_amount:gst, total,
         status:'new', txn_id:txnId, added_by:userId,
       });
@@ -4935,13 +4949,14 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   // -- SCHEDULE: Date/Time/Location (after payment) -----------------------
   if (screen==='schedule'&&activeSvc) {
-    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setScheduleLoc(locStr);markAuto('loc');setBookingDetail(b=>({...b,loc:locStr}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
+    const isDeliveryShipment = activeSvc.parent === 'delivery';
+    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setScheduleLoc(locStr);markAuto('loc');setBookingDetail(b=>({...b,loc:locStr,pickup:isDeliveryShipment?(b?.pickup||locStr):b?.pickup}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
 
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>setScreen('payment')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pick date & time</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{isDeliveryShipment ? 'Pickup & drop' : 'Pick date & time'}</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           {browsePay.paymentVerified && (
@@ -4949,6 +4964,32 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           )}
           <Field label="Date" req><input type="date" defaultValue={bookingDetail?.date||''} onChange={e=>setBookingDetail(b=>({...b,date:e.target.value}))} style={S.inp()}/></Field>
           <Field label="Time"><input type="time" defaultValue={bookingDetail?.time||'10:00'} onChange={e=>setBookingDetail(b=>({...b,time:e.target.value}))} style={S.inp()}/></Field>
+          {isDeliveryShipment ? (
+            <>
+              <Field label="Pickup address" req note="Where we collect the parcel">
+                <div style={{display:'flex',gap:8}}>
+                  <input
+                    value={bookingDetail?.pickup || scheduleLoc || ''}
+                    onChange={(e) => {
+                      setScheduleLoc(e.target.value);
+                      setBookingDetail((b) => ({ ...b, pickup: e.target.value, loc: e.target.value }));
+                    }}
+                    placeholder="Pickup — shop, home, office"
+                    style={{ ...S.inp(), flex: 1 }}
+                  />
+                  <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
+                </div>
+              </Field>
+              <Field label="Drop address" req note="Delivery destination">
+                <input
+                  value={bookingDetail?.drop || ''}
+                  onChange={(e) => setBookingDetail((b) => ({ ...b, drop: e.target.value }))}
+                  placeholder="Drop — customer address, PIN"
+                  style={S.inp()}
+                />
+              </Field>
+            </>
+          ) : (
           <Field label="Service location" note="Auto-filled from your GPS">
             <div style={{display:'flex',gap:8}}>
               <input value={scheduleLoc} {...browseBind('loc', e=>{ setScheduleLoc(e.target.value); setBookingDetail(b=>({...b,loc:e.target.value})); })} placeholder="Address, city, PIN" style={inpStyle('loc',{flex:1})}/>
@@ -4956,6 +4997,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             </div>
             {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4,fontWeight:600}}>✅ Location updated</div>}
           </Field>
+          )}
           <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
@@ -11399,6 +11441,7 @@ const ADMIN_TABS = [
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
   { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
+  { id: 'logistics', label: 'Logistics API', icon: '🚛' },
   { id: 'iam', label: 'Roles & IAM', icon: '🛡️' },
   { id: 'diagrams', label: 'Architecture', icon: '📐' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
@@ -13509,6 +13552,12 @@ function AdminControlCenter({ onPricesUpdated }) {
         {tab === 'vendor-leads' && usePin && (
           <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading vendor leads…</div>}>
             <AdminVendorLeadsTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} />
+          </Suspense>
+        )}
+
+        {tab === 'logistics' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading logistics pipeline…</div>}>
+            <AdminLogisticsPartnersTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
           </Suspense>
         )}
 

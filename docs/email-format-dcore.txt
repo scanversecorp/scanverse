@@ -1,0 +1,39 @@
+DCORE / ScanV — Zoho Mail setup (Calibri 11 · Navy + Black)
+============================================================
+
+ONE-TIME SETUP (5 minutes)
+--------------------------
+
+1. Default compose font
+   Zoho Mail → Settings (gear) → Mail → Compose
+   · Font: Calibri
+   · Size: 11
+   · Color: Black
+
+2. Email signature (HTML)
+   Settings → Mail → Signatures → + Add Signature
+   Name: Jasmeen · DCORE
+   · Open docs/email-signature-dcore.html in a browser
+   · Select all → Copy → Paste into signature editor
+   · Set as default for connect@dcoreglobal.com
+   · Save
+
+   Navy (#001F3F): your name + ScanV · DCORE line
+   Black (#000000): body text + Pune / Mobile / Email lines
+
+3. Paste body without grey stripes
+   · Copy from docs/email-*-plain.txt (NOT from chat)
+   · In compose: Cmd + Shift + V (Paste and Match Style)
+
+FOLLOW-UP EMAILS (Day 5+)
+--------------------------
+· Body: docs/email-followup-plain.txt
+· Signature: auto from Zoho (step 2)
+· Same font: Calibri 11 Black
+
+FILES
+-----
+email-porter-plain.txt      email-borzo-plain.txt
+email-shadowfax-plain.txt   email-qwqer-plain.txt
+email-delhivery-plain.txt   email-followup-plain.txt
+email-signature-dcore.html  email-signature-dcore-plain.txt
