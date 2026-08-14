@@ -23,6 +23,7 @@ import {
   geocodeAddress,
 } from "../_shared/notify.ts";
 import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
+import { executeVendorRouteTransfer } from "../_shared/razorpay-route.ts";
 
 const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes between retry rounds
 const OFFER_TIMEOUT_MS = 60 * 1000; // 60s per partner before moving to next nearest
@@ -569,6 +570,15 @@ async function assignVendor(
       }, { onConflict: "booking_id" }),
     );
   }
+
+  const routeResult = await executeVendorRouteTransfer(supabase, {
+    bookingId,
+    vendorId,
+  });
+  if (routeResult.attempted && !routeResult.success && !routeResult.skipped) {
+    console.warn("[dispatch] route transfer failed", bookingId, routeResult.reason);
+  }
+
   return true;
 }
 

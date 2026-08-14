@@ -1051,7 +1051,7 @@ Deno.serve(async (req: Request) => {
         "first_name", "last_name", "business_name", "email", "mobile2",
         "pan_number", "shop_or_flat", "building_name", "street_name", "village",
         "city", "pincode", "state", "country", "vehicle_number", "license_number",
-        "highest_education", "notes",
+        "highest_education", "notes", "razorpay_linked_account_id", "razorpay_route_status",
       ] as const;
       for (const k of strFields) {
         if (body[k] !== undefined) {
@@ -1075,6 +1075,17 @@ Deno.serve(async (req: Request) => {
       }
       if (body.gps_allowed_confirmed !== undefined) {
         patch.gps_allowed_confirmed = !!body.gps_allowed_confirmed;
+      }
+      if (body.razorpay_linked_account_id !== undefined) {
+        const acc = String(body.razorpay_linked_account_id || "").trim();
+        patch.razorpay_linked_account_id = acc || null;
+      }
+      if (body.razorpay_route_status !== undefined) {
+        const st = String(body.razorpay_route_status || "pending").toLowerCase();
+        if (!["pending", "activated", "suspended"].includes(st)) {
+          return json({ error: "razorpay_route_status must be pending, activated, or suspended" }, 400);
+        }
+        patch.razorpay_route_status = st;
       }
 
       const fn = String(patch.first_name ?? existing.first_name ?? "").trim();

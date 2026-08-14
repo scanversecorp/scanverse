@@ -15,6 +15,11 @@ import {
 } from "../_shared/booking-cancel.ts";
 import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
 import { isVendorEnabled } from "../_shared/vendor-providers.ts";
+import {
+  calcRouteSplit,
+  handleRouteTransferWebhook,
+  inferServicePriceFromTotal,
+} from "../_shared/razorpay-route.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -417,6 +422,10 @@ async function handleRegister(
   const userId = body.user_id ? String(body.user_id).trim() || null : null;
   const serviceId = body.service_id ? String(body.service_id).trim() || null : null;
   const serviceName = body.service_name ? String(body.service_name).trim() || null : null;
+  const servicePricePaise = body.service_price_paise != null
+    ? Math.round(Number(body.service_price_paise))
+    : inferServicePriceFromTotal(amountPaise);
+  const split = calcRouteSplit(servicePricePaise);
 
   if (!txnId.startsWith("TXN-") || !Number.isFinite(amountPaise) || amountPaise <= 0) {
     return json({ error: "Invalid txn_id or amount_paise" }, 400);
@@ -443,6 +452,9 @@ async function handleRegister(
       user_id: userId,
       service_id: serviceId,
       service_name: serviceName,
+      service_price_paise: split.service_price_paise,
+      platform_share_paise: split.platform_share_paise,
+      vendor_share_paise: split.vendor_share_paise,
       status: "pending",
       expires_at: expiresAt,
     },
@@ -474,6 +486,9 @@ async function handleRegister(
     success: true,
     txn_id: txnId,
     amount_paise: amountPaise,
+    service_price_paise: split.service_price_paise,
+    platform_share_paise: split.platform_share_paise,
+    vendor_share_paise: split.vendor_share_paise,
     payment_link_url: paymentLinkUrl,
     payment_link_id: paymentLinkId,
     razorpay_configured: razorpayEnabled && Boolean(razorpayAuth()),
@@ -688,6 +703,11 @@ async function handleWebhook(
     "payment_link.paid",
     "order.paid",
   ];
+
+  if (event.startsWith("transfer.")) {
+    const routeUpdate = await handleRouteTransferWebhook(supabase, body);
+    return json({ received: true, processed: routeUpdate.updated, event, ...routeUpdate });
+  }
 
   if (!paidEvents.includes(event) && body.action !== "webhook") {
     return json({ received: true, processed: false, event });

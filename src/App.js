@@ -425,6 +425,7 @@ async function registerPaymentIntent(txnId, amountPaise, userId, meta = {}) {
     user_id: userId || null,
     ...(meta.serviceId ? { service_id: meta.serviceId } : {}),
     ...(meta.serviceName ? { service_name: meta.serviceName } : {}),
+    ...(meta.servicePricePaise ? { service_price_paise: meta.servicePricePaise } : {}),
   };
   try {
     if (!(await waitForSupabase())) {
@@ -507,7 +508,7 @@ async function checkPaymentVerified(txnId, expectedAmountPaise) {
   return r.verified;
 }
 function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {}) {
-  const { serviceId = null, serviceName = null } = meta;
+  const { serviceId = null, serviceName = null, servicePricePaise = null } = meta;
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [upiOpened, setUpiOpened] = useState(false);
   const [checkingPay, setCheckingPay] = useState(false);
@@ -526,7 +527,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
     }
     setRazorpayLinkLoading(true);
     setRazorpayError(null);
-    const data = await registerPaymentIntent(txnId, amountPaise, userId, { serviceId, serviceName });
+    const data = await registerPaymentIntent(txnId, amountPaise, userId, { serviceId, serviceName, servicePricePaise });
     if (cancelledRef?.current) return;
     if (data?.payment_link_url) {
       setRazorpayLinkUrl(data.payment_link_url);
@@ -544,7 +545,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
       }
     }
     setRazorpayLinkLoading(false);
-  }, [txnId, amountPaise, userId, serviceId, serviceName, addToast]);
+  }, [txnId, amountPaise, userId, serviceId, serviceName, servicePricePaise, addToast]);
   useEffect(() => {
     if (!txnId || !amountPaise) return;
     const cancelled = { current: false };
@@ -4178,7 +4179,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     screen === 'payment' ? (paymentAmountPaise ?? browseTotal) : 0,
     userId,
     addToast,
-    { serviceId: activeSvc?.id, serviceName: activeSvc?.name },
+    { serviceId: activeSvc?.id, serviceName: activeSvc?.name, servicePricePaise: browsePrice },
   );
   const creatingRef = useRef(false);
   const browseScrollRef = useRef(null);
@@ -6097,7 +6098,7 @@ function BookScreen() {
   const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
   const svc=activeSvc;
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
-  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name});
+  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price});
   const creatingRef = useRef(false);
 
   useEffect(() => {
@@ -9348,6 +9349,8 @@ function vendorEditFormFromVendor(v) {
     notes: v?.notes || '',
     app_installed_confirmed: !!v?.app_installed_confirmed,
     gps_allowed_confirmed: !!v?.gps_allowed_confirmed,
+    razorpay_linked_account_id: v?.razorpay_linked_account_id || '',
+    razorpay_route_status: v?.razorpay_route_status || 'pending',
     services: svcMap,
   };
 }
@@ -9400,6 +9403,8 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
         license_number: form.license_number.trim().toUpperCase() || null,
         highest_education: form.highest_education.trim() || null,
         notes: form.notes.trim() || null,
+        razorpay_linked_account_id: form.razorpay_linked_account_id.trim() || null,
+        razorpay_route_status: form.razorpay_route_status || 'pending',
         app_installed_confirmed: form.app_installed_confirmed,
         gps_allowed_confirmed: form.gps_allowed_confirmed,
         services,
@@ -9483,6 +9488,20 @@ function VendorEditModal({ vendor, pin, allSvcs, onClose, onSaved, onActivate })
         <Field label="Internal notes">
           <textarea value={form.notes} onChange={(e) => f('notes', e.target.value)} rows={2} style={{ ...S.inp(), resize: 'vertical' }} placeholder="Admin-only notes…" />
         </Field>
+        <div style={{ marginTop: 12, padding: 12, background: `${C.acc}08`, borderRadius: 10, border: `1px solid ${C.acc}22` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Razorpay Route (vendor payout 85%)</div>
+          <Field label="Linked Account ID (acc_… from Route → Accounts)">
+            <input value={form.razorpay_linked_account_id} onChange={(e) => f('razorpay_linked_account_id', e.target.value.trim())} placeholder="acc_XXXXXXXXXXXXXX" style={S.inp()} />
+          </Field>
+          <Field label="Route status">
+            <select value={form.razorpay_route_status || 'pending'} onChange={(e) => f('razorpay_route_status', e.target.value)} style={S.inp()}>
+              <option value="pending">pending — KYC in progress</option>
+              <option value="activated">activated — ready for transfers</option>
+              <option value="suspended">suspended</option>
+            </select>
+          </Field>
+          <div style={{ fontSize: 10, color: C.dim, lineHeight: 1.5 }}>Set after creating vendor in Razorpay Route. Transfers run when dispatch assigns vendor (Razorpay payments only).</div>
+        </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: C.sub, cursor: 'pointer' }}>
           <input type="checkbox" checked={form.app_installed_confirmed} onChange={(e) => f('app_installed_confirmed', e.target.checked)} />
           App installed confirmed

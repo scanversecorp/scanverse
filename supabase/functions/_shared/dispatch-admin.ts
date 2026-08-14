@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { generateAcceptCode } from "./notify.ts";
 import { stopBookingSideEffects } from "./booking-cancel.ts";
+import { executeVendorRouteTransfer } from "./razorpay-route.ts";
 
 function escIlike(q: string): string {
   return q.replace(/[%_\\]/g, "\\$&");
@@ -238,7 +239,12 @@ async function assignDispatchVendor(
     .eq("dispatch_id", dispatchId)
     .in("status", ["offered", "pending", "sent", "ringing"]);
 
-  return { dispatch: updated, partner_id: partnerId, vendor };
+  const routeResult = await executeVendorRouteTransfer(sb, {
+    bookingId: dispatch.booking_id,
+    vendorId,
+  });
+
+  return { dispatch: updated, partner_id: partnerId, vendor, route_transfer: routeResult };
 }
 
 export async function dispatchControlAdmin(
