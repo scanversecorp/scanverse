@@ -18,4 +18,4 @@ console.log('\n--- TODAY SHORT SCRIPT ---\n');
 const shorts = readFileSync(new URL('../docs/social/shorts-scripts.txt', import.meta.url), 'utf8');
 console.log(shorts.split('#1')[1]?.split('#2')[0] || shorts.slice(0, 500));
 
-console.log('\nFull kit: docs/social/ · Setup: docs/SOCIAL-MEDIA-LAUNCH.md\n');
+console.log('\nFull kit: docs/social/genz-week-posts.txt · Voice: docs/social/genz-voice-guide.txt\n');

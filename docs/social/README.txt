@@ -1,24 +1,30 @@
-SCANV SOCIAL MEDIA — quick start
-==================================
+ScanV social media kit — @scanvapp
+====================================
 
-Recommended handle everywhere: @scanvapp
-App link in every bio: https://scanv-tau.vercel.app
+SETUP ORDER
+1. Upload profile photo: scanv-profile-picture.png (all platforms)
+2. Paste bios from facebook-page.txt, instagram-profile.txt, tiktok-profile.txt, youtube-channel.txt
+3. Post Day 1 from genz-week-posts.txt (after 9:30 AM IST)
+4. Track on #admin?tab=social — mark each platform posted
 
-FILES (copy-paste into each platform)
-  facebook-page.txt      — Page name, about, first post
-  instagram-profile.txt  — Bio, highlights, Reels ideas
-  tiktok-profile.txt     — Bio, first 5 videos
-  youtube-channel.txt    — Channel art text, about, Shorts
-  first-week-posts.txt   — 7 days × all platforms
-  shorts-scripts.txt     — 15–60 sec video scripts (Marathi + Hindi)
-  hashtags.txt           — Pune / PCMC tags
+GEN-Z CONTENT (primary)
+- genz-voice-guide.txt — tone rules
+- genz-week-posts.txt — full week captions (cheeky, double meaning, Gen-Z)
+- genz-shorts-scripts.txt — Reels / Shorts / TikTok hooks
 
-SETUP ORDER (fastest reach in Pune)
-  1. Instagram + Facebook (Meta Business Suite — one login)
-  2. YouTube + Shorts (same Google account)
-  3. TikTok (repurpose Shorts)
+CLASSIC / REFERENCE
+- first-week-posts.txt — day themes summary
+- daily-post-everywhere.txt — 5-platform daily workflow
+- hashtags.txt — rotate 3–5 tags
 
-Print week plan:
-  node scripts/social_content_calendar.mjs
+BRAND ASSETS
+- scanv-profile-picture.png — IG/TikTok/FB/YT profile (also public/scanv-brand-logo.png)
+- public/scanv-brand-logo.png — app + social logo
 
-After accounts live: URLs already wired in app footer (src/social-links.js).
+RULES
+- ScanV only in posts (not DCore)
+- 9:30 AM – 7 PM IST only
+- Link: https://scanv-tau.vercel.app?utm_source=social&utm_medium=genz
+
+CLI
+node scripts/social_pulse.mjs

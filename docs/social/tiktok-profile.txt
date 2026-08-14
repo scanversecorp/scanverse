@@ -1,23 +1,31 @@
-TIKTOK — @scanvapp
-===================
+TIKTOK — @scanvapp (Gen-Z profile)
+==================================
 
-Display name: ScanV Pune
+Display name: ScanV Pune 😏
 Username: scanvapp
-Bio:
-Pune & PCMC services — one app 📱
-Book cleaning, delivery & more ↓
+Profile photo: docs/social/scanv-profile-picture.png
+
+BIO
+Pune & PCMC — book services, skip the drama 📱
+Your mess. Our problem 😉 ↓
 scanv-tau.vercel.app
 
-FIRST 5 VIDEO IDEAS (15–30 sec each)
-1. "POV: You need deep clean in Wakad" → open ScanV → book
-2. "3 taps to book household service in PCMC"
-3. Marathi voiceover: "ScanV var booking — UPI payment app var"
-4. Before/after clean (partner B-roll) + ScanV logo end card
-5. "Launch partners wanted — DM us" + phone overlay 9270194842
+FIRST 5 VIDEOS (Gen-Z hooks)
+1. "POV: flat messy + guests tomorrow" → ScanV book → relief face
+2. "Main character vs side character booking" split screen
+3. Marathi: "Wakad madhe deep clean — 2 min, done, chill"
+4. "Verified waale only — no random uncle energy" + green screen app
+5. "Partner with ScanV — listing fee? nah 😏" + 9270194842
 
 END CARD (every video)
-Text: ScanV · scanv-tau.vercel.app
-Voice: "Link bio madhe"
+Text: ScanV · link in bio
+Voice: "Sorted. Bio madhe link."
+
+CAPTION TEMPLATE
+[hook line] + [1 line what ScanV does] + #ScanV #Pune #PCMC + 2 niche tags
+
+COMMENT TO PIN
+"App link in bio — don't scroll past your sign 👀"
 
 HASHTAGS
-#ScanV #Pune #PCMC #Wakad #PuneBusiness #MarathiTikTok #LocalServices
+#ScanV #Pune #PCMC #Wakad #PuneTok #MarathiTikTok #BookLocal #MainCharacter

@@ -1,37 +1,34 @@
-INSTAGRAM — @scanvapp
-=====================
+INSTAGRAM — @scanvapp (Gen-Z profile)
+======================================
 
-Display name: ScanV
+Display name: ScanV ✨
 Username: scanvapp
-Link: https://scanv-tau.vercel.app
-Contact: connect@dcoreglobal.com
+Profile photo: docs/social/scanv-profile-picture.png
+Link: https://scanv-tau.vercel.app?utm_source=instagram&utm_medium=bio
 
 BIO (copy as-is)
-Pune & PCMC local booking app 🏠📦
-Cleaning · Delivery · Food & more
-Book + pay on app 👇
-scanv-tau.vercel.app
+Pune & PCMC — your mess, our problem 😉
+Book cleaning · delivery & more
+Verified waale only · UPI on app ↓
 
-HIGHLIGHTS (create 4)
-1. How it works — 3 slides: Browse → Book → Track
-2. Household — deep clean, home help
-3. Wakad / PCMC — map pin stories
-4. Partner with us — WhatsApp 9270194842
+HIGHLIGHTS
+1. How it works — Browse → Book → Track (cheeky slides)
+2. Deep clean — before/after + "we won't tell"
+3. Wakad / PCMC — area stories + polls
+4. Partner? — WhatsApp 9270194842
 
-FIRST REEL (15 sec)
-Hook text on screen: "Pune madhe ekach app — sagli services"
-Show: phone scrolling ScanV home cards
-End: "ScanV — link in bio"
-Audio: trending Marathi/ Hindi audio (low volume)
+FIRST REEL
+Hook: "Your mess. Our problem. 😉"
+15 sec app demo → end "Link in bio — go be main character"
+Audio: trending low-volume beat
 
-FIRST FEED POST
-Caption:
-आम्ही ScanV — Wakad & PCMC साठी local booking app.
+PINNED COMMENT
+App link + "Day 1 gang check in 👇"
 
-✅ Verified partners
-✅ UPI payment on app
-✅ Track your booking
+FIRST CAROUSEL SLIDE TEXT
+Slide 1: "ScanV is live in Pune & PCMC"
+Slide 2: "Book verified services on one app"
+Slide 3: "UPI · track · zero drama"
 
-Link in bio 🔗
-
-#ScanV #Pune #PCMC #Wakad #Hinjewadi #HomeCleaning #LocalBusiness
+CAPTION STYLE
+See docs/social/genz-week-posts.txt

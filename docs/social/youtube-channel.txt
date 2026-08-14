@@ -1,33 +1,39 @@
-YOUTUBE + SHORTS — @scanvapp
-=============================
+YOUTUBE + SHORTS — @scanvapp (Gen-Z)
+====================================
 
 Channel name: ScanV
 Handle: @scanvapp
-Website: https://scanv-tau.vercel.app
+Profile: docs/social/scanv-profile-picture.png
+Banner: app screenshot + "Your mess. Our problem. 😉"
 
 CHANNEL DESCRIPTION
-ScanV — book local services in Pune & PCMC on one app.
+Pune & PCMC — book local services on one app.
+Cleaning · delivery · more coming soon.
 
-Household cleaning, deliveries, food, and more. Browse services, book, pay with UPI, and track your job in the app.
+Your mess. Our problem. 😉
+Verified partners · UPI on app · track every booking.
 
-📱 App: https://scanv-tau.vercel.app
-📞 +91-9270194842
-✉️ connect@dcoreglobal.com
+App: https://scanv-tau.vercel.app
+Partner WhatsApp: +91-9270194842
 
-New Shorts every week · Pune & PCMC focus
+SHORTS TITLES (SEO + Gen-Z)
+• "Your mess our problem — ScanV Pune app 😏"
+• "Book deep clean Wakad in 2 minutes #Shorts"
+• "Main character books on app #Pune #ScanV"
+• "No random uncle energy — verified only #ScanV"
 
-CHANNEL KEYWORDS
-ScanV, Pune services, PCMC, Wakad, home cleaning Pune, delivery app Pune, book services app
+SHORT DESCRIPTION TEMPLATE
+[hook] Book on ScanV → link below. Pune & PCMC.
 
-FIRST LONG VIDEO (2 min) — optional
-Title: "ScanV app demo — book local services in Pune & PCMC"
-Chapters: 0:00 Intro · 0:20 Browse cards · 0:50 Book household · 1:30 Pay & track · 1:50 Partner CTA
+#ScanV #Pune #Shorts #PCMC #BookLocal
 
-FIRST SHORT (≤60 sec)
-Title: "ScanV — Pune local services app in 30 seconds #Shorts"
-Script: see shorts-scripts.txt #1
+COMMUNITY POST (weekly)
+Poll: "Which service should we drop next?" Cleaning / Delivery / Food / All of it 🔥
 
-PLAYLIST
-• ScanV Shorts
-• How ScanV works
-• Pune & PCMC partners
+PLAYLIST NAMES
+• ScanV Shorts — Pune
+• How ScanV works (30 sec)
+• Partner stories
+
+END SCREEN
+Subscribe + "Link in description" + app URL

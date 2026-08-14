@@ -1,32 +1,32 @@
-FACEBOOK PAGE — ScanV
-=====================
+FACEBOOK PAGE — ScanV (Gen-Z tone)
+==================================
 
 Page name: ScanV
-Username: @scanvapp
-Category: Local Service · App Page
+Username: scanvapp
+Profile & cover: docs/social/scanv-profile-picture.png (+ app screenshot cover)
 Website: https://scanv-tau.vercel.app
-Phone: +91-9270194842
-Email: connect@dcoreglobal.com
-Location: Pune, Maharashtra · Service area: Pune + PCMC (Wakad, Hinjewadi, Baner)
+WhatsApp: +91-9270194842
 
-ABOUT (Short)
-Book local services in Pune & PCMC on ScanV — cleaning, delivery, food & more. Pay on app. Track live.
+ABOUT (short)
+Pune & PCMC local booking app. Your mess, our problem 😉
+Verified partners · UPI on app · track every booking.
 
-ABOUT (Long)
-ScanV is your local booking app for Pune and PCMC. Book verified household cleaning, deliveries, food, and more — pay securely on the app with UPI.
+ABOUT (long)
+ScanV is the one app for household services, delivery & more in Pune & PCMC. Book verified partners, pay on UPI, track live — no random WhatsApp forwards, no drama. Operated by DCore (legal only — don't use in posts).
 
-Launch partners welcome — zero listing fee for early vendors in Wakad & PCMC.
+FIRST POST (pin this)
+Your mess. Our problem. 😉
 
-CTA button: Sign Up → https://scanv-tau.vercel.app/?utm_source=facebook&utm_medium=social
+ScanV is here for Pune & PCMC — cleaning, delivery & more on one app. Verified partners. UPI payment. Track like a responsible adult.
 
-FIRST POST
-🧹📦 ScanV is live in Pune & PCMC!
+Try it → scanv-tau.vercel.app
 
-Book local services on one app:
-• Household cleaning
-• Deliveries
-• Food & more
+CTA button: Learn more → app link
 
-👉 https://scanv-tau.vercel.app
+STORY IDEAS
+• Poll: "Flat pass or fail inspection?"
+• "Parents visiting tomorrow?" + app link
+• Partner CTA with WhatsApp button
 
-#ScanV #Pune #PCMC #Wakad #LocalServices
+COMMENT REPLY TONE
+Friendly, cheeky, helpful — "Book on app, link up top 👆"

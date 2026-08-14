@@ -1,39 +1,36 @@
-WEEK 1 CONTENT CALENDAR — ScanV (@scanvapp)
-=============================================
-Post 9:30 AM – 7 PM IST only. Link: https://scanv-tau.vercel.app
+WEEK 1 CONTENT CALENDAR — ScanV Gen-Z (@scanvapp)
+===================================================
+Full captions: docs/social/genz-week-posts.txt
+Voice guide: docs/social/genz-voice-guide.txt
+Shorts: docs/social/genz-shorts-scripts.txt
 
-DAY 1 — LAUNCH (all platforms)
-Post: "ScanV is here for Pune & PCMC — book local services on one app."
-CTA: Try the app · Link in bio
-Format: Carousel (home screen) or 15s Reel/Short
+Post 9:30 AM – 7 PM IST · same caption on all 5 platforms
+
+DAY 1 — LAUNCH
+Hook: "Your mess. Our problem. 😉"
+Format: Carousel or 15s Reel · profile pic: scanv-profile-picture.png
 
 DAY 2 — HOUSEHOLD
-Post: "Deep cleaning in Wakad? Book verified partners on ScanV."
-Marathi line: "Wakad madhe deep cleaning — ScanV var book kara."
-Format: Reel + Facebook post
+Hook: "Deep clean so good you'll pretend you did it 💅"
+Format: Reel + Stories "Parents visiting tomorrow? 👀"
 
 DAY 3 — HOW IT WORKS
-Post: "Browse → Book → Pay UPI → Track. That's ScanV."
+Hook: "Browse → Book → UPI → Track. The whole situationship."
 Format: 3-slide carousel / Short
 
 DAY 4 — PCMC
-Post: "PCMC + Hinjewadi + Baner — we're building partner network now."
-Format: Map graphic or area list
+Hook: "Your area next? 👀"
+Format: Map + poll story
 
 DAY 5 — PARTNERS
-Post: "Local vendor? Join ScanV launch — zero listing fee."
-WhatsApp CTA: 9270194842
-Format: Static + Stories sticker link
+Hook: "Listing fee? Nah. We're not that type. 😏"
+WhatsApp: 9270194842
 
 DAY 6 — TRUST
-Post: "Verified partners · OTP login · Secure payment on app."
-Format: Infographic
+Hook: "Verified only — no random uncle energy 🔒"
 
-DAY 7 — WEEK RECAP + Short
-Post: "Week 1 — thank you Pune! More services coming."
-Format: YouTube Short recap of week
+DAY 7 — RECAP
+Hook: "Pune, you were kinda iconic ✨"
 
-DAILY STORIES (IG/FB)
-- Poll: "Which service first? Cleaning / Delivery / Food"
-- Countdown sticker to next feature
-- Repost customer/partner wins (when available)
+DAILY STORIES
+Polls · cheeky stickers · "flat pass or fail?" · repost wins

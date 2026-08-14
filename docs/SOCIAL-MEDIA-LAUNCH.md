@@ -27,8 +27,11 @@ Copy kit: `docs/social/` · Week plan: `node scripts/social_content_calendar.mjs
 ## Content rules
 
 - Say **ScanV** only in captions (not DCore)
-- Always link `scanv-tau.vercel.app` + UTM: `?utm_source=instagram&utm_medium=social`
-- Marathi + Hindi hooks for Pune/PCMC; English optional subtitle
+- **Gen-Z voice:** happy, cheeky double meaning, relatable — see `docs/social/genz-voice-guide.txt`
+- Full week captions: `docs/social/genz-week-posts.txt`
+- Profile photo: `docs/social/scanv-profile-picture.png` (all platforms)
+- Always link `scanv-tau.vercel.app` + UTM: `?utm_source=social&utm_medium=genz`
+- Marathi + Hindi + Hinglish hooks for Pune/PCMC
 - Post **9:30 AM – 7 PM IST** only
 - Repurpose one Short → Reel → TikTok (same video, crop 9:16)
 
