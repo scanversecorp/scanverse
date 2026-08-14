@@ -27,6 +27,8 @@
  *   pricing_2fa_reset_confirm — { otp } clears pricing admin TOTP enrollment
  *   get_admin_diagrams — architecture / data-flow Mermaid catalog (Admin PIN only)
  *   get_vendor_leads — local vendor research catalog (Admin PIN only; not in public bundle)
+ *   update_vendor_lead — { lead_id, onboard_status?, phone_verified?, name_verified?, address_verified?, aadhaar_verified?, aadhaar_last4?, validation_notes? }
+ *   add_vendor_lead_to_scanv — { lead_id } requires all four validations; creates pending vendor_partners row
  *   get_admin_url_index — confidential bookmark catalog (Admin PIN only)
  *   search_dispatches  — { q?, status?, vendor_id?, date_from?, date_to?, limit? }
  *   dispatch_detail    — { dispatch_id? | booking_id? }
@@ -86,7 +88,11 @@ import {
 } from "../_shared/vendor-providers.ts";
 import adminDiagramSections from "../_shared/admin-diagrams-data.json" with { type: "json" };
 import adminUrlIndexSections from "../_shared/admin-url-index-data.json" with { type: "json" };
-import { getVendorLeads } from "../_shared/vendor-leads-admin.ts";
+import {
+  addVendorLeadToScanV,
+  getVendorLeads,
+  updateVendorLead,
+} from "../_shared/vendor-leads-admin.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -1220,7 +1226,42 @@ Deno.serve(async (req) => {
   }
 
   if (action === "get_vendor_leads") {
-    return json(getVendorLeads(body));
+    try {
+      const result = await getVendorLeads(sb, body);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not load vendor leads";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "update_vendor_lead") {
+    try {
+      const result = await updateVendorLead(sb, body, "admin-vendor-leads");
+      if (result.error) return json({ error: result.error }, 400);
+      return json({ success: true, onboard: result.onboard });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "add_vendor_lead_to_scanv") {
+    try {
+      const result = await addVendorLeadToScanV(sb, body, "admin-vendor-leads");
+      if (result.error && !result.vendor_id) {
+        return json({ error: result.error, onboard: result.onboard }, 400);
+      }
+      return json({
+        success: true,
+        vendor_id: result.vendor_id,
+        onboard: result.onboard,
+        message: "Partner enrolled as pending — activate in Vendor Admin after eKYC review",
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Add to ScanV failed";
+      return json({ error: msg }, 500);
+    }
   }
 
   if (action === "get_admin_url_index") {

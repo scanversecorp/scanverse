@@ -1,0 +1,978 @@
+{
+  "cards": [
+    {
+      "id": "household",
+      "label": "Household services",
+      "icon": "🧹",
+      "sub_cards": [
+        {
+          "id": "pink",
+          "label": "Deep cleaning",
+          "theme": "pink"
+        },
+        {
+          "id": "green",
+          "label": "Home help",
+          "theme": "green"
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "label": "Cloud services",
+      "icon": "☁️",
+      "sub_cards": [
+        {
+          "id": "host",
+          "label": "Cloud hosting",
+          "theme": "host"
+        },
+        {
+          "id": "build",
+          "label": "Infrastructure",
+          "theme": "build"
+        },
+        {
+          "id": "care",
+          "label": "Managed & media",
+          "theme": "care"
+        },
+        {
+          "id": "pack",
+          "label": "Turnkey packages",
+          "theme": "pack"
+        }
+      ]
+    },
+    {
+      "id": "legal",
+      "label": "Legal services",
+      "icon": "⚖️",
+      "sub_cards": [
+        {
+          "id": "counsel",
+          "label": "Consultation & court",
+          "theme": "counsel"
+        },
+        {
+          "id": "docs",
+          "label": "Documents & registration",
+          "theme": "docs"
+        }
+      ]
+    },
+    {
+      "id": "vip",
+      "label": "VIP appointments",
+      "icon": "👑",
+      "sub_cards": [
+        {
+          "id": "concierge",
+          "label": "Concierge & assistant",
+          "theme": "concierge"
+        },
+        {
+          "id": "travel",
+          "label": "Travel & events",
+          "theme": "travel"
+        }
+      ]
+    },
+    {
+      "id": "health",
+      "label": "Health care",
+      "icon": "🩺",
+      "sub_cards": [
+        {
+          "id": "home",
+          "label": "Home care",
+          "theme": "home"
+        },
+        {
+          "id": "clinical",
+          "label": "Tests & pharmacy",
+          "theme": "clinical"
+        }
+      ]
+    },
+    {
+      "id": "property",
+      "label": "Property & rentals",
+      "icon": "🏘️",
+      "sub_cards": [
+        {
+          "id": "find",
+          "label": "Find property",
+          "theme": "find"
+        },
+        {
+          "id": "verify",
+          "label": "Verify & finance",
+          "theme": "verify"
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "label": "Deliveries",
+      "icon": "📦",
+      "sub_cards": [
+        {
+          "id": "local",
+          "label": "Local delivery",
+          "theme": "local"
+        },
+        {
+          "id": "express",
+          "label": "Express & bulk",
+          "theme": "express"
+        }
+      ]
+    },
+    {
+      "id": "food",
+      "label": "Food",
+      "icon": "🍱",
+      "sub_cards": [
+        {
+          "id": "daily",
+          "label": "Daily meals",
+          "theme": "daily"
+        },
+        {
+          "id": "events",
+          "label": "Catering & events",
+          "theme": "events"
+        }
+      ]
+    },
+    {
+      "id": "two-wheeler",
+      "label": "Two Wheeler Support",
+      "icon": "🛵",
+      "sub_cards": [
+        {
+          "id": "roadside",
+          "label": "Roadside help",
+          "theme": "roadside"
+        },
+        {
+          "id": "care",
+          "label": "Care & pickup",
+          "theme": "care"
+        }
+      ]
+    },
+    {
+      "id": "four-wheeler",
+      "label": "Four Wheeler Support",
+      "icon": "🚗",
+      "sub_cards": [
+        {
+          "id": "service",
+          "label": "Service & repair",
+          "theme": "service"
+        },
+        {
+          "id": "care",
+          "label": "Cleaning & care",
+          "theme": "care"
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "id": "hh-bathroom-deep",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Bathroom Deep Clean",
+      "price_inr": 499
+    },
+    {
+      "id": "hh-kitchen-deep",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Kitchen Deep Clean",
+      "price_inr": 599
+    },
+    {
+      "id": "hh-flat-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Full Flat Cleaning",
+      "price_inr": 1999
+    },
+    {
+      "id": "hh-care-plan",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Bathroom Care Plan",
+      "price_inr": 1499
+    },
+    {
+      "id": "hh-quick-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Quick Clean",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-sofa-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Deep cleaning",
+      "theme": "pink",
+      "name": "Sofa & Upholstery Clean",
+      "price_inr": 249
+    },
+    {
+      "id": "hh-house-help",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "House Help",
+      "price_inr": 182
+    },
+    {
+      "id": "hh-dishwashing",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Dishwashing",
+      "price_inr": 99
+    },
+    {
+      "id": "hh-kitchen-help",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Kitchen Tidy-Up",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-fan-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Fan Cleaning",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-window-clean",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Window Cleaning",
+      "price_inr": 199
+    },
+    {
+      "id": "hh-laundry",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Laundry Help",
+      "price_inr": 149
+    },
+    {
+      "id": "hh-bathroom-help",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Bathroom Refresh",
+      "price_inr": 199
+    },
+    {
+      "id": "hh-ironing",
+      "parent_card_id": "household",
+      "parent_card_label": "Household services",
+      "sub_card": "Home help",
+      "theme": "green",
+      "name": "Ironing & Pressing",
+      "price_inr": 149
+    },
+    {
+      "id": "cl-iaas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "Cloud Compute (IaaS)",
+      "price_inr": 9999
+    },
+    {
+      "id": "cl-paas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "App Platform (PaaS)",
+      "price_inr": 7999
+    },
+    {
+      "id": "cl-saas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "Business Apps (SaaS)",
+      "price_inr": 4999
+    },
+    {
+      "id": "cl-hybrid",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "Hybrid Cloud Setup",
+      "price_inr": 14999
+    },
+    {
+      "id": "cl-datacenter",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "Data Center Consulting",
+      "price_inr": 49999
+    },
+    {
+      "id": "cl-network",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "Enterprise Networking",
+      "price_inr": 29999
+    },
+    {
+      "id": "cl-hardware",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "IT Hardware Supply",
+      "price_inr": 19999
+    },
+    {
+      "id": "cl-infra-audit",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "Infrastructure Audit & Roadmap",
+      "price_inr": 8999
+    },
+    {
+      "id": "cl-managed",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Managed IT Services",
+      "price_inr": 2499
+    },
+    {
+      "id": "cl-backup",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Backup & Disaster Recovery",
+      "price_inr": 1499
+    },
+    {
+      "id": "cl-video",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Video & Streaming Platform",
+      "price_inr": 3999
+    },
+    {
+      "id": "cl-training",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Cloud & IT Training",
+      "price_inr": 4999
+    },
+    {
+      "id": "cl-office-box",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Office IT-in-a-Box",
+      "price_inr": 34999
+    },
+    {
+      "id": "cl-dc-operate",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Data Center Build & Run",
+      "price_inr": 79999
+    },
+    {
+      "id": "cl-dr-pack",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Business Continuity Pack",
+      "price_inr": 24999
+    },
+    {
+      "id": "cl-maas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Monitoring-as-a-Service",
+      "price_inr": 1999
+    },
+    {
+      "id": "cl-edtech",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Learning Platform Pack",
+      "price_inr": 59999
+    },
+    {
+      "id": "cl-ott-pack",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Streaming Platform Pack",
+      "price_inr": 69999
+    },
+    {
+      "id": "lg-consult",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Lawyer Consultation",
+      "price_inr": 999
+    },
+    {
+      "id": "lg-court",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Court Filing & Notices",
+      "price_inr": 29999
+    },
+    {
+      "id": "lg-contract",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Business Contract Review",
+      "price_inr": 39999
+    },
+    {
+      "id": "lg-family",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Family & Divorce Consult",
+      "price_inr": 1499
+    },
+    {
+      "id": "lg-doc-draft",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Document Drafting",
+      "price_inr": 19999
+    },
+    {
+      "id": "lg-property-reg",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Property Registration",
+      "price_inr": 49999
+    },
+    {
+      "id": "lg-notary",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Notary & Affidavit",
+      "price_inr": 499
+    },
+    {
+      "id": "lg-rental",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Rental Agreement Pack",
+      "price_inr": 999
+    },
+    {
+      "id": "vip-concierge",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "24×7 Personal Concierge",
+      "price_inr": 99999
+    },
+    {
+      "id": "vip-assistant",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "Executive Assistant",
+      "price_inr": 499
+    },
+    {
+      "id": "vip-priority",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "Priority Appointments",
+      "price_inr": 999
+    },
+    {
+      "id": "vip-dining",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "Premium Dining Reservations",
+      "price_inr": 499
+    },
+    {
+      "id": "vip-airport",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Travel & events",
+      "theme": "travel",
+      "name": "Airport Transfer",
+      "price_inr": 14999
+    },
+    {
+      "id": "vip-event",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Travel & events",
+      "theme": "travel",
+      "name": "Event Planning",
+      "price_inr": 49999
+    },
+    {
+      "id": "hl-doctor",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Doctor at Home",
+      "price_inr": 999
+    },
+    {
+      "id": "hl-specialist",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Specialist Consultation",
+      "price_inr": 14999
+    },
+    {
+      "id": "hl-elder",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Elder Care Visit",
+      "price_inr": 299
+    },
+    {
+      "id": "hl-nursing",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Nursing Care at Home",
+      "price_inr": 499
+    },
+    {
+      "id": "hl-checkup",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Full Body Checkup",
+      "price_inr": 19999
+    },
+    {
+      "id": "hl-lab",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Lab Tests at Home",
+      "price_inr": 799
+    },
+    {
+      "id": "hl-pharmacy",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Pharmacy Delivery",
+      "price_inr": 499
+    },
+    {
+      "id": "hl-vaccine",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Vaccination at Home",
+      "price_inr": 999
+    },
+    {
+      "id": "pr-buy",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Buy / Sell Assistance",
+      "price_inr": 99999
+    },
+    {
+      "id": "pr-rent",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Rent & PG Finder",
+      "price_inr": 499
+    },
+    {
+      "id": "pr-site",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Site Visit Package",
+      "price_inr": 19999
+    },
+    {
+      "id": "pr-commercial",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Commercial Space Finder",
+      "price_inr": 29999
+    },
+    {
+      "id": "pr-legal",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Verify & finance",
+      "theme": "verify",
+      "name": "Legal Verification",
+      "price_inr": 29999
+    },
+    {
+      "id": "pr-loan",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Verify & finance",
+      "theme": "verify",
+      "name": "Home Loan Assistance",
+      "price_inr": 19999
+    },
+    {
+      "id": "dl-sameday",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Same-Day Courier",
+      "price_inr": 99
+    },
+    {
+      "id": "dl-doc",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Document Delivery",
+      "price_inr": 149
+    },
+    {
+      "id": "dl-parcel",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Parcel Pickup & Drop",
+      "price_inr": 199
+    },
+    {
+      "id": "dl-grocery",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Grocery & Essentials Run",
+      "price_inr": 149
+    },
+    {
+      "id": "dl-intercity",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Express & bulk",
+      "theme": "express",
+      "name": "Inter-City Express",
+      "price_inr": 499
+    },
+    {
+      "id": "dl-bulk",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Express & bulk",
+      "theme": "express",
+      "name": "Business Bulk Delivery",
+      "price_inr": 999
+    },
+    {
+      "id": "fd-tiffin",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Home Tiffin Plan",
+      "price_inr": 59999
+    },
+    {
+      "id": "fd-restaurant",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Restaurant Order",
+      "price_inr": 199
+    },
+    {
+      "id": "fd-office",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Office Lunch Box",
+      "price_inr": 14999
+    },
+    {
+      "id": "fd-breakfast",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Breakfast & Snacks Plan",
+      "price_inr": 34999
+    },
+    {
+      "id": "fd-catering",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Catering & events",
+      "theme": "events",
+      "name": "Party Catering",
+      "price_inr": 99999
+    },
+    {
+      "id": "fd-festival",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Catering & events",
+      "theme": "events",
+      "name": "Festival Special Menu",
+      "price_inr": 29999
+    },
+    {
+      "id": "tw-mechanic",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "Mechanic Support",
+      "price_inr": 299
+    },
+    {
+      "id": "tw-pickup",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Pick-up & Drop Servicing",
+      "price_inr": 399
+    },
+    {
+      "id": "tw-fix",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "On-Road Fixing",
+      "price_inr": 199
+    },
+    {
+      "id": "tw-wash",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Bike Washing",
+      "price_inr": 99
+    },
+    {
+      "id": "tw-deep",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Deep Cleaning",
+      "price_inr": 149
+    },
+    {
+      "id": "tw-polish",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Bike Polish & Wax",
+      "price_inr": 119
+    },
+    {
+      "id": "tw-battery",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "Battery & Tyre Check",
+      "price_inr": 129
+    },
+    {
+      "id": "tw-towing",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "Emergency Towing",
+      "price_inr": 349
+    },
+    {
+      "id": "fw-mechanic",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "Mechanic Support",
+      "price_inr": 499
+    },
+    {
+      "id": "fw-pickup",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "Pick-up & Drop Servicing",
+      "price_inr": 799
+    },
+    {
+      "id": "fw-fix",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "On-Site Fixing",
+      "price_inr": 399
+    },
+    {
+      "id": "fw-maintenance",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "Periodic Car Service",
+      "price_inr": 599
+    },
+    {
+      "id": "fw-wash",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Car Washing",
+      "price_inr": 199
+    },
+    {
+      "id": "fw-deep",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Deep Cleaning",
+      "price_inr": 299
+    },
+    {
+      "id": "fw-detail",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Detailing & Interior",
+      "price_inr": 499
+    },
+    {
+      "id": "fw-sanitize",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Interior Sanitization",
+      "price_inr": 249
+    }
+  ]
+}

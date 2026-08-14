@@ -2,9 +2,10 @@
   "meta": {
     "captured_at": "2026-08-15",
     "market": "Pune / PCMC",
-    "version": 1,
-    "vendor_count": 21,
-    "service_count": 14
+    "version": 2,
+    "vendor_count": 48,
+    "service_count": 88,
+    "card_count": 10
   },
   "cards": [
     {
@@ -13,14 +14,177 @@
       "icon": "🧹",
       "sub_cards": [
         {
-          "id": "deep-cleaning",
+          "id": "pink",
           "label": "Deep cleaning",
           "theme": "pink"
         },
         {
-          "id": "home-help",
+          "id": "green",
           "label": "Home help",
           "theme": "green"
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "label": "Cloud services",
+      "icon": "☁️",
+      "sub_cards": [
+        {
+          "id": "host",
+          "label": "Cloud hosting",
+          "theme": "host"
+        },
+        {
+          "id": "build",
+          "label": "Infrastructure",
+          "theme": "build"
+        },
+        {
+          "id": "care",
+          "label": "Managed & media",
+          "theme": "care"
+        },
+        {
+          "id": "pack",
+          "label": "Turnkey packages",
+          "theme": "pack"
+        }
+      ]
+    },
+    {
+      "id": "legal",
+      "label": "Legal services",
+      "icon": "⚖️",
+      "sub_cards": [
+        {
+          "id": "counsel",
+          "label": "Consultation & court",
+          "theme": "counsel"
+        },
+        {
+          "id": "docs",
+          "label": "Documents & registration",
+          "theme": "docs"
+        }
+      ]
+    },
+    {
+      "id": "vip",
+      "label": "VIP appointments",
+      "icon": "👑",
+      "sub_cards": [
+        {
+          "id": "concierge",
+          "label": "Concierge & assistant",
+          "theme": "concierge"
+        },
+        {
+          "id": "travel",
+          "label": "Travel & events",
+          "theme": "travel"
+        }
+      ]
+    },
+    {
+      "id": "health",
+      "label": "Health care",
+      "icon": "🩺",
+      "sub_cards": [
+        {
+          "id": "home",
+          "label": "Home care",
+          "theme": "home"
+        },
+        {
+          "id": "clinical",
+          "label": "Tests & pharmacy",
+          "theme": "clinical"
+        }
+      ]
+    },
+    {
+      "id": "property",
+      "label": "Property & rentals",
+      "icon": "🏘️",
+      "sub_cards": [
+        {
+          "id": "find",
+          "label": "Find property",
+          "theme": "find"
+        },
+        {
+          "id": "verify",
+          "label": "Verify & finance",
+          "theme": "verify"
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "label": "Deliveries",
+      "icon": "📦",
+      "sub_cards": [
+        {
+          "id": "local",
+          "label": "Local delivery",
+          "theme": "local"
+        },
+        {
+          "id": "express",
+          "label": "Express & bulk",
+          "theme": "express"
+        }
+      ]
+    },
+    {
+      "id": "food",
+      "label": "Food",
+      "icon": "🍱",
+      "sub_cards": [
+        {
+          "id": "daily",
+          "label": "Daily meals",
+          "theme": "daily"
+        },
+        {
+          "id": "events",
+          "label": "Catering & events",
+          "theme": "events"
+        }
+      ]
+    },
+    {
+      "id": "two-wheeler",
+      "label": "Two Wheeler Support",
+      "icon": "🛵",
+      "sub_cards": [
+        {
+          "id": "roadside",
+          "label": "Roadside help",
+          "theme": "roadside"
+        },
+        {
+          "id": "care",
+          "label": "Care & pickup",
+          "theme": "care"
+        }
+      ]
+    },
+    {
+      "id": "four-wheeler",
+      "label": "Four Wheeler Support",
+      "icon": "🚗",
+      "sub_cards": [
+        {
+          "id": "service",
+          "label": "Service & repair",
+          "theme": "service"
+        },
+        {
+          "id": "care",
+          "label": "Cleaning & care",
+          "theme": "care"
         }
       ]
     }
@@ -151,6 +315,672 @@
       "theme": "green",
       "name": "Ironing & Pressing",
       "price_inr": 149
+    },
+    {
+      "id": "cl-iaas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "Cloud Compute (IaaS)",
+      "price_inr": 9999
+    },
+    {
+      "id": "cl-paas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "App Platform (PaaS)",
+      "price_inr": 7999
+    },
+    {
+      "id": "cl-saas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "Business Apps (SaaS)",
+      "price_inr": 4999
+    },
+    {
+      "id": "cl-hybrid",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Cloud hosting",
+      "theme": "host",
+      "name": "Hybrid Cloud Setup",
+      "price_inr": 14999
+    },
+    {
+      "id": "cl-datacenter",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "Data Center Consulting",
+      "price_inr": 49999
+    },
+    {
+      "id": "cl-network",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "Enterprise Networking",
+      "price_inr": 29999
+    },
+    {
+      "id": "cl-hardware",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "IT Hardware Supply",
+      "price_inr": 19999
+    },
+    {
+      "id": "cl-infra-audit",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Infrastructure",
+      "theme": "build",
+      "name": "Infrastructure Audit & Roadmap",
+      "price_inr": 8999
+    },
+    {
+      "id": "cl-managed",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Managed IT Services",
+      "price_inr": 2499
+    },
+    {
+      "id": "cl-backup",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Backup & Disaster Recovery",
+      "price_inr": 1499
+    },
+    {
+      "id": "cl-video",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Video & Streaming Platform",
+      "price_inr": 3999
+    },
+    {
+      "id": "cl-training",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Managed & media",
+      "theme": "care",
+      "name": "Cloud & IT Training",
+      "price_inr": 4999
+    },
+    {
+      "id": "cl-office-box",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Office IT-in-a-Box",
+      "price_inr": 34999
+    },
+    {
+      "id": "cl-dc-operate",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Data Center Build & Run",
+      "price_inr": 79999
+    },
+    {
+      "id": "cl-dr-pack",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Business Continuity Pack",
+      "price_inr": 24999
+    },
+    {
+      "id": "cl-maas",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Monitoring-as-a-Service",
+      "price_inr": 1999
+    },
+    {
+      "id": "cl-edtech",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Learning Platform Pack",
+      "price_inr": 59999
+    },
+    {
+      "id": "cl-ott-pack",
+      "parent_card_id": "cloud",
+      "parent_card_label": "Cloud services",
+      "sub_card": "Turnkey packages",
+      "theme": "pack",
+      "name": "Streaming Platform Pack",
+      "price_inr": 69999
+    },
+    {
+      "id": "lg-consult",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Lawyer Consultation",
+      "price_inr": 999
+    },
+    {
+      "id": "lg-court",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Court Filing & Notices",
+      "price_inr": 29999
+    },
+    {
+      "id": "lg-contract",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Business Contract Review",
+      "price_inr": 39999
+    },
+    {
+      "id": "lg-family",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Consultation & court",
+      "theme": "counsel",
+      "name": "Family & Divorce Consult",
+      "price_inr": 1499
+    },
+    {
+      "id": "lg-doc-draft",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Document Drafting",
+      "price_inr": 19999
+    },
+    {
+      "id": "lg-property-reg",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Property Registration",
+      "price_inr": 49999
+    },
+    {
+      "id": "lg-notary",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Notary & Affidavit",
+      "price_inr": 499
+    },
+    {
+      "id": "lg-rental",
+      "parent_card_id": "legal",
+      "parent_card_label": "Legal services",
+      "sub_card": "Documents & registration",
+      "theme": "docs",
+      "name": "Rental Agreement Pack",
+      "price_inr": 999
+    },
+    {
+      "id": "vip-concierge",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "24×7 Personal Concierge",
+      "price_inr": 99999
+    },
+    {
+      "id": "vip-assistant",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "Executive Assistant",
+      "price_inr": 499
+    },
+    {
+      "id": "vip-priority",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "Priority Appointments",
+      "price_inr": 999
+    },
+    {
+      "id": "vip-dining",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Concierge & assistant",
+      "theme": "concierge",
+      "name": "Premium Dining Reservations",
+      "price_inr": 499
+    },
+    {
+      "id": "vip-airport",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Travel & events",
+      "theme": "travel",
+      "name": "Airport Transfer",
+      "price_inr": 14999
+    },
+    {
+      "id": "vip-event",
+      "parent_card_id": "vip",
+      "parent_card_label": "VIP appointments",
+      "sub_card": "Travel & events",
+      "theme": "travel",
+      "name": "Event Planning",
+      "price_inr": 49999
+    },
+    {
+      "id": "hl-doctor",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Doctor at Home",
+      "price_inr": 999
+    },
+    {
+      "id": "hl-specialist",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Specialist Consultation",
+      "price_inr": 14999
+    },
+    {
+      "id": "hl-elder",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Elder Care Visit",
+      "price_inr": 299
+    },
+    {
+      "id": "hl-nursing",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Home care",
+      "theme": "home",
+      "name": "Nursing Care at Home",
+      "price_inr": 499
+    },
+    {
+      "id": "hl-checkup",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Full Body Checkup",
+      "price_inr": 19999
+    },
+    {
+      "id": "hl-lab",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Lab Tests at Home",
+      "price_inr": 799
+    },
+    {
+      "id": "hl-pharmacy",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Pharmacy Delivery",
+      "price_inr": 499
+    },
+    {
+      "id": "hl-vaccine",
+      "parent_card_id": "health",
+      "parent_card_label": "Health care",
+      "sub_card": "Tests & pharmacy",
+      "theme": "clinical",
+      "name": "Vaccination at Home",
+      "price_inr": 999
+    },
+    {
+      "id": "pr-buy",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Buy / Sell Assistance",
+      "price_inr": 99999
+    },
+    {
+      "id": "pr-rent",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Rent & PG Finder",
+      "price_inr": 499
+    },
+    {
+      "id": "pr-site",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Site Visit Package",
+      "price_inr": 19999
+    },
+    {
+      "id": "pr-commercial",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Find property",
+      "theme": "find",
+      "name": "Commercial Space Finder",
+      "price_inr": 29999
+    },
+    {
+      "id": "pr-legal",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Verify & finance",
+      "theme": "verify",
+      "name": "Legal Verification",
+      "price_inr": 29999
+    },
+    {
+      "id": "pr-loan",
+      "parent_card_id": "property",
+      "parent_card_label": "Property & rentals",
+      "sub_card": "Verify & finance",
+      "theme": "verify",
+      "name": "Home Loan Assistance",
+      "price_inr": 19999
+    },
+    {
+      "id": "dl-sameday",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Same-Day Courier",
+      "price_inr": 99
+    },
+    {
+      "id": "dl-doc",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Document Delivery",
+      "price_inr": 149
+    },
+    {
+      "id": "dl-parcel",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Parcel Pickup & Drop",
+      "price_inr": 199
+    },
+    {
+      "id": "dl-grocery",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Local delivery",
+      "theme": "local",
+      "name": "Grocery & Essentials Run",
+      "price_inr": 149
+    },
+    {
+      "id": "dl-intercity",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Express & bulk",
+      "theme": "express",
+      "name": "Inter-City Express",
+      "price_inr": 499
+    },
+    {
+      "id": "dl-bulk",
+      "parent_card_id": "delivery",
+      "parent_card_label": "Deliveries",
+      "sub_card": "Express & bulk",
+      "theme": "express",
+      "name": "Business Bulk Delivery",
+      "price_inr": 999
+    },
+    {
+      "id": "fd-tiffin",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Home Tiffin Plan",
+      "price_inr": 59999
+    },
+    {
+      "id": "fd-restaurant",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Restaurant Order",
+      "price_inr": 199
+    },
+    {
+      "id": "fd-office",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Office Lunch Box",
+      "price_inr": 14999
+    },
+    {
+      "id": "fd-breakfast",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Daily meals",
+      "theme": "daily",
+      "name": "Breakfast & Snacks Plan",
+      "price_inr": 34999
+    },
+    {
+      "id": "fd-catering",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Catering & events",
+      "theme": "events",
+      "name": "Party Catering",
+      "price_inr": 99999
+    },
+    {
+      "id": "fd-festival",
+      "parent_card_id": "food",
+      "parent_card_label": "Food",
+      "sub_card": "Catering & events",
+      "theme": "events",
+      "name": "Festival Special Menu",
+      "price_inr": 29999
+    },
+    {
+      "id": "tw-mechanic",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "Mechanic Support",
+      "price_inr": 299
+    },
+    {
+      "id": "tw-pickup",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Pick-up & Drop Servicing",
+      "price_inr": 399
+    },
+    {
+      "id": "tw-fix",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "On-Road Fixing",
+      "price_inr": 199
+    },
+    {
+      "id": "tw-wash",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Bike Washing",
+      "price_inr": 99
+    },
+    {
+      "id": "tw-deep",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Deep Cleaning",
+      "price_inr": 149
+    },
+    {
+      "id": "tw-polish",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Care & pickup",
+      "theme": "care",
+      "name": "Bike Polish & Wax",
+      "price_inr": 119
+    },
+    {
+      "id": "tw-battery",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "Battery & Tyre Check",
+      "price_inr": 129
+    },
+    {
+      "id": "tw-towing",
+      "parent_card_id": "two-wheeler",
+      "parent_card_label": "Two Wheeler Support",
+      "sub_card": "Roadside help",
+      "theme": "roadside",
+      "name": "Emergency Towing",
+      "price_inr": 349
+    },
+    {
+      "id": "fw-mechanic",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "Mechanic Support",
+      "price_inr": 499
+    },
+    {
+      "id": "fw-pickup",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "Pick-up & Drop Servicing",
+      "price_inr": 799
+    },
+    {
+      "id": "fw-fix",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "On-Site Fixing",
+      "price_inr": 399
+    },
+    {
+      "id": "fw-maintenance",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Service & repair",
+      "theme": "service",
+      "name": "Periodic Car Service",
+      "price_inr": 599
+    },
+    {
+      "id": "fw-wash",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Car Washing",
+      "price_inr": 199
+    },
+    {
+      "id": "fw-deep",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Deep Cleaning",
+      "price_inr": 299
+    },
+    {
+      "id": "fw-detail",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Detailing & Interior",
+      "price_inr": 499
+    },
+    {
+      "id": "fw-sanitize",
+      "parent_card_id": "four-wheeler",
+      "parent_card_label": "Four Wheeler Support",
+      "sub_card": "Cleaning & care",
+      "theme": "care",
+      "name": "Interior Sanitization",
+      "price_inr": 249
     }
   ],
   "vendors": [
@@ -908,6 +1738,936 @@
         "hh-kitchen-deep",
         "hh-flat-clean",
         "hh-quick-clean"
+      ]
+    },
+    {
+      "id": "courierbook-pune",
+      "business_name": "CourierBook Pune",
+      "contact_person": "",
+      "shop_office": "CourierBook (platform hub)",
+      "address": {
+        "building": "",
+        "street": "Doorstep pickup — Hinjewadi, Wakad, PCMC",
+        "area": "Pune / PCMC",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Doorstep pickup — Hinjewadi, Wakad, PCMC, Pune / PCMC, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8209384119"
+      ],
+      "emails": [],
+      "website": "https://www.courierbook.in/courier-service-in-pune/",
+      "maps_name": "CourierBook courier service Pune",
+      "services_offered": "Same-day Pune city, inter-city courier, doorstep pickup 60+ areas",
+      "rating": "Website",
+      "hours": "Same-day slots",
+      "service_areas": "Hinjewadi, Wakad, PCMC, Baner, Kothrud, Hadapsar",
+      "source": "courierbook.in",
+      "notes": "Platform aggregator — onboard as partner network",
+      "confidence": "high",
+      "service_ids": [
+        "dl-sameday",
+        "dl-parcel",
+        "dl-doc",
+        "dl-intercity"
+      ]
+    },
+    {
+      "id": "professional-courier-service-wakad",
+      "business_name": "Professional Courier Service Wakad",
+      "contact_person": "",
+      "shop_office": "Shop No. 6, Dhanraj Building, B wing",
+      "address": {
+        "building": "Dhanraj Building",
+        "street": "Kaspate Wasti",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Dhanraj Building, Kaspate Wasti, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 9922912559"
+      ],
+      "emails": [],
+      "website": "https://wakad.in/item/professional-courier-service-wakad/",
+      "maps_name": "Professional Courier Service Wakad",
+      "services_offered": "Local & national courier, document delivery",
+      "rating": "Wakad.in listing",
+      "hours": "Mon-Sun 9:00 AM - 6:00 PM",
+      "service_areas": "Wakad, Kaspate Wasti, PCMC",
+      "source": "Wakad.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "dl-sameday",
+        "dl-doc",
+        "dl-parcel"
+      ]
+    },
+    {
+      "id": "shree-maruti-courier-service-wakad",
+      "business_name": "Shree Maruti Courier Service Wakad",
+      "contact_person": "",
+      "shop_office": "Shop No 2/125/1/1/18",
+      "address": {
+        "building": "",
+        "street": "Swami Vivekananda, Opposite Lad Restaurant",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Swami Vivekananda, Opposite Lad Restaurant, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8856974665"
+      ],
+      "emails": [],
+      "website": "https://nearme.shreemaruti.com/locator/pune/wakad/",
+      "maps_name": "Shree Maruti Courier Service Wakad",
+      "services_offered": "Express, hyperlocal, national courier",
+      "rating": "Maruti locator",
+      "hours": "",
+      "service_areas": "Wakad, Pune, PCMC",
+      "source": "Shree Maruti locator",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "dl-sameday",
+        "dl-intercity",
+        "dl-bulk"
+      ]
+    },
+    {
+      "id": "dtdc-wakad",
+      "business_name": "DTDC Wakad",
+      "contact_person": "",
+      "shop_office": "DTDC Wakad",
+      "address": {
+        "building": "",
+        "street": "29, Jagtap Dairy, Near Hotel Waghjai",
+        "area": "Wakad",
+        "city": "Pimpri Chinchwad",
+        "pin": "411027",
+        "state": "Maharashtra",
+        "full": "29, Jagtap Dairy, Near Hotel Waghjai, Wakad, Pimpri Chinchwad, 411027, Maharashtra"
+      },
+      "phones": [
+        "+91 2027279828"
+      ],
+      "emails": [],
+      "website": "https://www.dtdc.in/",
+      "maps_name": "DTDC Wakad PCMC",
+      "services_offered": "Local, national, international courier; doorstep pickup",
+      "rating": "AskLaila listing",
+      "hours": "",
+      "service_areas": "Wakad, PCMC, Pune",
+      "source": "AskLaila + DTDC",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "dl-sameday",
+        "dl-intercity",
+        "dl-bulk",
+        "dl-doc"
+      ]
+    },
+    {
+      "id": "bikefix-pune",
+      "business_name": "BikeFix Pune",
+      "contact_person": "",
+      "shop_office": "BikeFix (doorstep service)",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune & PCMC",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune & PCMC, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 7507296501"
+      ],
+      "emails": [],
+      "website": "https://www.bikefixpune.in/",
+      "maps_name": "BikeFix Pune doorstep bike service",
+      "services_offered": "Doorstep bike service, breakdown, periodic service",
+      "rating": "Website — 500+ bikes serviced",
+      "hours": "7 days 9 AM - 9 PM",
+      "service_areas": "Wakad, Hinjewadi, Pimpri, Chinchwad, Ravet, 50+ areas",
+      "source": "bikefixpune.in",
+      "notes": "No fixed shop — service-area business",
+      "confidence": "high",
+      "service_ids": [
+        "tw-mechanic",
+        "tw-fix",
+        "tw-pickup",
+        "tw-wash"
+      ]
+    },
+    {
+      "id": "kp-biker-zone",
+      "business_name": "KP Biker Zone",
+      "contact_person": "",
+      "shop_office": "Jagtap Complex",
+      "address": {
+        "building": "SNO- 79/1/1, Jagtap Complex",
+        "street": "Sudarshan Nagar",
+        "area": "Pimple Gurav",
+        "city": "Pimpri-Chinchwad",
+        "pin": "411061",
+        "state": "Maharashtra",
+        "full": "SNO- 79/1/1, Jagtap Complex, Sudarshan Nagar, Pimple Gurav, Pimpri-Chinchwad, 411061, Maharashtra"
+      },
+      "phones": [
+        "+91 8263805949"
+      ],
+      "emails": [
+        "contact@kpbikerzone.com"
+      ],
+      "website": "https://kpbikerzone.in/bikes/pune/pimpri-chinchwad/",
+      "maps_name": "KP Biker Zone Pimpri Chinchwad",
+      "services_offered": "Doorstep bike service, repair, wash, pick-up drop to workshop",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Pimpri, Chinchwad, Wakad, Hinjewadi, Rahatani",
+      "source": "kpbikerzone.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "tw-mechanic",
+        "tw-fix",
+        "tw-wash",
+        "tw-deep",
+        "tw-pickup"
+      ]
+    },
+    {
+      "id": "gaadimech-pune",
+      "business_name": "GaadiMech Pune",
+      "contact_person": "",
+      "shop_office": "GaadiMech (doorstep car service)",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune & PCMC",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune & PCMC, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 8448285289"
+      ],
+      "emails": [],
+      "website": "https://www.gaadimech.com/car-service-in-pune",
+      "maps_name": "GaadiMech car service Pune",
+      "services_offered": "Doorstep periodic service, pick-up drop, 90-min express",
+      "rating": "Website",
+      "hours": "8 AM - 8 PM, 7 days",
+      "service_areas": "Hinjewadi, Wakad, Pimpri, Baner, Kothrud, Viman Nagar",
+      "source": "gaadimech.com",
+      "notes": "From ₹1,999 doorstep service",
+      "confidence": "high",
+      "service_ids": [
+        "fw-mechanic",
+        "fw-maintenance",
+        "fw-pickup",
+        "fw-fix"
+      ]
+    },
+    {
+      "id": "wisedrive-pune",
+      "business_name": "Wisedrive Pune",
+      "contact_person": "",
+      "shop_office": "Wisedrive (doorstep)",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9905129146"
+      ],
+      "emails": [],
+      "website": "https://www.wisedrive.com/car-service/pune",
+      "maps_name": "Wisedrive doorstep car service Pune",
+      "services_offered": "Doorstep car service, AC, battery, brakes, detailing",
+      "rating": "Website — 200k+ jobs",
+      "hours": "Same-day 30-min slots",
+      "service_areas": "Pune city & suburbs",
+      "source": "wisedrive.com",
+      "notes": "WhatsApp booking",
+      "confidence": "high",
+      "service_ids": [
+        "fw-mechanic",
+        "fw-maintenance",
+        "fw-fix",
+        "fw-wash",
+        "fw-detail"
+      ]
+    },
+    {
+      "id": "fix-n-ride-pune",
+      "business_name": "Fix N Ride Pune",
+      "contact_person": "",
+      "shop_office": "Fix N Ride",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 7249199430"
+      ],
+      "emails": [],
+      "website": "https://fixnride.in/",
+      "maps_name": "Fix N Ride car bike repair Pune",
+      "services_offered": "Doorstep car & bike repair, pick-up, battery, tyre",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Pune, PCMC",
+      "source": "fixnride.in",
+      "notes": "Visiting charge ₹349",
+      "confidence": "high",
+      "service_ids": [
+        "fw-fix",
+        "fw-mechanic",
+        "tw-mechanic",
+        "tw-fix"
+      ]
+    },
+    {
+      "id": "unity-car-works",
+      "business_name": "Unity Car Works",
+      "contact_person": "",
+      "shop_office": "Unity Car Works",
+      "address": {
+        "building": "Near Kate Petrol Pump, Mithila Nagari",
+        "street": "Besides Gareeb Nawaj Biryani",
+        "area": "Pimple Saudagar",
+        "city": "Pimpri Chinchwad",
+        "pin": "411027",
+        "state": "Maharashtra",
+        "full": "Near Kate Petrol Pump, Mithila Nagari, Besides Gareeb Nawaj Biryani, Pimple Saudagar, Pimpri Chinchwad, 411027, Maharashtra"
+      },
+      "phones": [
+        "+91 9143844844"
+      ],
+      "emails": [
+        "unitycaroworks@gmail.com"
+      ],
+      "website": "https://unitycarworks.com/",
+      "maps_name": "Unity Car Works Pimple Saudagar",
+      "services_offered": "Car repair, maintenance, detailing, emergency assist",
+      "rating": "Website",
+      "hours": "Mon-Sat 8am-6pm, Sun 8am-3pm",
+      "service_areas": "Pimple Saudagar, PCMC, Pune",
+      "source": "unitycarworks.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "fw-mechanic",
+        "fw-maintenance",
+        "fw-fix",
+        "fw-wash",
+        "fw-deep"
+      ]
+    },
+    {
+      "id": "phd-meals",
+      "business_name": "PHD Meals",
+      "contact_person": "",
+      "shop_office": "PHD Meals Kitchen",
+      "address": {
+        "building": "C/o Happy Co Live PG 130/11",
+        "street": "Shankar Kalat Nagar",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "C/o Happy Co Live PG 130/11, Shankar Kalat Nagar, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8459893110"
+      ],
+      "emails": [
+        "support@phdmeals.in"
+      ],
+      "website": "https://phdmeals.in/",
+      "maps_name": "PHD Meals Wakad tiffin",
+      "services_offered": "Home-style tiffin, corporate lunch, weekly/monthly plans",
+      "rating": "Website",
+      "hours": "Mon-Sat 10:30 AM - 9:30 PM",
+      "service_areas": "Wakad, Baner, Balewadi, Hinjewadi, Tathawade",
+      "source": "phdmeals.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "fd-tiffin",
+        "fd-office",
+        "fd-breakfast"
+      ]
+    },
+    {
+      "id": "tiffin-daily",
+      "business_name": "Tiffin Daily",
+      "contact_person": "",
+      "shop_office": "Tiffin Daily",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad / PCMC",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Wakad / PCMC, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9975436663"
+      ],
+      "emails": [
+        "info@tiffindaily.in"
+      ],
+      "website": "https://tiffindaily.in/",
+      "maps_name": "Tiffin Daily Pune",
+      "services_offered": "Monthly tiffin plans, veg/non-veg, trial meals",
+      "rating": "Website",
+      "hours": "Order lunch by 7 AM, dinner by 4 PM",
+      "service_areas": "Wakad, Hinjewadi, Punawale, Baner, Aundh, PCMC",
+      "source": "tiffindaily.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "fd-tiffin",
+        "fd-breakfast",
+        "fd-office"
+      ]
+    },
+    {
+      "id": "mauli-tiffin-service",
+      "business_name": "Mauli Tiffin Service",
+      "contact_person": "",
+      "shop_office": "Mauli Tiffin Service",
+      "address": {
+        "building": "41/1",
+        "street": "Parkhe Vasti",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "41/1, Parkhe Vasti, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 7219734697"
+      ],
+      "emails": [],
+      "website": "https://www.zomato.com/pune/mauli-tiffin-service-wakad",
+      "maps_name": "Mauli Tiffin Service Wakad",
+      "services_offered": "North Indian tiffin — breakfast, lunch, dinner delivery",
+      "rating": "Zomato listing",
+      "hours": "Delivery only",
+      "service_areas": "Wakad, PCMC",
+      "source": "Zomato",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "fd-tiffin",
+        "fd-restaurant"
+      ]
+    },
+    {
+      "id": "sparkle-nursing-bureau",
+      "business_name": "Sparkle Nursing Bureau",
+      "contact_person": "",
+      "shop_office": "Sparkle Nursing Bureau",
+      "address": {
+        "building": "Office near Bhumkar Chowk",
+        "street": "",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Office near Bhumkar Chowk, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 7722000812",
+        "+91 8108595001"
+      ],
+      "emails": [
+        "info@sparklebureau.in"
+      ],
+      "website": "https://sparklebureau.in/",
+      "maps_name": "Sparkle Nursing Bureau Wakad",
+      "services_offered": "Home nursing, elderly care, ICU nurses, 24/7 attendants",
+      "rating": "Website",
+      "hours": "24/7",
+      "service_areas": "Wakad, Hinjewadi, Baner, Pimple Saudagar, PCMC",
+      "source": "sparklebureau.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "hl-elder",
+        "hl-nursing",
+        "hl-doctor"
+      ]
+    },
+    {
+      "id": "ma-health-care-foundation",
+      "business_name": "MA Health Care Foundation",
+      "contact_person": "Mrs. Madhuri Gurav",
+      "shop_office": "MA Health Care Foundation",
+      "address": {
+        "building": "Jankar Residency, Shiv Shambho Colony",
+        "street": "Adarsh Nagar Rd, Kiwale",
+        "area": "Ravet",
+        "city": "Pimpri-Chinchwad",
+        "pin": "412101",
+        "state": "Maharashtra",
+        "full": "Jankar Residency, Shiv Shambho Colony, Adarsh Nagar Rd, Kiwale, Ravet, Pimpri-Chinchwad, 412101, Maharashtra"
+      },
+      "phones": [
+        "+91 9156567152"
+      ],
+      "emails": [],
+      "website": "https://mahealthfoundation.in/",
+      "maps_name": "MA Health Care nursing bureau Ravet",
+      "services_offered": "Home nursing, patient care, babysitting, medical equipment rental",
+      "rating": "Website — 15+ years",
+      "hours": "24/7",
+      "service_areas": "Wakad, Ravet, PCMC, Thergaon, Pimple Saudagar",
+      "source": "mahealthfoundation.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "hl-elder",
+        "hl-nursing",
+        "hl-specialist"
+      ]
+    },
+    {
+      "id": "omika-health-care",
+      "business_name": "Omika Health Care",
+      "contact_person": "",
+      "shop_office": "Omika Health Care",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9833988899",
+        "+91 9990211277"
+      ],
+      "emails": [],
+      "website": "https://omikahealthcare.com/nursing-service-in-pune/",
+      "maps_name": "Omika Health Care Pune nursing",
+      "services_offered": "12/24 hr nursing at home, IV, injections, post-op care",
+      "rating": "Website",
+      "hours": "24/7",
+      "service_areas": "Pune, PCMC",
+      "source": "omikahealthcare.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "hl-nursing",
+        "hl-elder",
+        "hl-doctor"
+      ]
+    },
+    {
+      "id": "advocate-haji-karamatulla-khan-kadri",
+      "business_name": "Advocate Haji Karamatulla Khan Kadri",
+      "contact_person": "Haji Karamatulla Khan Kadri",
+      "shop_office": "Advocate office",
+      "address": {
+        "building": "Plot No 8, Sec 30/32",
+        "street": "Chintamani Mandir Road, Walhekarwadi",
+        "area": "Chinchwad",
+        "city": "Pimpri Chinchwad",
+        "pin": "411033",
+        "state": "Maharashtra",
+        "full": "Plot No 8, Sec 30/32, Chintamani Mandir Road, Walhekarwadi, Chinchwad, Pimpri Chinchwad, 411033, Maharashtra"
+      },
+      "phones": [
+        "+91 7276869192",
+        "+91 9834988568"
+      ],
+      "emails": [
+        "advkhan785@gmail.com"
+      ],
+      "website": "https://www.advhajikaramat.in/",
+      "maps_name": "Advocate Haji Karamatulla Khan Kadri Chinchwad",
+      "services_offered": "Family, criminal, civil, property, tax, divorce, registration",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Pimpri Chinchwad, Pune, Maharashtra",
+      "source": "advhajikaramat.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "lg-consult",
+        "lg-court",
+        "lg-family",
+        "lg-property-reg",
+        "lg-contract"
+      ]
+    },
+    {
+      "id": "samyak-nahata-law-firm",
+      "business_name": "Samyak Nahata Law Firm",
+      "contact_person": "Adv. Samyak Nahata",
+      "shop_office": "The Jewel Of Pimpri",
+      "address": {
+        "building": "Office No.25, B Wing",
+        "street": "Kamala Cross Rd, near PCMC Building, MIDC",
+        "area": "Pimpri Colony",
+        "city": "Pimpri-Chinchwad",
+        "pin": "411018",
+        "state": "Maharashtra",
+        "full": "Office No.25, B Wing, Kamala Cross Rd, near PCMC Building, MIDC, Pimpri Colony, Pimpri-Chinchwad, 411018, Maharashtra"
+      },
+      "phones": [
+        "+91 8999355609"
+      ],
+      "emails": [
+        "samyak2399@gmail.com"
+      ],
+      "website": "https://advsamyakdhirajnahata.in/",
+      "maps_name": "Samyak Nahata Law Firm Pimpri",
+      "services_offered": "Divorce, criminal, consumer, cyber, civil, family law",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Pune, Pimpri-Chinchwad",
+      "source": "advsamyakdhirajnahata.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "lg-consult",
+        "lg-family",
+        "lg-contract",
+        "lg-doc-draft"
+      ]
+    },
+    {
+      "id": "estate-rabbit-wakad",
+      "business_name": "Estate Rabbit Wakad",
+      "contact_person": "",
+      "shop_office": "Estate Rabbit",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8483850070"
+      ],
+      "emails": [
+        "Info@estaterabbit.com"
+      ],
+      "website": "https://estaterabbit.com/flats-on-rent-in-wakad/",
+      "maps_name": "Estate Rabbit flats on rent Wakad",
+      "services_offered": "Flats on rent, buy/sell assistance, site visits, Wakad & West Pune",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Wakad, Hinjewadi, Baner, Balewadi, PCMC",
+      "source": "estaterabbit.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "pr-rent",
+        "pr-buy",
+        "pr-site"
+      ]
+    },
+    {
+      "id": "pune-rentals",
+      "business_name": "Pune Rentals",
+      "contact_person": "",
+      "shop_office": "Pune Rentals",
+      "address": {
+        "building": "",
+        "street": "Shankar Kalat Nagar",
+        "area": "Wakad",
+        "city": "Pimpri Chinchwad",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Shankar Kalat Nagar, Wakad, Pimpri Chinchwad, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 9540907979"
+      ],
+      "emails": [],
+      "website": "https://pune-rentals.com/",
+      "maps_name": "Pune Rentals Wakad",
+      "services_offered": "Rent flats, PG, site visits, tenant matching",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Wakad, PCMC, Pune",
+      "source": "pune-rentals.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "pr-rent",
+        "pr-site",
+        "pr-commercial"
+      ]
+    },
+    {
+      "id": "corporate-leasing-pune",
+      "business_name": "Corporate Leasing Pune",
+      "contact_person": "",
+      "shop_office": "Corporate Leasing Pune",
+      "address": {
+        "building": "",
+        "street": "Orbit Heritage, Wakad",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Orbit Heritage, Wakad, Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8788800500"
+      ],
+      "emails": [],
+      "website": "https://corporateleasingpune.com/",
+      "maps_name": "Corporate Leasing Pune Wakad",
+      "services_offered": "Corporate rentals, furnished flats, commercial leasing",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Wakad, Pune, PCMC",
+      "source": "corporateleasingpune.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "pr-rent",
+        "pr-commercial",
+        "pr-buy"
+      ]
+    },
+    {
+      "id": "core-it-solution-cits",
+      "business_name": "Core IT Solution (CITS)",
+      "contact_person": "",
+      "shop_office": "Shital Plaza Shop No. 10",
+      "address": {
+        "building": "Shital Plaza",
+        "street": "Hinjawadi Road, Opposite Hinjewadi Grampanchayat Building",
+        "area": "Hinjewadi",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Shital Plaza, Hinjawadi Road, Opposite Hinjewadi Grampanchayat Building, Hinjewadi, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 9762554009",
+        "+91 9372554009"
+      ],
+      "emails": [
+        "servicescoreit@gmail.com"
+      ],
+      "website": "https://coreit.in/",
+      "maps_name": "Core IT Solution Hinjewadi",
+      "services_offered": "Laptop/PC repair, hardware supply, IT support Hinjewadi",
+      "rating": "Google reviews on website",
+      "hours": "Mon-Sun 10 AM - 8 PM",
+      "service_areas": "Hinjewadi, Wakad, Pune",
+      "source": "coreit.in + Sulekha",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "cl-hardware",
+        "cl-managed",
+        "cl-network"
+      ]
+    },
+    {
+      "id": "infodot-technologies",
+      "business_name": "Infodot Technologies",
+      "contact_person": "",
+      "shop_office": "Infodot Technologies",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Hinjewadi / Pune",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Hinjewadi / Pune, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9343735067"
+      ],
+      "emails": [
+        "sales@infodot.co.in"
+      ],
+      "website": "https://infodot.co.in/it-services/managed-it-services-in-pune/",
+      "maps_name": "Infodot managed IT services Pune",
+      "services_offered": "Managed IT, cybersecurity, 24/7 monitoring, backup & DR",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Hinjewadi, Kharadi, Magarpatta, PCMC, Wakad",
+      "source": "infodot.co.in",
+      "notes": "On-site across Pune MMR",
+      "confidence": "high",
+      "service_ids": [
+        "cl-managed",
+        "cl-backup",
+        "cl-infra-audit",
+        "cl-maas"
+      ]
+    },
+    {
+      "id": "krezup-it-infrastructure",
+      "business_name": "Krezup IT Infrastructure",
+      "contact_person": "",
+      "shop_office": "Krezup",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune & MIDC",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune & MIDC, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9145361357"
+      ],
+      "emails": [],
+      "website": "https://krezup.in/",
+      "maps_name": "Krezup IT infrastructure Pune",
+      "services_offered": "Data center, networking, cabling, server install, AMC",
+      "rating": "Website",
+      "hours": "",
+      "service_areas": "Hinjewadi, Wakad, PCMC, Chakan, Kharadi",
+      "source": "krezup.in",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "cl-datacenter",
+        "cl-network",
+        "cl-hardware",
+        "cl-dc-operate"
+      ]
+    },
+    {
+      "id": "pravasi-cab-wakad",
+      "business_name": "Pravasi Cab Wakad",
+      "contact_person": "",
+      "shop_office": "Pravasi Cab",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Wakad",
+        "city": "Pune",
+        "pin": "411057",
+        "state": "Maharashtra",
+        "full": "Wakad, Pune, 411057, Maharashtra"
+      },
+      "phones": [
+        "+91 8149817272"
+      ],
+      "emails": [],
+      "website": "https://pravasicab.com/cab-service-wakad-pune",
+      "maps_name": "Pravasi Cab Wakad airport taxi",
+      "services_offered": "24/7 airport transfer, premium sedans/SUVs, corporate billing",
+      "rating": "Website",
+      "hours": "24/7",
+      "service_areas": "Wakad, PCMC, Pune Airport, outstation",
+      "source": "pravasicab.com",
+      "notes": "VIP airport & chauffeur partner candidate",
+      "confidence": "high",
+      "service_ids": [
+        "vip-airport",
+        "vip-concierge"
+      ]
+    },
+    {
+      "id": "k-k-travels",
+      "business_name": "K K Travels",
+      "contact_person": "",
+      "shop_office": "K K Travels",
+      "address": {
+        "building": "",
+        "street": "",
+        "area": "Pune",
+        "city": "Pune",
+        "pin": "",
+        "state": "Maharashtra",
+        "full": "Pune, Pune, Maharashtra"
+      },
+      "phones": [
+        "+91 9822979797"
+      ],
+      "emails": [],
+      "website": "https://www.kktravels.com/",
+      "maps_name": "KK Travels Pune airport transfer",
+      "services_offered": "Airport transfers, corporate travel, holiday tours, 150+ owned cabs",
+      "rating": "Website — est. 1995",
+      "hours": "24/7",
+      "service_areas": "Pune, Mumbai, Nashik airports",
+      "source": "kktravels.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "vip-airport",
+        "vip-event",
+        "vip-concierge"
+      ]
+    },
+    {
+      "id": "shreeram-cabs",
+      "business_name": "Shreeram Cabs",
+      "contact_person": "",
+      "shop_office": "Office No. 1, P.S.Terrace",
+      "address": {
+        "building": "P.S.Terrace",
+        "street": "Sasane Nagar",
+        "area": "Hadapsar",
+        "city": "Pune",
+        "pin": "411028",
+        "state": "Maharashtra",
+        "full": "P.S.Terrace, Sasane Nagar, Hadapsar, Pune, 411028, Maharashtra"
+      },
+      "phones": [
+        "+91 9373520808"
+      ],
+      "emails": [
+        "booking@shreeramcab.com"
+      ],
+      "website": "https://www.shreeramcab.com/",
+      "maps_name": "Shreeram Cabs Pune airport",
+      "services_offered": "Premium airport pickup/drop, sedans/Innova, corporate travellers",
+      "rating": "Website",
+      "hours": "24/7",
+      "service_areas": "Wakad, Hinjewadi, Baner, PCMC, Pune Airport",
+      "source": "shreeramcab.com",
+      "notes": "",
+      "confidence": "high",
+      "service_ids": [
+        "vip-airport",
+        "vip-assistant"
       ]
     }
   ]

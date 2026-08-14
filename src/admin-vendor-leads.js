@@ -4,7 +4,41 @@ import { useState, useEffect, useMemo } from 'react';
 const THEME_COLORS = {
   pink: { color: '#F472B6', bg: '#FFF1F5', border: '#FBCFE8' },
   green: { color: '#34D399', bg: '#ECFDF5', border: '#A7F3D0' },
+  host: { color: '#2563EB', bg: '#DBEAFE', border: '#93C5FD' },
+  build: { color: '#6366F1', bg: '#EEF2FF', border: '#A5B4FC' },
+  care: { color: '#0891B2', bg: '#CFFAFE', border: '#67E8F9' },
+  pack: { color: '#7C3AED', bg: '#F3E8FF', border: '#C4B5FD' },
+  counsel: { color: '#6366F1', bg: '#EEF2FF', border: '#A5B4FC' },
+  docs: { color: '#4F46E5', bg: '#E0E7FF', border: '#818CF8' },
+  concierge: { color: '#D97706', bg: '#FEF3C7', border: '#FCD34D' },
+  travel: { color: '#B45309', bg: '#FFEDD5', border: '#FDBA74' },
+  home: { color: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5' },
+  clinical: { color: '#E11D48', bg: '#FFE4E6', border: '#FDA4AF' },
+  find: { color: '#EA580C', bg: '#FFEDD5', border: '#FDBA74' },
+  verify: { color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' },
+  local: { color: '#0891B2', bg: '#CFFAFE', border: '#67E8F9' },
+  express: { color: '#0E7490', bg: '#ECFEFF', border: '#A5F3FC' },
+  daily: { color: '#DB2777', bg: '#FCE7F3', border: '#F9A8D4' },
+  events: { color: '#BE185D', bg: '#FFF1F2', border: '#FDA4AF' },
+  roadside: { color: '#EA580C', bg: '#FFEDD5', border: '#FDBA74' },
+  service: { color: '#7C3AED', bg: '#EDE9FE', border: '#C4B5FD' },
 };
+
+const ONBOARD_STATUS_LABELS = {
+  research: 'Research',
+  contacted: 'Contacted',
+  validating: 'Validating',
+  ready: 'Ready',
+  added: 'Added to ScanV',
+  rejected: 'Rejected',
+};
+
+const VALIDATION_FIELDS = [
+  { key: 'phone_verified', label: 'Phone verified', hint: 'Call / OTP on primary number' },
+  { key: 'name_verified', label: 'Name verified', hint: 'Business + contact person match Aadhaar / PAN' },
+  { key: 'address_verified', label: 'Address verified', hint: 'Shop or service area confirmed on Maps / visit' },
+  { key: 'aadhaar_verified', label: 'Aadhaar verified', hint: 'Digio eKYC or manual last-4 check' },
+];
 
 function telHref(phone) {
   const d = String(phone || '').replace(/\D/g, '');
@@ -92,6 +126,9 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
   const [selectedMainCards, setSelectedMainCards] = useState(new Set());
   const [selectedSubCards, setSelectedSubCards] = useState(new Set());
   const [initialized, setInitialized] = useState(false);
+  const [savingId, setSavingId] = useState('');
+  const [actionErr, setActionErr] = useState('');
+  const [drafts, setDrafts] = useState({});
 
   useEffect(() => {
     if (!pin || !adminHubFetch) return;
@@ -176,6 +213,72 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
       .sort((a, b) => a.business_name.localeCompare(b.business_name));
   }, [allVendors, activeServiceIds, selectedMainCards.size, selectedSubCards.size, q]);
 
+  const getDraft = (v) => {
+    const onboard = v.onboard || {};
+    return drafts[v.id] || {
+      onboard_status: onboard.onboard_status || 'research',
+      phone_verified: !!onboard.phone_verified,
+      name_verified: !!onboard.name_verified,
+      address_verified: !!onboard.address_verified,
+      aadhaar_verified: !!onboard.aadhaar_verified,
+      aadhaar_last4: onboard.aadhaar_last4 || '',
+      validation_notes: onboard.validation_notes || '',
+    };
+  };
+
+  const patchVendorOnboard = (leadId, onboard) => {
+    setCatalog((prev) => {
+      if (!prev?.vendors) return prev;
+      return {
+        ...prev,
+        vendors: prev.vendors.map((v) => (v.id === leadId ? { ...v, onboard } : v)),
+      };
+    });
+  };
+
+  const saveLead = async (leadId, patch) => {
+    setSavingId(leadId);
+    setActionErr('');
+    try {
+      const r = await adminHubFetch('update_vendor_lead', { lead_id: leadId, ...patch }, pin);
+      if (r?.error) throw new Error(r.error);
+      patchVendorOnboard(leadId, r.onboard);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[leadId];
+        return next;
+      });
+    } catch (e) {
+      setActionErr(e.message || 'Could not save lead');
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  const addToScanV = async (v) => {
+    const leadId = v.id;
+    const draft = getDraft(v);
+    setSavingId(leadId);
+    setActionErr('');
+    try {
+      const saveR = await adminHubFetch('update_vendor_lead', { lead_id: leadId, ...draft }, pin);
+      if (saveR?.error) throw new Error(saveR.error);
+      patchVendorOnboard(leadId, saveR.onboard);
+      const r = await adminHubFetch('add_vendor_lead_to_scanv', { lead_id: leadId }, pin);
+      if (r?.error) throw new Error(r.error);
+      patchVendorOnboard(leadId, r.onboard);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[leadId];
+        return next;
+      });
+    } catch (e) {
+      setActionErr(e.message || 'Could not add to ScanV');
+    } finally {
+      setSavingId('');
+    }
+  };
+
   const tagStyle = (theme) => {
     const t = THEME_COLORS[theme] || { color: C.acc, bg: `${C.acc}12`, border: `${C.acc}44` };
     return {
@@ -209,10 +312,15 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
         <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Vendor leads by ScanV card</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
           Pick main card(s) and sub-card(s). Vendors below are filtered to those services only.
+          Mark phone, name, address, and Aadhaar before adding a partner to ScanV.
           {catalog?.meta?.market ? ` Market: ${catalog.meta.market}.` : ''}
           {catalog?.meta?.captured_at ? ` Updated ${catalog.meta.captured_at}.` : ''}
         </div>
       </div>
+
+      {actionErr ? (
+        <div style={{ ...S.card(), padding: 12, marginBottom: 14, color: C.red, fontSize: 11 }}>{actionErr}</div>
+      ) : null}
 
       <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
         <MultiSelectRow
@@ -268,6 +376,14 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
       <div style={{ display: 'grid', gap: 12 }}>
         {vendors.map((v) => {
           const open = expanded === v.id;
+          const draft = getDraft(v);
+          const onboard = v.onboard || {};
+          const allVerified = draft.phone_verified && draft.name_verified && draft.address_verified && draft.aadhaar_verified;
+          const canAdd = allVerified && onboard.onboard_status !== 'added' && !onboard.vendor_partner_id;
+          const statusColor = onboard.onboard_status === 'added' ? C.grn
+            : onboard.onboard_status === 'rejected' ? C.red
+            : onboard.onboard_status === 'ready' ? C.acc
+            : C.gold;
           return (
             <div key={v.id} style={{ ...S.card(), padding: 0, overflow: 'hidden', border: `1px solid ${C.bdr}` }}>
               <button
@@ -280,7 +396,21 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, color: C.txt, fontSize: 14, marginBottom: 6 }}>{v.business_name}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontWeight: 800, color: C.txt, fontSize: 14 }}>{v.business_name}</div>
+                      <span style={{
+                        fontSize: 9, fontWeight: 800, textTransform: 'uppercase',
+                        padding: '4px 8px', borderRadius: 999, color: statusColor,
+                        background: `${statusColor}18`, border: `1px solid ${statusColor}44`,
+                      }}>
+                        {ONBOARD_STATUS_LABELS[onboard.onboard_status] || 'Research'}
+                      </span>
+                      {allVerified ? (
+                        <span style={{ fontSize: 9, fontWeight: 800, color: C.grn, background: `${C.grn}18`, padding: '4px 8px', borderRadius: 999 }}>
+                          4/4 validated
+                        </span>
+                      ) : null}
+                    </div>
                     <div style={{ marginBottom: 6 }}>
                       {(v.matched_services || []).map((s) => (
                         <span key={s.id} style={tagStyle(s.theme)} title={`${s.sub_card} · ${s.id}`}>{s.name}</span>
@@ -354,6 +484,110 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
                         {v.notes}
                       </div>
                     ) : null}
+
+                    <div style={{ marginTop: 12, padding: 12, background: `${C.acc}06`, borderRadius: 10, border: `1px solid ${C.acc}22` }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: C.txt, marginBottom: 10 }}>Add to ScanV — validation</div>
+
+                      <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>Onboard status</label>
+                        <select
+                          value={draft.onboard_status}
+                          onChange={(e) => setDrafts((prev) => ({
+                            ...prev,
+                            [v.id]: { ...getDraft(v), onboard_status: e.target.value },
+                          }))}
+                          style={{ ...S.inp(), fontSize: 11, padding: '8px 10px' }}
+                        >
+                          {(catalog?.onboard_statuses || Object.keys(ONBOARD_STATUS_LABELS)).map((s) => (
+                            <option key={s} value={s}>{ONBOARD_STATUS_LABELS[s] || s}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+                        {VALIDATION_FIELDS.map((f) => (
+                          <label key={f.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontSize: 11, color: C.txt }}>
+                            <input
+                              type="checkbox"
+                              checked={!!draft[f.key]}
+                              onChange={(e) => setDrafts((prev) => ({
+                                ...prev,
+                                [v.id]: { ...getDraft(v), [f.key]: e.target.checked },
+                              }))}
+                              style={{ marginTop: 2 }}
+                            />
+                            <span>
+                              <strong>{f.label}</strong>
+                              <span style={{ display: 'block', fontSize: 10, color: C.dim, fontWeight: 500 }}>{f.hint}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+
+                      <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>Aadhaar last 4 (after eKYC)</label>
+                        <input
+                          value={draft.aadhaar_last4}
+                          onChange={(e) => setDrafts((prev) => ({
+                            ...prev,
+                            [v.id]: { ...getDraft(v), aadhaar_last4: e.target.value.replace(/\D/g, '').slice(0, 4) },
+                          }))}
+                          placeholder="1234"
+                          maxLength={4}
+                          style={{ ...S.inp(), fontSize: 11, width: 100 }}
+                        />
+                        <textarea
+                          value={draft.validation_notes}
+                          onChange={(e) => setDrafts((prev) => ({
+                            ...prev,
+                            [v.id]: { ...getDraft(v), validation_notes: e.target.value },
+                          }))}
+                          placeholder="Validation notes (call log, eKYC ref, Maps check…)"
+                          rows={2}
+                          style={{ ...S.inp(), fontSize: 11, resize: 'vertical' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          disabled={savingId === v.id}
+                          onClick={() => saveLead(v.id, getDraft(v))}
+                          style={{
+                            padding: '8px 14px', borderRadius: 10, border: `1px solid ${C.bdr}`,
+                            background: C.surf, color: C.acc, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF,
+                          }}
+                        >
+                          {savingId === v.id ? 'Saving…' : 'Save status'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canAdd || savingId === v.id}
+                          title={canAdd ? 'Create pending vendor partner' : 'Check all four validations first'}
+                          onClick={() => addToScanV(v)}
+                          style={{
+                            padding: '8px 14px', borderRadius: 10, border: 'none',
+                            background: canAdd ? C.acc : `${C.dim}44`, color: '#fff',
+                            fontSize: 11, fontWeight: 800, cursor: canAdd ? 'pointer' : 'not-allowed', fontFamily: FF,
+                          }}
+                        >
+                          Add to ScanV
+                        </button>
+                        {onboard.vendor_partner_id ? (
+                          <a
+                            href={`#vendor-admin?vendor=${onboard.vendor_partner_id}`}
+                            style={{ fontSize: 11, color: C.grn, fontWeight: 700, textDecoration: 'none' }}
+                          >
+                            Open in Vendor Admin →
+                          </a>
+                        ) : null}
+                      </div>
+                      {!allVerified ? (
+                        <div style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+                          All four checks required before Add to ScanV: phone, name, address, Aadhaar.
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ) : null}
