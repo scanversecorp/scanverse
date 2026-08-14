@@ -1,0 +1,26 @@
+HOUSEHOLD VENDOR — 10-MIN CALL SCRIPT (Jasmeen / DCORE)
+
+OPEN
+"Namaste, am I speaking with [Name] from [Business]? I'm Jasmeen from DCORE Global — we run ScanV, a local booking app for Wakad and PCMC."
+
+HOOK (30 sec)
+"Customers search on ScanV for deep cleaning, home help, sofa cleaning — we send them verified local partners. Launch partners pay zero listing fee. You keep your price; we send bookings and collect UPI payment on the app."
+
+QUALIFY
+1. "Which areas do you cover daily?" → note Wakad / Hinjewadi / PCMC
+2. "Typical 2BHK deep clean price?" → note for ScanV pricing admin
+3. "How many jobs per week can you take from the app?" → capacity
+
+TRUST
+"We verify phone, address, and Aadhaar before listing. You appear under Household services on the app."
+
+CLOSE
+"I'll send a WhatsApp with our partner link. Can you share Aadhaar last-4 and one photo of your team or shop for verification? We can go live this week."
+
+OBJECTIONS
+- "We already have Urban Company" → "ScanV is local-first, lower commission, your brand name on the listing."
+- "No time" → "10 minutes now or I'll WhatsApp the one-pager — reply when free."
+- "What commission?" → "Launch: no listing fee; we agree a small platform fee per completed booking before first job."
+
+AFTER CALL
+Admin → Vendor Leads → mark Phone + Name + Address verified → Add to ScanV

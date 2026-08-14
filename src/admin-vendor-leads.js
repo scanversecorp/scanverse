@@ -45,6 +45,16 @@ function telHref(phone) {
   return d ? `tel:+${d.startsWith('91') ? d : `91${d}`}` : null;
 }
 
+function waHref(phone, text) {
+  const d = String(phone || '').replace(/\D/g, '');
+  if (!d) return null;
+  const n = d.startsWith('91') ? d : `91${d}`;
+  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+
+const VENDOR_OUTREACH_MSG = (name) =>
+  `Namaste, I'm Jasmeen from DCORE Global (ScanV — scanv-tau.vercel.app). We send verified bookings in Wakad/PCMC to partners like ${name || 'you'}. Zero listing fee for launch — you keep your pricing, we handle booking + UPI payment. Can we do a 10-minute call today?`;
+
 function mailHref(email) {
   const e = String(email || '').trim();
   return e ? `mailto:${e}` : null;
@@ -454,6 +464,12 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
                       {(v.phones || []).map((p) => (
                         <a key={p} href={telHref(p)} style={{ fontSize: 11, color: C.acc, fontWeight: 700, textDecoration: 'none' }}>{p}</a>
                       ))}
+                      {(v.phones || []).slice(0, 1).map((p) => {
+                        const wa = waHref(p, VENDOR_OUTREACH_MSG(v.business_name));
+                        return wa ? (
+                          <a key={`wa-${p}`} href={wa} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: C.grn, fontWeight: 700, textDecoration: 'none' }}>WhatsApp outreach →</a>
+                        ) : null;
+                      })}
                       {(v.emails || []).map((e) => (
                         <a key={e} href={mailHref(e)} style={{ fontSize: 11, color: C.acc, fontWeight: 700, textDecoration: 'none' }}>{e}</a>
                       ))}

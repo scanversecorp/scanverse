@@ -5,6 +5,94 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1
 import { listLogisticsPipeline } from "./logistics-partners-admin.ts";
 import { ONBOARD_STATUSES } from "./vendor-leads-admin.ts";
 
+const PRIORITY_AREAS = ["wakad", "hinjewadi", "baner", "kalewadi", "akurdi", "pcm", "pimpri", "chinchwad"];
+
+export function vendorOutreachMessage(businessName: string): string {
+  const name = businessName.trim() || "service partner";
+  return [
+    "Namaste, I'm Jasmeen from DCORE Global (ScanV — scanv-tau.vercel.app).",
+    `We send verified bookings in Wakad/PCMC to partners like ${name}.`,
+    "Zero listing fee for launch — you keep your pricing, we handle booking + UPI payment.",
+    "Can we do a 10-minute call today?",
+  ].join(" ");
+}
+
+function areaScore(area: string, serviceAreas: string): number {
+  const hay = `${area} ${serviceAreas}`.toLowerCase();
+  for (let i = 0; i < PRIORITY_AREAS.length; i++) {
+    if (hay.includes(PRIORITY_AREAS[i])) return PRIORITY_AREAS.length - i;
+  }
+  return 0;
+}
+
+function vendorPrimaryCard(vendorId: string): string | null {
+  const serviceById = new Map(catalog.services.map((s: { id: string; parent_card_id: string }) => [s.id, s]));
+  const v = (catalog.vendors as Array<{ id: string; service_ids: string[] }>).find((x) => x.id === vendorId);
+  if (!v?.service_ids?.length) return null;
+  const svc = serviceById.get(v.service_ids[0]);
+  return svc?.parent_card_id || null;
+}
+
+function buildStrikeList(
+  tracking: Array<{ lead_id: string; onboard_status: string }>,
+) {
+  const statusByLead = new Map(tracking.map((r) => [String(r.lead_id), String(r.onboard_status || "research")]));
+  const vendors = (catalog.vendors as Array<{
+    id: string;
+    business_name: string;
+    contact_person: string;
+    phones: string[];
+    address: { area: string; city: string };
+    service_areas: string;
+    confidence: string;
+  }>).filter((v) => {
+    const card = vendorPrimaryCard(v.id);
+    if (card !== "household") return false;
+    const st = statusByLead.get(v.id) || "research";
+    if (st === "added" || st === "rejected") return false;
+    return v.confidence === "high" && (v.phones?.length || 0) > 0;
+  });
+
+  vendors.sort((a, b) => {
+    const sa = areaScore(a.address?.area || "", a.service_areas || "");
+    const sb = areaScore(b.address?.area || "", b.service_areas || "");
+    if (sb !== sa) return sb - sa;
+    return a.business_name.localeCompare(b.business_name);
+  });
+
+  return vendors.slice(0, 8).map((v, i) => ({
+    rank: i + 1,
+    lead_id: v.id,
+    business_name: v.business_name,
+    contact_person: v.contact_person || null,
+    phone: v.phones[0],
+    area: v.address?.area || v.address?.city || "Pune",
+    onboard_status: statusByLead.get(v.id) || "research",
+    outreach_message: vendorOutreachMessage(v.business_name),
+    admin_url: `https://scanv-tau.vercel.app/#admin?tab=vendor-leads`,
+  }));
+}
+
+function buildLogisticsStrike(
+  logistics: Array<{ id: string; name: string; outreach_status: string; follow_up_at: string | null; contact_email: string }>,
+) {
+  const now = new Date();
+  return logistics
+    .filter((p) =>
+      p.follow_up_at &&
+      new Date(String(p.follow_up_at)) <= now &&
+      !["integrated", "declined", "contract"].includes(String(p.outreach_status))
+    )
+    .map((p) => ({
+      partner_id: p.id,
+      name: p.name,
+      outreach_status: p.outreach_status,
+      contact_email: p.contact_email,
+      follow_up_template: "docs/email-followup-plain.txt",
+      admin_url: "https://scanv-tau.vercel.app/#admin?tab=logistics",
+    }));
+}
+
 type CardRow = {
   card_id: string;
   label: string;
@@ -46,14 +134,6 @@ function servicesByCard(): Map<string, number> {
     map.set(s.parent_card_id, (map.get(s.parent_card_id) || 0) + 1);
   }
   return map;
-}
-
-function vendorPrimaryCard(vendorId: string): string | null {
-  const serviceById = new Map(catalog.services.map((s: { id: string; parent_card_id: string }) => [s.id, s]));
-  const v = (catalog.vendors as Array<{ id: string; service_ids: string[] }>).find((x) => x.id === vendorId);
-  if (!v?.service_ids?.length) return null;
-  const svc = serviceById.get(v.service_ids[0]);
-  return svc?.parent_card_id || null;
 }
 
 export async function getBusinessCommand(sb: SupabaseClient) {
@@ -134,6 +214,11 @@ export async function getBusinessCommand(sb: SupabaseClient) {
   return {
     cards,
     action_queue: actionQueue,
+    strike_list: {
+      vendors: buildStrikeList(tracking),
+      logistics: buildLogisticsStrike(logistics),
+      generated_at: new Date().toISOString(),
+    },
     summary: {
       card_count: cards.length,
       overall_readiness_pct: overallReadiness,

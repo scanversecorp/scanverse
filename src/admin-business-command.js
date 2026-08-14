@@ -79,6 +79,28 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
   const cards = data?.cards || [];
   const queue = data?.action_queue || [];
   const logistics = data?.logistics_pipeline || [];
+  const strike = data?.strike_list || {};
+
+  const markContacted = async (leadId) => {
+    setBusyId(leadId);
+    setMsg('');
+    try {
+      await adminHubFetch('update_vendor_lead', { lead_id: leadId, onboard_status: 'contacted' }, pin);
+      setMsg('Marked contacted');
+      await load();
+    } catch (e) {
+      setMsg(e.message || 'Update failed');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const waUrl = (phone, text) => {
+    const d = String(phone || '').replace(/\D/g, '');
+    if (!d) return null;
+    const n = d.startsWith('91') ? d : `91${d}`;
+    return `https://wa.me/${n}?text=${encodeURIComponent(text || '')}`;
+  };
 
   return (
     <div>
@@ -107,6 +129,41 @@ export function AdminBusinessCommandTab({ pin, adminHubFetch, onNavigateTab, C, 
 
       {msg ? (
         <div style={{ ...S.card(), padding: 10, marginBottom: 12, fontSize: 11, color: msg.includes('fail') ? C.red : C.grn }}>{msg}</div>
+      ) : null}
+
+      {(strike.vendors || []).length ? (
+        <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
+          <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6, fontSize: 13 }}>Today&apos;s strike list — call / WhatsApp</div>
+          <div style={{ fontSize: 10, color: C.dim, marginBottom: 10 }}>Household · Wakad/PCMC priority · agent picks these daily</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {strike.vendors.slice(0, 5).map((v) => (
+              <div key={v.lead_id} style={{ padding: 10, borderRadius: 10, border: `1px solid ${C.bdr}`, background: `${C.gold}08` }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: C.txt }}>#{v.rank} {v.business_name}</div>
+                <div style={{ fontSize: 10, color: C.sub, marginTop: 4 }}>{v.area} · {v.phone} · {v.onboard_status}</div>
+                <div style={{ fontSize: 10, color: C.dim, marginTop: 6, lineHeight: 1.45 }}>{v.outreach_message}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  <a href={`tel:${String(v.phone).replace(/\s/g, '')}`} style={{ fontSize: 10, fontWeight: 700, color: C.acc, textDecoration: 'none' }}>Call →</a>
+                  {waUrl(v.phone, v.outreach_message) ? (
+                    <a href={waUrl(v.phone, v.outreach_message)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color: C.grn, textDecoration: 'none' }}>WhatsApp →</a>
+                  ) : null}
+                  <Btn v="outline" sm type="button" disabled={busyId === v.lead_id} onClick={() => markContacted(v.lead_id)}>Mark contacted</Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {(strike.logistics || []).length ? (
+        <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.red}44` }}>
+          <div style={{ fontWeight: 800, color: C.red, marginBottom: 8, fontSize: 13 }}>Logistics follow-ups DUE</div>
+          {strike.logistics.map((p) => (
+            <div key={p.partner_id} style={{ fontSize: 11, color: C.sub, marginBottom: 6 }}>
+              {p.name} → {p.contact_email} · use docs/email-followup-plain.txt
+            </div>
+          ))}
+          {onNavigateTab ? <Btn v="outline" sm type="button" onClick={() => onNavigateTab('logistics')}>Logistics tab →</Btn> : null}
+        </div>
       ) : null}
 
       <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
