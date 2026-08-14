@@ -1,0 +1,30 @@
+TO: info@qwqer.in
+SUBJECT: QWQER Express API + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear QWQER Team,
+
+We are ScanV (DCORE Global Corporation), building a customer booking portal for Pune and PCMC.
+
+We are interested in QWQER Express API integration for intra-city deliveries: ScanV handles booking and payment; QWQER fulfills; ScanV displays live tracking and status to the customer.
+
+Pilot: Pune (confirm coverage) · courier / parcel · low initial volume
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Enterprise / merchant account (Pune)
+- API documentation (quote, create, cancel, track, webhooks)
+- Sandbox credentials
+- Commercial & billing terms
+
+We would appreciate a callback or intro to your API / business development team.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+

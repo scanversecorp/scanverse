@@ -1,10 +1,25 @@
 #!/usr/bin/env node
 /** ScanV business pulse — run daily (cron / Cursor automation). No Mac mail access needed. */
 import https from 'https';
+import { readFileSync } from 'fs';
 
-const SB = process.env.SCANV_SB_URL || 'https://rwlwrmmqtedugcreweut.supabase.co';
-const KEY = process.env.SCANV_SB_KEY || 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
-const PIN = process.env.ADMIN_HUB_PIN || process.env.SUPPORT_ADMIN_PIN || '';
+function loadDotEnv() {
+  try {
+    const raw = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+    for (const line of raw.split('\n')) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+      if (!m || process.env[m[1]]) continue;
+      let v = m[2].trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      process.env[m[1]] = v;
+    }
+  } catch { /* no .env */ }
+}
+loadDotEnv();
+
+const SB = process.env.SCANV_SB_URL || process.env.SB_URL || 'https://rwlwrmmqtedugcreweut.supabase.co';
+const KEY = process.env.SCANV_SB_KEY || process.env.SB_KEY || 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
+const PIN = process.env.ADMIN_HUB_PIN || process.env.SUPPORT_ADMIN_PIN || process.env.ADMIN_PIN || '';
 
 if (!PIN) {
   console.error('Set ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN env var');

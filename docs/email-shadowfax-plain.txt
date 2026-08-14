@@ -1,0 +1,31 @@
+TO: hello@shadowfax.in
+SUBJECT: Hyperlocal API + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear Shadowfax Team,
+
+We are ScanV (DCORE Global Corporation), a customer portal for local deliveries in Pune and PCMC.
+
+We want Shadowfax hyperlocal API integration: customer books on ScanV → we create the trip via API → live rider tracking in ScanV (not a separate consumer app).
+
+Pilot: Pune · same-day / parcel · validation phase
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Merchant / client partner onboarding
+- Hyperlocal API: serviceability, create order, cancel, track
+- Real-time rider GPS (webhook or push API)
+- Sandbox/UAT credentials
+- Dedicated integration contact
+
+Please connect us with your enterprise / API integrations team.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+

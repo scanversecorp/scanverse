@@ -1,0 +1,176 @@
+================================================================================
+SCANV LOGISTICS PARTNER OUTREACH — copy each block into Zoho Mail → Send
+From: connect@dcoreglobal.com | Sign: Jasmeen S P | +91-8484850288
+================================================================================
+
+--- EMAIL 1: PORTER ---
+TO: help@porter.in
+SUBJECT: API integration + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear Porter Enterprise Team,
+
+We are ScanV, a customer-facing services and logistics portal operated by DCORE Global Corporation, focused initially on Pune and PCMC.
+
+We are exploring a Porter Enterprise API integration so customers can book local shipments on ScanV while fulfillment runs on Porter's network — with live driver tracking shown inside the ScanV app (customers would not need to switch to the Porter consumer app).
+
+What we want to build:
+1. Customer enters pickup + drop, package/vehicle type, and contact details on ScanV
+2. ScanV shows a fare quote (Porter rate + our platform fee, if applicable)
+3. Customer pays on ScanV (Razorpay)
+4. ScanV creates the trip via Porter API on the customer's behalf
+5. ScanV tracks Porter driver status and location in our live track screen
+6. Trip completion, cancellation, and support handled with clear status sync
+
+Pilot scope (Phase 1):
+- Geography: Pune + PCMC
+- Use cases: Same-day courier, parcel pickup/drop, small business deliveries
+- Volume: Low initial volume — validation phase
+- Product: https://scanv-tau.vercel.app
+
+What we need from Porter:
+1. Enterprise account activation (Pune)
+2. API documentation — quote, create order, cancel, track, driver details
+3. Webhooks — driver assigned, pickup, in-transit, delivered, cancelled
+4. Sandbox/UAT credentials
+5. Prepaid wallet setup and commercial terms
+6. Dedicated contact for integration support
+
+We would appreciate a callback or introduction to your API / enterprise integrations team for a Pune pilot.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+
+--- EMAIL 2: BORZO ---
+TO: sales.in@borzodelivery.com
+SUBJECT: Business API + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear Borzo Team,
+
+We are ScanV, a customer-facing logistics portal by DCORE Global Corporation, starting in Pune and PCMC.
+
+We want to integrate Borzo Business API 1.8 so customers book on ScanV, we create Borzo trips via API, and show live driver tracking inside ScanV (customers stay on our app).
+
+Pilot: Pune/PCMC · same-day courier & parcel · low initial volume
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Sandbox access (robotapitest-in.borzodelivery.com)
+- Production API token after UAT
+- Webhooks / status updates for driver assigned, pickup, in-transit, delivered
+- Commercial terms & prepaid billing
+
+We have reviewed your API docs (calculate-order, create-order). Happy to share a one-pager or join a call.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+
+--- EMAIL 3: SHADOWFAX ---
+TO: hello@shadowfax.in
+SUBJECT: Hyperlocal API + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear Shadowfax Team,
+
+We are ScanV (DCORE Global Corporation), a customer portal for local deliveries in Pune and PCMC.
+
+We want Shadowfax hyperlocal API integration: customer books on ScanV → we create the trip via API → live rider tracking in ScanV (not a separate consumer app).
+
+Pilot: Pune · same-day / parcel · validation phase
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Merchant / client partner onboarding
+- Hyperlocal API: serviceability, create order, cancel, track
+- Real-time rider GPS (webhook or push API)
+- Sandbox/UAT credentials
+- Dedicated integration contact
+
+Please connect us with your enterprise / API integrations team.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+
+--- EMAIL 4: QWQER ---
+TO: info@qwqer.in
+SUBJECT: QWQER Express API + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear QWQER Team,
+
+We are ScanV (DCORE Global Corporation), building a customer booking portal for Pune and PCMC.
+
+We are interested in QWQER Express API integration for intra-city deliveries: ScanV handles booking and payment; QWQER fulfills; ScanV displays live tracking and status to the customer.
+
+Pilot: Pune (confirm coverage) · courier / parcel · low initial volume
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Enterprise / merchant account (Pune)
+- API documentation (quote, create, cancel, track, webhooks)
+- Sandbox credentials
+- Commercial & billing terms
+
+We would appreciate a callback or intro to your API / business development team.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+
+--- EMAIL 5: DELHIVERY ---
+TO: vendordesk@delhivery.com
+SUBJECT: API partnership + Pune hyperlocal pilot — ScanV (DCORE Global Corporation)
+
+Dear Delhivery Team,
+
+We are ScanV (DCORE Global Corporation), a customer-facing delivery portal focused on Pune and PCMC, with plans to scale nationally.
+
+We want Delhivery API integration for:
+- Hyperlocal / same-day (Pune pilot)
+- Optional express for inter-city later
+
+Flow: customer books on ScanV → we create shipment via API → live tracking in ScanV.
+
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Business onboarding & assigned SPOC
+- Sandbox API token + client account
+- Hyperlocal + standard shipment APIs (create, pickup, track, cancel)
+- Webhooks for status and POD
+
+Please assign a business development / integration contact for a Pune pilot.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================

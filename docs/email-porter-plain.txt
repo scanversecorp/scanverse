@@ -1,0 +1,43 @@
+TO: help@porter.in
+SUBJECT: API integration + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear Porter Enterprise Team,
+
+We are ScanV, a customer-facing services and logistics portal operated by DCORE Global Corporation, focused initially on Pune and PCMC.
+
+We are exploring a Porter Enterprise API integration so customers can book local shipments on ScanV while fulfillment runs on Porter's network — with live driver tracking shown inside the ScanV app (customers would not need to switch to the Porter consumer app).
+
+What we want to build:
+1. Customer enters pickup + drop, package/vehicle type, and contact details on ScanV
+2. ScanV shows a fare quote (Porter rate + our platform fee, if applicable)
+3. Customer pays on ScanV (Razorpay)
+4. ScanV creates the trip via Porter API on the customer's behalf
+5. ScanV tracks Porter driver status and location in our live track screen
+6. Trip completion, cancellation, and support handled with clear status sync
+
+Pilot scope (Phase 1):
+- Geography: Pune + PCMC
+- Use cases: Same-day courier, parcel pickup/drop, small business deliveries
+- Volume: Low initial volume — validation phase
+- Product: https://scanv-tau.vercel.app
+
+What we need from Porter:
+1. Enterprise account activation (Pune)
+2. API documentation — quote, create order, cancel, track, driver details
+3. Webhooks — driver assigned, pickup, in-transit, delivered, cancelled
+4. Sandbox/UAT credentials
+5. Prepaid wallet setup and commercial terms
+6. Dedicated contact for integration support
+
+We would appreciate a callback or introduction to your API / enterprise integrations team for a Pune pilot.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
+================================================================================
+

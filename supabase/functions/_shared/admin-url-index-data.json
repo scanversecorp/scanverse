@@ -90,6 +90,12 @@
         "note": "overview"
       },
       {
+        "label": "Business HQ",
+        "adminTab": "business",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=business",
+        "note": "All 10 cards · vendor gaps · revenue pipeline · action queue"
+      },
+      {
         "label": "Pricing",
         "adminTab": "pricing",
         "url": "https://scanv-tau.vercel.app/#admin?tab=pricing",
@@ -172,6 +178,12 @@
         "adminTab": "vendor-leads",
         "url": "https://scanv-tau.vercel.app/#admin?tab=vendor-leads",
         "note": "Confidential local vendor research · Household card · PIN-gated API"
+      },
+      {
+        "label": "Logistics API",
+        "adminTab": "logistics",
+        "url": "https://scanv-tau.vercel.app/#admin?tab=logistics",
+        "note": "Porter/Borzo/Delhivery outreach · follow-ups · sandbox keys"
       },
       {
         "label": "Architecture",

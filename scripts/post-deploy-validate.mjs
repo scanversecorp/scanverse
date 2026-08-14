@@ -1,13 +1,29 @@
 #!/usr/bin/env node
 /**
  * Post-deploy validation for ScanV production.
- * Usage: ADMIN_PIN=yourpin node scripts/post-deploy-validate.mjs
+ * Usage: node scripts/post-deploy-validate.mjs  (reads .env ADMIN_* pins)
  * Exit 0 = all checks passed; exit 1 = failures listed.
  */
+import { readFileSync } from 'fs';
+
+function loadDotEnv() {
+  try {
+    const raw = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+    for (const line of raw.split('\n')) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+      if (!m || process.env[m[1]]) continue;
+      let v = m[2].trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      process.env[m[1]] = v;
+    }
+  } catch { /* no .env */ }
+}
+loadDotEnv();
+
 const APP_URL = process.env.APP_URL || 'https://scanv-tau.vercel.app';
 const SB_URL = process.env.SB_URL || 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY = process.env.SB_KEY || 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
-const ADMIN_PIN = process.env.ADMIN_PIN || '';
+const ADMIN_PIN = process.env.ADMIN_PIN || process.env.ADMIN_HUB_PIN || process.env.SUPPORT_ADMIN_PIN || '';
 
 const EXPECTED_VENDORS = [
   'twofactor', 'msg91', 'twilio', 'whatsapp', 'razorpay', 'vyapar_upi',
@@ -160,6 +176,15 @@ async function checkDiagrams() {
   }
 }
 
+async function checkBusinessCommand() {
+  const data = await adminHub('get_business_command');
+  const cards = data.cards || [];
+  if (cards.length !== 10) fail(`Business HQ: ${cards.length} cards (expected 10)`);
+  else pass(`Business HQ: ${cards.length} card pipelines`);
+  if (typeof data.summary?.overall_readiness_pct !== 'number') fail('Business HQ: missing readiness summary');
+  else pass(`Business HQ readiness: ${data.summary.overall_readiness_pct}%`);
+}
+
 async function main() {
   console.log(`\nScanV post-deploy validation → ${APP_URL}\n`);
   await checkFrontendBundle();
@@ -168,8 +193,9 @@ async function main() {
     await checkGoLiveSwitches();
     await checkDiagrams();
     await checkAdminUrlIndex();
+    await checkBusinessCommand();
   } else {
-    console.warn('\n⚠ Set ADMIN_PIN to validate Go-Live switch board and diagram catalog.\n');
+    console.warn('\n⚠ Set ADMIN_PIN (or ADMIN_HUB_PIN in .env) to validate admin APIs.\n');
   }
   console.log(`\n${passes.length} passed, ${failures.length} failed\n`);
   if (failures.length) {

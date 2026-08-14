@@ -1,0 +1,28 @@
+TO: sales.in@borzodelivery.com
+SUBJECT: Business API + Pune pilot — ScanV (DCORE Global Corporation)
+
+Dear Borzo Team,
+
+We are ScanV, a customer-facing logistics portal by DCORE Global Corporation, starting in Pune and PCMC.
+
+We want to integrate Borzo Business API 1.8 so customers book on ScanV, we create Borzo trips via API, and show live driver tracking inside ScanV (customers stay on our app).
+
+Pilot: Pune/PCMC · same-day courier & parcel · low initial volume
+Product: https://scanv-tau.vercel.app
+
+We need:
+- Sandbox access (robotapitest-in.borzodelivery.com)
+- Production API token after UAT
+- Webhooks / status updates for driver assigned, pickup, in-transit, delivered
+- Commercial terms & prepaid billing
+
+We have reviewed your API docs (calculate-order, create-order). Happy to share a one-pager or join a call.
+
+Thank you,
+
+Jasmeen S P
+ScanV · DCORE Global Corporation
+Pune, Maharashtra
+Mobile: +91-8484850288
+Email: connect@dcoreglobal.com
+
