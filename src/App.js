@@ -18,6 +18,7 @@ import QRCode from 'qrcode';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
+const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
@@ -2184,8 +2185,18 @@ function adminAuthOk() {
   } catch { return false; }
 }
 
-function setAdminAuth(pin) {
-  sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify({ pin, exp: Date.now() + 86400000 }));
+function setAdminAuth(pin, iam = null) {
+  sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify({ pin, iam, exp: Date.now() + 86400000 }));
+}
+
+function getAdminIam() {
+  const auth = getAdminAuth();
+  return auth?.iam || null;
+}
+
+function adminHasPerm(perm) {
+  const iam = getAdminIam();
+  return !!(iam?.permissions || []).includes(perm);
 }
 
 function getAdminAuth() {
@@ -2201,6 +2212,8 @@ function getAdminAuth() {
 async function adminHubFetch(action, payload = {}, pin) {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
   if (pin) headers['x-admin-pin'] = pin;
+  const staffToken = getAdminAuth()?.staff_token;
+  if (staffToken) headers['Authorization'] = `Bearer ${staffToken}`;
   const res = await fetch(ADMIN_FN, {
     method: 'POST',
     headers,
@@ -11384,6 +11397,7 @@ const ADMIN_TABS = [
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
   { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
+  { id: 'iam', label: 'Roles & IAM', icon: '🛡️' },
   { id: 'diagrams', label: 'Architecture', icon: '📐' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -13184,6 +13198,7 @@ function AdminBookingsTab({ pin }) {
 function AdminControlCenter({ onPricesUpdated }) {
   const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
   const [authed, setAuthed] = useState(adminAuthOk());
+  const [iam, setIam] = useState(() => getAdminIam());
   const [tab, setTab] = useState(() => adminTabFromHash() || 'overview');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -13216,11 +13231,12 @@ function AdminControlCenter({ onPricesUpdated }) {
     if (!pin) { setErr('Enter admin PIN'); return; }
     setLoading(true); setErr('');
     try {
-      await adminHubFetch('whoami', {}, pin);
+      const who = await adminHubFetch('whoami', {}, pin);
       sessionStorage.setItem(ADMIN_PIN_KEY, pin);
-      setAdminAuth(pin);
+      setAdminAuth(pin, who);
+      setIam(who);
       setAuthed(true);
-      setMsg('Admin hub unlocked');
+      setMsg(`Admin hub unlocked · ${who.roles?.join(', ') || who.role || 'staff'}`);
     } catch {
       setErr('Incorrect PIN — set ADMIN_HUB_PIN, SUPPORT_ADMIN_PIN, PRICING_ADMIN_PIN, or VENDOR_ADMIN_PIN in Supabase secrets');
       setAuthed(false);
@@ -13245,6 +13261,7 @@ function AdminControlCenter({ onPricesUpdated }) {
     sessionStorage.removeItem(ADMIN_PIN_KEY);
     setAuthed(false);
     setStats(null);
+    setIam(null);
   };
 
   const tabBtn = (t) => ({
@@ -13443,6 +13460,12 @@ function AdminControlCenter({ onPricesUpdated }) {
         {tab === 'vendor-leads' && usePin && (
           <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading vendor leads…</div>}>
             <AdminVendorLeadsTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} />
+          </Suspense>
+        )}
+
+        {tab === 'iam' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading IAM…</div>}>
+            <AdminIamTab pin={usePin} adminHubFetch={adminHubFetch} iam={iam} C={C} S={S} FF={FF} Spin={Spin} />
           </Suspense>
         )}
 

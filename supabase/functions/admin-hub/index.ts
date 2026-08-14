@@ -38,10 +38,14 @@
  *   directory_detail   — { profile_id? | vendor_id? }
  *   update_profile     — { profile_id, patch }
  *   list_vendors_brief — { status?, limit? } active vendors for assign dropdown
+ *   get_iam_catalog — roles, permissions, PIN→role map
+ *   list_staff_users — staff IAM registry
+ *   upsert_staff_user — { email, display_name, role_ids?, support_agent_id?, notes? }
+ *   assign_staff_roles — { staff_id, role_ids[], replace? }
  *
- * Auth: x-admin-pin header
- *   ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN
- *   exec_* actions require ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN only
+ * Auth: Authorization Bearer (staff JWT) OR x-admin-pin
+ *   PIN secrets: ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
+ *   Permissions enforced via iam_roles / iam_permissions (see get_iam_catalog)
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -93,14 +97,25 @@ import {
   getVendorLeads,
   updateVendorLead,
 } from "../_shared/vendor-leads-admin.ts";
+import {
+  assignStaffRoles,
+  getIamCatalog,
+  listStaffUsers,
+  upsertStaffUser,
+} from "../_shared/iam-admin.ts";
+import {
+  hasPermission,
+  iamWhoamiPayload,
+  requireHubPermission,
+  resolveIamContext,
+  type IamContext,
+} from "../_shared/iam.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-admin-pin",
+    "authorization, x-client-info, apikey, content-type, x-admin-pin, x-support-pin",
 };
-
-type AdminRole = "support_admin" | null;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -115,26 +130,10 @@ function adminSb() {
   return createClient(url, key);
 }
 
-function resolveRole(req: Request): AdminRole {
-  const pin = req.headers.get("x-admin-pin") || "";
-  const pins = [
-    Deno.env.get("ADMIN_HUB_PIN"),
-    Deno.env.get("SUPPORT_ADMIN_PIN"),
-    Deno.env.get("PRICING_ADMIN_PIN"),
-    Deno.env.get("VENDOR_ADMIN_PIN"),
-  ].filter((p): p is string => !!p && p.length >= 6);
-  if (pins.some((p) => pin === p)) return "support_admin";
-  return null;
-}
-
-function resolveExecRole(req: Request): AdminRole {
-  const pin = req.headers.get("x-admin-pin") || "";
-  const pins = [
-    Deno.env.get("ADMIN_HUB_PIN"),
-    Deno.env.get("SUPPORT_ADMIN_PIN"),
-  ].filter((p): p is string => !!p && p.length >= 6);
-  if (pins.some((p) => pin === p)) return "support_admin";
-  return null;
+function iamActorLabel(ctx: IamContext): string {
+  if (ctx.staff_email) return ctx.staff_email;
+  if (ctx.pin_key) return `pin:${ctx.pin_key}`;
+  return "admin-hub";
 }
 
 function isoDaysAgo(days: number): string {
@@ -605,6 +604,18 @@ async function createAgent(sb: ReturnType<typeof adminSb>, body: Record<string, 
   };
   const { data, error } = await sb.from("support_agents").insert(row).select().single();
   if (error) return json({ error: error.message }, 500);
+
+  if (row.email) {
+    const iamRole = role === "support_admin" ? "support_admin" : "support_agent";
+    await upsertStaffUser(sb, {
+      email: row.email,
+      display_name: name,
+      role_ids: [iamRole],
+      support_agent_id: data.id,
+      notes: "Linked from support_agents registry",
+    }, "create_agent");
+  }
+
   return json({ agent: data });
 }
 
@@ -1028,14 +1039,14 @@ async function getGoLiveConfig(sb: ReturnType<typeof adminSb>): Promise<Response
 async function updateGoLiveSwitch(
   sb: ReturnType<typeof adminSb>,
   body: Record<string, unknown>,
-  req: Request,
+  ctx: IamContext,
 ): Promise<Response> {
   const key = String(body.key || "").trim();
   if (!GO_LIVE_SWITCH_KEYS.has(key)) {
     return json({ error: "Invalid switch key" }, 400);
   }
-  if (EXEC_ONLY_SWITCH_KEYS.has(key) && !resolveExecRole(req)) {
-    return json({ error: "Owner PIN (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN) required for this switch" }, 403);
+  if (EXEC_ONLY_SWITCH_KEYS.has(key) && !hasPermission(ctx, "hub.go_live.exec")) {
+    return json({ error: "Permission hub.go_live.exec required for this switch" }, 403);
   }
   const enabled = body.enabled === true || body.enabled === 1 || body.enabled === "1";
   return updatePlatformSetting(sb, {
@@ -1070,11 +1081,6 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const role = resolveRole(req);
-  if (!role) {
-    return json({ error: "Unauthorized" }, 401);
-  }
-
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
@@ -1089,8 +1095,20 @@ Deno.serve(async (req) => {
   const action = String(body.action || "");
   const sb = adminSb();
 
+  const ctx = await resolveIamContext(req, sb);
+  if (!ctx) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  if (action !== "whoami") {
+    const missingPerm = requireHubPermission(ctx, action);
+    if (missingPerm) {
+      return json({ error: `Missing permission: ${missingPerm}` }, 403);
+    }
+  }
+
   if (action === "whoami") {
-    return json({ role, admin: true });
+    return json(iamWhoamiPayload(ctx));
   }
 
   if (action === "stats") {
@@ -1181,7 +1199,7 @@ Deno.serve(async (req) => {
   }
 
   if (action === "update_go_live_switch") {
-    return updateGoLiveSwitch(sb, body, req);
+    return updateGoLiveSwitch(sb, body, ctx);
   }
 
   if (action === "update_go_live_check") {
@@ -1212,14 +1230,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (action === "exec_stats" || action === "exec_charts") {
-    const execRole = resolveExecRole(req);
-    if (!execRole) {
-      return json({ error: "Executive dashboard requires ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN" }, 403);
-    }
-    if (action === "exec_stats") return execStats(sb);
-    return execCharts(sb);
-  }
+  if (action === "exec_stats") return execStats(sb);
+  if (action === "exec_charts") return execCharts(sb);
 
   if (action === "get_admin_diagrams") {
     return json({ sections: adminDiagramSections });
@@ -1237,7 +1249,7 @@ Deno.serve(async (req) => {
 
   if (action === "update_vendor_lead") {
     try {
-      const result = await updateVendorLead(sb, body, "admin-vendor-leads");
+      const result = await updateVendorLead(sb, body, iamActorLabel(ctx));
       if (result.error) return json({ error: result.error }, 400);
       return json({ success: true, onboard: result.onboard });
     } catch (e) {
@@ -1248,7 +1260,7 @@ Deno.serve(async (req) => {
 
   if (action === "add_vendor_lead_to_scanv") {
     try {
-      const result = await addVendorLeadToScanV(sb, body, "admin-vendor-leads");
+      const result = await addVendorLeadToScanV(sb, body, iamActorLabel(ctx));
       if (result.error && !result.vendor_id) {
         return json({ error: result.error, onboard: result.onboard }, 400);
       }
@@ -1348,14 +1360,40 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (action === "pricing_2fa_status" || action === "pricing_2fa_reset_send" || action === "pricing_2fa_reset_confirm") {
-    const execRole = resolveExecRole(req);
-    if (!execRole) {
-      return json({ error: "Reset pricing 2FA requires ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN" }, 403);
+  if (action === "pricing_2fa_status") return pricing2faStatus(sb);
+  if (action === "pricing_2fa_reset_send") return pricing2faResetSend(sb);
+  if (action === "pricing_2fa_reset_confirm") return pricing2faResetConfirm(sb, body);
+
+  if (action === "get_iam_catalog") {
+    try {
+      const catalog = await getIamCatalog(sb);
+      return json(catalog);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "IAM catalog failed";
+      return json({ error: msg }, 500);
     }
-    if (action === "pricing_2fa_status") return pricing2faStatus(sb);
-    if (action === "pricing_2fa_reset_send") return pricing2faResetSend(sb);
-    return pricing2faResetConfirm(sb, body);
+  }
+
+  if (action === "list_staff_users") {
+    try {
+      const staff = await listStaffUsers(sb);
+      return json({ staff, count: staff.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "List staff failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "upsert_staff_user") {
+    const result = await upsertStaffUser(sb, body, iamActorLabel(ctx));
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, staff: result.staff });
+  }
+
+  if (action === "assign_staff_roles") {
+    const result = await assignStaffRoles(sb, body, iamActorLabel(ctx));
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, staff: result.staff });
   }
 
   return json({ error: "Unknown action" }, 400);
