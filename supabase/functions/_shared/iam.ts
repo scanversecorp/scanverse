@@ -75,6 +75,7 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   list_staff_users: "hub.iam",
   upsert_staff_user: "hub.iam",
   assign_staff_roles: "hub.iam",
+  delete_staff_user: "hub.iam",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

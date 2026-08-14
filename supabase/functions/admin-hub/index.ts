@@ -99,6 +99,7 @@ import {
 } from "../_shared/vendor-leads-admin.ts";
 import {
   assignStaffRoles,
+  deleteStaffUser,
   getIamCatalog,
   listStaffUsers,
   upsertStaffUser,
@@ -1394,6 +1395,12 @@ Deno.serve(async (req) => {
     const result = await assignStaffRoles(sb, body, iamActorLabel(ctx));
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, staff: result.staff });
+  }
+
+  if (action === "delete_staff_user") {
+    const result = await deleteStaffUser(sb, body);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, deleted: result.deleted });
   }
 
   return json({ error: "Unknown action" }, 400);

@@ -42,10 +42,19 @@ export async function listStaffUsers(sb: SupabaseClient) {
   const { data: staff, error } = await sb
     .from("staff_users")
     .select("id, email, display_name, active, auth_user_id, support_agent_id, notes, created_at, updated_at")
-    .order("email");
+    .order("display_name");
   if (error) throw new Error(error.message);
 
+  const phoneByStaff = new Map<string, string | null>();
   const ids = (staff || []).map((s) => s.id);
+  if (ids.length) {
+    const phoneRes = await sb.from("staff_users").select("id, phone").in("id", ids);
+    if (!phoneRes.error) {
+      for (const row of phoneRes.data || []) {
+        phoneByStaff.set(String(row.id), row.phone ? String(row.phone) : null);
+      }
+    }
+  }
   let assignments: Array<{ staff_id: string; role_id: string }> = [];
   if (ids.length) {
     const { data: rows, error: aErr } = await sb
@@ -65,6 +74,7 @@ export async function listStaffUsers(sb: SupabaseClient) {
 
   return (staff || []).map((s) => ({
     ...s,
+    phone: phoneByStaff.get(s.id) ?? null,
     role_ids: rolesByStaff.get(s.id) || [],
   }));
 }
@@ -74,28 +84,67 @@ export async function upsertStaffUser(
   body: Record<string, unknown>,
   grantedBy: string,
 ) {
-  const email = String(body.email || "").trim().toLowerCase();
-  const displayName = String(body.display_name || body.name || "").trim();
+  const staffIdParam = String(body.staff_id || "").trim();
+  let existing: { id: string; email: string; display_name: string; active: boolean; notes: string | null; phone?: string | null } | null = null;
+
+  if (staffIdParam) {
+    const { data, error } = await sb
+      .from("staff_users")
+      .select("id, email, display_name, active, notes")
+      .eq("id", staffIdParam)
+      .maybeSingle();
+    if (error) return { error: error.message };
+    if (!data) return { error: "Staff user not found" };
+    existing = data;
+  } else {
+    const emailLookup = String(body.email || "").trim().toLowerCase();
+    if (emailLookup) {
+      const { data } = await sb.from("staff_users").select("id, email, display_name, active, notes").eq("email", emailLookup).maybeSingle();
+      existing = data;
+    }
+  }
+
+  const email = String(body.email || existing?.email || "").trim().toLowerCase();
+  const displayName = String(body.display_name || body.name || existing?.display_name || "").trim();
   if (!email || !email.includes("@")) return { error: "Valid email required" };
   if (!displayName) return { error: "display_name required" };
 
-  const patch = {
+  const patch: Record<string, unknown> = {
     email,
     display_name: displayName,
-    active: body.active !== false,
-    notes: body.notes ? String(body.notes).slice(0, 2000) : null,
-    support_agent_id: body.support_agent_id ? String(body.support_agent_id) : null,
+    active: body.active !== undefined ? !!body.active : (existing?.active ?? true),
+    notes: body.notes !== undefined
+      ? (body.notes ? String(body.notes).slice(0, 2000) : null)
+      : (existing?.notes ?? null),
   };
 
-  const { data: existing } = await sb.from("staff_users").select("id").eq("email", email).maybeSingle();
+  if (body.phone !== undefined) {
+    patch.phone = body.phone ? String(body.phone).trim().slice(0, 32) : null;
+  } else if (existing?.phone !== undefined) {
+    patch.phone = existing.phone;
+  }
 
+  if (existing && existing.email !== email) {
+    const { data: conflict } = await sb.from("staff_users").select("id").eq("email", email).neq("id", existing.id).maybeSingle();
+    if (conflict) return { error: "Email already used by another staff user" };
+  }
+
+  const writePatch = { ...patch };
   let staffId: string;
   if (existing) {
-    const { data, error } = await sb.from("staff_users").update(patch).eq("id", existing.id).select("id").single();
+    let { data, error } = await sb.from("staff_users").update(writePatch).eq("id", existing.id).select("id").single();
+    if (error?.message?.includes("phone") && error.message.includes("does not exist")) {
+      delete writePatch.phone;
+      ({ data, error } = await sb.from("staff_users").update(writePatch).eq("id", existing.id).select("id").single());
+    }
     if (error) return { error: error.message };
     staffId = data.id;
   } else {
-    const { data, error } = await sb.from("staff_users").insert(patch).select("id").single();
+    let { data, error } = await sb.from("staff_users").insert(writePatch).select("id").single();
+    if (error?.message?.includes("phone") && error.message.includes("does not exist")) {
+      delete writePatch.phone;
+      ({ data, error } = await sb.from("staff_users").insert(writePatch).select("id").single());
+    }
     if (error) return { error: error.message };
     staffId = data.id;
   }
@@ -104,11 +153,15 @@ export async function upsertStaffUser(
     await sb.from("support_agents").update({ staff_user_id: staffId }).eq("id", String(body.support_agent_id));
   }
 
+  if (patch.phone !== undefined && writePatch.phone !== undefined) {
+    await sb.from("support_agents").update({ phone: patch.phone }).eq("staff_user_id", staffId);
+  }
+
   const roleIds = Array.isArray(body.role_ids)
     ? body.role_ids.map((r) => String(r)).filter(Boolean)
-    : [];
+    : null;
 
-  if (body.role_ids !== undefined) {
+  if (roleIds !== null) {
     await sb.from("staff_role_assignments").delete().eq("staff_id", staffId);
     if (roleIds.length) {
       const rows = roleIds.map((role_id) => ({
@@ -125,6 +178,22 @@ export async function upsertStaffUser(
   const users = await listStaffUsers(sb);
   const user = users.find((u) => u.id === staffId);
   return { staff: user };
+}
+
+export async function deleteStaffUser(sb: SupabaseClient, body: Record<string, unknown>) {
+  const staffId = String(body.staff_id || "").trim();
+  if (!staffId) return { error: "staff_id required" };
+
+  const { data: row } = await sb.from("staff_users").select("id, display_name, email").eq("id", staffId).maybeSingle();
+  if (!row) return { error: "Staff user not found" };
+
+  await sb.from("support_agents").update({ staff_user_id: null }).eq("staff_user_id", staffId);
+
+  const { error } = await sb.from("staff_users").delete().eq("id", staffId);
+  if (error) return { error: error.message };
+
+  invalidateIamCache();
+  return { success: true, deleted: row };
 }
 
 export async function assignStaffRoles(

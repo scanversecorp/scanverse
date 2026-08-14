@@ -11390,7 +11390,7 @@ const ADMIN_TABS = [
   { id: 'investments', label: 'Investments', icon: '📈' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'agents', label: 'Support Agents', icon: '👥' },
-  { id: 'users', label: 'Add user', icon: '👤' },
+  { id: 'users', label: 'Staff users', icon: '👤' },
   { id: 'dispatch', label: 'Dispatch Desk', icon: '📦' },
   { id: 'directory', label: 'Users & Vendors', icon: '👤' },
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
@@ -13228,6 +13228,20 @@ function AdminControlCenter({ onPricesUpdated }) {
     window.addEventListener('hashchange', syncTabFromHash);
     return () => window.removeEventListener('hashchange', syncTabFromHash);
   }, [authed]);
+
+  useEffect(() => {
+    if (!authed || !usePin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const who = await adminHubFetch('whoami', {}, usePin);
+        if (cancelled) return;
+        setAdminAuth(usePin, who);
+        setIam(who);
+      } catch { /* stale PIN handled on next action */ }
+    })();
+    return () => { cancelled = true; };
+  }, [authed, usePin]);
 
   const login = async () => {
     if (!pin) { setErr('Enter admin PIN'); return; }

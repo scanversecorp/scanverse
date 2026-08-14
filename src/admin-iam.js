@@ -1,5 +1,6 @@
 /** Admin IAM — roles, permissions, staff assignments (PIN-gated hub tab). */
 import { useState, useEffect, useMemo } from 'react';
+import { formatRoleWithRank, sortRolesByPower } from './iam-role-ranks';
 
 const ROLE_COLORS = {
   scanv_owner: '#DC2626',
@@ -24,6 +25,7 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
   const [form, setForm] = useState({
     email: '',
     display_name: '',
+    phone: '',
     role_ids: ['support_agent'],
     notes: '',
   });
@@ -57,6 +59,11 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
     return [...new Set(perms.map((p) => p.domain))].sort();
   }, [catalog]);
 
+  const rolesByPower = useMemo(
+    () => sortRolesByPower(catalog?.roles || []),
+    [catalog?.roles],
+  );
+
   const saveStaff = async (e) => {
     e.preventDefault();
     if (!canManage) return;
@@ -65,7 +72,7 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
     try {
       await adminHubFetch('upsert_staff_user', form, pin);
       setMsg('Staff user saved');
-      setForm({ email: '', display_name: '', role_ids: ['support_agent'], notes: '' });
+      setForm({ email: '', display_name: '', phone: '', role_ids: ['support_agent'], notes: '' });
       await load();
     } catch (err) {
       setMsg(err.message || 'Save failed');
@@ -97,8 +104,9 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
         <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Roles & IAM</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
           Permission matrix for ScanV staff. PIN secrets map to roles in Supabase secrets; staff JWT roles are assigned below.
+          Role power: <strong style={{ color: C.txt }}>#1 lowest</strong> (Support Agent) → <strong style={{ color: C.txt }}>#6 highest</strong> (ScanV Owner).
           {iam?.auth_method ? ` Signed in via ${iam.auth_method}.` : ''}
-          {iam?.roles?.length ? ` Your roles: ${iam.roles.join(', ')}.` : ''}
+          {iam?.roles?.length ? ` Your roles: ${iam.roles.map((r) => formatRoleWithRank(r, r)).join(', ')}.` : ''}
         </div>
       </div>
 
@@ -125,7 +133,9 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
                 <tr key={`${row.pin_key}-${row.role_id}`} style={{ borderBottom: `1px solid ${C.bdr}` }}>
                   <td style={{ padding: '6px 8px', fontFamily: 'monospace', color: C.acc }}>{row.pin_key}</td>
                   <td style={{ padding: '6px 8px' }}>
-                    <span style={{ color: ROLE_COLORS[row.role_id] || C.txt, fontWeight: 700 }}>{row.role_id}</span>
+                    <span style={{ color: ROLE_COLORS[row.role_id] || C.txt, fontWeight: 700 }}>
+                      {formatRoleWithRank(row.role_id, row.role_id)}
+                    </span>
                   </td>
                   <td style={{ padding: '6px 8px', color: C.sub }}>{row.description || '—'}</td>
                 </tr>
@@ -141,8 +151,10 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
           <thead>
             <tr>
               <th style={{ textAlign: 'left', padding: 6, position: 'sticky', left: 0, background: C.surf }}>Permission</th>
-              {roles.map((r) => (
-                <th key={r.id} style={{ padding: 6, color: ROLE_COLORS[r.id] || C.txt, minWidth: 72 }}>{r.label}</th>
+              {rolesByPower.map((r) => (
+                <th key={r.id} style={{ padding: 6, color: ROLE_COLORS[r.id] || C.txt, minWidth: 72 }}>
+                  {formatRoleWithRank(r.id, r.label)}
+                </th>
               ))}
             </tr>
           </thead>
@@ -154,7 +166,7 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
                     <div style={{ fontWeight: 700, color: C.txt }}>{p.id}</div>
                     <div style={{ color: C.dim }}>{p.label}</div>
                   </td>
-                  {roles.map((r) => (
+                  {rolesByPower.map((r) => (
                     <td key={r.id} style={{ textAlign: 'center', padding: 6 }}>
                       {permGranted(permissionsByRole, r.id, p.id) ? (
                         <span style={{ color: C.grn, fontWeight: 800 }}>✓</span>
@@ -194,9 +206,16 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
                 onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
                 style={{ ...S.inp(), fontSize: 11 }}
               />
+              <input
+                type="tel"
+                placeholder="Phone"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                style={{ ...S.inp(), fontSize: 11 }}
+              />
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {roles.map((r) => {
+              {rolesByPower.map((r) => {
                 const on = form.role_ids.includes(r.id);
                 return (
                   <label key={r.id} style={{ fontSize: 10, display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
@@ -208,7 +227,9 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
                         role_ids: on ? f.role_ids.filter((x) => x !== r.id) : [...f.role_ids, r.id],
                       }))}
                     />
-                    <span style={{ color: ROLE_COLORS[r.id] || C.txt, fontWeight: 700 }}>{r.label}</span>
+                    <span style={{ color: ROLE_COLORS[r.id] || C.txt, fontWeight: 700 }}>
+                      {formatRoleWithRank(r.id, r.label)}
+                    </span>
                   </label>
                 );
               })}
@@ -240,6 +261,7 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
                   <div>
                     <div style={{ fontWeight: 800, color: C.txt, fontSize: 12 }}>{u.display_name}</div>
                     <div style={{ fontSize: 10, color: C.acc }}>{u.email}</div>
+                    {u.phone ? <div style={{ fontSize: 10, color: C.sub }}>{u.phone}</div> : null}
                   </div>
                   <span style={{
                     fontSize: 9, fontWeight: 800, padding: '4px 8px', borderRadius: 999,
@@ -255,7 +277,7 @@ export function AdminIamTab({ pin, adminHubFetch, iam, C, S, FF, Spin }) {
                       color: ROLE_COLORS[rid] || C.txt,
                       border: `1px solid ${ROLE_COLORS[rid] || C.bdr}44`,
                     }}>
-                      {rid}
+                      {formatRoleWithRank(rid, rid)}
                     </span>
                   ))}
                 </div>
