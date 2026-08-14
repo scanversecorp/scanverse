@@ -1,9 +1,9 @@
-/** Admin-only local vendor leads — fetched from admin-hub after PIN (not in public bundle). */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+/** Admin-only local vendor leads — fetched once after PIN; filtered by main/sub-card multi-select. */
+import { useState, useEffect, useMemo } from 'react';
 
 const THEME_COLORS = {
-  pink: { color: '#F472B6', bg: '#FFF1F5', border: '#FBCFE8', label: 'Deep cleaning' },
-  green: { color: '#34D399', bg: '#ECFDF5', border: '#A7F3D0', label: 'Home help' },
+  pink: { color: '#F472B6', bg: '#FFF1F5', border: '#FBCFE8' },
+  green: { color: '#34D399', bg: '#ECFDF5', border: '#A7F3D0' },
 };
 
 function telHref(phone) {
@@ -16,59 +16,165 @@ function mailHref(email) {
   return e ? `mailto:${e}` : null;
 }
 
+function toggleSet(set, value) {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
+
+function MultiSelectRow({ label, hint, options, selected, onChange, C, S, FF }) {
+  const allSelected = options.length > 0 && options.every((o) => selected.has(o.value));
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.txt }}>{label}</div>
+          {hint ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{hint}</div> : null}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => onChange(new Set(options.map((o) => o.value)))}
+            style={{ padding: '4px 10px', borderRadius: 999, border: `1px solid ${C.bdr}`, background: C.surf, color: C.acc, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(new Set())}
+            style={{ padding: '4px 10px', borderRadius: 999, border: `1px solid ${C.bdr}`, background: C.surf, color: C.sub, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {options.map((opt) => {
+          const on = selected.has(opt.value);
+          const theme = opt.theme ? THEME_COLORS[opt.theme] : null;
+          const border = on ? (theme?.color || C.acc) : C.bdr;
+          const bg = on ? (theme ? `${theme.color}18` : `${C.acc}18`) : C.surf;
+          const color = on ? (theme?.color || C.acc) : C.sub;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(toggleSet(selected, opt.value))}
+              style={{
+                padding: '8px 14px', borderRadius: 12, border: `1.5px solid ${border}`, background: bg, color,
+                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF, textAlign: 'left',
+              }}
+            >
+              {on ? '✓ ' : ''}{opt.icon ? `${opt.icon} ` : ''}{opt.label}
+              {opt.count != null ? <span style={{ fontWeight: 500, opacity: 0.85 }}> ({opt.count})</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      {!options.length ? (
+        <div style={{ fontSize: 11, color: C.dim, padding: '8px 0' }}>Select a main card first.</div>
+      ) : null}
+      {!allSelected && options.length ? (
+        <div style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>{selected.size} of {options.length} selected</div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
   const [catalog, setCatalog] = useState(null);
   const [loadErr, setLoadErr] = useState('');
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  const [subCard, setSubCard] = useState('all');
-  const [serviceId, setServiceId] = useState('all');
-  const [confidence, setConfidence] = useState('all');
-  const [area, setArea] = useState('');
   const [expanded, setExpanded] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchLeads = useCallback(async () => {
-    if (!pin || !adminHubFetch) return;
-    setLoading(true);
-    setLoadErr('');
-    try {
-      const r = await adminHubFetch('get_vendor_leads', {
-        q: q.trim(),
-        sub_card: subCard,
-        service_id: serviceId,
-        confidence,
-        area: area.trim(),
-      }, pin);
-      if (r?.error) throw new Error(r.error);
-      setCatalog(r);
-    } catch (e) {
-      setLoadErr(e.message || 'Could not load vendor leads');
-      setCatalog(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [pin, adminHubFetch, q, subCard, serviceId, confidence, area]);
+  const [selectedMainCards, setSelectedMainCards] = useState(new Set());
+  const [selectedSubCards, setSelectedSubCards] = useState(new Set());
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => { fetchLeads(); }, q || area ? 320 : 0);
-    return () => clearTimeout(t);
-  }, [fetchLeads, q, area]);
+    if (!pin || !adminHubFetch) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadErr('');
+    adminHubFetch('get_vendor_leads', {}, pin)
+      .then((r) => {
+        if (cancelled) return;
+        if (r?.error) throw new Error(r.error);
+        setCatalog(r);
+        const mainIds = (r.cards || []).map((c) => c.id);
+        const subLabels = (r.cards || []).flatMap((c) => (c.sub_cards || []).map((sc) => sc.label));
+        setSelectedMainCards(new Set(mainIds));
+        setSelectedSubCards(new Set(subLabels));
+        setInitialized(true);
+      })
+      .catch((e) => {
+        if (!cancelled) setLoadErr(e.message || 'Could not load vendor leads');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [pin, adminHubFetch]);
 
-  const services = catalog?.services || [];
-  const vendors = catalog?.vendors || [];
-  const card = catalog?.cards?.[0];
+  const cards = catalog?.cards || [];
+  const allVendors = catalog?.vendors || [];
+  const allServices = catalog?.services || [];
+
+  const mainCardOptions = useMemo(
+    () => cards.map((c) => ({
+      value: c.id,
+      label: c.label,
+      icon: c.icon || '',
+      count: (c.sub_cards || []).length,
+    })),
+    [cards],
+  );
 
   const subCardOptions = useMemo(() => {
-    const base = [{ id: 'all', label: 'All sub-cards' }];
-    (card?.sub_cards || []).forEach((sc) => base.push({ id: sc.label, label: sc.label, theme: sc.theme }));
-    return base;
-  }, [card]);
+    const activeCards = cards.filter((c) => selectedMainCards.has(c.id));
+    return activeCards.flatMap((c) => (c.sub_cards || []).map((sc) => ({
+      value: sc.label,
+      label: sc.label,
+      theme: sc.theme,
+      count: allServices.filter((s) => s.parent_card_id === c.id && s.sub_card === sc.label).length,
+    })));
+  }, [cards, selectedMainCards, allServices]);
 
-  const chipBtn = (active) => ({
-    padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${active ? C.acc : C.bdr}`,
-    background: active ? `${C.acc}18` : C.surf, color: active ? C.acc : C.sub,
-    fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF,
-  });
+  useEffect(() => {
+    if (!initialized || !subCardOptions.length) return;
+    const allowed = new Set(subCardOptions.map((o) => o.value));
+    setSelectedSubCards((prev) => {
+      const next = new Set([...prev].filter((label) => allowed.has(label)));
+      if (next.size === 0 && allowed.size) return allowed;
+      return next;
+    });
+  }, [subCardOptions, initialized]);
+
+  const activeServices = useMemo(() => allServices.filter(
+    (s) => selectedMainCards.has(s.parent_card_id) && selectedSubCards.has(s.sub_card),
+  ), [allServices, selectedMainCards, selectedSubCards]);
+
+  const activeServiceIds = useMemo(() => new Set(activeServices.map((s) => s.id)), [activeServices]);
+
+  const vendors = useMemo(() => {
+    if (!selectedMainCards.size || !selectedSubCards.size) return [];
+    const needle = q.trim().toLowerCase();
+    return allVendors
+      .map((v) => {
+        const matched = (v.scanv_services || []).filter((s) => activeServiceIds.has(s.id));
+        if (!matched.length) return null;
+        const hay = [
+          v.business_name, v.contact_person, v.address?.full, v.address?.area, v.address?.pin,
+          ...(v.phones || []), ...(v.emails || []), v.services_offered, v.service_areas,
+        ].join(' ').toLowerCase();
+        if (needle && !hay.includes(needle)) return null;
+        return { ...v, matched_services: matched };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.business_name.localeCompare(b.business_name));
+  }, [allVendors, activeServiceIds, selectedMainCards.size, selectedSubCards.size, q]);
 
   const tagStyle = (theme) => {
     const t = THEME_COLORS[theme] || { color: C.acc, bg: `${C.acc}12`, border: `${C.acc}44` };
@@ -82,75 +188,81 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
     return <div style={{ ...S.card(), padding: 16, color: C.red, fontSize: 12 }}>{loadErr}</div>;
   }
 
+  if (loading && !catalog) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, color: C.dim, fontSize: 11 }}>
+        <Spin size={16} /> Loading vendor catalog…
+      </div>
+    );
+  }
+
+  const selectionSummary = [
+    `${selectedMainCards.size} main card${selectedMainCards.size === 1 ? '' : 's'}`,
+    `${selectedSubCards.size} sub-card${selectedSubCards.size === 1 ? '' : 's'}`,
+    `${activeServices.length} service${activeServices.length === 1 ? '' : 's'}`,
+    `${vendors.length} vendor${vendors.length === 1 ? '' : 's'}`,
+  ].join(' · ');
+
   return (
     <div>
       <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.gold}` }}>
-        <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Confidential — vendor lead research</div>
+        <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Vendor leads by ScanV card</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
-          Local vendors for <strong style={{ color: C.txt }}>{card?.label || 'Household services'}</strong>
-          {catalog?.meta?.market ? ` · ${catalog.meta.market}` : ''}
-          {catalog?.meta?.captured_at ? ` · captured ${catalog.meta.captured_at}` : ''}
-          . Loaded from server after Admin PIN — not in the customer app bundle.
+          Pick main card(s) and sub-card(s). Vendors below are filtered to those services only.
+          {catalog?.meta?.market ? ` Market: ${catalog.meta.market}.` : ''}
+          {catalog?.meta?.captured_at ? ` Updated ${catalog.meta.captured_at}.` : ''}
         </div>
-        {catalog?.stats ? (
-          <div style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-            Showing {catalog.stats.shown} of {catalog.stats.total_vendors} vendors
-          </div>
-        ) : null}
       </div>
 
-      <div style={{ ...S.card(), padding: 14, marginBottom: 14 }}>
-        <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+        <MultiSelectRow
+          label="Main card"
+          hint="ScanV home categories — select one or more"
+          options={mainCardOptions}
+          selected={selectedMainCards}
+          onChange={setSelectedMainCards}
+          C={C} S={S} FF={FF}
+        />
+
+        <MultiSelectRow
+          label="Sub-card"
+          hint="Service groups inside the selected main card(s)"
+          options={subCardOptions}
+          selected={selectedSubCards}
+          onChange={setSelectedSubCards}
+          C={C} S={S} FF={FF}
+        />
+
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Search vendors</div>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, phone, email, area, services…"
+            placeholder="Name, phone, email, area, PIN…"
             style={{ ...S.inp(), fontSize: 12 }}
           />
-          <input
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            placeholder="Filter by area / PIN (e.g. Wakad, 411057)"
-            style={{ ...S.inp(), fontSize: 12 }}
-          />
-          <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ ...S.inp(), fontSize: 12 }}>
-            <option value="all">All ScanV services (14)</option>
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} · {s.sub_card}</option>
-            ))}
-          </select>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {subCardOptions.map((opt) => (
-              <button key={opt.id} type="button" style={chipBtn(subCard === opt.id)} onClick={() => setSubCard(opt.id)}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {[
-              ['all', 'All confidence'],
-              ['high', 'Verified contact'],
-              ['verify_maps', 'Verify in Maps'],
-            ].map(([id, label]) => (
-              <button key={id} type="button" style={chipBtn(confidence === id)} onClick={() => setConfidence(id)}>
-                {label}
-              </button>
-            ))}
-            <button type="button" style={chipBtn(false)} onClick={fetchLeads} disabled={loading}>
-              {loading ? 'Loading…' : 'Refresh'}
-            </button>
-          </div>
         </div>
       </div>
 
-      {loading && !vendors.length ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, color: C.dim, fontSize: 11 }}>
-          <Spin size={16} /> Loading vendor leads…
-        </div>
+      <div style={{ ...S.card(), padding: '12px 16px', marginBottom: 14, background: `${C.acc}08`, border: `1px solid ${C.acc}33` }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: C.txt, marginBottom: 8 }}>{selectionSummary}</div>
+        {activeServices.length ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {activeServices.map((s) => (
+              <span key={s.id} style={tagStyle(s.theme)} title={s.id}>{s.name}</span>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: C.dim }}>Select at least one main card and one sub-card to see vendors.</div>
+        )}
+      </div>
+
+      {!selectedMainCards.size || !selectedSubCards.size ? (
+        <div style={{ ...S.card(), padding: 16, color: C.dim, fontSize: 12 }}>Choose main card and sub-card filters above.</div>
       ) : null}
 
-      {!loading && !vendors.length ? (
-        <div style={{ ...S.card(), padding: 16, color: C.dim, fontSize: 12 }}>No vendors match these filters.</div>
+      {selectedMainCards.size && selectedSubCards.size && !vendors.length ? (
+        <div style={{ ...S.card(), padding: 16, color: C.dim, fontSize: 12 }}>No vendors found for these services{q ? ' matching your search' : ''}.</div>
       ) : null}
 
       <div style={{ display: 'grid', gap: 12 }}>
@@ -168,23 +280,19 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, color: C.txt, fontSize: 14, marginBottom: 4 }}>{v.business_name}</div>
-                    <div style={{ fontSize: 10, color: C.dim, marginBottom: 6 }}>
-                      {v.parent_card_label}
-                      {v.sub_cards?.length ? ` · ${v.sub_cards.join(' · ')}` : ''}
-                    </div>
+                    <div style={{ fontWeight: 800, color: C.txt, fontSize: 14, marginBottom: 6 }}>{v.business_name}</div>
                     <div style={{ marginBottom: 6 }}>
-                      {(v.scanv_services || []).slice(0, open ? undefined : 4).map((s) => (
-                        <span key={s.id} style={tagStyle(s.theme)} title={s.id}>{s.name}</span>
+                      {(v.matched_services || []).map((s) => (
+                        <span key={s.id} style={tagStyle(s.theme)} title={`${s.sub_card} · ${s.id}`}>{s.name}</span>
                       ))}
-                      {!open && (v.scanv_services || []).length > 4 ? (
-                        <span style={{ fontSize: 9, color: C.dim }}>+{(v.scanv_services || []).length - 4} more</span>
-                      ) : null}
                     </div>
                     <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.45 }}>
                       {v.address?.area ? `${v.address.area}, ` : ''}{v.address?.city || 'Pune'}
                       {v.address?.pin ? ` · ${v.address.pin}` : ''}
                     </div>
+                    {(v.phones || []).length ? (
+                      <div style={{ fontSize: 11, color: C.acc, marginTop: 4, fontWeight: 700 }}>{v.phones[0]}</div>
+                    ) : null}
                   </div>
                   <span style={{
                     fontSize: 9, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0,
@@ -227,7 +335,7 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
 
                     {v.maps_name ? (
                       <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.maps_name + ' Pune')}`}
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${v.maps_name} Pune`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ fontSize: 11, color: C.acc }}
@@ -239,26 +347,13 @@ export function AdminVendorLeadsTab({ pin, adminHubFetch, C, S, FF, Spin }) {
                     <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.5 }}>
                       <strong style={{ color: C.txt }}>Offers:</strong> {v.services_offered || '—'}
                     </div>
-                    {v.service_areas ? (
-                      <div style={{ fontSize: 10, color: C.dim }}>Areas: {v.service_areas}</div>
-                    ) : null}
+                    {v.service_areas ? <div style={{ fontSize: 10, color: C.dim }}>Areas: {v.service_areas}</div> : null}
                     {v.hours ? <div style={{ fontSize: 10, color: C.dim }}>Hours: {v.hours}</div> : null}
-                    {v.rating ? <div style={{ fontSize: 10, color: C.dim }}>Rating: {v.rating}</div> : null}
                     {v.notes ? (
                       <div style={{ fontSize: 10, color: C.gold, lineHeight: 1.45, padding: 8, background: `${C.gold}10`, borderRadius: 8 }}>
                         {v.notes}
                       </div>
                     ) : null}
-                    <div style={{ fontSize: 9, color: C.dim }}>Source: {v.source || '—'}</div>
-
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, marginBottom: 6 }}>ScanV service tags</div>
-                      {(v.scanv_services || []).map((s) => (
-                        <span key={s.id} style={tagStyle(s.theme)} title={`${s.id} · ₹${s.price_inr || '—'}`}>
-                          {s.sub_card}: {s.name}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 </div>
               ) : null}

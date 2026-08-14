@@ -65,16 +65,18 @@ function vendorHaystack(v: VendorRow): string {
 function enrichVendor(v: VendorRow) {
   const scanv_services = (v.service_ids || [])
     .map((id) => serviceById.get(id))
-    .filter(Boolean);
-  const sub_cards = [...new Set(scanv_services.map((s) => s!.sub_card))];
-  const themes = [...new Set(scanv_services.map((s) => s!.theme))];
+    .filter(Boolean) as ServiceRow[];
+  const sub_cards = [...new Set(scanv_services.map((s) => s.sub_card))];
+  const themes = [...new Set(scanv_services.map((s) => s.theme))];
+  const parent_card_ids = [...new Set(scanv_services.map((s) => s.parent_card_id))];
+  const parent_card_labels = [...new Set(scanv_services.map((s) => s.parent_card_label))];
   return {
     ...v,
     scanv_services,
     sub_cards,
     themes,
-    parent_card_id: "household",
-    parent_card_label: "Household services",
+    parent_card_ids,
+    parent_card_label: parent_card_labels.join(" · ") || "—",
   };
 }
 
