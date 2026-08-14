@@ -27,7 +27,7 @@ Copy kit: `docs/social/` · Week plan: `node scripts/social_content_calendar.mjs
 ## Content rules
 
 - Say **ScanV** only in captions (not DCore)
-- Always include **🚀 COMING SOON to Pune & PCMC** in launch posts
+- Always include **🚀 Coming soon everywhere in Pune & PCMC** in launch posts
 - **Gen-Z voice:** happy, cheeky double meaning — see `docs/social/genz-voice-guide.txt`
 - Full week captions: `docs/social/genz-week-posts.txt`
 - Profile photo: `docs/social/scanv-profile-picture.png` (all platforms)

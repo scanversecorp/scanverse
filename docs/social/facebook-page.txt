@@ -15,12 +15,10 @@ ABOUT (long)
 ScanV is the one app for household services, delivery & more in Pune & PCMC. Book verified partners, pay on UPI, track live — no random WhatsApp forwards, no drama. Operated by DCore (legal only — don't use in posts).
 
 FIRST POST
-🚀 COMING SOON — ScanV for Pune & PCMC
+🚀 Coming soon everywhere in Pune & PCMC
 
-Your mess. Our problem. 😉 Cleaning, delivery & more on one app — launching soon.
-Register now · be first when we go live.
-
-Try preview → scanv-tau.vercel.app
+Your mess. Our problem. 😉 Cleaning, delivery & more — one app, all of Pune.
+Register now · launch first → scanv-tau.vercel.app
 
 CTA button: Learn more → app link
 
