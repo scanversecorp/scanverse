@@ -13,8 +13,9 @@ open "https://business.facebook.com/" 2>/dev/null || true
 sleep 1
 open "https://www.instagram.com/accounts/emailsignup/" 2>/dev/null || true
 sleep 1
-open "https://www.tiktok.com/signup" 2>/dev/null || true
+open "https://www.threads.net/" 2>/dev/null || true
 sleep 1
+# TikTok banned in India — skip signup
 open "https://studio.youtube.com/" 2>/dev/null || true
 sleep 1
 open "file://${ROOT}/docs/social/ACCOUNT-SETUP-RUNBOOK.md" 2>/dev/null || true

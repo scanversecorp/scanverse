@@ -24,7 +24,8 @@ const queue = (r.today_queue || []).filter((i) => !i.is_daily_everywhere);
 const ps = bundle?.platform_status || {};
 
 console.log('═══════════════════════════════════════════════════');
-console.log('  SCANV SOCIAL PULSE — POST EVERYWHERE');
+console.log('  SCANV SOCIAL PULSE — POST EVERYWHERE (India)');
+console.log('  FB · IG · Threads · YouTube · Shorts (TikTok banned IN)');
 console.log('  ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST');
 console.log('  @' + (cfg.handle || 'scanvapp') + ' · Day ' + (cfg.today_day_number || '?') +
   (cfg.calendar_week > 1 ? ' week ' + cfg.calendar_week : ''));
@@ -64,9 +65,10 @@ if (queue.length) {
   console.log('');
 }
 
-console.log('PLATFORMS');
+console.log('PLATFORMS (India daily)');
 console.log('  1. Facebook + Instagram → https://business.facebook.com/');
-console.log('  2. TikTok               → https://www.tiktok.com/upload');
+console.log('  2. Threads              → https://www.threads.net/');
 console.log('  3. YouTube + Shorts     → https://studio.youtube.com/');
-console.log('  Guide: docs/social/daily-post-everywhere.txt');
+console.log('  TikTok: banned in India — use Reels instead');
+console.log('  Setup: node scripts/social_setup_agent.mjs');
 console.log('═══════════════════════════════════════════════════\n');

@@ -25,6 +25,7 @@ const PLATFORM_LABELS = {
   all: 'All',
   facebook: 'Facebook',
   instagram: 'IG',
+  threads: 'Threads',
   tiktok: 'TikTok',
   youtube: 'YouTube',
   youtube_shorts: 'Shorts',
@@ -75,8 +76,8 @@ function PostEverywherePanel({ bundle, videoBundle, platforms, progress, busy, o
     <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `2px solid ${progress?.complete ? C.green : C.gold}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
         <div>
-          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>Post everywhere today — 5 platforms</div>
-          <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{bundle.title} · Copy once → paste on all</div>
+          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>Post everywhere today — FB · IG · Threads · YT · Shorts</div>
+          <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{bundle.title} · Copy once → paste on all (TikTok N/A India)</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: progress?.complete ? C.green : C.acc }}>

@@ -7,7 +7,7 @@ const IST = "Asia/Kolkata";
 export const EVERYWHERE_PLATFORMS = [
   { id: "facebook", label: "Facebook", studio: "https://business.facebook.com/" },
   { id: "instagram", label: "Instagram", studio: "https://business.facebook.com/" },
-  { id: "tiktok", label: "TikTok", studio: "https://www.tiktok.com/upload" },
+  { id: "threads", label: "Threads", studio: "https://www.threads.net/" },
   { id: "youtube", label: "YouTube", studio: "https://studio.youtube.com/" },
   { id: "youtube_shorts", label: "YouTube Shorts", studio: "https://studio.youtube.com/" },
 ] as const;

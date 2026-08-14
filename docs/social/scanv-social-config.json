@@ -1,0 +1,67 @@
+{
+  "brand": "ScanV",
+  "handle": "scanvapp",
+  "market": "Pune & PCMC, India",
+  "app_url": "https://scanv-tau.vercel.app?utm_source=social&utm_medium=organic",
+  "business_phone": "+91-9270194842",
+  "business_email": "connect@dcoreglobal.com",
+  "profile_photo": "docs/social/scanv-profile-picture.png",
+  "posting_window_ist": "09:30-19:00",
+  "platforms": {
+    "facebook": {
+      "priority": 1,
+      "available_in_india": true,
+      "signup": "https://www.facebook.com/pages/create",
+      "manage": "https://business.facebook.com/",
+      "target_url": "https://www.facebook.com/scanvapp",
+      "username": "scanvapp"
+    },
+    "instagram": {
+      "priority": 2,
+      "available_in_india": true,
+      "signup": "https://www.instagram.com/accounts/emailsignup/",
+      "manage": "https://business.facebook.com/",
+      "target_url": "https://www.instagram.com/scanvapp",
+      "username": "scanvapp",
+      "bio_file": "docs/social/instagram-profile.txt"
+    },
+    "threads": {
+      "priority": 3,
+      "available_in_india": true,
+      "signup": "https://www.threads.net/",
+      "manage": "https://www.threads.net/",
+      "target_url": "https://www.threads.net/@scanvapp",
+      "username": "scanvapp",
+      "note": "TikTok replacement for India — link via Instagram"
+    },
+    "youtube": {
+      "priority": 4,
+      "available_in_india": true,
+      "signup": "https://studio.youtube.com/",
+      "target_url": "https://www.youtube.com/@scanvapp",
+      "handle": "scanvapp",
+      "bio_file": "docs/social/youtube-channel.txt"
+    },
+    "youtube_shorts": {
+      "priority": 5,
+      "available_in_india": true,
+      "manage": "https://studio.youtube.com/",
+      "note": "Same channel as YouTube — vertical 9:16"
+    },
+    "tiktok": {
+      "priority": 99,
+      "available_in_india": false,
+      "status": "banned_india_june_2020",
+      "fallback": "instagram_reels",
+      "target_url": "https://www.tiktok.com/@scanvapp"
+    }
+  },
+  "post_everywhere_daily": ["facebook", "instagram", "threads", "youtube", "youtube_shorts"],
+  "content_files": {
+    "voice": "docs/social/genz-voice-guide.txt",
+    "week_posts": "docs/social/genz-week-posts.txt",
+    "shorts": "docs/social/genz-shorts-scripts.txt"
+  },
+  "dashboard": "https://scanv-tau.vercel.app/#admin?tab=social",
+  "account_status_script": "node scripts/social_account_status.mjs"
+}
