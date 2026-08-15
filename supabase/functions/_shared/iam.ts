@@ -91,6 +91,7 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   update_social_config: "hub.settings",
   update_social_platform: "hub.settings",
   mark_social_everywhere: "hub.settings",
+  purge_test_data: "hub.purge_test",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

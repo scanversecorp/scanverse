@@ -41,7 +41,8 @@
  *   get_iam_catalog — roles, permissions, PIN→role map
  *   list_staff_users — staff IAM registry
  *   upsert_staff_user — { email, display_name, role_ids?, support_agent_id?, notes? }
- *   assign_staff_roles — { staff_id, role_ids[], replace? }
+ *   mark_social_everywhere — mark daily post platform done
+ *   purge_test_data      — { dry_run?, confirm_execute?, confirm? } pre-launch wipe (owner only)
  *
  * Auth: Authorization Bearer (staff JWT) OR x-admin-pin
  *   PIN secrets: ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
@@ -98,6 +99,9 @@ import {
   updateVendorLead,
 } from "../_shared/vendor-leads-admin.ts";
 import {
+  purgeTestDataAdmin,
+} from "../_shared/purge-test-data-admin.ts";
+import {
   assignStaffRoles,
   deleteStaffUser,
   getIamCatalog,
@@ -132,6 +136,7 @@ import {
 } from "../_shared/vendor-outreach-admin.ts";
 import {
   hasPermission,
+  hasRole,
   iamWhoamiPayload,
   requireHubPermission,
   resolveIamContext,
@@ -1538,6 +1543,22 @@ Deno.serve(async (req) => {
     const result = await markSocialEverywhere(sb, body);
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, item: result.item });
+  }
+
+  if (action === "purge_test_data") {
+    const gate = requireHubPermission(iam, "purge_test_data");
+    const ownerOk = hasRole(iam, "scanv_owner") || hasPermission(iam, "hub.purge_test");
+    if (gate && !ownerOk) return gate;
+    try {
+      const url = Deno.env.get("SUPABASE_URL")!;
+      const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const result = await purgeTestDataAdmin(sb, body, url, key);
+      if (result.error) return json(result, 400);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Purge failed";
+      return json({ error: msg }, 500);
+    }
   }
 
   return json({ error: "Unknown action" }, 400);

@@ -34,7 +34,7 @@ const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const HDFC_VYAPAR_MERCHANT_ID = '82037575';
 const ASSIST   = '+91-9270194842';
 const LOCAL_COMMUNITIES = 'Local Communities';
-const INCORPORATION_ORIGIN = 'Designed & Developed with Incorporation, San Francisco, California, USA';
+const INCORPORATION_ORIGIN = 'Designed & Developed by Incorporation, San Francisco, California, USA';
 
 const UPI_PACKAGES = {
   GPay: 'com.google.android.apps.nbu.paisa.user',
@@ -2206,7 +2206,7 @@ function CopyrightLine({ style }) {
   return (
     <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.45, ...style }}>
       <div>© ScanV</div>
-      <div style={{ marginTop: 4, fontSize: 10, color: '#888' }}>Operated by DCore</div>
+      <div style={{ marginTop: 4, fontSize: 10, color: '#888' }}>Operated by DCore - All Rights Reserved</div>
       <div style={{ marginTop: 4 }}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
