@@ -807,11 +807,27 @@ function SvcGrid2({ items, renderItem, gap = 10 }) {
 }
 const FF = "'Inter',system-ui,sans-serif";
 const SCANV_LOGO_SRC = '/scanv-logo-sm.png';
+const SCANV_LOGO_QR_URL = `${APP_URL}?utm_source=logo&utm_medium=qr`;
 
-function ScanVLogoMark({ size = 32, showWordmark = false, wordmarkSize = 20, center = false }) {
+function ScanVLogoMark({ size = 32, showWordmark = false, wordmarkSize = 20, center = false, linkToApp = false }) {
+  const mark = (
+    <img
+      src={SCANV_LOGO_SRC}
+      alt="ScanV — scan QR or tap to open app"
+      width={size}
+      height={size}
+      title="Open ScanV app"
+      style={{ borderRadius: Math.round(size * 0.22), objectFit: 'cover', display: 'block' }}
+    />
+  );
+  const logoBody = linkToApp ? (
+    <a href={SCANV_LOGO_QR_URL} style={{ display: 'block', flexShrink: 0, lineHeight: 0 }} aria-label="Open ScanV app">
+      {mark}
+    </a>
+  ) : mark;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: center ? 'center' : 'flex-start', gap: showWordmark ? 8 : 0, flexShrink: 0 }}>
-      <img src={SCANV_LOGO_SRC} alt="ScanV" width={size} height={size} style={{ borderRadius: Math.round(size * 0.22), objectFit: 'cover', display: 'block' }} />
+      {logoBody}
       {showWordmark ? (
         <div style={{ fontWeight: 800, fontSize: wordmarkSize, fontFamily: FF, lineHeight: 1 }}>
           <span style={{ color: C.txt }}>Scan</span><span style={{ color: C.acc }}>V</span>

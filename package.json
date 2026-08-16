@@ -16,6 +16,7 @@
     "start": "react-scripts start",
     "build": "REACT_APP_TS=1786665000000 react-scripts build",
     "optimize-images": "node scripts/optimize-images.mjs",
+    "logo:qr": "node scripts/generate-logo-with-qr.mjs",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
