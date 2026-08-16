@@ -1,6 +1,7 @@
 /** Admin — service schedule input file CRUD */
 
 const DEFAULT_WINDOWS = [
+  { day: 0, start: "09:00", end: "19:00" },
   { day: 1, start: "09:00", end: "19:00" },
   { day: 2, start: "09:00", end: "19:00" },
   { day: 3, start: "09:00", end: "19:00" },

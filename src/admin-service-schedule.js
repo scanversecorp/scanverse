@@ -8,7 +8,7 @@ const PARENT_ORDER = [
 ];
 
 function emptyWindows() {
-  return [1, 2, 3, 4, 5, 6].map((day) => ({ day, start: '09:00', end: '19:00' }));
+  return [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, start: '09:00', end: '19:00' }));
 }
 
 function groupServicesByParent(services) {

@@ -8,6 +8,7 @@ export const DEFAULT_SCHEDULE = {
   enforce_schedule: true,
   allow_outside_schedule: false,
   windows: [
+    { day: 0, start: '09:00', end: '19:00' },
     { day: 1, start: '09:00', end: '19:00' },
     { day: 2, start: '09:00', end: '19:00' },
     { day: 3, start: '09:00', end: '19:00' },
