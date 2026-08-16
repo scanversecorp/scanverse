@@ -16,11 +16,14 @@ import {
 } from 'react';
 import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
+import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
+import { ScheduleBookingPanel } from './admin-service-schedule';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
 const AdminLogisticsPartnersTab = lazy(() => import('./admin-logistics-partners').then((m) => ({ default: m.AdminLogisticsPartnersTab })));
 const AdminSocialContentTab = lazy(() => import('./admin-social-content').then((m) => ({ default: m.AdminSocialContentTab })));
+const AdminServiceScheduleTabLazy = lazy(() => import('./admin-service-schedule').then((m) => ({ default: m.AdminServiceScheduleTab })));
 const AdminBusinessCommandTab = lazy(() => import('./admin-business-command').then((m) => ({ default: m.AdminBusinessCommandTab })));
 const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
 const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ default: m.AdminAddUserPanel })));
@@ -4232,6 +4235,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState('');
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
+  const [serviceSchedule, setServiceSchedule] = useState(null);
+  const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
   const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
   const [search, setSearch]               = useState('');
   const [waToken, setWaToken]     = useState('');
@@ -4257,6 +4262,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   useEffect(() => {
     if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop(browseScrollRef.current);
   }, [screen]);
+
+  useEffect(() => {
+    if (!activeSvc?.id) { setServiceSchedule(null); return; }
+    let cancelled = false;
+    fetchServiceSchedule(sb, activeSvc.id)
+      .then((s) => { if (!cancelled) setServiceSchedule(s); })
+      .catch(() => { if (!cancelled) setServiceSchedule(normalizeScheduleRow(null)); });
+    return () => { cancelled = true; };
+  }, [activeSvc?.id]);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('scanv_login_mobile');
@@ -4302,9 +4316,17 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       setCity(draft.city || '');
       setPincode(draft.pincode || '');
       if (draft.pendingProfile) setPendingProfile(draft.pendingProfile);
+      if (draft.date || draft.bookingDetail?.date) {
+        setBookingDetail((b) => ({
+          ...(b || {}),
+          ...(draft.bookingDetail || {}),
+          date: draft.date || draft.bookingDetail?.date,
+          time: draft.time || draft.bookingDetail?.time || '10:00',
+        }));
+      }
       browsePay.setPaymentVerified(true);
       browsePay.setUpiOpened(true);
-      setScreen('schedule');
+      setScreen(draft.date || draft.bookingDetail?.date ? 'payment' : 'schedule');
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4394,13 +4416,14 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
       setUserId(profile.id);
       setPendingProfile(profile);
-      const newTxnId = 'TXN-' + Date.now();
-      setPaymentAmountPaise(browseTotal);
-      setTxnId(newTxnId);
+      setScheduleOutsideOk(false);
+      if (!bookingDetail?.date) {
+        const sched = serviceSchedule || normalizeScheduleRow(null);
+        const next = findNextAvailableSlot(sched);
+        if (next) setBookingDetail((b) => ({ ...(b || {}), date: next.date, time: next.time }));
+      }
       saveBookingDraft({
         flow: 'browse',
-        txnId: newTxnId,
-        amountPaise: browseTotal,
         userId: profile.id,
         serviceId: activeSvc?.id,
         serviceName: activeSvc?.name,
@@ -4412,11 +4435,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         city,
         pincode,
         pendingProfile: profile,
+        bookingDetail,
       });
-      browsePay.setUpiOpened(false);
-      browsePay.setPaymentVerified(false);
-      setPaymentMethod(null);
-      setScreen('payment');
+      setScreen('schedule');
+      addToast?.('Mobile verified — pick date & time before payment', 'success');
     } catch(e) { setErr(e.message||'Verification failed.'); }
     finally { setLoading(false); }
   };
@@ -4521,6 +4543,48 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     setLoading(false);
   };
 
+  const proceedToPaymentFromSchedule = async () => {
+    if (!bookingDetail?.date) return setErr('Select a date');
+    const sched = serviceSchedule || normalizeScheduleRow(null);
+    const v = validateBookingSlot(bookingDetail.date, bookingDetail.time || '10:00', sched, { outsideOk: scheduleOutsideOk });
+    if (!v.ok) return setErr(v.message);
+    const isDeliveryShipment = activeSvc?.parent === 'delivery';
+    const loc = bookingDetail.loc || `${village}, ${city} ${pincode}`.trim();
+    if (isDeliveryShipment) {
+      if (!(bookingDetail.pickup || scheduleLoc || loc).trim()) return setErr('Enter pickup address');
+      if (!(bookingDetail.drop || '').trim()) return setErr('Enter drop address');
+    } else if (!loc.trim()) return setErr('Enter service location');
+    setErr('');
+    const newTxnId = 'TXN-' + Date.now();
+    setPaymentAmountPaise(browseTotal);
+    setTxnId(newTxnId);
+    saveBookingDraft({
+      flow: 'browse',
+      txnId: newTxnId,
+      amountPaise: browseTotal,
+      userId,
+      serviceId: activeSvc?.id,
+      serviceName: activeSvc?.name,
+      firstName,
+      lastName,
+      mobile,
+      address,
+      village,
+      city,
+      pincode,
+      pendingProfile,
+      date: bookingDetail.date,
+      time: bookingDetail.time || '10:00',
+      bookingDetail,
+      scheduleOutsideOk,
+    });
+    browsePay.setUpiOpened(false);
+    browsePay.setPaymentVerified(false);
+    setPaymentMethod(null);
+    setScreen('payment');
+    addToast?.('Schedule saved — proceed to payment', 'success');
+  };
+
   const confirmPayment = async (method) => {
     if (!browsePay.paymentVerified) {
       addToast?.('Payment not confirmed yet — complete payment first', 'error');
@@ -4531,17 +4595,27 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       addToast?.('Payment not verified. Finish paying — we check automatically.', 'error');
       return;
     }
+    const sched = serviceSchedule || normalizeScheduleRow(null);
+    const v = validateBookingSlot(bookingDetail?.date, bookingDetail?.time || '10:00', sched, { outsideOk: scheduleOutsideOk });
+    if (!v.ok) {
+      setErr(v.message);
+      setScreen('schedule');
+      return;
+    }
     setPaymentMethod(method);
-    setScreen('schedule');
-    addToast?.('Payment confirmed — pick date & time', 'success');
+    await createBooking(method);
   };
 
-  const createBooking = async () => {
+  const createBooking = async (methodOverride) => {
     if (creatingRef.current) return;
     if (!guardBookStart(activeSvc, addToast)) return;
     if (!bookingDetail?.date) return setErr('Select a date');
     if (!userId||!activeSvc||!txnId) return setErr('Session expired — start again');
-    if (!paymentMethod || !browsePay.paymentVerified) return setErr('Complete payment first');
+    const payM = methodOverride || paymentMethod;
+    if (!payM || !browsePay.paymentVerified) return setErr('Complete payment first');
+    const sched = serviceSchedule || normalizeScheduleRow(null);
+    const v = validateBookingSlot(bookingDetail.date, bookingDetail.time || '10:00', sched, { outsideOk: scheduleOutsideOk });
+    if (!v.ok) return setErr(v.message);
     creatingRef.current = true;
     setLoading(true); setErr('');
     try {
@@ -4643,7 +4717,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       });
       await sbIgnore(sb().from('payments').insert({
         booking_id:bk.id, user_id:userId, amount:total,
-        method:paymentMethod||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
+        method:payM||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
       }));
       await invokeBookingDispatch({
@@ -5001,23 +5075,36 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     );
   }
 
-  // -- SCHEDULE: Date/Time/Location (after payment) -----------------------
+  // -- SCHEDULE: Date/Time/Location (after verify, before payment) ------
   if (screen==='schedule'&&activeSvc) {
     const isDeliveryShipment = activeSvc.parent === 'delivery';
+    const sched = serviceSchedule || normalizeScheduleRow(null);
+    const schedVal = bookingDetail?.date
+      ? validateBookingSlot(bookingDetail.date, bookingDetail.time || '10:00', sched, { outsideOk: scheduleOutsideOk })
+      : null;
     const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setScheduleLoc(locStr);markAuto('loc');setBookingDetail(b=>({...b,loc:locStr,pickup:isDeliveryShipment?(b?.pickup||locStr):b?.pickup}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
 
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
-          <button onClick={()=>setScreen('payment')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{isDeliveryShipment ? 'Pickup & drop' : 'Pick date & time'}</div>
+          <button onClick={()=>setScreen('verify')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{isDeliveryShipment ? 'Schedule pickup' : 'Pick date & time'}</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
-          {browsePay.paymentVerified && (
-            <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
-          )}
-          <Field label="Date" req><input type="date" defaultValue={bookingDetail?.date||''} onChange={e=>setBookingDetail(b=>({...b,date:e.target.value}))} style={S.inp()}/></Field>
-          <Field label="Time"><input type="time" defaultValue={bookingDetail?.time||'10:00'} onChange={e=>setBookingDetail(b=>({...b,time:e.target.value}))} style={S.inp()}/></Field>
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 2 of 3 · Choose schedule before payment</div>
+          <ScheduleBookingPanel
+            serviceId={activeSvc.id}
+            schedule={sched}
+            date={bookingDetail?.date || ''}
+            time={bookingDetail?.time || '10:00'}
+            onDate={(v) => setBookingDetail((b) => ({ ...(b || {}), date: v }))}
+            onTime={(v) => setBookingDetail((b) => ({ ...(b || {}), time: v }))}
+            outsideOk={scheduleOutsideOk}
+            onOutsideOk={setScheduleOutsideOk}
+            validation={schedVal}
+            onUseNext={(next) => { setBookingDetail((b) => ({ ...(b || {}), date: next.date, time: next.time })); setScheduleOutsideOk(false); setErr(''); }}
+            C={C} S={S} FF={FF} Btn={Btn} Field={Field} Spin={Spin}
+          >
           {isDeliveryShipment ? (
             <>
               <Field label="Pickup address" req note="Where we collect the parcel">
@@ -5053,24 +5140,30 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           </Field>
           )}
           <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
+          </ScheduleBookingPanel>
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
       </>,
-      <StickyCta onClick={createBooking}>{loading?<><Spin size={16}/> Confirming…</>:'Confirm booking →'}</StickyCta>
+      <StickyCta onClick={proceedToPaymentFromSchedule} disabled={!bookingDetail?.date || (schedVal && !schedVal.ok)}>{loading?<><Spin size={16}/>…</>:'Continue to payment →'}</StickyCta>
     );
   }
 
-  // -- PAYMENT: UPI / Razorpay (after verify, before schedule) ------------
+  // -- PAYMENT: UPI / Razorpay (after schedule) ---------------------------
   if (screen==='payment'&&activeSvc) {
     const price=browsePrice,fee=browseFee,gst=browseGst,total=browseTotal;
     const { setUpiOpened, setPaymentVerified } = browsePay;
     return browseWrap(
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
-          <button onClick={()=>{setScreen('verify');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
+          <button onClick={()=>{setScreen('schedule');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
+          {bookingDetail?.date && (
+            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.txt,fontWeight:600}}>
+              📅 Scheduled · {bookingDetail.date} · {bookingDetail.time || '10:00'}
+            </div>
+          )}
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
             <div style={{fontSize:13,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
@@ -5132,7 +5225,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP before payment</div>
+          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
             <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -5180,7 +5273,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
                     style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={()=>verifyProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & continue to pay →'}</Btn>
+              <Btn full onClick={()=>verifyProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pick schedule →'}</Btn>
             </>
           )}
           {verifyMethod==='whatsapp'&&!otpSent&&(
@@ -6205,9 +6298,13 @@ function BookScreen() {
   const { markAuto: markBookAuto, inpStyle: bookInpStyle, bind: bookBind } = bookAuto;
   const [bookLat,setBookLat]=useState(user?.last_lat||silentGeo?.lat||null);
   const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
+  const [serviceSchedule, setServiceSchedule] = useState(null);
+  const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
   const svc=activeSvc;
   const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
-  const bookPay=usePaymentVerification(step===3?txnId:null,step===3?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price});
+  const payStep = skipVerify ? 3 : 4;
+  const scheduleStep = skipVerify ? 2 : 3;
+  const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price});
   const creatingRef = useRef(false);
 
   useEffect(() => {
@@ -6233,13 +6330,25 @@ function BookScreen() {
       if (draft.loc) setLoc(draft.loc);
       if (draft.bookLat != null) setBookLat(draft.bookLat);
       if (draft.bookLng != null) setBookLng(draft.bookLng);
+      if (draft.date) setDate(draft.date);
+      if (draft.time) setTime(draft.time);
       bookPay.setPaymentVerified(true);
       bookPay.setUpiOpened(true);
-      setStep(4);
+      setStep(draft.date ? payStep : scheduleStep);
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!svc?.id) { setServiceSchedule(null); return; }
+    let cancelled = false;
+    fetchServiceSchedule(sb, svc.id)
+      .then((s) => { if (!cancelled) setServiceSchedule(s); })
+      .catch(() => { if (!cancelled) setServiceSchedule(normalizeScheduleRow(null)); });
+    return () => { cancelled = true; };
+  }, [svc?.id]);
+
   const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setLoc(locStr);markBookAuto('loc');setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpChannel('sms');setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
@@ -6283,33 +6392,51 @@ function BookScreen() {
       setUser(profile);
       setBookOtpVerified(true);
       setLoc([bookAddress,bookCity,bookPincode].filter(Boolean).join(', '));
-      const newTxnId = 'TXN-' + Date.now();
-      setPaymentAmountPaise(total);
-      setTxnId(newTxnId);
-      saveBookingDraft({
-        flow: 'book',
-        txnId: newTxnId,
-        amountPaise: total,
-        userId: profile.id,
-        serviceId: svc?.id,
-        serviceName: svc?.name,
-        bookFirstName,
-        bookLastName,
-        bookPhone,
-        bookAddress,
-        bookCity,
-        bookPincode,
-        bookLat: user?.last_lat,
-        bookLng: user?.last_lng,
-        loc: [bookAddress, bookCity, bookPincode].filter(Boolean).join(', '),
-      });
-      bookPay.setUpiOpened(false);
-      bookPay.setPaymentVerified(false);
-      setPayMethod(null);
-      setStep(3);
-      addToast('Mobile verified — proceed to payment ✓','success');
+      setScheduleOutsideOk(false);
+      const sched = serviceSchedule || normalizeScheduleRow(null);
+      if (!date) {
+        const next = findNextAvailableSlot(sched);
+        if (next) { setDate(next.date); setTime(next.time); }
+      }
+      setStep(scheduleStep);
+      addToast('Mobile verified — pick date & time before payment ✓','success');
     }catch(e){addToast(e.message||'Verification failed','error');}
     finally{setLoading(false);}
+  };
+
+  const proceedBookToPayment = () => {
+    const sched = serviceSchedule || normalizeScheduleRow(null);
+    const v = validateBookingSlot(date, time || '10:00', sched, { outsideOk: scheduleOutsideOk });
+    if (!v.ok) return addToast(v.message, 'error');
+    if (!loc.trim()) return addToast('Enter service location', 'error');
+    const newTxnId = 'TXN-' + Date.now();
+    setPaymentAmountPaise(total);
+    setTxnId(newTxnId);
+    saveBookingDraft({
+      flow: 'book',
+      txnId: newTxnId,
+      amountPaise: total,
+      userId: user?.id,
+      serviceId: svc?.id,
+      serviceName: svc?.name,
+      bookFirstName,
+      bookLastName,
+      bookPhone,
+      bookAddress,
+      bookCity,
+      bookPincode,
+      bookLat,
+      bookLng,
+      loc,
+      date,
+      time,
+      scheduleOutsideOk,
+    });
+    bookPay.setUpiOpened(false);
+    bookPay.setPaymentVerified(false);
+    setPayMethod(null);
+    setStep(payStep);
+    addToast('Schedule saved — proceed to payment', 'success');
   };
 
   const create = async () => {
@@ -6318,6 +6445,13 @@ function BookScreen() {
     if (!date) return addToast('Select a date', 'error');
     if (!txnId) return addToast('Complete payment first', 'error');
     if (!payMethod || !bookPay.paymentVerified) return addToast('Complete UPI payment first', 'error');
+    const sched = serviceSchedule || normalizeScheduleRow(null);
+    const v = validateBookingSlot(date, time || '10:00', sched, { outsideOk: scheduleOutsideOk });
+    if (!v.ok) {
+      addToast(v.message, 'error');
+      setStep(scheduleStep);
+      return;
+    }
     creatingRef.current = true;
     setLoading(true);
     try {
@@ -6325,7 +6459,7 @@ function BookScreen() {
       if (!paid) {
         bookPay.setPaymentVerified(false);
         setPayMethod(null);
-        setStep(3);
+        setStep(payStep);
         return addToast('Payment not verified. Complete payment before booking.', 'error');
       }
       const payCheck = await fetchPaymentVerification(txnId, total);
@@ -6418,41 +6552,23 @@ function BookScreen() {
       return;
     }
     setPayMethod(method);
-    setStep(4);
-    addToast('Payment confirmed — pick date & time', 'success');
+    await create();
   };
   const goFromService=()=>{
     if(skipVerify){
-      const newTxnId = 'TXN-' + Date.now();
-      setTxnId(newTxnId);
-      setPaymentAmountPaise(total);
-      saveBookingDraft({
-        flow: 'book',
-        txnId: newTxnId,
-        amountPaise: total,
-        userId: user?.id,
-        serviceId: svc?.id,
-        serviceName: svc?.name,
-        bookFirstName,
-        bookLastName,
-        bookPhone,
-        bookAddress,
-        bookCity,
-        bookPincode,
-        bookLat,
-        bookLng,
-        loc,
-      });
-      bookPay.setUpiOpened(false);
-      bookPay.setPaymentVerified(false);
-      setPayMethod(null);
-      setStep(3);
+      setScheduleOutsideOk(false);
+      const sched = serviceSchedule || normalizeScheduleRow(null);
+      if (!date) {
+        const next = findNextAvailableSlot(sched);
+        if (next) { setDate(next.date); setTime(next.time); }
+      }
+      setStep(scheduleStep);
     }
     else setStep(2);
   };
   const progressTotal=skipVerify?3:4;
-  const progressIdx=step===1?1:step===2?2:step===3?(skipVerify?2:3):step===4?(skipVerify?3:4):1;
-  const stepLabels=skipVerify?['Service','Pay','Schedule']:['Service','Verify','Pay','Schedule'];
+  const progressIdx=step===1?1:step===2?(skipVerify?2:2):step===3?(skipVerify?3:3):step===4?4:1;
+  const stepLabels=skipVerify?['Service','Schedule','Pay']:['Service','Verify','Schedule','Pay'];
   const bookBlockMsg = svc ? svcBookBlockReason(svc) : null;
   if (!svc) return null;
   if (bookBlockMsg) {
@@ -6483,7 +6599,7 @@ function BookScreen() {
             </div>
           </div>
           {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
-          <Btn full onClick={goFromService}>{skipVerify?'Continue to payment →':'Continue →'}</Btn>
+          <Btn full onClick={goFromService}>{skipVerify?'Continue to schedule →':'Continue →'}</Btn>
         </>}
 
         {step===2&&!skipVerify&&<>
@@ -6516,13 +6632,39 @@ function BookScreen() {
                     style={{width:40,height:48,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:8,color:C.acc,fontFamily:'monospace',fontSize:22,outline:'none'}}/>
                 ))}
               </div>
-              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pay →'}</Btn>
+              <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pick schedule →'}</Btn>
             </>
           )}
         </>}
 
-        {step===3&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 3 · Pay platform fee</div>
+        {step===scheduleStep&&<>
+          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Pick date & time · before payment</div>
+          <ScheduleBookingPanel
+            serviceId={svc.id}
+            schedule={serviceSchedule || normalizeScheduleRow(null)}
+            date={date}
+            time={time}
+            onDate={setDate}
+            onTime={setTime}
+            outsideOk={scheduleOutsideOk}
+            onOutsideOk={setScheduleOutsideOk}
+            validation={date ? validateBookingSlot(date, time || '10:00', serviceSchedule || normalizeScheduleRow(null), { outsideOk: scheduleOutsideOk }) : null}
+            onUseNext={(next) => { setDate(next.date); setTime(next.time); setScheduleOutsideOk(false); }}
+            C={C} S={S} FF={FF} Btn={Btn} Field={Field} Spin={Spin}
+          >
+            <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} {...bookBind('loc', e=>setLoc(e.target.value))} placeholder="Address or area" style={bookInpStyle('loc',{flex:1})}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
+            <Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field>
+          </ScheduleBookingPanel>
+          <Btn full onClick={proceedBookToPayment}>Continue to payment →</Btn>
+        </>}
+
+        {step===payStep&&<>
+          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Pay platform fee</div>
+          {date && (
+            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.txt,fontWeight:600}}>
+              📅 Scheduled · {date} · {time || '10:00'}
+            </div>
+          )}
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
             <div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
@@ -6535,18 +6677,6 @@ function BookScreen() {
             disabled={false}
             onConfirm={() => confirmPaid('UPI')}
           />
-        </>}
-
-        {step===4&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 4 · Pick date & time</div>
-          {bookPay.paymentVerified && (
-            <div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Payment received · {txnId}</div>
-          )}
-          <Field label="Date" req><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp()}/></Field>
-          <Field label="Time"><input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.inp()}/></Field>
-          <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} {...bookBind('loc', e=>setLoc(e.target.value))} placeholder="Address or area" style={bookInpStyle('loc',{flex:1})}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
-          <Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field>
-          <Btn full onClick={create} disabled={loading}>{loading?<><Spin size={16}/>Confirming…</>:'Confirm booking →'}</Btn>
         </>}
       </div>
     </div>
@@ -11480,6 +11610,7 @@ const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'business', label: 'Business HQ', icon: '🎯' },
   { id: 'index', label: 'URL Index', icon: '🔗' },
+  { id: 'schedule', label: 'Service Schedule', icon: '📅' },
   { id: 'pricing', label: 'Pricing', icon: '💰' },
   { id: 'support', label: 'Customer Support', icon: '🎧' },
   { id: 'refunds', label: 'Refunds', icon: '💸' },
@@ -13498,6 +13629,12 @@ function AdminControlCenter({ onPricesUpdated }) {
             </div>
             <PricingAdminPage hubPin={usePin} embedded onPricesUpdated={onPricesUpdated} />
           </div>
+        )}
+
+        {tab === 'schedule' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading service schedules…</div>}>
+            <AdminServiceScheduleTabLazy pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
+          </Suspense>
         )}
 
         {tab === 'support' && (

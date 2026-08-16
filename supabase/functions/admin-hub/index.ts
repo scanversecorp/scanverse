@@ -117,6 +117,11 @@ import {
   updateSocialPlatform,
 } from "../_shared/social-content-admin.ts";
 import {
+  getServiceScheduleAdmin,
+  listServiceSchedulesAdmin,
+  updateServiceScheduleAdmin,
+} from "../_shared/service-schedule-admin.ts";
+import {
   listExternalTrips,
   listLogisticsPipeline,
   updateLogisticsPartner,
@@ -1543,6 +1548,32 @@ Deno.serve(async (req) => {
     const result = await markSocialEverywhere(sb, body);
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, item: result.item });
+  }
+
+  if (action === "list_service_schedules") {
+    try {
+      return json(await listServiceSchedulesAdmin(sb));
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "List schedules failed" }, 500);
+    }
+  }
+
+  if (action === "get_service_schedule") {
+    try {
+      const serviceId = String(body.service_id || "");
+      return json(await getServiceScheduleAdmin(sb, serviceId));
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "Get schedule failed" }, 400);
+    }
+  }
+
+  if (action === "update_service_schedule") {
+    try {
+      const result = await updateServiceScheduleAdmin(sb, body, iam.actor);
+      return json(result);
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "Update schedule failed" }, 400);
+    }
   }
 
   if (action === "purge_test_data") {
