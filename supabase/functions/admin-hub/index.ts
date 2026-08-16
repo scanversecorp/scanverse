@@ -1495,17 +1495,17 @@ Deno.serve(async (req) => {
   }
 
   if (action === "send_vendor_outreach") {
-    const gate = requireHubPermission(iam, "send_vendor_outreach");
-    if (gate) return gate;
-    const result = await sendVendorOutreach(sb, body, iam.actor);
+    const gate = requireHubPermission(ctx, "send_vendor_outreach");
+    if (gate) return json({ error: `Missing permission: ${gate}` }, 403);
+    const result = await sendVendorOutreach(sb, body, iamActorLabel(ctx));
     if (result.error) return json(result, result.configured === false ? 503 : 400);
     return json(result);
   }
 
   if (action === "send_strike_list_outreach") {
-    const gate = requireHubPermission(iam, "send_strike_list_outreach");
-    if (gate) return gate;
-    const result = await sendStrikeListOutreach(sb, body, iam.actor);
+    const gate = requireHubPermission(ctx, "send_strike_list_outreach");
+    if (gate) return json({ error: `Missing permission: ${gate}` }, 403);
+    const result = await sendStrikeListOutreach(sb, body, iamActorLabel(ctx));
     if (result.error && !result.results) return json(result, result.configured === false ? 503 : 400);
     return json(result);
   }
@@ -1569,7 +1569,7 @@ Deno.serve(async (req) => {
 
   if (action === "update_service_schedule") {
     try {
-      const result = await updateServiceScheduleAdmin(sb, body, iam.actor);
+      const result = await updateServiceScheduleAdmin(sb, body, iamActorLabel(ctx));
       return json(result);
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : "Update schedule failed" }, 400);
@@ -1577,9 +1577,9 @@ Deno.serve(async (req) => {
   }
 
   if (action === "purge_test_data") {
-    const gate = requireHubPermission(iam, "purge_test_data");
-    const ownerOk = hasRole(iam, "scanv_owner") || hasPermission(iam, "hub.purge_test");
-    if (gate && !ownerOk) return gate;
+    const gate = requireHubPermission(ctx, "purge_test_data");
+    const ownerOk = hasRole(ctx, "scanv_owner") || hasPermission(ctx, "hub.purge_test");
+    if (gate && !ownerOk) return json({ error: `Missing permission: ${gate}` }, 403);
     try {
       const url = Deno.env.get("SUPABASE_URL")!;
       const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

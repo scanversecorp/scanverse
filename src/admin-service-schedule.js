@@ -11,6 +11,10 @@ function emptyWindows() {
   return [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, start: '09:00', end: '19:00' }));
 }
 
+function sortWindows(windows) {
+  return [...(windows || emptyWindows())].sort((a, b) => Number(a.day) - Number(b.day));
+}
+
 function groupServicesByParent(services) {
   const map = new Map();
   for (const s of services || []) {
@@ -73,7 +77,7 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
       .then((r) => {
         if (cancelled) return;
         if (r?.error) throw new Error(r.error);
-        setDraft({ ...r.schedule, windows: [...(r.schedule?.windows || emptyWindows())] });
+        setDraft({ ...r.schedule, windows: sortWindows(r.schedule?.windows) });
         setServiceName(r.service_name || selectedId);
       })
       .catch((e) => { if (!cancelled) setLoadErr(e.message || 'Could not load service schedule'); })
@@ -132,7 +136,7 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
     try {
       const r = await adminHubFetch('update_service_schedule', draft, pin);
       if (r?.error) throw new Error(r.error);
-      setDraft({ ...r.schedule, windows: [...(r.schedule?.windows || [])] });
+      setDraft({ ...r.schedule, windows: sortWindows(r.schedule?.windows) });
       setSaveMsg('Schedule saved — applies to all vendors for this service');
     } catch (e) {
       setSaveMsg(e.message || 'Save failed');
