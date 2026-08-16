@@ -24,6 +24,7 @@ import {
 } from "../_shared/notify.ts";
 import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
 import { executeVendorRouteTransfer } from "../_shared/razorpay-route.ts";
+import { getExcludedVendorIds, isVendorExcludedForService } from "../_shared/service-vendor-exclusions.ts";
 
 const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes between retry rounds
 const OFFER_TIMEOUT_MS = 60 * 1000; // 60s per partner before moving to next nearest
@@ -336,17 +337,6 @@ async function diagnoseEmptyVendorQueue(
   };
 }
 
-async function getExcludedVendorIds(
-  supabase: ReturnType<typeof createClient>,
-  serviceId: string,
-): Promise<string[]> {
-  const { data } = await supabase
-    .from("service_vendor_exclusions")
-    .select("vendor_id")
-    .eq("service_id", serviceId);
-  return (data || []).map((r: { vendor_id: string }) => String(r.vendor_id));
-}
-
 async function getVendorQueue(
   supabase: ReturnType<typeof createClient>,
   serviceId: string,
@@ -405,6 +395,12 @@ async function notifyVendor(
   vendor: { vendor_id: string; phone: string; business_name: string },
   attemptNum: number,
 ): Promise<{ callFailed: boolean }> {
+  const serviceId = String(dispatch.service_id || "");
+  if (await isVendorExcludedForService(supabase, vendor.vendor_id, serviceId)) {
+    console.warn("[dispatch] skip notify — vendor excluded for service", vendor.vendor_id, serviceId);
+    return { callFailed: false };
+  }
+
   const msg = bookingAcceptMessage(
     String(dispatch.service_name),
     String(dispatch.scheduled_date || "ASAP"),
@@ -505,6 +501,17 @@ async function assignVendor(
     .single();
 
   if (!vendor || vendor.status !== "active") return false;
+
+  const { data: dispMeta } = await supabase
+    .from("booking_dispatch")
+    .select("service_id")
+    .eq("id", dispatchId)
+    .maybeSingle();
+  const serviceId = String(dispMeta?.service_id || "");
+  if (await isVendorExcludedForService(supabase, vendorId, serviceId)) {
+    console.warn("[dispatch] assign blocked — vendor excluded for service", vendorId, serviceId);
+    return false;
+  }
 
   const { data: bkStatus } = await supabase
     .from("bookings")
@@ -608,6 +615,12 @@ async function offerVendorInApp(
   attemptNum: number,
   mode: DispatchMode,
 ) {
+  const serviceId = String(dispatch.service_id || "");
+  if (await isVendorExcludedForService(supabase, vendor.vendor_id, serviceId)) {
+    console.warn("[dispatch] skip in-app offer — vendor excluded for service", vendor.vendor_id, serviceId);
+    return;
+  }
+
   if (inAppOffersEnabled(mode)) {
     await logAttempt(
       supabase,
@@ -802,6 +815,10 @@ async function processDispatchTick(
   }
 
   const vendor = top3[idx];
+  if (await isVendorExcludedForService(supabase, vendor.vendor_id, serviceId)) {
+    console.warn("[dispatch] skip queue slot — vendor excluded for service", vendor.vendor_id, serviceId);
+    return advanceToNextVendor(supabase, dispatch, top3);
+  }
   await supabase.from("booking_dispatch").update({ status: "dispatching" }).eq("id", dispatch.id);
   await offerVendorInApp(supabase, dispatch, vendor, attemptNum, dispatchMode);
   await supabase.from("booking_dispatch").update({
@@ -925,6 +942,14 @@ Deno.serve(async (req: Request) => {
             .eq("status", "active")
             .maybeSingle();
           if (vendor) {
+            const excluded = await isVendorExcludedForService(
+              supabase,
+              vendor.id,
+              String(disp.service_id || ""),
+            );
+            if (excluded) {
+              return json({ success: false, error: "Vendor excluded for this service" });
+            }
             await assignVendor(supabase, disp.id, disp.booking_id, vendor.id);
             return json({ success: true, accepted: true });
           }

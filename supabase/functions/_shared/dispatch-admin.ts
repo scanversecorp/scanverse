@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { generateAcceptCode } from "./notify.ts";
 import { stopBookingSideEffects } from "./booking-cancel.ts";
 import { executeVendorRouteTransfer } from "./razorpay-route.ts";
+import { isVendorExcludedForService } from "./service-vendor-exclusions.ts";
 
 function escIlike(q: string): string {
   return q.replace(/[%_\\]/g, "\\$&");
@@ -208,10 +209,14 @@ async function assignDispatchVendor(
 
   const { data: dispatch } = await sb
     .from("booking_dispatch")
-    .select("id, booking_id, status")
+    .select("id, booking_id, status, service_id")
     .eq("id", dispatchId)
     .maybeSingle();
   if (!dispatch) throw new Error("Dispatch not found");
+
+  if (await isVendorExcludedForService(sb, vendorId, String(dispatch.service_id || ""))) {
+    throw new Error("Vendor is excluded from dispatch for this service");
+  }
 
   const partnerId = vendor.profile_id || vendorId;
   const { data: updated, error } = await sb

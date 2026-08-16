@@ -198,7 +198,7 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
       for (const v of rows) enabled[v.vendor_id] = v.dispatch_enabled !== false;
       setVendorEnabled(enabled);
       const enabledCount = rows.filter((v) => v.dispatch_enabled !== false).length;
-      setVendorMsg(`Vendor dispatch saved · ${enabledCount} of ${rows.length} receive bookings`);
+      setVendorMsg(`Vendor dispatch saved · ${enabledCount} of ${rows.length} receive acceptance alerts`);
     } catch (e) {
       setVendorMsg(e.message || 'Save vendors failed');
     } finally {
@@ -334,7 +334,7 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
       <div style={{ ...S.card(), padding: 12, maxHeight: '72vh', overflowY: 'auto' }}>
         <div style={{ fontWeight: 800, fontSize: 13, color: C.txt, marginBottom: 4 }}>Vendors for this service</div>
         <div style={{ fontSize: 10, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>
-          Checked vendors receive bookings · uncheck to exclude from dispatch
+          Checked vendors receive bookings · uncheck to exclude — no in-app offer, SMS, or call for this service (even if nearby)
         </div>
         {!selectedId ? (
           <div style={{ fontSize: 11, color: C.dim }}>Select a service</div>
