@@ -54,13 +54,21 @@ export async function listServiceSchedulesAdmin(sb: ReturnType<typeof import("ht
     .order("sort_order", { ascending: true });
   if (pErr) throw pErr;
 
+  const parentIds = [...new Set((pricing || []).map((p) => p.parent_id).filter(Boolean))];
+  const { data: parents } = parentIds.length
+    ? await sb.from("service_pricing").select("service_id, service_name").in("service_id", parentIds)
+    : { data: [] as { service_id: string; service_name: string }[] };
+  const parentNames = new Map((parents || []).map((p) => [p.service_id, p.service_name]));
+
   const { data: rows, error } = await sb.from("service_schedules").select("*");
   if (error) throw error;
   const byId = new Map((rows || []).map((r) => [r.service_id, r]));
 
-  const services = (pricing || []).map((p) =>
-    normalizeRow(byId.get(p.service_id) || null, p.service_id, p.parent_id)
-  );
+  const services = (pricing || []).map((p) => ({
+    ...normalizeRow(byId.get(p.service_id) || null, p.service_id, p.parent_id),
+    service_name: p.service_name || p.service_id,
+    parent_name: parentNames.get(p.parent_id) || p.parent_id || "Other",
+  }));
 
   return { services, count: services.length };
 }

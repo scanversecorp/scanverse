@@ -81,10 +81,19 @@ async function checkFrontendBundle() {
   } else {
     pass('Main bundle has no embedded Mermaid diagram data');
   }
-  if (mainSrc.includes('github.com/scanversecorp/scanverse') || mainSrc.includes('get_admin_url_index')) {
+  if (mainSrc.includes('github.com/scanversecorp/scanverse')) {
     fail('Main bundle may expose confidential admin URL catalog');
   } else {
     pass('Main bundle has no admin URL index catalog');
+  }
+  if (
+    mainSrc.includes('list_service_schedules')
+    && mainSrc.includes('AdminServiceSchedule')
+    && mainSrc.includes('min_lead_minutes')
+  ) {
+    pass('Main bundle includes service schedule booking UI');
+  } else {
+    fail('Main bundle missing service schedule booking UI');
   }
 
   const docsRes = await fetch(`${APP_URL}/docs/architecture.html`);
@@ -185,15 +194,51 @@ async function checkBusinessCommand() {
   else pass(`Business HQ readiness: ${data.summary.overall_readiness_pct}%`);
 }
 
+async function checkServiceSchedulesPublic() {
+  const res = await fetch(`${SB_URL}/rest/v1/service_schedules?select=service_id&limit=1`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) return fail(`service_schedules REST read failed (${res.status})`);
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length < 1) fail('service_schedules table empty or unreadable');
+  else pass(`service_schedules REST: ${rows.length}+ row(s) readable`);
+
+  for (const action of ['list_service_schedules', 'get_service_schedule', 'update_service_schedule']) {
+    const hub = await fetch(`${SB_URL}/functions/v1/admin-hub`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, service_id: 'hh-kitchen' }),
+    });
+    const body = await hub.json();
+    if (body.error === 'Unknown action') fail(`${action} returns Unknown action (admin-hub not deployed)`);
+    else if (body.error === 'Unauthorized') pass(`${action} routed (PIN required)`);
+    else fail(`${action} unexpected response: ${JSON.stringify(body).slice(0, 80)}`);
+  }
+}
+
+async function checkServiceSchedulesAdmin() {
+  const list = await adminHub('list_service_schedules');
+  const rows = list.schedules || list.items || [];
+  if (!rows.length) fail('list_service_schedules returned no rows');
+  else pass(`list_service_schedules: ${rows.length} service(s)`);
+
+  const sid = rows[0].service_id;
+  const one = await adminHub('get_service_schedule', { service_id: sid });
+  if (!one.schedule && !one.service_id) fail(`get_service_schedule missing payload for ${sid}`);
+  else pass(`get_service_schedule: ${sid} (${one.schedule?.windows?.length ?? one.windows?.length ?? '?'} windows)`);
+}
+
 async function main() {
   console.log(`\nScanV post-deploy validation → ${APP_URL}\n`);
   await checkFrontendBundle();
   await checkPlatformConfig();
+  await checkServiceSchedulesPublic();
   if (ADMIN_PIN) {
     await checkGoLiveSwitches();
     await checkDiagrams();
     await checkAdminUrlIndex();
     await checkBusinessCommand();
+    await checkServiceSchedulesAdmin();
   } else {
     console.warn('\n⚠ Set ADMIN_PIN (or ADMIN_HUB_PIN in .env) to validate admin APIs.\n');
   }

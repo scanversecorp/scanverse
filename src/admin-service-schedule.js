@@ -3,8 +3,40 @@ import { useEffect, useMemo, useState } from 'react';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const PARENT_ORDER = [
+  'legal', 'cloud', 'vip', 'health', 'property', 'household', 'delivery', 'food', 'two-wheeler', 'four-wheeler',
+];
+
 function emptyWindows() {
   return [1, 2, 3, 4, 5, 6].map((day) => ({ day, start: '09:00', end: '19:00' }));
+}
+
+function groupServicesByParent(services) {
+  const map = new Map();
+  for (const s of services || []) {
+    const parentId = s.parent_id || 'other';
+    if (!map.has(parentId)) {
+      map.set(parentId, {
+        parentId,
+        parentName: s.parent_name || parentId,
+        services: [],
+      });
+    }
+    map.get(parentId).services.push(s);
+  }
+  const groups = [...map.values()];
+  groups.sort((a, b) => {
+    const ai = PARENT_ORDER.indexOf(a.parentId);
+    const bi = PARENT_ORDER.indexOf(b.parentId);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return String(a.parentName).localeCompare(String(b.parentName));
+  });
+  for (const g of groups) {
+    g.services.sort((a, b) => String(a.service_name || a.service_id).localeCompare(String(b.service_name || b.service_id)));
+  }
+  return groups;
 }
 
 export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Btn }) {
@@ -15,6 +47,7 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
   const [loadErr, setLoadErr] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [expandedParents, setExpandedParents] = useState(() => new Set());
 
   useEffect(() => {
     if (!pin) return;
@@ -47,6 +80,30 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
   }, [pin, selectedId, adminHubFetch]);
+
+  const grouped = useMemo(() => groupServicesByParent(services), [services]);
+
+  useEffect(() => {
+    if (!grouped.length) return;
+    setExpandedParents(new Set(grouped.map((g) => g.parentId)));
+  }, [grouped]);
+
+  useEffect(() => {
+    if (!selectedId || !services?.length) return;
+    const svc = services.find((s) => s.service_id === selectedId);
+    if (svc?.parent_id) {
+      setExpandedParents((prev) => new Set([...prev, svc.parent_id]));
+    }
+  }, [selectedId, services]);
+
+  const toggleParent = (parentId) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  };
 
   const sorted = useMemo(() => {
     return [...(services || [])].sort((a, b) => String(a.service_id).localeCompare(String(b.service_id)));
@@ -96,31 +153,65 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 280px) 1fr', gap: 14, alignItems: 'start' }}>
       <div style={{ ...S.card(), padding: 12, maxHeight: '72vh', overflowY: 'auto' }}>
         <div style={{ fontWeight: 800, fontSize: 13, color: C.txt, marginBottom: 8 }}>Services ({sorted.length})</div>
-        <div style={{ fontSize: 10, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>Schedule input file per service · IST · all vendors</div>
-        {sorted.map((s) => (
-          <button
-            key={s.service_id}
-            type="button"
-            onClick={() => setSelectedId(s.service_id)}
-            style={{
-              display: 'block',
-              width: '100%',
-              textAlign: 'left',
-              padding: '8px 10px',
-              marginBottom: 4,
-              borderRadius: 8,
-              border: `1px solid ${selectedId === s.service_id ? C.acc : C.bdr}`,
-              background: selectedId === s.service_id ? `${C.acc}14` : C.surf,
-              color: C.txt,
-              cursor: 'pointer',
-              fontFamily: FF,
-              fontSize: 11,
-            }}
-          >
-            <div style={{ fontWeight: 700 }}>{s.service_id}</div>
-            <div style={{ fontSize: 10, color: C.dim }}>{s.enforce_schedule ? 'Enforced' : 'Excluded'} · {s.min_lead_minutes}m lead</div>
-          </button>
-        ))}
+        <div style={{ fontSize: 10, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>Main service → sub-service · IST · all vendors</div>
+        {grouped.map((group) => {
+          const open = expandedParents.has(group.parentId);
+          return (
+            <div key={group.parentId} style={{ marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => toggleParent(group.parentId)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '7px 8px',
+                  marginBottom: 4,
+                  borderRadius: 8,
+                  border: `1px solid ${C.bdr}`,
+                  background: C.deep,
+                  color: C.txt,
+                  cursor: 'pointer',
+                  fontFamily: FF,
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                <span style={{ color: C.acc, width: 12, flexShrink: 0 }}>{open ? '▼' : '▶'}</span>
+                <span style={{ flex: 1, lineHeight: 1.35 }}>{group.parentName}</span>
+                <span style={{ fontSize: 10, color: C.dim, fontWeight: 600 }}>{group.services.length}</span>
+              </button>
+              {open && group.services.map((s) => (
+                <button
+                  key={s.service_id}
+                  type="button"
+                  onClick={() => setSelectedId(s.service_id)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '7px 10px 7px 22px',
+                    marginBottom: 3,
+                    borderRadius: 8,
+                    border: `1px solid ${selectedId === s.service_id ? C.acc : C.bdr}`,
+                    background: selectedId === s.service_id ? `${C.acc}14` : C.surf,
+                    color: C.txt,
+                    cursor: 'pointer',
+                    fontFamily: FF,
+                    fontSize: 11,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, lineHeight: 1.35 }}>{s.service_name || s.service_id}</div>
+                  <div style={{ fontSize: 10, color: C.dim }}>
+                    {s.service_id} · {s.enforce_schedule ? 'Enforced' : 'Excluded'} · {s.min_lead_minutes}m lead
+                  </div>
+                </button>
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ ...S.card(), padding: 16 }}>
