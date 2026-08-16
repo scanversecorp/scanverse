@@ -18,13 +18,15 @@ if (!existsSync(BASE)) {
   copyFileSync(join(PUBLIC, 'scanv-brand-logo.png'), BASE);
 }
 
+const APP_QR = { qrScale: 0.25, qrYShift: 0.28, qrXShift: 0.02 };
+
 const TARGETS = [
-  { src: BASE, out: join(PUBLIC, 'scanv-brand-logo.png'), qrScale: 0.26 },
-  { src: BASE, out: join(PUBLIC, 'scanv-logo-sm.png'), size: 256, qrScale: 0.28 },
-  { src: BASE, out: join(PUBLIC, 'logo192.png'), size: 192, qrScale: 0.26 },
-  { src: BASE, out: join(PUBLIC, 'logo512.png'), size: 512, qrScale: 0.24 },
-  { src: BASE, out: join(PUBLIC, 'apple-touch-icon.png'), size: 180, qrScale: 0.26 },
-  { src: BASE, out: join(DOCS_SOCIAL, 'scanv-profile-picture.png'), size: 512, qrScale: 0.24 },
+  { src: BASE, out: join(PUBLIC, 'scanv-brand-logo.png'), ...APP_QR },
+  { src: BASE, out: join(PUBLIC, 'scanv-logo-sm.png'), size: 256, ...APP_QR },
+  { src: BASE, out: join(PUBLIC, 'logo192.png'), size: 192, ...APP_QR },
+  { src: BASE, out: join(PUBLIC, 'logo512.png'), size: 512, ...APP_QR },
+  { src: BASE, out: join(PUBLIC, 'apple-touch-icon.png'), size: 180, ...APP_QR },
+  { src: BASE, out: join(DOCS_SOCIAL, 'scanv-profile-picture.png'), size: 512, ...APP_QR },
 ];
 
 const qrPath = join(PUBLIC, '.logo-qr-temp.png');
@@ -60,8 +62,8 @@ for spec in specs:
     draw = ImageDraw.Draw(badge)
     draw.rounded_rectangle([0, 0, badge.size[0]-1, badge.size[1]-1], radius=max(4, pad), outline='#d63a56', width=max(2, pad//2))
     badge.paste(q, (pad, pad), q)
-    x = w - badge.size[0] - pad
-    y = h - badge.size[1] - pad
+    x = w - badge.size[0] - pad - int(w * spec.get('qrXShift', 0))
+    y = h - badge.size[1] - pad - int(h * spec.get('qrYShift', 0))
     img.paste(badge, (x, y), badge)
     img.save(spec['out'], 'PNG')
 print('ok', len(specs))
