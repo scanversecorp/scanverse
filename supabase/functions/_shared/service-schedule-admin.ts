@@ -122,3 +122,96 @@ export async function updateServiceScheduleAdmin(
   if (error) throw error;
   return { schedule: normalizeRow(data, serviceId, meta?.parent_id) };
 }
+
+function serviceMatchIds(serviceId: string, parentId: string | null): string[] {
+  return [...new Set([serviceId, parentId].filter(Boolean))] as string[];
+}
+
+function serviceMatchOr(serviceId: string, parentId: string | null): string {
+  return serviceMatchIds(serviceId, parentId)
+    .flatMap((id) => [`service_id.eq.${id}`, `category_id.eq.${id}`])
+    .join(",");
+}
+
+export async function listServiceScheduleVendorsAdmin(
+  sb: ReturnType<typeof import("https://esm.sh/@supabase/supabase-js@2.49.1").createClient>,
+  serviceId: string,
+) {
+  if (!serviceId) throw new Error("service_id required");
+
+  const { data: meta } = await sb
+    .from("service_pricing")
+    .select("parent_id")
+    .eq("service_id", serviceId)
+    .maybeSingle();
+  const parentId = meta?.parent_id || null;
+
+  const { data: rows, error } = await sb
+    .from("vendor_partner_services")
+    .select("vendor_id, vendor_partners!inner(id, business_name, phone, status)")
+    .eq("is_active", true)
+    .or(serviceMatchOr(serviceId, parentId));
+  if (error) throw error;
+
+  const { data: exclusions, error: exErr } = await sb
+    .from("service_vendor_exclusions")
+    .select("vendor_id")
+    .eq("service_id", serviceId);
+  if (exErr) throw exErr;
+  const excluded = new Set((exclusions || []).map((r) => String(r.vendor_id)));
+
+  const byVendor = new Map<string, Record<string, unknown>>();
+  for (const row of rows || []) {
+    const vp = row.vendor_partners as Record<string, unknown>;
+    const vendorId = String(row.vendor_id);
+    if (byVendor.has(vendorId)) continue;
+    byVendor.set(vendorId, {
+      vendor_id: vendorId,
+      business_name: String(vp.business_name || "Vendor"),
+      phone: String(vp.phone || ""),
+      status: String(vp.status || ""),
+      dispatch_enabled: !excluded.has(vendorId),
+    });
+  }
+
+  const vendors = [...byVendor.values()].sort((a, b) =>
+    String(a.business_name).localeCompare(String(b.business_name))
+  );
+
+  return {
+    service_id: serviceId,
+    vendors,
+    excluded_vendor_ids: vendors.filter((v) => !v.dispatch_enabled).map((v) => v.vendor_id),
+    count: vendors.length,
+  };
+}
+
+export async function updateServiceScheduleVendorsAdmin(
+  sb: ReturnType<typeof import("https://esm.sh/@supabase/supabase-js@2.49.1").createClient>,
+  payload: Record<string, unknown>,
+  updatedBy?: string,
+) {
+  const serviceId = String(payload.service_id || "");
+  if (!serviceId) throw new Error("service_id required");
+
+  const excludedRaw = payload.excluded_vendor_ids;
+  const excludedIds = Array.isArray(excludedRaw)
+    ? [...new Set(excludedRaw.map((id) => String(id)).filter(Boolean))]
+    : [];
+
+  const { error: delErr } = await sb.from("service_vendor_exclusions").delete().eq("service_id", serviceId);
+  if (delErr) throw delErr;
+
+  if (excludedIds.length) {
+    const { error: insErr } = await sb.from("service_vendor_exclusions").insert(
+      excludedIds.map((vendor_id) => ({
+        service_id: serviceId,
+        vendor_id,
+        excluded_by: updatedBy || "admin",
+      })),
+    );
+    if (insErr) throw insErr;
+  }
+
+  return listServiceScheduleVendorsAdmin(sb, serviceId);
+}

@@ -203,7 +203,7 @@ async function checkServiceSchedulesPublic() {
   if (!Array.isArray(rows) || rows.length < 1) fail('service_schedules table empty or unreadable');
   else pass(`service_schedules REST: ${rows.length}+ row(s) readable`);
 
-  for (const action of ['list_service_schedules', 'get_service_schedule', 'update_service_schedule']) {
+  for (const action of ['list_service_schedules', 'get_service_schedule', 'update_service_schedule', 'list_service_schedule_vendors', 'update_service_schedule_vendors']) {
     const hub = await fetch(`${SB_URL}/functions/v1/admin-hub`, {
       method: 'POST',
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },

@@ -94,6 +94,8 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   list_service_schedules: "hub.settings",
   get_service_schedule: "hub.settings",
   update_service_schedule: "hub.settings",
+  list_service_schedule_vendors: "hub.settings",
+  update_service_schedule_vendors: "hub.settings",
   purge_test_data: "hub.purge_test",
 };
 

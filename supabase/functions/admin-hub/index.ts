@@ -119,7 +119,9 @@ import {
 import {
   getServiceScheduleAdmin,
   listServiceSchedulesAdmin,
+  listServiceScheduleVendorsAdmin,
   updateServiceScheduleAdmin,
+  updateServiceScheduleVendorsAdmin,
 } from "../_shared/service-schedule-admin.ts";
 import {
   listExternalTrips,
@@ -1573,6 +1575,24 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : "Update schedule failed" }, 400);
+    }
+  }
+
+  if (action === "list_service_schedule_vendors") {
+    try {
+      const serviceId = String(body.service_id || "");
+      return json(await listServiceScheduleVendorsAdmin(sb, serviceId));
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "List vendors failed" }, 400);
+    }
+  }
+
+  if (action === "update_service_schedule_vendors") {
+    try {
+      const result = await updateServiceScheduleVendorsAdmin(sb, body, iamActorLabel(ctx));
+      return json(result);
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "Update vendors failed" }, 400);
     }
   }
 

@@ -336,6 +336,17 @@ async function diagnoseEmptyVendorQueue(
   };
 }
 
+async function getExcludedVendorIds(
+  supabase: ReturnType<typeof createClient>,
+  serviceId: string,
+): Promise<string[]> {
+  const { data } = await supabase
+    .from("service_vendor_exclusions")
+    .select("vendor_id")
+    .eq("service_id", serviceId);
+  return (data || []).map((r: { vendor_id: string }) => String(r.vendor_id));
+}
+
 async function getVendorQueue(
   supabase: ReturnType<typeof createClient>,
   serviceId: string,
@@ -345,7 +356,8 @@ async function getVendorQueue(
   categoryId = "",
 ): Promise<VendorQueueResult> {
   const unavailable = await getUnavailableVendorIds(supabase);
-  const blocked = new Set([...excludeIds, ...unavailable]);
+  const excluded = await getExcludedVendorIds(supabase, serviceId);
+  const blocked = new Set([...excludeIds, ...unavailable, ...excluded]);
   const matchOr = serviceMatchOr(serviceId, categoryId);
   if (!lat || !lng) {
     const { data } = await supabase

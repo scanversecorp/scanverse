@@ -52,6 +52,10 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
   const [saveMsg, setSaveMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [expandedParents, setExpandedParents] = useState(() => new Set());
+  const [vendors, setVendors] = useState([]);
+  const [vendorEnabled, setVendorEnabled] = useState({});
+  const [vendorBusy, setVendorBusy] = useState(false);
+  const [vendorMsg, setVendorMsg] = useState('');
 
   useEffect(() => {
     if (!pin) return;
@@ -82,6 +86,26 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
       })
       .catch((e) => { if (!cancelled) setLoadErr(e.message || 'Could not load service schedule'); })
       .finally(() => { if (!cancelled) setBusy(false); });
+    return () => { cancelled = true; };
+  }, [pin, selectedId, adminHubFetch]);
+
+  useEffect(() => {
+    if (!pin || !selectedId) return;
+    let cancelled = false;
+    setVendorBusy(true);
+    setVendorMsg('');
+    adminHubFetch('list_service_schedule_vendors', { service_id: selectedId }, pin)
+      .then((r) => {
+        if (cancelled) return;
+        if (r?.error) throw new Error(r.error);
+        const rows = r.vendors || [];
+        setVendors(rows);
+        const enabled = {};
+        for (const v of rows) enabled[v.vendor_id] = v.dispatch_enabled !== false;
+        setVendorEnabled(enabled);
+      })
+      .catch((e) => { if (!cancelled) setVendorMsg(e.message || 'Could not load vendors'); })
+      .finally(() => { if (!cancelled) setVendorBusy(false); });
     return () => { cancelled = true; };
   }, [pin, selectedId, adminHubFetch]);
 
@@ -137,11 +161,48 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
       const r = await adminHubFetch('update_service_schedule', draft, pin);
       if (r?.error) throw new Error(r.error);
       setDraft({ ...r.schedule, windows: sortWindows(r.schedule?.windows) });
-      setSaveMsg('Schedule saved — applies to all vendors for this service');
+      setSaveMsg('Schedule saved');
     } catch (e) {
       setSaveMsg(e.message || 'Save failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const allVendorsEnabled = vendors.length > 0 && vendors.every((v) => vendorEnabled[v.vendor_id] !== false);
+  const enabledVendorCount = vendors.filter((v) => vendorEnabled[v.vendor_id] !== false).length;
+
+  const toggleAllVendors = (checked) => {
+    const next = {};
+    for (const v of vendors) next[v.vendor_id] = checked;
+    setVendorEnabled(next);
+  };
+
+  const toggleVendor = (vendorId, checked) => {
+    setVendorEnabled((prev) => ({ ...prev, [vendorId]: checked }));
+  };
+
+  const saveVendors = async () => {
+    if (!selectedId) return;
+    setVendorBusy(true);
+    setVendorMsg('');
+    try {
+      const excluded_vendor_ids = vendors
+        .filter((v) => vendorEnabled[v.vendor_id] === false)
+        .map((v) => v.vendor_id);
+      const r = await adminHubFetch('update_service_schedule_vendors', { service_id: selectedId, excluded_vendor_ids }, pin);
+      if (r?.error) throw new Error(r.error);
+      const rows = r.vendors || [];
+      setVendors(rows);
+      const enabled = {};
+      for (const v of rows) enabled[v.vendor_id] = v.dispatch_enabled !== false;
+      setVendorEnabled(enabled);
+      const enabledCount = rows.filter((v) => v.dispatch_enabled !== false).length;
+      setVendorMsg(`Vendor dispatch saved · ${enabledCount} of ${rows.length} receive bookings`);
+    } catch (e) {
+      setVendorMsg(e.message || 'Save vendors failed');
+    } finally {
+      setVendorBusy(false);
     }
   };
 
@@ -154,7 +215,7 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 280px) 1fr', gap: 14, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 260px) minmax(320px, 1fr) minmax(220px, 280px)', gap: 14, alignItems: 'start' }}>
       <div style={{ ...S.card(), padding: 12, maxHeight: '72vh', overflowY: 'auto' }}>
         <div style={{ fontWeight: 800, fontSize: 13, color: C.txt, marginBottom: 8 }}>Services ({sorted.length})</div>
         <div style={{ fontSize: 10, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>Main service → sub-service · IST · all vendors</div>
@@ -266,6 +327,70 @@ export function AdminServiceScheduleTab({ pin, adminHubFetch, C, S, FF, Spin, Bt
 
             {saveMsg && <div style={{ fontSize: 11, color: saveMsg.includes('failed') || saveMsg.includes('Could') ? C.red : C.grn, marginBottom: 10 }}>{saveMsg}</div>}
             <Btn onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save schedule file'}</Btn>
+          </>
+        )}
+      </div>
+
+      <div style={{ ...S.card(), padding: 12, maxHeight: '72vh', overflowY: 'auto' }}>
+        <div style={{ fontWeight: 800, fontSize: 13, color: C.txt, marginBottom: 4 }}>Vendors for this service</div>
+        <div style={{ fontSize: 10, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>
+          Checked vendors receive bookings · uncheck to exclude from dispatch
+        </div>
+        {!selectedId ? (
+          <div style={{ fontSize: 11, color: C.dim }}>Select a service</div>
+        ) : vendorBusy && !vendors.length ? (
+          <div style={{ fontSize: 11, color: C.dim, display: 'flex', gap: 8 }}><Spin size={14} /> Loading vendors…</div>
+        ) : vendors.length === 0 ? (
+          <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>No active vendors enrolled for this service yet.</div>
+        ) : (
+          <>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: C.txt, marginBottom: 10, cursor: 'pointer', fontWeight: 700 }}>
+              <input
+                type="checkbox"
+                checked={allVendorsEnabled}
+                onChange={(e) => toggleAllVendors(e.target.checked)}
+              />
+              Select all ({enabledVendorCount}/{vendors.length})
+            </label>
+            {vendors.map((v) => (
+              <label
+                key={v.vendor_id}
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'flex-start',
+                  padding: '8px 10px',
+                  marginBottom: 4,
+                  borderRadius: 8,
+                  border: `1px solid ${vendorEnabled[v.vendor_id] !== false ? C.bdr : `${C.gold}88`}`,
+                  background: vendorEnabled[v.vendor_id] !== false ? C.surf : `${C.gold}10`,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={vendorEnabled[v.vendor_id] !== false}
+                  onChange={(e) => toggleVendor(v.vendor_id, e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, color: C.txt, lineHeight: 1.35 }}>{v.business_name}</div>
+                  <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
+                    {v.phone || 'No phone'} · {v.status}
+                    {vendorEnabled[v.vendor_id] === false ? ' · excluded' : ''}
+                  </div>
+                </span>
+              </label>
+            ))}
+            {vendorMsg && (
+              <div style={{ fontSize: 11, color: vendorMsg.includes('failed') || vendorMsg.includes('Could') ? C.red : C.grn, marginTop: 10 }}>
+                {vendorMsg}
+              </div>
+            )}
+            <Btn onClick={saveVendors} disabled={vendorBusy} style={{ marginTop: 10, width: '100%' }}>
+              {vendorBusy ? 'Saving…' : 'Save vendor dispatch'}
+            </Btn>
           </>
         )}
       </div>
