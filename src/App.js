@@ -1459,6 +1459,169 @@ function bookingDraftForIntent(intent) {
   return draft?.txnId === intent?.txn_id ? draft : null;
 }
 
+function scheduleFromDraft(draft) {
+  if (!draft) return { date: '', time: '10:00' };
+  return {
+    date: draft.date || draft.bookingDetail?.date || '',
+    time: draft.time || draft.bookingDetail?.time || '10:00',
+  };
+}
+
+function intentHasSavedSchedule(intent) {
+  const draft = bookingDraftForIntent(intent);
+  return !!scheduleFromDraft(draft).date;
+}
+
+/** Create booking + dispatch after Razorpay payment when schedule was already chosen. */
+async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, schedule = {}) {
+  const draft = bookingDraftForIntent(intent);
+  const { date: bookDate, time: bookTime } = {
+    ...scheduleFromDraft(draft),
+    ...schedule,
+  };
+  if (!bookDate) return { ok: false, reason: 'missing_schedule' };
+
+  const svc = resolveServiceForPaidIntent(intent, draft);
+  if (!svc) {
+    return { ok: false, reason: 'missing_service', error: `Could not match service — contact support with ref ${intent.txn_id}` };
+  }
+
+  const payCheck = await fetchPaymentVerification(intent.txn_id, intent.amount_paise);
+  if (!payCheck.verified) {
+    return { ok: false, reason: 'not_verified', error: 'Payment no longer verified — contact support' };
+  }
+
+  const existingByTxn = await findBookingByTxn(intent.txn_id, { customerId: user.id });
+  if (existingByTxn) {
+    clearBookingDraft();
+    clearPaymentReturnUrl();
+    return { ok: true, bookingId: existingByTxn.id, existing: true };
+  }
+
+  const { price, fee, gst, total } = bookingTotalsForSvc(svc);
+  const isDeliveryShipment = svc.parent === 'delivery';
+  const locFromDraft = draft?.loc
+    || draft?.bookingDetail?.loc
+    || [draft?.address || user.address, draft?.village || user.village, draft?.city || user.city, draft?.pincode || user.pincode].filter(Boolean).join(', ');
+  const loc = (locFromDraft || [user.address, user.city, user.pincode].filter(Boolean).join(', ') || user.last_address || '').trim();
+  const pickupText = (draft?.bookingDetail?.pickup || draft?.pickup || loc).trim();
+  const dropText = (draft?.bookingDetail?.drop || draft?.drop || '').trim();
+  const locationLabel = isDeliveryShipment && pickupText && dropText
+    ? `Pickup: ${pickupText} → Drop: ${dropText}`
+    : loc;
+  const custLat = draft?.bookLat ?? draft?.bookingDetail?.lat ?? user.last_lat ?? null;
+  const custLng = draft?.bookLng ?? draft?.bookingDetail?.lng ?? user.last_lng ?? null;
+  const fullName = `${draft?.firstName || draft?.bookFirstName || user.first_name || ''} ${draft?.lastName || draft?.bookLastName || user.last_name || ''}`.trim()
+    || user.name || 'Customer';
+
+  const dup = await findDuplicateBooking({
+    customerId: user.id,
+    serviceId: svc.id || svc.parent || null,
+    date: bookDate,
+    time: bookTime,
+    txnId: intent.txn_id,
+    location: locationLabel,
+    lat: custLat,
+    lng: custLng,
+  });
+  if (dup) {
+    const dupAction = await handleDuplicateBooking(dup, {
+      addToast,
+      allowOverride: dup.txn_id !== intent.txn_id,
+      onUseExisting: (existing) => {
+        clearBookingDraft();
+        clearPaymentReturnUrl();
+        if (nav.setTrackBookingId && nav.setScreen) goToTrack(nav.setTrackBookingId, nav.setScreen, existing.id);
+      },
+    });
+    if (!dupAction.proceed) {
+      return dupAction.usedExisting ? { ok: true, bookingId: dup.id, existing: true } : { ok: false, reason: 'duplicate' };
+    }
+  }
+
+  const { data: bk, error } = await sb().from('bookings').insert({
+    customer_id: user.id,
+    service_name: intent.service_name || svc.name,
+    service_id: svc.id || svc.parent || null,
+    customer_name: fullName,
+    customer_email: user.email || `${user.phone || 'customer'}@scanv.app`,
+    date: bookDate,
+    time: bookTime,
+    notes: draft?.bookingDetail?.notes || draft?.notes || '',
+    location_text: locationLabel,
+    pickup_text: isDeliveryShipment ? pickupText : null,
+    drop_text: isDeliveryShipment ? dropText : null,
+    customer_lat: custLat,
+    customer_lng: custLng,
+    price,
+    platform_fee: fee,
+    gst_amt: gst,
+    total,
+    status: 'confirmed',
+    txn_id: intent.txn_id,
+    paid_at: intent.paid_at || new Date().toISOString(),
+  }).select().single();
+
+  if (error) {
+    if (isUniqueViolation(error)) {
+      const dupRetry = await findBookingByTxn(intent.txn_id, { customerId: user.id });
+      if (dupRetry) {
+        clearBookingDraft();
+        clearPaymentReturnUrl();
+        return { ok: true, bookingId: dupRetry.id, existing: true };
+      }
+    }
+    throw error;
+  }
+
+  await sb().from('service_requests').insert({
+    customer_id: user.id,
+    service_name: intent.service_name || svc.name,
+    service_type: svc.cat || svc.parent || 'Delivery',
+    preferred_date: bookDate,
+    preferred_time: bookTime,
+    notes: draft?.bookingDetail?.notes || draft?.notes || 'Confirmed after Razorpay payment',
+    location_text: locationLabel,
+    pickup_text: isDeliveryShipment ? pickupText : null,
+    drop_text: isDeliveryShipment ? dropText : null,
+    price,
+    platform_fee: fee,
+    gst_amount: gst,
+    total,
+    status: 'new',
+    txn_id: intent.txn_id,
+    added_by: user.id,
+  });
+
+  await sbIgnore(sb().from('payments').insert({
+    booking_id: bk.id,
+    user_id: user.id,
+    amount: total,
+    method: draft?.paymentMethod || 'Razorpay',
+    status: 'success',
+    txn_id: intent.txn_id,
+    gateway: 'Razorpay',
+    payer_vpa: payCheck.payer_vpa || null,
+  }));
+
+  await invokeBookingDispatch({
+    bookingId: bk.id,
+    serviceId: svc.id || svc.parent || '',
+    categoryId: svc.parent || '',
+    customerId: user.id,
+    serviceName: intent.service_name || svc.name,
+    lat: custLat,
+    lng: custLng,
+    location: locationLabel,
+    date: bookDate,
+    time: bookTime,
+  }, addToast);
+
+  clearBookingDraft();
+  clearPaymentReturnUrl();
+  return { ok: true, bookingId: bk.id, booking: bk };
+}
+
 const ACTIVE_BOOKING_STATUSES = ['confirmed', 'in_progress', 'in-progress'];
 const CANCELLED_BOOKING_STATUSES = ['cancelled'];
 
@@ -1684,7 +1847,11 @@ async function resumePaidBookingDraft(addToast) {
   const payCheck = await fetchPaymentVerification(returnTxn, draft.amountPaise);
   if (!payCheck.verified) return null;
   clearPaymentReturnUrl();
-  addToast?.('Payment confirmed — pick date & time to finish your booking', 'success');
+  if (scheduleFromDraft(draft).date) {
+    addToast?.('Payment confirmed — completing your booking…', 'success');
+  } else {
+    addToast?.('Payment confirmed — pick date & time to finish your booking', 'success');
+  }
   return { draft, payCheck };
 }
 
@@ -4256,6 +4423,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     { serviceId: activeSvc?.id, serviceName: activeSvc?.name, servicePricePaise: browsePrice },
   );
   const creatingRef = useRef(false);
+  const autoPayContinueRef = useRef(false);
   const browseScrollRef = useRef(null);
   const browseHomeScrollRef = useRef(null);
 
@@ -4271,6 +4439,14 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       .catch(() => { if (!cancelled) setServiceSchedule(normalizeScheduleRow(null)); });
     return () => { cancelled = true; };
   }, [activeSvc?.id]);
+
+  useEffect(() => {
+    if (screen !== 'payment' || !browsePay.paymentVerified || !bookingDetail?.date || !txnId || !userId) return;
+    if (autoPayContinueRef.current || creatingRef.current) return;
+    autoPayContinueRef.current = true;
+    confirmPayment(paymentMethod || 'Razorpay');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, browsePay.paymentVerified, bookingDetail?.date, txnId, userId, paymentMethod]);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('scanv_login_mobile');
@@ -4326,6 +4502,30 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       }
       browsePay.setPaymentVerified(true);
       browsePay.setUpiOpened(true);
+      const uid = draft.userId || localStorage.getItem('scanv_uid');
+      if (uid && (draft.date || draft.bookingDetail?.date)) {
+        const mob = phoneFromProfileId(uid);
+        if (mob) await ensureProfileAuthSession(mob);
+        const { data: prof } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
+        if (prof?.first_name) {
+          const intent = {
+            txn_id: draft.txnId,
+            amount_paise: draft.amountPaise,
+            service_id: draft.serviceId,
+            service_name: draft.serviceName,
+          };
+          try {
+            const finalized = await finalizePaidIntentBooking(prof, intent, addToast, {});
+            if (finalized.ok && finalized.bookingId) {
+              addToast?.('Booking confirmed — finding your partner 📍', 'success');
+              onRegistered(prof, finalized.bookingId);
+              return;
+            }
+          } catch (e) {
+            addToast?.(e.message || 'Could not complete booking', 'error');
+          }
+        }
+      }
       setScreen(draft.date || draft.bookingDetail?.date ? 'payment' : 'schedule');
     })();
     return () => { cancelled = true; };
@@ -6306,6 +6506,15 @@ function BookScreen() {
   const scheduleStep = skipVerify ? 2 : 3;
   const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price});
   const creatingRef = useRef(false);
+  const autoPayContinueRef = useRef(false);
+
+  useEffect(() => {
+    if (step !== payStep || !bookPay.paymentVerified || !date || !txnId) return;
+    if (autoPayContinueRef.current || creatingRef.current) return;
+    autoPayContinueRef.current = true;
+    confirmPaid(payMethod || 'Razorpay');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, payStep, bookPay.paymentVerified, date, txnId, payMethod]);
 
   useEffect(() => {
     let cancelled = false;
@@ -6334,6 +6543,24 @@ function BookScreen() {
       if (draft.time) setTime(draft.time);
       bookPay.setPaymentVerified(true);
       bookPay.setUpiOpened(true);
+      if (user?.id && draft.date) {
+        const intent = {
+          txn_id: draft.txnId,
+          amount_paise: draft.amountPaise,
+          service_id: draft.serviceId,
+          service_name: draft.serviceName,
+        };
+        try {
+          const finalized = await finalizePaidIntentBooking(user, intent, addToast, { setTrackBookingId, setScreen });
+          if (finalized.ok && finalized.bookingId) {
+            addToast('Booking confirmed — finding your partner 📍', 'success');
+            goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+            return;
+          }
+        } catch (e) {
+          addToast(e.message || 'Could not complete booking', 'error');
+        }
+      }
       setStep(draft.date ? payStep : scheduleStep);
     })();
     return () => { cancelled = true; };
@@ -7521,6 +7748,7 @@ function BookingsScreen() {
   const [completingId,setCompletingId]=useState(null);
   const [cancelModalBooking,setCancelModalBooking]=useState(null);
   const [cancellingId,setCancellingId]=useState(null);
+  const autoRecoverRef = useRef(false);
 
   const load=useCallback(async()=>{
     const col=user.role==='partner'?'partner_id':'customer_id';
@@ -7528,8 +7756,27 @@ function BookingsScreen() {
     const visible = user.role === 'customer' ? dedupeBookingsForDisplay(data || []) : (data || []);
     setBookings(visible);
     if (user.role === 'customer') {
-      const pending = await findOrphanPaidIntents(user.id);
-      setOrphans(pending);
+      let pending = await findOrphanPaidIntents(user.id);
+      if (pending.length && !autoRecoverRef.current) {
+        const autoIntent = pending.find((intent) => intentHasSavedSchedule(intent));
+        if (autoIntent) {
+          autoRecoverRef.current = true;
+          setRecoverBusy(true);
+          try {
+            const finalized = await finalizePaidIntentBooking(user, autoIntent, addToast, { setTrackBookingId, setScreen });
+            if (finalized.ok && finalized.bookingId) {
+              addToast(finalized.existing ? 'Opening your booking' : 'Booking confirmed — finding your partner 📍', 'success');
+              goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+              pending = pending.filter((i) => i.txn_id !== autoIntent.txn_id);
+            }
+          } catch (e) {
+            addToast(e.message || 'Could not complete booking', 'error');
+          } finally {
+            setRecoverBusy(false);
+          }
+        }
+      }
+      setOrphans(pending.filter((intent) => !intentHasSavedSchedule(intent)));
     } else {
       setOrphans([]);
     }
@@ -7592,12 +7839,39 @@ function BookingsScreen() {
       const returnTxn = parsePaymentReturnTxn();
       if (!returnTxn || user.role !== 'customer') return;
       const existing = await findBookingByTxn(returnTxn, { customerId: user.id });
-      if (cancelled || !existing) return;
-      clearPaymentReturnUrl();
-      clearBookingDraft();
-      setOrphans((prev) => prev.filter((i) => i.txn_id !== returnTxn));
-      addToast('Booking found for your payment — opening track', 'success');
-      goToTrack(setTrackBookingId, setScreen, existing.id);
+      if (cancelled) return;
+      if (existing) {
+        clearPaymentReturnUrl();
+        clearBookingDraft();
+        setOrphans((prev) => prev.filter((i) => i.txn_id !== returnTxn));
+        addToast('Booking found for your payment — opening track', 'success');
+        goToTrack(setTrackBookingId, setScreen, existing.id);
+        return;
+      }
+      const draft = loadBookingDraft();
+      if (draft?.txnId === returnTxn && scheduleFromDraft(draft).date) {
+        setRecoverBusy(true);
+        try {
+          const intent = {
+            txn_id: returnTxn,
+            amount_paise: draft.amountPaise,
+            service_id: draft.serviceId,
+            service_name: draft.serviceName,
+          };
+          const finalized = await finalizePaidIntentBooking(user, intent, addToast, { setTrackBookingId, setScreen });
+          if (cancelled) return;
+          if (finalized.ok && finalized.bookingId) {
+            addToast('Booking confirmed — finding your partner 📍', 'success');
+            goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+            setOrphans((prev) => prev.filter((i) => i.txn_id !== returnTxn));
+            load();
+          }
+        } catch (e) {
+          if (!cancelled) addToast(e.message || 'Could not complete booking', 'error');
+        } finally {
+          if (!cancelled) setRecoverBusy(false);
+        }
+      }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -7736,106 +8010,17 @@ function BookingsScreen() {
     if (!recoverDate) return addToast('Select a date', 'error');
     setRecoverBusy(true);
     try {
-      const svc = resolveServiceForPaidIntent(intent, bookingDraftForIntent(intent));
-      if (!svc) throw new Error('Could not match service — contact support with ref ' + intent.txn_id);
-      const { price, fee, gst, total } = bookingTotalsForSvc(svc);
-      const loc = [user.address, user.city, user.pincode].filter(Boolean).join(', ') || user.last_address || '';
-      const payCheck = await fetchPaymentVerification(intent.txn_id, intent.amount_paise);
-      if (!payCheck.verified) throw new Error('Payment no longer verified — contact support');
-      const existing = await findDuplicateBooking({
-        customerId: user.id,
-        serviceId: svc.id || svc.parent || null,
-        date: recoverDate,
-        time: recoverTime || '10:00',
-        txnId: intent.txn_id,
-        location: loc,
-        lat: user.last_lat ?? null,
-        lng: user.last_lng ?? null,
-      });
-      if (existing) {
-        const dupAction = await handleDuplicateBooking(existing, {
-          addToast,
-          allowOverride: existing.txn_id !== intent.txn_id,
-          onUseExisting: (dup) => {
-            clearBookingDraft();
-            setRecovering(null);
-            goToTrack(setTrackBookingId, setScreen, dup.id);
-            load();
-          },
-        });
-        if (!dupAction.proceed) return;
-      }
-      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Customer';
-      const { data: bk, error } = await sb().from('bookings').insert({
-        customer_id: user.id,
-        service_name: intent.service_name || svc.name,
-        service_id: svc.id || svc.parent || null,
-        customer_name: fullName,
-        customer_email: user.email || '',
-        date: recoverDate,
-        time: recoverTime || '10:00',
-        notes: 'Recovered after Razorpay payment',
-        location_text: loc,
-        customer_lat: user.last_lat ?? null,
-        customer_lng: user.last_lng ?? null,
-        price, platform_fee: fee, gst_amt: gst, total,
-        status: 'confirmed',
-        txn_id: intent.txn_id,
-        paid_at: intent.paid_at || new Date().toISOString(),
-      }).select().single();
-      if (error) {
-        if (isUniqueViolation(error)) {
-          const dupRetry = await findBookingByTxn(intent.txn_id, { customerId: user.id });
-          if (dupRetry) {
-            clearBookingDraft();
-            setRecovering(null);
-            addToast('Booking already exists for this payment — opening track', 'success');
-            goToTrack(setTrackBookingId, setScreen, dupRetry.id);
-            load();
-            return;
-          }
-        }
-        throw error;
-      }
-      await sb().from('service_requests').insert({
-        customer_id: user.id,
-        service_name: intent.service_name || svc.name,
-        service_type: svc.cat || svc.parent || 'Delivery',
-        preferred_date: recoverDate,
-        preferred_time: recoverTime || '10:00',
-        notes: 'Recovered after Razorpay payment',
-        location_text: loc,
-        price, platform_fee: fee, gst_amount: gst, total,
-        status: 'new',
-        txn_id: intent.txn_id,
-        added_by: user.id,
-      });
-      await sbIgnore(sb().from('payments').insert({
-        booking_id: bk.id,
-        user_id: user.id,
-        amount: total,
-        method: 'Razorpay',
-        status: 'success',
-        txn_id: intent.txn_id,
-        gateway: 'Razorpay',
-        payer_vpa: payCheck.payer_vpa || null,
-      }));
-      await invokeBookingDispatch({
-        bookingId: bk.id,
-        serviceId: svc.id || svc.parent || '',
-        categoryId: svc.parent || '',
-        customerId: user.id,
-        serviceName: intent.service_name || svc.name,
-        lat: user.last_lat ?? null,
-        lng: user.last_lng ?? null,
-        location: loc,
-        date: recoverDate,
-        time: recoverTime || '10:00',
-      }, addToast);
-      clearBookingDraft();
+      const finalized = await finalizePaidIntentBooking(
+        user,
+        intent,
+        addToast,
+        { setTrackBookingId, setScreen },
+        { date: recoverDate, time: recoverTime || '10:00' },
+      );
+      if (!finalized.ok) throw new Error(finalized.error || 'Could not complete booking');
       setRecovering(null);
-      addToast('Booking created from your payment ✓', 'success');
-      goToTrack(setTrackBookingId, setScreen, bk.id);
+      addToast(finalized.existing ? 'Opening your booking' : 'Booking confirmed — finding your partner 📍', 'success');
+      goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
       load();
     } catch (e) {
       addToast(e.message || 'Could not complete booking', 'error');
@@ -7859,6 +8044,11 @@ function BookingsScreen() {
         </>
       )}
       <div style={{padding:16}}>
+        {recoverBusy && user.role === 'customer' && (
+          <div style={{ ...S.card(), marginBottom: 14, padding: 16, display: 'flex', alignItems: 'center', gap: 10, color: C.grn, fontSize: 12, fontWeight: 600 }}>
+            <Spin size={16} /> Completing your booking and alerting nearby partners…
+          </div>
+        )}
         {!!orphans.length && user.role === 'customer' && (
           <div style={{ ...S.card(), marginBottom: 14, padding: 14, border: `1.5px solid rgba(0,122,77,0.35)`, background: '#e6f4ee' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Payment received — finish booking</div>
@@ -14110,6 +14300,26 @@ export default function App() {
             sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
             setScreen('track');
             return;
+          }
+          if (pendingDraft?.txnId === returnTxn && scheduleFromDraft(pendingDraft).date) {
+            try {
+              const finalized = await finalizePaidIntentBooking(profile, {
+                txn_id: returnTxn,
+                amount_paise: pendingDraft.amountPaise,
+                service_id: pendingDraft.serviceId,
+                service_name: pendingDraft.serviceName,
+              }, null, { setTrackBookingId, setScreen });
+              if (finalized.ok && finalized.bookingId) {
+                setUser(profile);
+                setState('app');
+                setTrackBookingId(finalized.bookingId);
+                sessionStorage.setItem(TRACK_BOOKING_KEY, finalized.bookingId);
+                setScreen('track');
+                return;
+              }
+            } catch (e) {
+              console.warn('[ScanV] finalize after payment', e.message);
+            }
           }
         }
         setUser(profile);
