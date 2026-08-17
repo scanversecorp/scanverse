@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const PARENT_ORDER = [
-  'legal', 'cloud', 'vip', 'health', 'property', 'household', 'delivery', 'food', 'two-wheeler', 'four-wheeler',
+  'legal', 'cloud', 'vip', 'health', 'property', 'household', 'beauty', 'delivery', 'food', 'repairs', 'two-wheeler', 'four-wheeler',
 ];
 
 function emptyWindows() {

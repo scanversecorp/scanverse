@@ -82,7 +82,7 @@ async function issueSessionResponse(extra: Record<string, unknown> = {}) {
 
 const PARENT_IDS = new Set([
   "legal", "cloud", "vip", "health", "property", "household",
-  "delivery", "food", "two-wheeler", "four-wheeler",
+  "delivery", "food", "beauty", "repairs", "two-wheeler", "four-wheeler",
 ]);
 
 const PARENT_CARD_TITLES: Record<string, string> = {
@@ -94,6 +94,8 @@ const PARENT_CARD_TITLES: Record<string, string> = {
   household: "Cleaning & Home Help",
   delivery: "Courier & Deliveries",
   food: "Food & Restaurants & Bars",
+  beauty: "Beauty & Personal Care",
+  repairs: "Repairs & Handyman",
   "two-wheeler": "Bike Care",
   "four-wheeler": "Car Care",
 };

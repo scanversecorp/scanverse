@@ -188,7 +188,7 @@ async function checkDiagrams() {
 async function checkBusinessCommand() {
   const data = await adminHub('get_business_command');
   const cards = data.cards || [];
-  if (cards.length !== 10) fail(`Business HQ: ${cards.length} cards (expected 10)`);
+  if (cards.length !== 12) fail(`Business HQ: ${cards.length} cards (expected 12)`);
   else pass(`Business HQ: ${cards.length} card pipelines`);
   if (typeof data.summary?.overall_readiness_pct !== 'number') fail('Business HQ: missing readiness summary');
   else pass(`Business HQ readiness: ${data.summary.overall_readiness_pct}%`);

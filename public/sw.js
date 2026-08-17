@@ -1,8 +1,9 @@
-/* ScanV Service Worker v9 — precache webp tiles + stale-while-revalidate images */
-const CACHE = 'scanv-v9';
-const IMAGE_CACHE = 'scanv-v9-images';
+/* ScanV Service Worker v10 — precache webp tiles + stale-while-revalidate images */
+const CACHE = 'scanv-v10';
+const IMAGE_CACHE = 'scanv-v10-images';
 
 const PRECACHE_IMAGES = [
+  '/home-models/beauty.webp',
   '/home-models/cloud.webp',
   '/home-models/delivery.webp',
   '/home-models/food.webp',
@@ -11,10 +12,19 @@ const PRECACHE_IMAGES = [
   '/home-models/household.webp',
   '/home-models/legal.webp',
   '/home-models/property.webp',
+  '/home-models/repairs.webp',
   '/home-models/two-wheeler.webp',
   '/home-models/vip.webp',
   '/services/bathroom-deep.webp',
   '/services/bathroom-help.webp',
+  '/services/beauty/facial.webp',
+  '/services/beauty/haircut-men.webp',
+  '/services/beauty/haircut-women.webp',
+  '/services/beauty/makeup.webp',
+  '/services/beauty/mani-pedi.webp',
+  '/services/beauty/massage.webp',
+  '/services/beauty/mehendi.webp',
+  '/services/beauty/threading.webp',
   '/services/care-plan.webp',
   '/services/cloud/backup.webp',
   '/services/cloud/datacenter.webp',
@@ -85,6 +95,14 @@ const PRECACHE_IMAGES = [
   '/services/property/rent.webp',
   '/services/property/site-visit.webp',
   '/services/quick-clean.webp',
+  '/services/repairs/ac-service.webp',
+  '/services/repairs/appliance-mount.webp',
+  '/services/repairs/carpenter.webp',
+  '/services/repairs/electrician.webp',
+  '/services/repairs/geyser.webp',
+  '/services/repairs/plumber.webp',
+  '/services/repairs/ro-purifier.webp',
+  '/services/repairs/washing-machine.webp',
   '/services/sofa-clean.webp',
   '/services/two-wheeler/battery.webp',
   '/services/two-wheeler/deep-clean.webp',

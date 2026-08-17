@@ -836,7 +836,7 @@ function ScanVLogoMark({ size = LOGO_SIZE.sm, center = false, linkToApp = false 
 }
 
 const BDR = `1.5px solid ${C.bdr}`;
-const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food', 'two-wheeler':'2-Wheeler', 'four-wheeler':'4-Wheeler' };
+const SVC_SHORT = { legal:'Legal', cloud:'Cloud', vip:'VIP', health:'Health', property:'Property', household:'Household', delivery:'Delivery', food:'Food', beauty:'Beauty', repairs:'Repairs', 'two-wheeler':'2-Wheeler', 'four-wheeler':'4-Wheeler' };
 
 /** Home page category card titles only (HomeModelCard) — no redundant "services" suffix */
 const HOME_CARD_TITLE = {
@@ -848,6 +848,8 @@ const HOME_CARD_TITLE = {
   household: 'Cleaning & Home Help',
   delivery: 'Courier & Deliveries',
   food: 'Food & Restaurants & Bars',
+  beauty: 'Beauty & Personal Care',
+  repairs: 'Repairs & Handyman',
   'two-wheeler': 'Bike Care',
   'four-wheeler': 'Car Care',
 };
@@ -1199,6 +1201,68 @@ const FOUR_WHEELER_SVCS = [
     features:['Ozone cabin treatment','AC vent disinfect','Fabric & seat spray','Touch-point wipe-down','Pet & smoke odour help'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,100+' },
 ];
 
+const BT_THEME = {
+  salon:   { id:'salon',   label:'Salon at home', color:'#DB2777', bg:'#FCE7F3', border:'#F9A8D4', gradFrom:'#FBCFE8', gradTo:'#F472B6', tagline:'Hair · grooming · nails · verified stylists' },
+  occasion:{ id:'occasion',label:'Occasion & care', color:'#BE185D', bg:'#FFF1F2', border:'#FDA4AF', gradFrom:'#FFE4E6', gradTo:'#FB7185', tagline:'Makeup · facial · mehendi · wellness' },
+};
+const BEAUTY_SVCS = [
+  { id:'bt-haircut-women', parent:'beauty', theme:'salon', icon:'💇‍♀️', img:'/services/beauty/haircut-women.png', name:'Women\'s Haircut & Styling', sub:'Cut · blow-dry · basic styling · 45–60 min', unit:'visit', mrp:79900, price:discPaise(79900), cash:false,
+    desc:'ScanV salon at home — verified stylists for women\'s haircut, wash, and blow-dry in the comfort of your home across local communities.',
+    features:['Verified home stylists','Hygiene kit carried','Wash & blow-dry','Basic styling included','Same-day slots'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,800+' },
+  { id:'bt-haircut-men', parent:'beauty', theme:'salon', icon:'💈', img:'/services/beauty/haircut-men.png', name:'Men\'s Haircut & Beard', sub:'Haircut · beard trim · styling · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV men\'s grooming — doorstep haircut and beard trim from verified barbers with clean tools and disposable liners.',
+    features:['Doorstep barber visit','Beard trim & shape','Disposable hygiene liners','UPI at booking','Evening slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,400+' },
+  { id:'bt-threading', parent:'beauty', theme:'salon', icon:'✨', img:'/services/beauty/threading.png', name:'Threading & Waxing', sub:'Eyebrow · upper lip · arms · hygienic', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV threading & waxing — trained beauticians for eyebrow shaping, facial threading, and waxing with single-use supplies where required.',
+    features:['Eyebrow & facial threading','Arms & legs waxing','Hygienic disposables','Female beauticians on request','Combo packages'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,100+' },
+  { id:'bt-mani-pedi', parent:'beauty', theme:'salon', icon:'💅', img:'/services/beauty/mani-pedi.png', name:'Manicure & Pedicure', sub:'Cut · file · polish · foot soak · 60 min', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV mani-pedi at home — classic manicure and pedicure with cuticle care, soak, and polish from verified nail technicians.',
+    features:['Classic mani-pedi','Cuticle & nail care','Polish included','Sterilised tools','Couple booking'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,900+' },
+  { id:'bt-makeup', parent:'beauty', theme:'occasion', icon:'💄', img:'/services/beauty/makeup.png', name:'Party & Bridal Makeup', sub:'Party · engagement · bridal trial · premium', unit:'visit', mrp:149900, price:discPaise(149900), cash:false,
+    desc:'ScanV makeup artists — party, engagement, and bridal makeup at home with premium products and trial sessions on request.',
+    features:['Certified MUAs','Premium product kits','Bridal & party looks','Trial session add-on','Early morning slots'], turnaround:'24–48 hrs', rating:'4.9 ⭐', bookings:'1,200+' },
+  { id:'bt-facial', parent:'beauty', theme:'occasion', icon:'🧖‍♀️', img:'/services/beauty/facial.png', name:'Facial & Cleanup', sub:'Deep cleanse · glow · acne-safe · 45 min', unit:'visit', mrp:69900, price:discPaise(69900), cash:false,
+    desc:'ScanV facial at home — deep cleanse, steam, extraction, and mask tailored to skin type with dermatologist-approved products.',
+    features:['Skin-type assessment','Steam & extraction','Glow mask finish','Acne-safe options','Monthly plan'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,600+' },
+  { id:'bt-massage', parent:'beauty', theme:'occasion', icon:'💆', img:'/services/beauty/massage.png', name:'Head Massage (Champi)', sub:'Oil champi · stress relief · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV head massage — traditional oil champi for stress relief and hair nourishment from trained therapists at your home.',
+    features:['Ayurvedic oil option','30-min session','Neck & shoulder add-on','Female therapists available','Evening slots'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'3,200+' },
+  { id:'bt-mehendi', parent:'beauty', theme:'occasion', icon:'🌸', img:'/services/beauty/mehendi.png', name:'Mehendi at Home', sub:'Bridal · party · Arabic · cone art', unit:'visit', mrp:89900, price:discPaise(89900), cash:false,
+    desc:'ScanV mehendi artists — bridal, party, and festival designs at home with natural cones and custom pattern consult.',
+    features:['Bridal & party designs','Arabic & traditional','Natural henna cones','Design consult','Group booking'], turnaround:'24–48 hrs', rating:'4.9 ⭐', bookings:'980+' },
+];
+
+const RP_THEME = {
+  fix:       { id:'fix',       label:'Fix it', color:'#EA580C', bg:'#FFEDD5', border:'#FDBA74', gradFrom:'#FED7AA', gradTo:'#FB923C', tagline:'Electric · plumbing · carpenter · AC' },
+  appliances:{ id:'appliances',label:'Appliances', color:'#C2410C', bg:'#FFF7ED', border:'#FDBA74', gradFrom:'#FFEDD5', gradTo:'#F97316', tagline:'Washer · RO · geyser · TV mount' },
+};
+const REPAIRS_SVCS = [
+  { id:'rp-electrician', parent:'repairs', theme:'fix', icon:'⚡', img:'/services/repairs/electrician.png', name:'Electrician Visit', sub:'Switch · fan · wiring · fuse · 60 min', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV electrician — verified electricians for switchboards, fans, lights, and minor wiring fixes at home with upfront visit charges.',
+    features:['Verified electricians','Switch & fan repair','Fuse & MCB check','Parts at MRP+labour quote','Same-day slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'4,800+' },
+  { id:'rp-plumber', parent:'repairs', theme:'fix', icon:'🔧', img:'/services/repairs/plumber.png', name:'Plumber Visit', sub:'Tap · leak · blockage · flush · 60 min', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV plumber — fix taps, leaks, blockages, and flush issues with transparent labour charges and parts quoted before work starts.',
+    features:['Leak & tap repair','Blockage clearing','Flush & WC fix','Transparent parts quote','Emergency slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'5,200+' },
+  { id:'rp-carpenter', parent:'repairs', theme:'fix', icon:'🪚', img:'/services/repairs/carpenter.png', name:'Carpenter Visit', sub:'Door · lock · hinge · furniture · hourly', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV carpenter — door alignment, lock fitting, hinge repair, and minor furniture fixes from skilled local carpenters.',
+    features:['Door & lock repair','Hinge & handle fix','Shelf & furniture','Hourly or fixed visit','Measurement guidance'], turnaround:'Same day', rating:'4.6 ⭐', bookings:'2,400+' },
+  { id:'rp-ac', parent:'repairs', theme:'fix', icon:'❄️', img:'/services/repairs/ac-service.png', name:'AC Service & Gas Refill', sub:'Split AC · deep clean · gas check · seasonal', unit:'visit', mrp:99900, price:discPaise(99900), cash:false,
+    desc:'ScanV AC service — seasonal deep clean, filter wash, cooling check, and gas refill guidance for split AC units at home.',
+    features:['Deep clean & filter wash','Cooling performance check','Gas refill if needed','Split AC specialists','AMC plans'], turnaround:'24–48 hrs', rating:'4.8 ⭐', bookings:'3,600+' },
+  { id:'rp-washing', parent:'repairs', theme:'appliances', icon:'🫧', img:'/services/repairs/washing-machine.png', name:'Washing Machine Repair', sub:'Front/top load · drum · motor · leak', unit:'visit', mrp:59900, price:discPaise(59900), cash:false,
+    desc:'ScanV washing machine repair — diagnosis and repair for front-load and top-load machines with genuine parts guidance.',
+    features:['All major brands','Drum & motor repair','Leak & noise fix','Diagnosis included','90-day labour warranty'], turnaround:'Same/next day', rating:'4.7 ⭐', bookings:'2,100+' },
+  { id:'rp-ro', parent:'repairs', theme:'appliances', icon:'💧', img:'/services/repairs/ro-purifier.png', name:'RO / Water Purifier Service', sub:'Filter change · SMPS · leak · TDS check', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV RO service — filter replacement, SMPS repair, leak fixes, and TDS checks for home water purifiers.',
+    features:['Filter & membrane change','SMPS & pump repair','TDS test included','All major RO brands','AMC available'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,800+' },
+  { id:'rp-geyser', parent:'repairs', theme:'appliances', icon:'🔥', img:'/services/repairs/geyser.png', name:'Geyser Repair', sub:'Heating · thermostat · leak · 60 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV geyser repair — fix heating failures, thermostat issues, and leaks for electric geysers with safety checks included.',
+    features:['Heating element check','Thermostat replacement','Leak & safety valve','Electric geyser focus','Winter priority slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'1,900+' },
+  { id:'rp-appliance', parent:'repairs', theme:'appliances', icon:'📺', img:'/services/repairs/appliance-mount.png', name:'TV & Appliance Mount', sub:'TV bracket · microwave · chimney · install', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV appliance mount — secure TV wall mounting, microwave shelf install, and basic chimney fitting with your hardware or ours.',
+    features:['TV wall mount install','Stud finder & levelling','Microwave & shelf fit','Cable tidy basic','Hardware guidance'], turnaround:'Same day', rating:'4.6 ⭐', bookings:'1,600+' },
+];
+
 const SUB_CATEGORIES = {
   household: { title:'Household services', subtitle:'Deep cleaning & home help · 25% off · verified partners', cat:'Household Services', themes:HH_THEME, svcs:HOUSEHOLD_SVCS, themeOrder:['pink','green'] },
   cloud:     { title:'Cloud services', subtitle:'AI · cloud · data center · packages · 25% off', cat:'Cloud Services', themes:CL_THEME, svcs:CLOUD_SVCS, themeOrder:['host','build','care','pack'] },
@@ -1210,10 +1274,12 @@ const SUB_CATEGORIES = {
   food:      { title:'Food', subtitle:'Tiffin · restaurants · bars · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
   'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · polish · 8 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
   'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 8 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
+  beauty: { title:'Beauty & Personal Care', subtitle:'Salon · grooming · makeup at home · 25% off', cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','occasion'] },
+  repairs: { title:'Repairs & Handyman', subtitle:'Electric · plumbing · AC · appliances · 25% off', cat:'Repairs & Handyman', themes:RP_THEME, svcs:REPAIRS_SVCS, themeOrder:['fix','appliances'] },
 };
 
 /** Parent category ids — home cards + pricing admin grouping */
-const PARENT_IDS = new Set(['legal', 'cloud', 'vip', 'health', 'property', 'household', 'delivery', 'food', 'two-wheeler', 'four-wheeler']);
+const PARENT_IDS = new Set(['legal', 'cloud', 'vip', 'health', 'property', 'household', 'delivery', 'food', 'beauty', 'repairs', 'two-wheeler', 'four-wheeler']);
 
 /**
  * PRICING DATA FLOW (single source of truth)
@@ -2751,8 +2817,10 @@ const SVCS = [
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 8 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 6 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
+  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:'Salon · grooming · makeup · 8 services', cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurants · bars · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
+  { id:'repairs',  icon:'🔧', name:'Repairs & Handyman', sub:'Electric · plumbing · AC · 8 services', cat:'Repairs & Handyman', cash:false, ...svcDisc(299), repairs:true },
   { id:'two-wheeler', icon:'🛵', name:'Two Wheeler Support', sub:'Mechanic · pick-up · wash · 8 services', cat:'Two Wheeler Support', cash:false, ...svcDisc(299), twowheeler:true },
   { id:'four-wheeler', icon:'🚗', name:'Four Wheeler Support', sub:'Car service · pick-up · sanitization · 8 services', cat:'Four Wheeler Support', cash:false, ...svcDisc(499), fourwheeler:true },
 ];
@@ -2771,8 +2839,10 @@ const SVC_CARD_THEME = {
   health:   { bgFrom:'#FEE2E2', bgTo:'#FECACA', b1:'#F87171', b2:'#DC2626', glow:'rgba(220,38,38,0.16)', img:'/home-models/health.png' },
   property: { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)', img:'/home-models/property.png' },
   household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/home-models/household.png' },
+  beauty:   { bgFrom:'#FCE7F3', bgTo:'#FFE4E6', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.2)', tag:'💄 Glow', img:'/home-models/beauty.png' },
   delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)', img:'/home-models/delivery.png' },
   food:     { bgFrom:'#FCE7F3', bgTo:'#FBCFE8', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.18)', img:'/home-models/food.png' },
+  repairs:  { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.2)', tag:'🔧 Fix', img:'/home-models/repairs.png' },
   'two-wheeler': { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.2)', tag:'🛵 Bike', img:'/home-models/two-wheeler.png' },
   'four-wheeler': { bgFrom:'#EDE9FE', bgTo:'#DDD6FE', b1:'#A78BFA', b2:'#7C3AED', glow:'rgba(124,58,237,0.2)', tag:'🚗 Car', img:'/home-models/four-wheeler.png' },
 };
@@ -2784,8 +2854,10 @@ const HOME_CARD_META = {
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
   property: { commitment:'Find home. Find peace.',          face:'Verified listings · local' },
   household:{ commitment:'A lighter home. A lighter heart.',face:'Deep clean & home help · 12 services' },
+  beauty:   { commitment:'Look good. Feel confident.',     face:'Salon & grooming · 8 services' },
   delivery: { commitment:'On time. With a smile.',          face:'Vikram · local delivery' },
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
+  repairs:  { commitment:'Fixed right. Stress gone.',       face:'Electric · plumbing · AC · 8 services' },
   'two-wheeler': { commitment:'Back on the road. Fast.',    face:'Ravi · bike mechanic · live GPS' },
   'four-wheeler': { commitment:'Your car. Our care.',       face:'Suresh · car service · live tracking' },
 };
@@ -6326,8 +6398,10 @@ const SVC_DETAIL = {
   health:   { desc:'Doctors at home, lab tests, pharmacy delivery, nursing, and vaccinations — 8 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Nursing care at home','Vaccination at home'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent, verify, and finance property in local communities — 6 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Commercial space search','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
   household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 14 services · 25% off.', features:['Deep cleaning visits','Sofa & upholstery clean','Hourly home help','Ironing & pressing','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
+  beauty:   { desc:'Salon at home, grooming, makeup, facial, and mehendi from verified beauticians — 8 beauty services · 25% off.', features:['Haircut & styling','Threading & waxing','Party & bridal makeup','Facial & cleanup','Mehendi at home'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,200+' },
   delivery: { desc:'Same-day courier, documents, parcels, groceries, and inter-city express — 6 delivery services · 25% off.', features:['Same-day pickup','Document handover','Grocery & essentials run','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Home tiffin, breakfast plans, restaurant orders, office lunch, and catering — 6 food services · 25% off.', features:['Monthly tiffin plans','Breakfast & snacks plan','Restaurant delivery','Office lunch boxes','Party catering'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
+  repairs:  { desc:'Electrician, plumber, carpenter, AC service, and appliance repairs at home — 8 handyman services · 25% off.', features:['Electrician & plumber visits','AC service & gas check','Washing machine & RO repair','Geyser & TV mount','Same-day slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,800+' },
   'two-wheeler': { desc:'Mechanic support, pick-up & drop servicing, roadside fixing, towing, washing, polish, and deep cleaning — 8 bike services · 25% off · live GPS.', features:['Roadside mechanic','Emergency towing','Pick-up & drop servicing','On-road fixing','Live partner tracking'], turnaround:'30–90 min', rating:'4.8 ⭐', bookings:'6,400+' },
   'four-wheeler': { desc:'Car mechanic, pick-up & drop servicing, on-site fixing, periodic service, washing, sanitization, deep cleaning, and detailing — 8 car services · 25% off · live GPS.', features:['Home/roadside mechanic','Periodic car service','Pick-up & drop servicing','Wash & sanitization','Live partner map'], turnaround:'45 min–2 days', rating:'4.8 ⭐', bookings:'4,200+' },
 };
