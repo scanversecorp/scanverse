@@ -38,7 +38,7 @@
  *   directory_detail   — { profile_id? | vendor_id? }
  *   update_profile     — { profile_id, patch }
  *   set_profile_status — { profile_id, status: active|paused }
- *   delete_profile     — { profile_id } removes profile + auth user so they can re-register
+ *   delete_profile     — { profile_id } revokes auth login; profile + bookings kept for records
  *   list_vendors_brief — { status?, limit? } active vendors for assign dropdown
  *   get_iam_catalog — roles, permissions, PIN→role map
  *   list_staff_users — staff IAM registry

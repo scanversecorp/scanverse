@@ -302,32 +302,31 @@ export async function deleteProfileAdmin(
 
   const { data: profile, error: loadErr } = await sb
     .from("profiles")
-    .select("id, role, phone, email")
+    .select("id, role, phone, email, status")
     .eq("id", profileId)
     .maybeSingle();
   if (loadErr) throw new Error(loadErr.message);
   if (!profile) throw new Error("Profile not found");
   if (profile.role === "admin") throw new Error("Cannot delete an admin profile");
-
-  const d10 = digits10(profile.phone) || (profileId.startsWith("cust_") ? digits10(profileId.slice(5)) : "");
-  const mobiles = d10.length === 10
-    ? [...new Set([`+91${d10}`, `91${d10}`, d10, profile.phone].filter(Boolean))]
-    : [profile.phone].filter(Boolean);
-
-  if (mobiles.length) {
-    await sb.from("wa_verifications").delete().in("mobile", mobiles);
+  if (String(profile.status || "").toLowerCase() === "deleted") {
+    return { revoked: true, profile_id: profileId, profile, auth_deleted: 0, already_revoked: true };
   }
-  if (d10.length === 10) {
-    await sb.from("student_cloud").delete().eq("mobile_e164", `+91${d10}`);
-    await sb.from("student_cloud").delete().eq("mobile", d10);
-  }
-  await sb.from("user_locations").delete().eq("user_id", profileId);
-
-  const { error: delErr } = await sb.from("profiles").delete().eq("id", profileId);
-  if (delErr) throw new Error(delErr.message);
 
   const authDeleted = await deleteAuthUsersByEmail(sb, profileAuthEmailsFor(profile));
-  return { deleted: true, profile_id: profileId, auth_deleted: authDeleted.length };
+
+  const { data, error } = await sb
+    .from("profiles")
+    .update({
+      status: "deleted",
+      mobile_verified: false,
+      mobile_verified_at: null,
+    })
+    .eq("id", profileId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  return { revoked: true, profile_id: profileId, profile: data, auth_deleted: authDeleted.length };
 }
 
 export async function listVendorsBriefAdmin(

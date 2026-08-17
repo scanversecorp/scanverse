@@ -52,8 +52,11 @@ function phoneLookupVariants(mobile: string): string[] {
 function profileLooksRegistered(p: {
   first_name?: string | null;
   name?: string | null;
+  status?: string | null;
 } | null): boolean {
-  return !!(String(p?.first_name || "").trim() || String(p?.name || "").trim());
+  if (!p) return false;
+  if (String(p.status || "").toLowerCase() === "deleted") return false;
+  return !!(String(p.first_name || "").trim() || String(p.name || "").trim());
 }
 
 async function findProfileByMobile(
@@ -525,7 +528,8 @@ Deno.serve(async (req: Request) => {
         }
 
         const existing = await findProfileByMobile(supabase, mobile);
-        if (existing && profileLooksRegistered(existing)) {
+        const existingDeleted = String(existing?.status || "").toLowerCase() === "deleted";
+        if (existing && profileLooksRegistered(existing) && !existingDeleted) {
           return json({
             success: false,
             code: "already_registered",

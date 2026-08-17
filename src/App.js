@@ -1871,7 +1871,13 @@ function phoneLookupVariants(mob) {
 }
 
 function profileLooksRegistered(p) {
+  if (!p) return false;
+  if (String(p.status || '').toLowerCase() === 'deleted') return false;
   return !!(p?.first_name?.trim() || p?.name?.trim());
+}
+
+function profileLoginRevoked(p) {
+  return String(p?.status || '').toLowerCase() === 'deleted';
 }
 
 function profileHasAddress(p) {
@@ -1913,7 +1919,7 @@ function directoryStatusColor(st) {
   const s = String(st || '').toLowerCase();
   if (s === 'active') return C.grn;
   if (s === 'paused' || s === 'pending') return C.gold;
-  if (s === 'offboarded' || s === 'suspended') return C.red;
+  if (s === 'offboarded' || s === 'suspended' || s === 'deleted') return C.red;
   return C.acc;
 }
 
@@ -5032,6 +5038,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         mobile_verified: true,
         mobile_verified_at: new Date().toISOString(),
       };
+      if (profileLoginRevoked(existing)) geoUpdates.status = 'active';
       if (loginGeo?.lat != null && loginGeo?.lng != null) {
         geoUpdates.last_lat = loginGeo.lat;
         geoUpdates.last_lng = loginGeo.lng;
@@ -14017,12 +14024,12 @@ function AdminDirectoryTab({ pin }) {
 
   const deleteUser = async (profileId) => {
     if (!profileId) return;
-    if (!window.confirm('Permanently delete this user? They can re-register with the same mobile number.')) return;
-    if (!window.confirm('This removes their profile and login. Bookings stay for records. Continue?')) return;
+    if (!window.confirm('Revoke this user\'s login? Their profile and booking history stay for records.')) return;
+    if (!window.confirm('They can sign in again with OTP using the same mobile number. Continue?')) return;
     setLoading(true); setErr('');
     try {
       await adminHubFetch('delete_profile', { profile_id: profileId }, pin);
-      setMsg('User deleted — they can register again');
+      setMsg('Login revoked — profile kept for records');
       await loadDirectory(q);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
@@ -15237,7 +15244,7 @@ export default function App() {
         const {data:{session}}=await sb().auth.getSession();
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
-          if (p&&!profileAccountBlocked(p)&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
+          if (p&&!profileAccountBlocked(p)&&!profileLoginRevoked(p)&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
             await finishAppBoot(p);
             return;
           }
@@ -15247,7 +15254,7 @@ export default function App() {
           const mob = phoneFromProfileId(uid);
           if (mob) await ensureProfileAuthSession(mob);
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
-          if (p&&!profileAccountBlocked(p)&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
+          if (p&&!profileAccountBlocked(p)&&!profileLoginRevoked(p)&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
             await finishAppBoot(p);
             return;
           }
