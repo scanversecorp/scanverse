@@ -809,22 +809,22 @@ function SvcGrid2({ items, renderItem, gap = 10 }) {
   );
 }
 const FF = "'Inter',system-ui,sans-serif";
-const SCANV_LOGO_SRC = '/scanv-logo-sm.png';
-const SCANV_LOGO_QR_URL = `${APP_URL}?utm_source=logo&utm_medium=qr`;
+const SCANV_LOGO_SRC = '/scanv-brand-logo.png';
+const LOGO_SIZE = { sm: 52, md: 56, lg: 88, xl: 96 };
 
-function ScanVLogoMark({ size = 40, center = false, linkToApp = false }) {
+function ScanVLogoMark({ size = LOGO_SIZE.sm, center = false, linkToApp = false }) {
   const mark = (
     <img
       src={SCANV_LOGO_SRC}
-      alt="ScanV — scan QR or tap to open app"
+      alt="ScanV"
       width={size}
       height={size}
-      title="Open ScanV app"
-      style={{ borderRadius: Math.round(size * 0.22), objectFit: 'cover', display: 'block' }}
+      title="ScanV"
+      style={{ borderRadius: Math.round(size * 0.22), objectFit: 'contain', display: 'block' }}
     />
   );
   const logoBody = linkToApp ? (
-    <a href={SCANV_LOGO_QR_URL} style={{ display: 'block', flexShrink: 0, lineHeight: 0 }} aria-label="Open ScanV app">
+    <a href={APP_URL} style={{ display: 'block', flexShrink: 0, lineHeight: 0 }} aria-label="Open ScanV">
       {mark}
     </a>
   ) : mark;
@@ -5110,7 +5110,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   if (screen==='services') return browseWrap(
     <>
       <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
-        <ScanVLogoMark size={44} />
+        <ScanVLogoMark size={LOGO_SIZE.md} />
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
@@ -5878,7 +5878,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   /* -- UI -- */
   const logo = (
     <div style={{textAlign:'center',marginBottom:22}}>
-      <ScanVLogoMark size={80} center />
+      <ScanVLogoMark size={LOGO_SIZE.xl} center />
       <div style={{fontSize:11,color:C.sub,marginTop:10}}>ScanV · {LOCAL_COMMUNITIES}</div>
       <div style={{fontSize:10,color:C.dim,marginTop:4,lineHeight:1.4}}>{INCORPORATION_ORIGIN}</div>
     </div>
@@ -6178,7 +6178,7 @@ function TopBar({title,back}) {
   return (
     <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'10px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
       {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-           :<ScanVLogoMark size={40} />}
+           :<ScanVLogoMark size={LOGO_SIZE.sm} />}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
       {!back&&<button onClick={logout} style={{background:C.gls,border:`1px solid ${C.bdr}`,color:C.sub,padding:'6px 12px',borderRadius:8,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Sign out</button>}
     </div>
@@ -9513,7 +9513,7 @@ function VendorOnboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
-        <ScanVLogoMark size={44} />
+        <ScanVLogoMark size={LOGO_SIZE.md} />
         <div style={{ fontSize: 10, color: C.cyan, fontWeight: 700, letterSpacing: 1, marginTop: 10 }}>PARTNER ONBOARDING</div>
         <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>Become a ScanV Partner</div>
         <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
@@ -10275,7 +10275,7 @@ function FaqPage() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)' }}>
-        <ScanVLogoMark size={40} />
+        <ScanVLogoMark size={LOGO_SIZE.sm} />
         <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 13, textDecoration: 'none' }}>← Back</a>
       </div>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px 80px' }}>
@@ -14174,7 +14174,7 @@ function LegalPage({page}) {
     <div className="scanv-shell" style={APP_SHELL}>
       {/* Header */}
       <div style={{flexShrink:0,background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-        <ScanVLogoMark size={40} />
+        <ScanVLogoMark size={LOGO_SIZE.sm} />
         <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>
       </div>
       <div style={{...BROWSE_SCROLL_BODY}}>
@@ -14516,7 +14516,7 @@ export default function App() {
   if (state==='boot') return (
     <><style>{APP_CSS}</style>
     <div className="scanv-shell" style={{...APP_SHELL, minHeight: '100vh', justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
-      <ScanVLogoMark size={72} center />
+      <ScanVLogoMark size={LOGO_SIZE.lg} center />
       <div style={{ marginTop: 16 }}><Spin size={32}/></div>
       <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
     </div></>
