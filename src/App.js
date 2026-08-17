@@ -875,7 +875,7 @@ const HOME_CARD_TITLE = {
   property: 'Property & Rentals',
   household: 'Cleaning & Home Help',
   delivery: 'Courier & Deliveries',
-  food: 'Food & Restaurants & Bars',
+  food: 'Food & Restaurants',
   beauty: 'Beauty & Personal Care',
   repairs: 'Repairs & Handyman',
   'two-wheeler': 'Bike Care',

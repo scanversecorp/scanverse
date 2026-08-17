@@ -93,7 +93,7 @@ const PARENT_CARD_TITLES: Record<string, string> = {
   property: "Property & Rentals",
   household: "Cleaning & Home Help",
   delivery: "Courier & Deliveries",
-  food: "Food & Restaurants & Bars",
+  food: "Food & Restaurants",
   beauty: "Beauty & Personal Care",
   repairs: "Repairs & Handyman",
   "two-wheeler": "Bike Care",
