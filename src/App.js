@@ -2859,12 +2859,39 @@ const S = {
 const APP_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  html{background:#fafafa;height:100%}
-  body{background:${C.bg};color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
+  html{background:#e8e6e1;height:100%}
+  body{background:#e8e6e1;color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
-  @media (min-width:481px){html,body{background:#e8e6e1}}
-  .scanv-shell{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;height:100%;min-height:100dvh;min-height:-webkit-fill-available;background:${C.bg}}
-  @media (min-width:481px){.scanv-shell{height:100dvh;max-height:100dvh;min-height:100dvh;max-width:480px;margin:0 auto;border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}}
+  #root{align-items:center;justify-content:center;background:#e8e6e1}
+  .scanv-root{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
+  .scanv-shell{
+    width:calc(100% - 16px);
+    max-width:calc(100% - 16px);
+    flex:1;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    min-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    margin:calc(8px + env(safe-area-inset-top,0px)) auto calc(8px + env(safe-area-inset-bottom,0px));
+    background:${C.bg};
+    overflow:hidden;
+    border-radius:28px;
+    box-shadow:0 6px 32px rgba(0,0,0,0.12);
+  }
+  @media (min-width:481px){
+    .scanv-shell{
+      width:100%;
+      max-width:480px;
+      height:100dvh;
+      max-height:100dvh;
+      min-height:100dvh;
+      margin:0 auto;
+      border-radius:22px;
+      box-shadow:0 8px 40px rgba(0,0,0,0.1);
+    }
+  }
   #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
   @media (max-width:480px){
@@ -3322,18 +3349,17 @@ const BROWSE_HOME_STACK = {
   width: '100%',
 };
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
-/** Full-bleed mobile shell; centered phone frame on desktop via .scanv-shell */
+/** iPhone-style rounded shell; frame sizing lives in .scanv-shell CSS */
 const APP_SHELL = {
   display: 'flex',
   flexDirection: 'column',
-  height: '100dvh',
-  maxHeight: '100dvh',
-  minHeight: '100dvh',
-  width: '100%',
   background: C.bg,
   overflow: 'hidden',
   boxSizing: 'border-box',
   fontFamily: FF,
+  flex: 1,
+  minHeight: 0,
+  width: '100%',
 };
 /** Full-page admin / desk layouts — sticky header + scrollable body (Safari-safe). */
 const ADMIN_PAGE_SHELL = {
@@ -5903,7 +5929,9 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   );
 
   const wrap=content=>(
-    <div style={{minHeight:'100vh',background:C.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',fontFamily:"'DM Sans',sans-serif"}}>
+    <div className="scanv-root">
+    <div className="scanv-shell" style={APP_SHELL}>
+    <div style={{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{width:'100%',maxWidth:420}}>
         {logo}{stepBar}
         <div style={S.card({padding:24})}>
@@ -5936,6 +5964,8 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         </div>
         <CopyrightLine style={{ marginTop: 12 }} />
       </div>
+    </div>
+    </div>
     </div>
   );
 
@@ -14515,10 +14545,12 @@ export default function App() {
 
   if (state==='boot') return (
     <><style>{APP_CSS}</style>
-    <div className="scanv-shell" style={{...APP_SHELL, minHeight: '100vh', justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
+    <div className="scanv-root">
+    <div className="scanv-shell" style={{...APP_SHELL, justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
       <ScanVLogoMark size={LOGO_SIZE.lg} center />
       <div style={{ marginTop: 16 }}><Spin size={32}/></div>
       <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
+    </div>
     </div></>
   );
 

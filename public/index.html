@@ -60,19 +60,20 @@
       min-height: 100dvh;
       min-height: -webkit-fill-available;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #fafafa;
+      background: #e8e6e1;
       color: #121212;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
     body { overscroll-behavior: none; overflow-x: hidden; }
-    @media (min-width: 481px) { html, body, #root { background: #e8e6e1; } }
     #root {
       height: 100dvh;
       height: -webkit-fill-available;
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
       overflow: hidden;
     }
     ::-webkit-scrollbar { width: 0; background: transparent; }
@@ -80,7 +81,7 @@
       position: fixed; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #fafafa; gap: 16px; z-index: 9999;
+      background: #e8e6e1; gap: 16px; z-index: 9999;
     }
     #root-loader .logo {
       width: 96px; height: 96px;
