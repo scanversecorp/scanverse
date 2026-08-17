@@ -34,10 +34,26 @@ function scheduleBounds() {
   return {
     today,
     max,
-    minStr: today.toISOString().slice(0, 10),
-    maxStr: max.toISOString().slice(0, 10),
+    minStr: localIsoDate(today),
+    maxStr: localIsoDate(max),
   };
 }
+
+function localIsoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function defaultSgrScheduleDate() {
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return localIsoDate(tomorrow);
+}
+
+const DEFAULT_SGR_SCHEDULE_TIME = '14:30';
 
 function validateSgrDob(dateStr, ageFromDob) {
   if (!dateStr) return 'Enter date of birth';
@@ -111,8 +127,8 @@ export function StudentCloudAdmitScreen({
   const [lat, setLat] = useState(silentGeo?.lat ?? null);
   const [lng, setLng] = useState(silentGeo?.lng ?? null);
   const [courseId, setCourseId] = useState(initialCourse?.id || courseList[0]?.id || 'cl-training');
-  const [scheduleDate, setScheduleDate] = useState('');
-  const [scheduleTime, setScheduleTime] = useState('10:00');
+  const [scheduleDate, setScheduleDate] = useState(defaultSgrScheduleDate);
+  const [scheduleTime, setScheduleTime] = useState(DEFAULT_SGR_SCHEDULE_TIME);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [otpVerified, setOtpVerified] = useState(false);
