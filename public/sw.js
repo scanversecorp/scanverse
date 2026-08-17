@@ -1,6 +1,6 @@
-/* ScanV Service Worker v12 — precache webp tiles + stale-while-revalidate images */
-const CACHE = 'scanv-v12';
-const IMAGE_CACHE = 'scanv-v12-images';
+/* ScanV Service Worker v13 — precache webp tiles + stale-while-revalidate images */
+const CACHE = 'scanv-v13';
+const IMAGE_CACHE = 'scanv-v13-images';
 
 const PRECACHE_IMAGES = [
   '/home-models/beauty.webp',
