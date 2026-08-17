@@ -3349,37 +3349,8 @@ function captureFreshGps(fallbackGeo = null) {
 }
 
 /** Fixed browse header — shell margin handles safe-area; keep header padding modest */
-const BROWSE_HDR_PAD = '8px';
+const BROWSE_HDR_PAD = '10px';
 const BROWSE_HOME_INSET = 12;
-const BROWSE_HOME_TOPBAR = {
-  flexShrink: 0,
-  background: C.surf,
-  borderBottom: BDR,
-  padding: '4px 12px',
-  paddingTop: BROWSE_HDR_PAD,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-  width: '88%',
-  maxWidth: 336,
-  margin: '0 auto',
-  boxSizing: 'border-box',
-};
-const BROWSE_LOC_PILL = {
-  fontSize: 9,
-  fontWeight: 700,
-  color: C.cyan,
-  background: '#dce8f7',
-  padding: '3px 8px',
-  borderRadius: 99,
-  border: BDR,
-  maxWidth: '56%',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  flexShrink: 1,
-};
 const BROWSE_HOME_STACK = {
   display: 'grid',
   gridTemplateColumns: '1fr',
