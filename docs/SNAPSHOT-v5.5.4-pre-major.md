@@ -11,7 +11,7 @@
 | **Short** | `5343d3f` |
 | **Message** | Update footer copy and add pre-launch test data purge tooling. |
 | **Branch** | `main` |
-| **Live URL** | https://scanv-tau.vercel.app |
+| **Live URL** | https://getscanv.com |
 | **Supabase** | `rwlwrmmqtedugcreweut` |
 
 ### What this snapshot includes

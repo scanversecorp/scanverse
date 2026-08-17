@@ -9,7 +9,7 @@ import { dirname, join } from 'path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
 const DOCS_SOCIAL = join(ROOT, 'docs', 'social');
-const APP_URL = process.env.APP_URL || 'https://scanv-tau.vercel.app';
+const APP_URL = process.env.APP_URL || 'https://getscanv.com';
 /** Direct app open — scan logo from print, screen, or social */
 const QR_URL = `${APP_URL}?utm_source=logo&utm_medium=qr`;
 

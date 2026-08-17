@@ -5,7 +5,7 @@ UPDATE scanv_social_content SET caption = 'Your mess. Our problem. 😉
 ScanV just dropped in Pune & PCMC — book cleaning, delivery & more on one app. Verified waale. UPI on app. Track it.
 
 Link in bio — go be main character.
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=genz', format_notes = 'Carousel or 15s Reel · cheeky launch energy · all 5 platforms', updated_at = NOW()
+https://getscanv.com?utm_source=social&utm_medium=genz', format_notes = 'Carousel or 15s Reel · cheeky launch energy · all 5 platforms', updated_at = NOW()
 WHERE id = 'w1-d1-launch-post';
 
 UPDATE scanv_social_content SET caption = 'POV: Pune madhe services — ekach app. Your mess. Our problem. 😉 UPI · track · no drama.', format_notes = '15s screen record · repost Reels + Shorts + TikTok', updated_at = NOW()
@@ -25,7 +25,7 @@ UPDATE scanv_social_content SET caption = 'Deep clean so good you''ll pretend yo
 Wakad & PCMC — verified deep cleaning on ScanV. Book before guests arrive (you know the vibe).
 
 Wakad madhe deep cleaning? ScanV var 2 min.
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=genz', updated_at = NOW()
+https://getscanv.com?utm_source=social&utm_medium=genz', updated_at = NOW()
 WHERE id = 'w1-d2-household-post';
 
 UPDATE scanv_social_content SET caption = 'Wakad madhe deep cleaning? ScanV var 2 minute. Flat spotless — tu credit ghe. 😉', updated_at = NOW()

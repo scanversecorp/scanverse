@@ -11,7 +11,7 @@ We want Delhivery API integration for:
 
 Flow: customer books on ScanV → we create shipment via API → live tracking in ScanV.
 
-Product: https://scanv-tau.vercel.app
+Product: https://getscanv.com
 
 We need:
 - Business onboarding & assigned SPOC

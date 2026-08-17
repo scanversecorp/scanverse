@@ -1,7 +1,7 @@
 # ScanV Documentation
 
 **ScanV v5.5.3** · DCore  
-Production: [scanv-tau.vercel.app](https://scanv-tau.vercel.app)
+Production: [getscanv.com](https://getscanv.com)
 
 ## Architecture & data flow (Admin PIN only)
 

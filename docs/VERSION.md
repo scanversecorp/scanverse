@@ -6,7 +6,7 @@
 |-------|-------|
 | **Version** | `5.5.2` (build stamp `1786395600000`) |
 | **Status** | Deployed on Vercel |
-| **URL** | [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app) |
+| **URL** | [https://getscanv.com](https://getscanv.com) |
 | **Git commit** | `8fbfd930b86e3a9abad87ebecb13439ef3e74584` |
 | **Commit message** | Change commitments tagline to Global Happiness. |
 | **Branch** | `main` |
@@ -29,7 +29,7 @@
 ### QR URL (production behavior)
 
 ```
-https://scanv-tau.vercel.app/?qr=1&utm_source=qr&utm_medium=print
+https://getscanv.com/?qr=1&utm_source=qr&utm_medium=print
 ```
 
 Opens QR landing → register flow (not direct browse).
@@ -60,7 +60,7 @@ Opens QR landing → register flow (not direct browse).
 ### QR URL (v5.5.3 behavior)
 
 ```
-https://scanv-tau.vercel.app/?qr=1&utm_source=qr&utm_medium=print
+https://getscanv.com/?qr=1&utm_source=qr&utm_medium=print
 ```
 
 Same URL — after deploy, scan goes straight to browse; `?qr=` params stripped from address bar after capture.
@@ -87,8 +87,8 @@ Same URL — after deploy, scan goes straight to browse; `?qr=` params stripped 
 ## Verify production
 
 ```bash
-curl -sI https://scanv-tau.vercel.app/ | grep -i last-modified
-curl -s https://scanv-tau.vercel.app/ | grep -o 'main\.[a-f0-9]*\.js'
+curl -sI https://getscanv.com/ | grep -i last-modified
+curl -s https://getscanv.com/ | grep -o 'main\.[a-f0-9]*\.js'
 ```
 
 ## Deploy v5.5.3

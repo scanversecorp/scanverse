@@ -2,7 +2,7 @@
 
 **Brand:** ScanV only (DCore = parent, not in social bios)  
 **Handle:** `@scanvapp` on all platforms  
-**App link:** https://scanv-tau.vercel.app  
+**App link:** https://getscanv.com  
 **Support:** +91-9270194842 · connect@dcoreglobal.com
 
 ## Platforms
@@ -42,7 +42,7 @@ Copy kit: `docs/social/` · Week plan: `node scripts/social_content_calendar.mjs
 - **Gen-Z voice:** happy, cheeky double meaning — see `docs/social/genz-voice-guide.txt`
 - Full week captions: `docs/social/genz-week-posts.txt`
 - Profile photo: `docs/social/scanv-profile-picture.png` (all platforms)
-- Always link `scanv-tau.vercel.app` + UTM: `?utm_source=social&utm_medium=genz`
+- Always link `getscanv.com` + UTM: `?utm_source=social&utm_medium=genz`
 - Marathi + Hindi + Hinglish hooks for Pune/PCMC
 - Post **9:30 AM – 7 PM IST** only
 - Repurpose one Short → Reel → TikTok (same video, crop 9:16)

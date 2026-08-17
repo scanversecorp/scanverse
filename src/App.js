@@ -1,6 +1,6 @@
 /**
  * ScanV v5.5 -- Daylight Trust UI
- * URL: https://scanv-tau.vercel.app
+ * URL: https://getscanv.com
  * DCore · ScanV marketplace
  * Daylight Trust: #f2efe8 · #d63a56 · Android-first
  *
@@ -31,7 +31,7 @@ const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ d
 const AdminStudentCloudTab = lazy(() => import('./student-cloud').then((m) => ({ default: m.AdminStudentCloudTab })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
-const APP_URL  = 'https://scanv-tau.vercel.app';
+const APP_URL  = 'https://getscanv.com';
 /** Scan this URL — opens ScanV in the browser; no “Add to Home Screen” step. */
 const SCANV_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
 const UPI_PA   = 'dcoreglobalcorporati.82037575@hdfcbank';
@@ -4120,7 +4120,7 @@ async function reverseGeo(lat,lng) {
   try {
     // Nominatim for address text — OSM postcodes are unreliable in India; prefer India Post API
     const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en&zoom=18&addressdetails=1`,{
-      headers:{'User-Agent':'ScanV/5.5 (https://scanv-tau.vercel.app; dcoreglobal.com)'}
+      headers:{'User-Agent':'ScanV/5.5 (https://getscanv.com; dcoreglobal.com)'}
     });
     const d=await r.json(); const a=d.address||{};
     const state=a.state||'Maharashtra';

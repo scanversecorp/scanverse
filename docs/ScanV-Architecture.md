@@ -13,7 +13,7 @@ The full system context, deployment, edge-function, vendor-toggle, and security 
 
 | Item | Value |
 |------|-------|
-| Production | https://scanv-tau.vercel.app |
+| Production | https://getscanv.com |
 | Supabase project | `rwlwrmmqtedugcreweut` |
 | Edge functions | 11 — see ARCHITECTURE.md §3 |
 | Payments | Vyapar UPI primary · GPay PhonePe Paytm Navi BHIM · Razorpay backup |

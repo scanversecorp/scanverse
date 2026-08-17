@@ -6,8 +6,8 @@ Read-only business owner dashboard with KPIs, charts, and platform health metric
 
 | Item | Value |
 |------|-------|
-| **URL** | `https://scanv-tau.vercel.app/#exec` |
-| **Alias** | `https://scanv-tau.vercel.app/#exec-dashboard` |
+| **URL** | `https://getscanv.com/#exec` |
+| **Alias** | `https://getscanv.com/#exec-dashboard` |
 | **PIN** | `ADMIN_HUB_PIN` or `SUPPORT_ADMIN_PIN` (Supabase secrets) |
 | **From admin hub** | `#admin` → Overview → **Executive Dashboard →** |
 

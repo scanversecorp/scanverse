@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
   const sb = createClient(url, key);
   const vendors = await loadClientVendorPayload(sb);
 
-  return new Response(JSON.stringify({ vendors, app_url: Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app" }), {
+  return new Response(JSON.stringify({ vendors, app_url: Deno.env.get("APP_URL") || "https://getscanv.com" }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

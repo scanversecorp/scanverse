@@ -25,7 +25,7 @@ Verifies ScanV UPI / Razorpay payments before the PWA allows booking to continue
 supabase secrets set RAZORPAY_KEY_ID=rzp_live_xxx
 supabase secrets set RAZORPAY_KEY_SECRET=xxx   # required for payment links + API check
 supabase secrets set RAZORPAY_WEBHOOK_SECRET=whsec_xxx
-supabase secrets set APP_URL=https://scanv-tau.vercel.app
+supabase secrets set APP_URL=https://getscanv.com
 supabase functions deploy razorpay-payment
 supabase db push   # payment_intents migration
 ```

@@ -20,7 +20,7 @@ function loadDotEnv() {
 }
 loadDotEnv();
 
-const APP_URL = process.env.APP_URL || 'https://scanv-tau.vercel.app';
+const APP_URL = process.env.APP_URL || 'https://getscanv.com';
 const SB_URL = process.env.SB_URL || 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY = process.env.SB_KEY || 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const ADMIN_PIN = process.env.ADMIN_PIN || process.env.ADMIN_HUB_PIN || process.env.SUPPORT_ADMIN_PIN || '';

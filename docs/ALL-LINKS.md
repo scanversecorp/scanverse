@@ -8,10 +8,10 @@
 
 | Name | URL | Notes |
 |------|-----|-------|
-| **Primary PWA** | https://scanv-tau.vercel.app | Main ScanV deployment |
+| **Primary PWA** | https://getscanv.com | Main ScanV deployment |
 | Alternate alias | https://scanverse-tau.vercel.app | Same Vercel project |
 | Legacy (wrong app) | https://scanverse.vercel.app | Old QR scanner — **not ScanV** |
-| QR landing | https://scanv-tau.vercel.app?qr=1 | Print QR campaigns |
+| QR landing | https://getscanv.com?qr=1 | Print QR campaigns |
 | Corporate site | https://www.dcoreglobal.com | DCore (ScanV operator) |
 | Parent engineering | https://www.vanguardnode.com | VanguardNode (Wix) |
 | Beauty brand | https://www.richroyalscorp.com | Rich Royals Corp (Wix) |
@@ -24,18 +24,18 @@ Not linked in public navigation. Bookmark-only access.
 
 | Route | URL | Auth |
 |-------|-----|------|
-| Admin Control Center | https://scanv-tau.vercel.app/#admin | `ADMIN_HUB_PIN` or leader PINs |
-| Admin alias | https://scanv-tau.vercel.app/#admin-hub | Same as above |
-| Executive Dashboard | https://scanv-tau.vercel.app/#exec | Owner PIN only |
-| Exec alias | https://scanv-tau.vercel.app/#exec-dashboard | Same as above |
-| Pricing Admin | https://scanv-tau.vercel.app/#pricing-admin | `PRICING_ADMIN_PIN` |
-| Customer Support | https://scanv-tau.vercel.app/#customer-support | `SUPPORT_AGENT_PIN` / admin PINs |
-| Vendor Onboard | https://scanv-tau.vercel.app/#vendor-onboard | Public self-registration |
-| Vendor Admin | https://scanv-tau.vercel.app/#vendor-admin | `VENDOR_ADMIN_PIN` |
-| Booking Track | https://scanv-tau.vercel.app/#track?id=BK-… | Public (booking ID) |
-| FAQ | https://scanv-tau.vercel.app/#faq | Public |
-| Report Issue | https://scanv-tau.vercel.app/#report | Public |
-| Track Ticket | https://scanv-tau.vercel.app/#track-ticket | Public (ticket # + mobile) |
+| Admin Control Center | https://getscanv.com/#admin | `ADMIN_HUB_PIN` or leader PINs |
+| Admin alias | https://getscanv.com/#admin-hub | Same as above |
+| Executive Dashboard | https://getscanv.com/#exec | Owner PIN only |
+| Exec alias | https://getscanv.com/#exec-dashboard | Same as above |
+| Pricing Admin | https://getscanv.com/#pricing-admin | `PRICING_ADMIN_PIN` |
+| Customer Support | https://getscanv.com/#customer-support | `SUPPORT_AGENT_PIN` / admin PINs |
+| Vendor Onboard | https://getscanv.com/#vendor-onboard | Public self-registration |
+| Vendor Admin | https://getscanv.com/#vendor-admin | `VENDOR_ADMIN_PIN` |
+| Booking Track | https://getscanv.com/#track?id=BK-… | Public (booking ID) |
+| FAQ | https://getscanv.com/#faq | Public |
+| Report Issue | https://getscanv.com/#report | Public |
+| Track Ticket | https://getscanv.com/#track-ticket | Public (ticket # + mobile) |
 
 ---
 
@@ -45,10 +45,10 @@ SPA rewrites to `index.html`; rendered by `LegalPage` component.
 
 | Page | URL |
 |------|-----|
-| Privacy Policy | https://scanv-tau.vercel.app/privacy |
-| Terms & Conditions | https://scanv-tau.vercel.app/terms |
-| Refund Policy | https://scanv-tau.vercel.app/refund |
-| Payment Policy | https://scanv-tau.vercel.app/payment |
+| Privacy Policy | https://getscanv.com/privacy |
+| Terms & Conditions | https://getscanv.com/terms |
+| Refund Policy | https://getscanv.com/refund |
+| Payment Policy | https://getscanv.com/payment |
 
 ---
 
@@ -61,7 +61,7 @@ SPA rewrites to `index.html`; rendered by `LegalPage` component.
 | Markdown source | `docs/ARCHITECTURE.md`, `docs/APP-DATA-FLOW.md` (private repo) |
 | Regulatory roadmap | `docs/REGULATORY-APPROVALS-INDIA.md` (Admin / leadership) |
 
-Public URLs `/docs/architecture.html` and `/docs/data-flow.html` are **removed** — not served on scanv-tau.vercel.app.
+Public URLs `/docs/architecture.html` and `/docs/data-flow.html` are **removed** — not served on getscanv.com.
 
 ---
 

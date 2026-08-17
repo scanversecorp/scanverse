@@ -111,7 +111,7 @@ const SECRET_CHECKS: Array<{
   { key: "RAZORPAY_ROUTE_ENABLED", functions: "razorpay-payment · booking-dispatch", description: "Set true after Route is live — enables 85% vendor transfers on dispatch assign", required: false, check: () => envConfigured("RAZORPAY_ROUTE_ENABLED") },
   { key: "VYAPAR_WEBHOOK_SECRET", functions: "razorpay-payment", description: "Vyapar UPI notify webhook secret", required: true, check: () => envConfigured("VYAPAR_WEBHOOK_SECRET") },
   { key: "DISPATCH_SECRET", functions: "booking-dispatch", description: "Protects dispatch tick/cron endpoints", required: true, check: () => envConfigured("DISPATCH_SECRET") },
-  { key: "APP_URL", functions: "razorpay-payment", description: "Payment return URL (https://scanv-tau.vercel.app)", required: true, check: () => envConfigured("APP_URL") },
+  { key: "APP_URL", functions: "razorpay-payment", description: "Payment return URL (https://getscanv.com)", required: true, check: () => envConfigured("APP_URL") },
   { key: "ADMIN_HUB_PIN", functions: "admin-hub", description: "Admin Control Center PIN", required: true, check: () => envConfigured("ADMIN_HUB_PIN") },
   { key: "SUPPORT_ADMIN_PIN", functions: "admin-hub · customer-support", description: "Support admin PIN (full desk + hub)", required: true, check: () => envConfigured("SUPPORT_ADMIN_PIN") },
   { key: "SUPPORT_AGENT_PIN", functions: "customer-support", description: "Support agent PIN (read-only desk)", required: true, check: () => envConfigured("SUPPORT_AGENT_PIN") },
@@ -235,7 +235,7 @@ async function buildSwitchRow(
 }
 
 export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, unknown>> {
-  const appUrl = Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app";
+  const appUrl = Deno.env.get("APP_URL") || "https://getscanv.com";
   const sbProject = "rwlwrmmqtedugcreweut";
   const manualMap = await loadManualCheckMap(sb);
   const razorpayRouteTicket = await loadRazorpayRouteTicket(sb);

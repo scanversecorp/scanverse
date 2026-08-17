@@ -8,7 +8,7 @@ We are ScanV, building a customer booking portal for Pune and PCMC.
 We are interested in QWQER Express API integration for intra-city deliveries: ScanV handles booking and payment; QWQER fulfills; ScanV displays live tracking and status to the customer.
 
 Pilot: Pune (confirm coverage) · courier / parcel · low initial volume
-Product: https://scanv-tau.vercel.app
+Product: https://getscanv.com
 
 We need:
 - Enterprise / merchant account (Pune)

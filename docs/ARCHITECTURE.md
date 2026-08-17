@@ -1,7 +1,7 @@
 # ScanV — System Architecture
 
 **Version:** v5.5.3 · **Updated:** 14 Aug 2026 · DCore  
-**Production:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)
+**Production:** [https://getscanv.com](https://getscanv.com)
 
 > **Integration note:** External service providers are pluggable via Admin Go-Live toggles. Diagrams may change as integrations are added.
 
@@ -102,9 +102,9 @@ flowchart TB
 
 | Environment | URL |
 |-------------|-----|
-| Production PWA | https://scanv-tau.vercel.app |
-| QR landing | https://scanv-tau.vercel.app/?qr=1 |
-| Printable QR | https://scanv-tau.vercel.app/scanv-qr.png |
+| Production PWA | https://getscanv.com |
+| QR landing | https://getscanv.com/?qr=1 |
+| Printable QR | https://getscanv.com/scanv-qr.png |
 | Architecture diagrams | Admin only → `#admin` → Architecture tab |
 
 ---
@@ -257,7 +257,7 @@ flowchart TB
 | Layer | Technology |
 |-------|------------|
 | Frontend | React 18 · single-file `src/App.js` |
-| Hosting | Vercel · scanv-tau.vercel.app |
+| Hosting | Vercel · getscanv.com |
 | Backend | Supabase Edge Functions Deno x11 |
 | Database | PostgreSQL Supabase Mumbai |
 | Auth | GoTrue mobile OTP synthetic email |

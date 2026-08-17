@@ -6,10 +6,10 @@ UPDATE scanv_social_content SET caption = 'Your mess. Our problem. 😉
 
 One app for cleaning, delivery & more. Verified waale. UPI on app. Track it.
 Register now · be first at launch 👇
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=coming_soon', updated_at = NOW()
+https://getscanv.com?utm_source=social&utm_medium=coming_soon', updated_at = NOW()
 WHERE id = 'w1-d1-launch-post';
 
-UPDATE scanv_social_content SET caption = '🚀 COMING SOON — Pune madhe services, ekach app. Your mess. Our problem. 😉 Preview: scanv-tau.vercel.app', updated_at = NOW()
+UPDATE scanv_social_content SET caption = '🚀 COMING SOON — Pune madhe services, ekach app. Your mess. Our problem. 😉 Preview: getscanv.com', updated_at = NOW()
 WHERE id = 'w1-d1-launch-reel';
 
 UPDATE scanv_social_content SET caption = 'ScanV coming soon 🚀 — tap link · get on the list · Pune & PCMC', updated_at = NOW()
@@ -45,12 +45,12 @@ WHERE week_number = 2 AND is_daily_everywhere = TRUE AND caption NOT LIKE '%COMI
 UPDATE scanv_social_content SET caption = '10 cards. One app. 🚀 COMING SOON to Pune & PCMC.
 
 Open ScanV → pick service → OTP → join waitlist · first booking at launch.
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=coming_soon_user', updated_at = NOW()
+https://getscanv.com?utm_source=social&utm_medium=coming_soon_user', updated_at = NOW()
 WHERE id = 'w2-d6-register-user';
 
 UPDATE scanv_social_content SET caption = '🚀 COMING SOON — recruiting partners across all 10 categories.
 
 Register for launch · listing fee nahi 😏
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=coming_soon_partner
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=coming_soon_partner
 WhatsApp: 9270194842', updated_at = NOW()
 WHERE id = 'w2-d7-register-partner';

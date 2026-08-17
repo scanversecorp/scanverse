@@ -28,7 +28,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const INTENT_TTL_MS = 30 * 60 * 1000;
-const APP_URL = Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app";
+const APP_URL = Deno.env.get("APP_URL") || "https://getscanv.com";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

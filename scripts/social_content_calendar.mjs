@@ -2,7 +2,7 @@
 /** Print ScanV week-1 social calendar — copy into Meta/TikTok/YouTube. */
 import { readFileSync } from 'fs';
 
-const APP = 'https://scanv-tau.vercel.app?utm_source=social&utm_medium=organic';
+const APP = 'https://getscanv.com?utm_source=social&utm_medium=organic';
 const HANDLE = '@scanvapp';
 
 console.log('══════════════════════════════════════════');

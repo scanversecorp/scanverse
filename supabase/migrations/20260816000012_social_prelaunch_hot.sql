@@ -11,10 +11,10 @@ Local community · Local support · Global happiness.
 Your mess. Our problem. 😉
 
 Need a service? Register now 👇
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+https://getscanv.com?utm_source=social&utm_medium=user_register
 
 Got skills? Join as partner 👇
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register',
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register',
    'Carousel or static + Reel/Short 15s · both CTAs', TRUE, 5),
 
   ('w3-d2-user-waitlist', 3, 2, 'Prelaunch — User waitlist', 'campaign', 'all',
@@ -24,7 +24,7 @@ ScanV is coming HOT — cleaning, delivery, food, health & more.
 Open app → OTP → you''re on the list. Launch first. Zero drama.
 
 🚀 Coming soon everywhere in Pune & PCMC.
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register',
+https://getscanv.com?utm_source=social&utm_medium=user_register',
    'User CTA focus · Marathi hook in Stories', TRUE, 5),
 
   ('w3-d3-partner-waitlist', 3, 3, 'Prelaunch — Partner waitlist', 'campaign', 'all',
@@ -34,7 +34,7 @@ ScanV is coming HOT for Pune & PCMC partners.
 Deep clean · delivery · food · mechanics · legal · more.
 Listing fee on launch: nahi 😏
 
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register
 Questions: 9270194842',
    'Partner CTA · WhatsApp story sticker', TRUE, 5),
 
@@ -48,8 +48,8 @@ Need one? Register as user.
 Got one? Register as partner.
 🚀 Coming soon everywhere in Pune & PCMC.
 
-User → scanv-tau.vercel.app
-Partner → scanv-tau.vercel.app/#vendor-onboard',
+User → getscanv.com
+Partner → getscanv.com/#vendor-onboard',
    '12-slide carousel · one service per slide', TRUE, 5),
 
   ('w3-d5-countdown', 3, 5, 'Prelaunch — Launch loading', 'campaign', 'all',
@@ -61,8 +61,8 @@ Don''t be the one who finds out after your neighbour already booked.
 🚀 Coming soon everywhere in Pune & PCMC.
 Your mess. Our problem. 😉
 
-Users → https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
-Partners → https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register',
+Users → https://getscanv.com?utm_source=social&utm_medium=user_register
+Partners → https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register',
    'Countdown sticker Stories · poll "Ready?"', TRUE, 5),
 
   ('w3-d6-user-emotional', 3, 6, 'Prelaunch — User emotional', 'emotional_story', 'all',
@@ -72,7 +72,7 @@ ScanV is coming HOT so Pune can book verified help in minutes.
 Register now. Thank yourself later.
 
 🚀 Coming soon everywhere in Pune & PCMC.
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register',
+https://getscanv.com?utm_source=social&utm_medium=user_register',
    'Face-to-camera or text video · user CTA end card', TRUE, 5),
 
   ('w3-d7-partner-emotional', 3, 7, 'Prelaunch — Partner emotional', 'emotional_story', 'all',
@@ -81,7 +81,7 @@ https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register',
 ScanV is coming HOT. We''re building the partner network NOW.
 Join before launch. First movers get the first bookings.
 
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register
 WhatsApp: 9270194842',
    'Partner POV · Marathi optional · vendor-onboard CTA', TRUE, 5),
 

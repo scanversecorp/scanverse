@@ -14,8 +14,8 @@ When a customer confirms a paid booking, `booking-dispatch` automatically:
 
 | Page | URL |
 |------|-----|
-| Partner onboarding | `https://scanv-tau.vercel.app/#vendor-onboard` |
-| Partner admin (activate/offboard) | `https://scanv-tau.vercel.app/#vendor-admin` |
+| Partner onboarding | `https://getscanv.com/#vendor-onboard` |
+| Partner admin (activate/offboard) | `https://getscanv.com/#vendor-admin` |
 
 ## Deploy
 

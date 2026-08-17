@@ -49,7 +49,7 @@ function calendarWeekFromOffset(offset: number): number {
 async function getConfig(sb: SupabaseClient) {
   const { data, error } = await sb.from("scanv_social_config").select("*").eq("id", "default").maybeSingle();
   if (error) throw new Error(error.message);
-  return data || { id: "default", week_start_date: istYmd(), handle: "scanvapp", app_link: "https://scanv-tau.vercel.app" };
+  return data || { id: "default", week_start_date: istYmd(), handle: "scanvapp", app_link: "https://getscanv.com" };
 }
 
 function parsePlatformStatus(raw: unknown): PlatformStatus {

@@ -19,7 +19,7 @@ Pilot scope (Phase 1):
 - Geography: Pune + PCMC
 - Use cases: Same-day courier, parcel pickup/drop, small business deliveries
 - Volume: Low initial volume — validation phase
-- Product: https://scanv-tau.vercel.app
+- Product: https://getscanv.com
 
 What we need from Porter:
 1. Enterprise account activation (Pune)

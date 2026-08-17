@@ -34,7 +34,7 @@ TIKTOK_USERNAME=scanvapp
 
 SCANV_BUSINESS_PHONE=9270194842
 SCANV_BUSINESS_EMAIL=connect@dcoreglobal.com
-SCANV_APP_URL=https://scanv-tau.vercel.app
+SCANV_APP_URL=https://getscanv.com
 
 SETUP_COMPLETED_DATE=
 META_ADMIN_FB_PASSWORD=

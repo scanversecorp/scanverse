@@ -575,7 +575,7 @@ export function ticketClosureMessage(
     `ScanV Support — Ticket ${ticketNumber} resolved\n` +
     `Subject: ${subject}\n` +
     `Resolution: ${closureNote}\n` +
-    `Track: https://scanv-tau.vercel.app/#track-ticket?id=${ticketNumber}\n` +
+    `Track: https://getscanv.com/#track-ticket?id=${ticketNumber}\n` +
     `Questions? Call +91-9270194842`
   );
 }

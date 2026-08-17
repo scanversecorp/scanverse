@@ -1,6 +1,6 @@
 # ScanV — Backup, Recovery & Scale
 
-**Production:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)  
+**Production:** [https://getscanv.com](https://getscanv.com)  
 **Supabase project:** `rwlwrmmqtedugcreweut`  
 **Updated:** 14 Aug 2026
 
@@ -121,7 +121,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 ### If OTP or payments spike
 
 1. Admin → Go-Live — disable failing vendor, enable backup route.
-2. Check [#otp-delivery-report](https://scanv-tau.vercel.app/#otp-delivery-report).
+2. Check [#otp-delivery-report](https://getscanv.com/#otp-delivery-report).
 3. Temporarily raise 2Factor wallet / Razorpay limits with provider.
 
 ---

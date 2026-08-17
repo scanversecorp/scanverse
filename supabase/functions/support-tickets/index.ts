@@ -145,7 +145,7 @@ async function createTicket(sb: ReturnType<typeof adminSb>, body: Record<string,
     success: true,
     ticket_number: ticketNumber,
     ticket,
-    track_url: `https://scanv-tau.vercel.app/#track-ticket?id=${ticketNumber}`,
+    track_url: `https://getscanv.com/#track-ticket?id=${ticketNumber}`,
   });
 }
 

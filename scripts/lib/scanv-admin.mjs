@@ -20,7 +20,7 @@ loadDotEnv();
 export const SB_URL = process.env.SCANV_SB_URL || process.env.SB_URL || 'https://rwlwrmmqtedugcreweut.supabase.co';
 export const SB_KEY = process.env.SCANV_SB_KEY || process.env.SB_KEY || 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 export const ADMIN_PIN = process.env.ADMIN_HUB_PIN || process.env.SUPPORT_ADMIN_PIN || process.env.ADMIN_PIN || '';
-export const APP_URL = process.env.APP_URL || 'https://scanv-tau.vercel.app';
+export const APP_URL = process.env.APP_URL || 'https://getscanv.com';
 
 export function adminHubPost(action, payload = {}) {
   if (!ADMIN_PIN) throw new Error('Set ADMIN_HUB_PIN, SUPPORT_ADMIN_PIN, or ADMIN_PIN in .env');

@@ -4,7 +4,7 @@ THREADS — @scanvapp (India · TikTok alternative)
 Username: scanvapp
 URL: https://www.threads.net/@scanvapp
 Profile photo: docs/social/scanv-profile-picture.png
-Link: https://scanv-tau.vercel.app?utm_source=threads&utm_medium=bio
+Link: https://getscanv.com?utm_source=threads&utm_medium=bio
 
 SETUP
 1. Create via Instagram app → Menu → Threads → use IG account linked to ScanV Page
@@ -16,7 +16,7 @@ One App for everything
 Local community · Local support · Global happiness
 🚀 Coming soon everywhere in Pune & PCMC
 Your mess. Our problem 😉 ↓
-scanv-tau.vercel.app
+getscanv.com
 
 POST STYLE
 Short cheeky text — cross-post from IG caption or genz-week-posts.txt Day threads items

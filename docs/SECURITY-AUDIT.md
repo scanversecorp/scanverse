@@ -1,6 +1,6 @@
 # ScanV Security Audit — 12 Aug 2026
 
-**Project:** ScanV (scanverse) · Supabase `rwlwrmmqtedugcreweut` · Vercel `scanv-tau.vercel.app`
+**Project:** ScanV (scanverse) · Supabase `rwlwrmmqtedugcreweut` · Vercel `getscanv.com`
 
 ---
 

@@ -8,7 +8,7 @@ We are ScanV, a customer-facing logistics portal, starting in Pune and PCMC.
 We want to integrate Borzo Business API 1.8 so customers book on ScanV, we create Borzo trips via API, and show live driver tracking inside ScanV (customers stay on our app).
 
 Pilot: Pune/PCMC · same-day courier & parcel · low initial volume
-Product: https://scanv-tau.vercel.app
+Product: https://getscanv.com
 
 We need:
 - Sandbox access (robotapitest-in.borzodelivery.com)

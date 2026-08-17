@@ -3,7 +3,7 @@
  * Minimal load test — homepage + Supabase REST health (public endpoints only)
  * Usage: node scripts/loadtest.mjs [concurrency] [durationSec]
  */
-const HOMEPAGE = process.env.LOADTEST_HOMEPAGE || 'https://scanv-tau.vercel.app';
+const HOMEPAGE = process.env.LOADTEST_HOMEPAGE || 'https://getscanv.com';
 const SUPABASE_URL = process.env.LOADTEST_SUPABASE_URL || 'https://rwlwrmmqtedugcreweut.supabase.co';
 const ANON_KEY = process.env.LOADTEST_ANON_KEY || 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 

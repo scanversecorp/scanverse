@@ -1,12 +1,12 @@
 # ScanV — Go-Live Checklist
 
-**Production URL:** [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app)  
+**Production URL:** [https://getscanv.com](https://getscanv.com)  
 **Supabase project:** `rwlwrmmqtedugcreweut`  
 **Version:** v5.5.3 · Updated 14 Aug 2026
 
 Use this page before accepting real customer bookings and payments. Tick each box when done.
 
-**Live tracker:** Admin Hub → **Go-Live** tab at [#admin](https://scanv-tau.vercel.app/#admin) — all sections below are mirrored there with switches, secret status, auto checks, and manual tick boxes.
+**Live tracker:** Admin Hub → **Go-Live** tab at [#admin](https://getscanv.com/#admin) — all sections below are mirrored there with switches, secret status, auto checks, and manual tick boxes.
 
 ---
 
@@ -24,10 +24,10 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
   ```
 - [ ] `OTP_REPORT_SECRET` set in Supabase secrets (matches callback `?key=`)
 - [ ] Test OTP on a real +91 mobile — SMS arrives within ~30 seconds
-- [ ] Admin OTP report shows **delivered** (not failed): [#otp-delivery-report](https://scanv-tau.vercel.app/#otp-delivery-report)
+- [ ] Admin OTP report shows **delivered** (not failed): [#otp-delivery-report](https://getscanv.com/#otp-delivery-report)
 - [ ] *(Optional)* Turn off **voice_otp_fallback** in Admin Hub → Go-Live (SMS-only OTP)
 
-**Admin UI:** [#admin → Go-Live tab](https://scanv-tau.vercel.app/#admin) — runtime switches + secret status (no values shown)
+**Admin UI:** [#admin → Go-Live tab](https://getscanv.com/#admin) — runtime switches + secret status (no values shown)
 
 **Docs:** [OTP-DELIVERY-REPORT.md](./OTP-DELIVERY-REPORT.md)
 
@@ -62,7 +62,7 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
   https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/razorpay-payment
   ```
 - [ ] Webhook events enabled: `payment.captured`, `payment_link.paid`
-- [ ] `APP_URL=https://scanv-tau.vercel.app` set in Supabase secrets
+- [ ] `APP_URL=https://getscanv.com` set in Supabase secrets
 - [ ] Test Razorpay payment link flow end-to-end on phone
 
 **Docs:** [ALL-APIS-AND-WEBHOOKS.md](./ALL-APIS-AND-WEBHOOKS.md)
@@ -99,9 +99,9 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
 
 - [ ] Latest `main` deployed on Vercel (bundle hash changed after last push)
 - [ ] QR scan opens services home — no “Add to Home Screen” prompt
-- [ ] Printable QR live: [scanv-qr.png](https://scanv-tau.vercel.app/scanv-qr.png)
-- [ ] Privacy policy final: [/privacy](https://scanv-tau.vercel.app/privacy)
-- [ ] Terms final: [/terms](https://scanv-tau.vercel.app/terms)
+- [ ] Printable QR live: [scanv-qr.png](https://getscanv.com/scanv-qr.png)
+- [ ] Privacy policy final: [/privacy](https://getscanv.com/privacy)
+- [ ] Terms final: [/terms](https://getscanv.com/terms)
 - [ ] FAQ / report pages load correctly
 - [ ] Mobile layout tested on iPhone + Android (real devices)
 
@@ -116,7 +116,7 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
 - [ ] Dispatch mode set in admin hub (in-app / external / both)
 - [ ] Support desk tested (`#customer-support`) with agent PIN
 - [ ] Support phone `+91-9270194842` staffed or forwarded
-- [ ] Admin hub accessible: [#admin](https://scanv-tau.vercel.app/#admin)
+- [ ] Admin hub accessible: [#admin](https://getscanv.com/#admin)
 
 **Docs:** [ADMIN-HUB.md](./ADMIN-HUB.md) · [DEPLOY-VENDOR-DISPATCH.md](./DEPLOY-VENDOR-DISPATCH.md)
 
@@ -126,7 +126,7 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
 
 Run this once on a physical device before announcing go-live:
 
-- [ ] Open [scanv-tau.vercel.app](https://scanv-tau.vercel.app) or scan [scanv-qr.png](https://scanv-tau.vercel.app/scanv-qr.png)
+- [ ] Open [getscanv.com](https://getscanv.com) or scan [scanv-qr.png](https://getscanv.com/scanv-qr.png)
 - [ ] Browse services → open a service detail
 - [ ] Start booking → enter mobile → **Send OTP** → SMS received → verify
 - [ ] Complete booking form (address, schedule)
@@ -173,9 +173,9 @@ Tick these in Admin → **Go-Live** → Manual checklist (section **I. Backup & 
 
 | Resource | URL |
 |----------|-----|
-| Production app | https://scanv-tau.vercel.app |
-| Admin hub | https://scanv-tau.vercel.app/#admin |
-| OTP delivery report | https://scanv-tau.vercel.app/#otp-delivery-report |
+| Production app | https://getscanv.com |
+| Admin hub | https://getscanv.com/#admin |
+| OTP delivery report | https://getscanv.com/#otp-delivery-report |
 | Supabase dashboard | https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut |
 | 2Factor.in | https://2factor.in |
 | Razorpay dashboard | https://dashboard.razorpay.com |

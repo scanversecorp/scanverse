@@ -1232,7 +1232,7 @@ Deno.serve(async (req) => {
   }
 
   if (action === "get_admin_url_index") {
-    return json({ sections: adminUrlIndexSections, app_url: Deno.env.get("APP_URL") || "https://scanv-tau.vercel.app" });
+    return json({ sections: adminUrlIndexSections, app_url: Deno.env.get("APP_URL") || "https://getscanv.com" });
   }
 
   if (action === "search_dispatches") {

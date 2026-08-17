@@ -1,11 +1,11 @@
 # ScanV — App Store & Play Store Roadmap
 
-ScanV is live as a **web app** at [https://scanv-tau.vercel.app](https://scanv-tau.vercel.app).  
+ScanV is live as a **web app** at [https://getscanv.com](https://getscanv.com).  
 The customer QR opens that URL directly — **no “Add to Home Screen” step**.
 
 | QR URL | Purpose |
 |--------|---------|
-| `https://scanv-tau.vercel.app/?qr=1&utm_source=qr&utm_medium=print` | Print / share QR — opens browse home, captures scan analytics in background |
+| `https://getscanv.com/?qr=1&utm_source=qr&utm_medium=print` | Print / share QR — opens browse home, captures scan analytics in background |
 | Printable PNG | `public/scanv-qr.png` (same URL encoded) |
 
 ---
@@ -48,7 +48,7 @@ Point Capacitor `server.url` at production during dev, or ship the `build/` fold
 ### Native features to add later
 
 - Push notifications (booking alerts for vendors) — `@capacitor/push-notifications` + FCM / APNs
-- Deep links — `scanv://` or `https://scanv-tau.vercel.app` universal links
+- Deep links — `scanv://` or `https://getscanv.com` universal links
 - GPS — already works in WebView; Capacitor Geolocation optional for tighter control
 
 ---

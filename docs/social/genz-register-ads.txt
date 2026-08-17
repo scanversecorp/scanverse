@@ -14,7 +14,7 @@ Local community · Local support · Global happiness.
 🚀 Coming soon everywhere in Pune & PCMC.
 Open app → choose any of 10 services → verify mobile OTP → join the waitlist.
 Your mess. Our problem. 😉
-scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+getscanv.com?utm_source=social&utm_medium=user_register
 
 POST 2
 Still saving random numbers in Notes app?
@@ -34,7 +34,7 @@ Countdown: "Your flat won't clean itself"
 
 PARTNER / SERVICE PROVIDER REGISTRATION
 ---------------------------------------
-URL: scanv-tau.vercel.app/#vendor-onboard
+URL: getscanv.com/#vendor-onboard
 WhatsApp: 9270194842
 
 POST 1
@@ -65,7 +65,7 @@ STORY
 ---
 
 PIN BOTH (carousel slide 1 / slide 2)
-Slide 1: NEED SERVICE? → scanv-tau.vercel.app
+Slide 1: NEED SERVICE? → getscanv.com
 Slide 2: PROVIDE SERVICE? → #vendor-onboard
 
 COMMENT TO PIN

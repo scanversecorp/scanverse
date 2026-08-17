@@ -5,7 +5,7 @@ YOUTUBE SHORTS / REELS / TIKTOK SCRIPTS (ScanV only)
 [0-3s] Text: "Pune madhe services book karaycha ekach app?"
 [3-15s] Screen record: ScanV home → tap Household → pick service
 [15-25s] Text: "UPI payment · track booking"
-[25-30s] Logo + scanv-tau.vercel.app
+[25-30s] Logo + getscanv.com
 
 #2 — Marathi hook
 Voice: "Wakad madhe deep cleaning pahije? ScanV var 2 minute."

@@ -64,8 +64,8 @@ Table: `otp_delivery_reports`
 
 | URL | Access |
 |-----|--------|
-| `https://scanv-tau.vercel.app/#otp-delivery-report` | Standalone page |
-| `https://scanv-tau.vercel.app/#admin` → **OTP Delivery** tab | Admin hub |
+| `https://getscanv.com/#otp-delivery-report` | Standalone page |
+| `https://getscanv.com/#admin` → **OTP Delivery** tab | Admin hub |
 
 PIN: `ADMIN_HUB_PIN`, `SUPPORT_ADMIN_PIN`, or other admin hub PINs.
 

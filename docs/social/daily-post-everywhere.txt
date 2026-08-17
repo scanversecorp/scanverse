@@ -48,7 +48,7 @@ Week 1 themes repeat every 7 days until Week 2 calendar is added.
 
 ## Link (always include)
 
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=organic
+https://getscanv.com?utm_source=social&utm_medium=organic
 
 ## Also post daily (optional)
 

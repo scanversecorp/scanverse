@@ -9,10 +9,10 @@ Local community · Local support · Global happiness.
 Your mess. Our problem. 😉
 
 Need a service? Register now 👇
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+https://getscanv.com?utm_source=social&utm_medium=user_register
 
 Got skills? Join as partner 👇
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register', updated_at = NOW()
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register', updated_at = NOW()
 WHERE id = 'w3-d1-coming-hot';
 
 UPDATE scanv_social_content SET caption = caption || E'\n\nOne App for everything.\nLocal community · Local support · Global happiness.'

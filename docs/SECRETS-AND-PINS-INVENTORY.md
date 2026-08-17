@@ -27,7 +27,7 @@
 | `RAZORPAY_KEY_ID` | Supabase secrets | Razorpay API key ID | Live/test per Razorpay dashboard |
 | `RAZORPAY_KEY_SECRET` | Supabase secrets | Razorpay API secret | Required for payment links |
 | `RAZORPAY_WEBHOOK_SECRET` | Supabase secrets | Webhook HMAC verification | From Razorpay webhook config |
-| `APP_URL` | Supabase secrets | Payment redirect URL | `https://scanv-tau.vercel.app` |
+| `APP_URL` | Supabase secrets | Payment redirect URL | `https://getscanv.com` |
 
 ---
 
@@ -135,7 +135,7 @@ npx supabase secrets set \
   RAZORPAY_KEY_SECRET=<value> \
   RAZORPAY_WEBHOOK_SECRET=<value> \
   TWOFACTOR_API_KEY=<value> \
-  APP_URL=https://scanv-tau.vercel.app
+  APP_URL=https://getscanv.com
 
 npx supabase functions deploy --no-verify-jwt
 ```

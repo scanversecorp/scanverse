@@ -5,10 +5,10 @@ Internal support desk for searching customers, bookings, and payments. Not linke
 ## Access URL
 
 ```
-https://scanv-tau.vercel.app/#customer-support
+https://getscanv.com/#customer-support
 ```
 
-**Admin hub (all tools):** `https://scanv-tau.vercel.app/#admin` — see [ADMIN-HUB.md](./ADMIN-HUB.md)
+**Admin hub (all tools):** `https://getscanv.com/#admin` — see [ADMIN-HUB.md](./ADMIN-HUB.md)
 
 ## Roles
 

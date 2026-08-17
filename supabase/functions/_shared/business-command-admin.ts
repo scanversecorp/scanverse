@@ -80,7 +80,7 @@ function buildStrikeList(
     area: v.address?.area || v.address?.city || "Pune",
     onboard_status: statusByLead.get(v.id) || "research",
     outreach_message: vendorOutreachMessage(v.business_name),
-    admin_url: `https://scanv-tau.vercel.app/#admin?tab=vendor-leads`,
+    admin_url: `https://getscanv.com/#admin?tab=vendor-leads`,
   }));
 }
 
@@ -100,7 +100,7 @@ function buildLogisticsStrike(
       outreach_status: p.outreach_status,
       contact_email: p.contact_email,
       follow_up_template: "docs/email-followup-plain.txt",
-      admin_url: "https://scanv-tau.vercel.app/#admin?tab=logistics",
+      admin_url: "https://getscanv.com/#admin?tab=logistics",
     }));
 }
 

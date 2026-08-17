@@ -5,7 +5,7 @@ Unified leader hub for pricing, customer support, agent management, vendors, boo
 ## Access URL
 
 ```
-https://scanv-tau.vercel.app/#admin
+https://getscanv.com/#admin
 ```
 
 Alias: `#admin-hub`

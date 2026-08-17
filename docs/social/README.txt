@@ -31,7 +31,7 @@ RULES
 - ScanV only in posts (not DCore)
 - Brand lines: One App for everything · Local community · Local support · Global happiness
 - 9:30 AM – 7 PM IST only
-- Link: https://scanv-tau.vercel.app?utm_source=social&utm_medium=genz
+- Link: https://getscanv.com?utm_source=social&utm_medium=genz
 
 CLI
 node scripts/social_prelaunch.mjs          — pre-launch HOT waitlist (users + partners)
@@ -39,5 +39,5 @@ node scripts/social_pulse.mjs
 node scripts/social_services_campaign.mjs  — today's service ad + register CTAs
 
 REGISTER LINKS
-User (OTP on first book): https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
-Partner: https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+User (OTP on first book): https://getscanv.com?utm_source=social&utm_medium=user_register
+Partner: https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register

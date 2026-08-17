@@ -22,7 +22,7 @@ Paste bios from:
 
 STEP 1 — PIN THESE (before any other post)
 ------------------------------------------
-Bio link (IG/FB/Threads): https://scanv-tau.vercel.app?utm_source=social&utm_medium=profile
+Bio link (IG/FB/Threads): https://getscanv.com?utm_source=social&utm_medium=profile
 YouTube About link: same
 
 Pinned post / featured comment:
@@ -30,8 +30,8 @@ One App for everything.
 Local community · Local support · Global happiness.
 🚀 Coming soon everywhere in Pune & PCMC
 
-Need a service? Register → scanv-tau.vercel.app
-Provide a service? Partner → scanv-tau.vercel.app/#vendor-onboard
+Need a service? Register → getscanv.com
+Provide a service? Partner → getscanv.com/#vendor-onboard
 Help: 9270194842
 
 STEP 2 — POST #1 (same caption everywhere)
@@ -48,8 +48,8 @@ Verified partners · UPI · live tracking.
 Your mess. Our problem. 😉
 
 Register before launch 👇
-Users: https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
-Partners: https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+Users: https://getscanv.com?utm_source=social&utm_medium=user_register
+Partners: https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register
 
 #ScanV #Pune #PCMC #ComingSoon #ImComingHot
 
@@ -60,14 +60,14 @@ STEP 3 — POST #2 (next day — user focus)
 Still scrolling WhatsApp for a cleaner? 📱
 
 I'm coming HOT. Register on ScanV now — launch first.
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
+https://getscanv.com?utm_source=social&utm_medium=user_register
 
 STEP 4 — POST #3 (vendor focus)
 -------------------------------
 Local vendor? Freelancer? Shop owner?
 
 Join ScanV partner waitlist — listing fee nahi on launch 😏
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register
 9270194842
 
 STEP 5 — STORIES (daily from day 1)
@@ -83,4 +83,4 @@ After first 3 posts:
   node scripts/social_prelaunch.mjs   ← today's HOT caption + both CTAs
   node scripts/social_pulse.mjs       ← admin dashboard queue
   Full 14-day plan: docs/social/prelaunch-coming-hot.txt
-  Admin: https://scanv-tau.vercel.app/#admin?tab=social
+  Admin: https://getscanv.com/#admin?tab=social

@@ -8,7 +8,7 @@ We are ScanV, a customer portal for local deliveries in Pune and PCMC.
 We want Shadowfax hyperlocal API integration: customer books on ScanV → we create the trip via API → live rider tracking in ScanV (not a separate consumer app).
 
 Pilot: Pune · same-day / parcel · validation phase
-Product: https://scanv-tau.vercel.app
+Product: https://getscanv.com
 
 We need:
 - Merchant / client partner onboarding

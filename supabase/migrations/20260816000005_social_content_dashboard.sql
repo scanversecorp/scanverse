@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS scanv_social_config (
   id                TEXT PRIMARY KEY DEFAULT 'default',
   week_start_date   DATE NOT NULL DEFAULT CURRENT_DATE,
   handle            TEXT NOT NULL DEFAULT 'scanvapp',
-  app_link          TEXT NOT NULL DEFAULT 'https://scanv-tau.vercel.app',
+  app_link          TEXT NOT NULL DEFAULT 'https://getscanv.com',
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -55,12 +55,12 @@ ALTER TABLE scanv_social_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scanv_social_content ENABLE ROW LEVEL SECURITY;
 
 INSERT INTO scanv_social_config (id, week_start_date, handle, app_link) VALUES
-  ('default', CURRENT_DATE, 'scanvapp', 'https://scanv-tau.vercel.app')
+  ('default', CURRENT_DATE, 'scanvapp', 'https://getscanv.com')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO scanv_social_content (id, week_number, day_number, title, content_type, platform, caption, format_notes, script_ref, emotional, sort_order) VALUES
   ('w1-d1-launch-post', 1, 1, 'Day 1 — Launch announcement', 'carousel', 'all',
-   'ScanV is here for Pune & PCMC — book local services on one app. Try the app · Link in bio https://scanv-tau.vercel.app?utm_source=social&utm_medium=organic',
+   'ScanV is here for Pune & PCMC — book local services on one app. Try the app · Link in bio https://getscanv.com?utm_source=social&utm_medium=organic',
    'Carousel (home screen) or static + all platforms', NULL, FALSE, 10),
   ('w1-d1-launch-reel', 1, 1, 'Day 1 — App demo Reel/Short', 'reel', 'all',
    'Pune madhe services book karaycha ekach app? ScanV — UPI payment · track booking.',
@@ -68,7 +68,7 @@ INSERT INTO scanv_social_content (id, week_number, day_number, title, content_ty
   ('w1-d1-story-poll', 1, 1, 'Story — service poll', 'story', 'instagram',
    'Poll: Which service first? Cleaning / Delivery / Food', 'IG + FB Stories sticker poll', NULL, FALSE, 30),
   ('w1-d1-story-link', 1, 1, 'Story — link sticker', 'story', 'instagram',
-   'ScanV is live — tap link · Pune & PCMC', 'Link sticker → scanv-tau.vercel.app', NULL, FALSE, 40),
+   'ScanV is live — tap link · Pune & PCMC', 'Link sticker → getscanv.com', NULL, FALSE, 40),
   ('w1-d1-emotional', 1, 1, 'Emotional — why ScanV for Pune', 'emotional_story', 'instagram',
    'We built ScanV because booking local help in Pune should be simple — one app, verified partners, no chasing.',
    'Face-to-camera or text-on-video · Marathi optional hook', NULL, TRUE, 50),

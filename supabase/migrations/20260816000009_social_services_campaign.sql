@@ -12,14 +12,14 @@ INSERT INTO scanv_social_content (id, week_number, day_number, title, content_ty
   ('w2-d1-services-hh-dl', 2, 1, 'Week 2 — Household + Delivery', 'campaign', 'all',
    'Flat messy? Parcel stuck? One app. 🧹 Deep clean + 📦 courier on ScanV — verified waale, UPI, track. Your mess. Our problem. 😉
 
-Book: https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register
-Partner (cleaners/couriers): https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register',
+Book: https://getscanv.com?utm_source=social&utm_medium=user_register
+Partner (cleaners/couriers): https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register',
    'Carousel: 2 cards + dual CTA slide', TRUE, 5),
 
   ('w2-d2-services-food-tw', 2, 2, 'Week 2 — Food + Two Wheeler', 'campaign', 'all',
    'Tiffin craving or bike crying? 🍱 Food + 🛵 mechanic on ScanV. Book before you regret it.
 
-Users → scanv-tau.vercel.app · Partners → #vendor-onboard · 9270194842',
+Users → getscanv.com · Partners → #vendor-onboard · 9270194842',
    'Reel: split screen food + bike', TRUE, 5),
 
   ('w2-d3-services-fw-health', 2, 3, 'Week 2 — Four Wheeler + Health', 'campaign', 'all',
@@ -40,7 +40,7 @@ Users → scanv-tau.vercel.app · Partners → #vendor-onboard · 9270194842',
 Open ScanV → pick service → OTP → book → UPI → track.
 No account drama. First booking = you''re in.
 
-https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register',
+https://getscanv.com?utm_source=social&utm_medium=user_register',
    'Mega carousel all 10 home cards', TRUE, 5),
 
   ('w2-d7-register-partner', 2, 7, 'Week 2 — Register as PARTNER', 'campaign', 'all',
@@ -49,12 +49,12 @@ https://scanv-tau.vercel.app?utm_source=social&utm_medium=user_register',
 ✓ OTP + eKYC · ✓ digital bookings · ✓ UPI payouts
 Launch pe listing fee nahi 😏
 
-https://scanv-tau.vercel.app/#vendor-onboard?utm_source=social&utm_medium=partner_register
+https://getscanv.com/#vendor-onboard?utm_source=social&utm_medium=partner_register
 WhatsApp: 9270194842',
    'Partner CTA video + WhatsApp sticker story', TRUE, 5),
 
   ('w2-story-user', 2, 6, 'Story — book as user', 'story', 'instagram',
-   'Need a service? Tap → scanv-tau.vercel.app', 'Link sticker', FALSE, 20),
+   'Need a service? Tap → getscanv.com', 'Link sticker', FALSE, 20),
   ('w2-story-partner', 2, 7, 'Story — join as partner', 'story', 'instagram',
    'Provide services? Join ScanV → vendor-onboard', 'Link sticker + 9270194842', FALSE, 20)
 ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, title = EXCLUDED.title, updated_at = NOW();

@@ -34,7 +34,7 @@ Facebook, Instagram, TikTok, and YouTube require **your** phone OTP, email inbox
 | 4 | Page name: **ScanV** |
 | 5 | Upload `docs/social/scanv-profile-picture.png` as profile photo |
 | 6 | Set username: [facebook.com/scanvapp](https://www.facebook.com/scanvapp) (Settings → Page name → @username) |
-| 7 | About → Website: `https://scanv-tau.vercel.app` · Phone: 9270194842 · Email: connect@dcoreglobal.com |
+| 7 | About → Website: `https://getscanv.com` · Phone: 9270194842 · Email: connect@dcoreglobal.com |
 | 8 | Paste About text from `docs/social/facebook-page.txt` |
 | 9 | Open [business.facebook.com](https://business.facebook.com) → add Page **ScanV** to Business Portfolio (create portfolio **ScanV** if needed) |
 | 10 | Instagram: Settings → Account → Add new professional account **OR** link existing → username **scanvapp** |
@@ -53,7 +53,7 @@ Facebook, Instagram, TikTok, and YouTube require **your** phone OTP, email inbox
 | 2 | Profile → **Switch to Business Account** → category Local Services |
 | 3 | Username: **scanvapp** → [tiktok.com/@scanvapp](https://www.tiktok.com/@scanvapp) |
 | 4 | Bio from `docs/social/tiktok-profile.txt` |
-| 5 | Edit profile → Website: `https://scanv-tau.vercel.app` |
+| 5 | Edit profile → Website: `https://getscanv.com` |
 | 6 | Upload same profile photo |
 
 **Save in credentials.env:** `TIKTOK_USERNAME`, `TIKTOK_URL`, login method (phone/email)

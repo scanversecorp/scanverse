@@ -4,7 +4,7 @@ FACEBOOK PAGE — ScanV (Gen-Z tone)
 Page name: ScanV
 Username: scanvapp
 Profile & cover: docs/social/scanv-profile-picture.png (+ app screenshot cover)
-Website: https://scanv-tau.vercel.app
+Website: https://getscanv.com
 WhatsApp: +91-9270194842
 
 ABOUT (short)
@@ -21,7 +21,7 @@ Local community · Local support · Global happiness.
 
 🚀 Coming soon everywhere in Pune & PCMC
 Your mess. Our problem. 😉
-Register now · launch first → scanv-tau.vercel.app
+Register now · launch first → getscanv.com
 
 CTA button: Learn more → app link
 

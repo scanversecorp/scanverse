@@ -6,37 +6,37 @@
     "items": [
       {
         "label": "ScanV Home",
-        "url": "https://scanv-tau.vercel.app/",
+        "url": "https://getscanv.com/",
         "note": "Main PWA · browse & book"
       },
       {
         "label": "QR landing",
-        "url": "https://scanv-tau.vercel.app/?qr=1",
+        "url": "https://getscanv.com/?qr=1",
         "note": "Print QR campaigns"
       },
       {
         "label": "FAQ",
-        "url": "https://scanv-tau.vercel.app/#faq",
+        "url": "https://getscanv.com/#faq",
         "note": "Help & policies summary"
       },
       {
         "label": "Report issue",
-        "url": "https://scanv-tau.vercel.app/#report",
+        "url": "https://getscanv.com/#report",
         "note": "Create support ticket"
       },
       {
         "label": "Track support ticket",
-        "url": "https://scanv-tau.vercel.app/#track-ticket",
+        "url": "https://getscanv.com/#track-ticket",
         "note": "Ticket # + mobile"
       },
       {
         "label": "Track booking",
-        "url": "https://scanv-tau.vercel.app/#track?id=BK-XXXX",
+        "url": "https://getscanv.com/#track?id=BK-XXXX",
         "note": "Replace BK-XXXX with booking ID"
       },
       {
         "label": "Partner registration",
-        "url": "https://scanv-tau.vercel.app/#vendor-onboard",
+        "url": "https://getscanv.com/#vendor-onboard",
         "note": "Vendor self-signup"
       }
     ]
@@ -48,32 +48,32 @@
     "items": [
       {
         "label": "Admin Control Center",
-        "url": "https://scanv-tau.vercel.app/#admin",
+        "url": "https://getscanv.com/#admin",
         "note": "ADMIN_HUB_PIN or leader PINs"
       },
       {
         "label": "Executive dashboard",
-        "url": "https://scanv-tau.vercel.app/#exec",
+        "url": "https://getscanv.com/#exec",
         "note": "Owner PIN · KPIs & charts"
       },
       {
         "label": "Pricing admin",
-        "url": "https://scanv-tau.vercel.app/#pricing-admin",
+        "url": "https://getscanv.com/#pricing-admin",
         "note": "PRICING_ADMIN_PIN + 2FA"
       },
       {
         "label": "Customer support desk",
-        "url": "https://scanv-tau.vercel.app/#customer-support",
+        "url": "https://getscanv.com/#customer-support",
         "note": "SUPPORT_AGENT_PIN or admin PINs"
       },
       {
         "label": "Vendor admin",
-        "url": "https://scanv-tau.vercel.app/#vendor-admin",
+        "url": "https://getscanv.com/#vendor-admin",
         "note": "VENDOR_ADMIN_PIN or admin PINs"
       },
       {
         "label": "OTP delivery reports",
-        "url": "https://scanv-tau.vercel.app/#otp-delivery-report",
+        "url": "https://getscanv.com/#otp-delivery-report",
         "note": "2Factor callback stats"
       }
     ]
@@ -86,127 +86,127 @@
       {
         "label": "Overview",
         "adminTab": "overview",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=overview",
+        "url": "https://getscanv.com/#admin?tab=overview",
         "note": "overview"
       },
       {
         "label": "Business HQ",
         "adminTab": "business",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=business",
+        "url": "https://getscanv.com/#admin?tab=business",
         "note": "All 10 cards · vendor gaps · revenue pipeline · action queue"
       },
       {
         "label": "Pricing",
         "adminTab": "pricing",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=pricing",
+        "url": "https://getscanv.com/#admin?tab=pricing",
         "note": "pricing"
       },
       {
         "label": "Customer Support",
         "adminTab": "support",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=support",
+        "url": "https://getscanv.com/#admin?tab=support",
         "note": "support"
       },
       {
         "label": "Refunds",
         "adminTab": "refunds",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=refunds",
+        "url": "https://getscanv.com/#admin?tab=refunds",
         "note": "refunds"
       },
       {
         "label": "Investments",
         "adminTab": "investments",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=investments",
+        "url": "https://getscanv.com/#admin?tab=investments",
         "note": "investments"
       },
       {
         "label": "Tickets",
         "adminTab": "tickets",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=tickets",
+        "url": "https://getscanv.com/#admin?tab=tickets",
         "note": "tickets"
       },
       {
         "label": "Support Agents",
         "adminTab": "agents",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=agents",
+        "url": "https://getscanv.com/#admin?tab=agents",
         "note": "agents"
       },
       {
         "label": "Dispatch Desk",
         "adminTab": "dispatch",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=dispatch",
+        "url": "https://getscanv.com/#admin?tab=dispatch",
         "note": "Full dispatch queue · pause · assign · location"
       },
       {
         "label": "Users & Vendors",
         "adminTab": "directory",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=directory",
+        "url": "https://getscanv.com/#admin?tab=directory",
         "note": "Customers · partners · bookings · vendor assign"
       },
       {
         "label": "Vendors & Dispatch",
         "adminTab": "vendors",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=vendors",
+        "url": "https://getscanv.com/#admin?tab=vendors",
         "note": "vendors"
       },
       {
         "label": "GPS Status",
         "adminTab": "gps",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=gps",
+        "url": "https://getscanv.com/#admin?tab=gps",
         "note": "gps"
       },
       {
         "label": "Bookings & Payments",
         "adminTab": "bookings",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=bookings",
+        "url": "https://getscanv.com/#admin?tab=bookings",
         "note": "bookings"
       },
       {
         "label": "OTP Delivery",
         "adminTab": "otp",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=otp",
+        "url": "https://getscanv.com/#admin?tab=otp",
         "note": "otp"
       },
       {
         "label": "Go-Live",
         "adminTab": "go-live",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=go-live",
+        "url": "https://getscanv.com/#admin?tab=go-live",
         "note": "Switch board · 12 vendors + runtime toggles"
       },
       {
         "label": "Vendor Leads",
         "adminTab": "vendor-leads",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=vendor-leads",
+        "url": "https://getscanv.com/#admin?tab=vendor-leads",
         "note": "Confidential local vendor research · Household card · PIN-gated API"
       },
       {
         "label": "Logistics API",
         "adminTab": "logistics",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=logistics",
+        "url": "https://getscanv.com/#admin?tab=logistics",
         "note": "Porter/Borzo/Delhivery outreach · follow-ups · sandbox keys"
       },
       {
         "label": "Social Media",
         "adminTab": "social",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=social",
+        "url": "https://getscanv.com/#admin?tab=social",
         "note": "Daily posts · videos · stories · emotional tracker"
       },
       {
         "label": "Architecture",
         "adminTab": "diagrams",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=diagrams",
+        "url": "https://getscanv.com/#admin?tab=diagrams",
         "note": "31 architecture & data-flow diagrams"
       },
       {
         "label": "Database / App",
         "adminTab": "database",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=database",
+        "url": "https://getscanv.com/#admin?tab=database",
         "note": "database"
       },
       {
         "label": "Settings",
         "adminTab": "settings",
-        "url": "https://scanv-tau.vercel.app/#admin?tab=settings",
+        "url": "https://getscanv.com/#admin?tab=settings",
         "note": "settings"
       }
     ]
@@ -265,22 +265,22 @@
     "items": [
       {
         "label": "Privacy Policy",
-        "url": "https://scanv-tau.vercel.app/privacy",
+        "url": "https://getscanv.com/privacy",
         "note": "DPDP Act 2023"
       },
       {
         "label": "Terms & Conditions",
-        "url": "https://scanv-tau.vercel.app/terms",
+        "url": "https://getscanv.com/terms",
         "note": "Booking terms"
       },
       {
         "label": "Refund Policy",
-        "url": "https://scanv-tau.vercel.app/refund",
+        "url": "https://getscanv.com/refund",
         "note": "Cancellation & refunds"
       },
       {
         "label": "Payment Policy",
-        "url": "https://scanv-tau.vercel.app/payment",
+        "url": "https://getscanv.com/payment",
         "note": "Fees & UPI"
       }
     ]
@@ -339,7 +339,7 @@
     "items": [
       {
         "label": "Print QR PNG",
-        "url": "https://scanv-tau.vercel.app/scanv-qr.png",
+        "url": "https://getscanv.com/scanv-qr.png",
         "note": "Standee & print"
       },
       {
