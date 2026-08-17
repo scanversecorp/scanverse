@@ -9,7 +9,7 @@ const PUBLIC = path.resolve(process.cwd(), 'public');
 const UNSPLASH = {
   'home-models/beauty.png': 'photo-1522335789203-aabd1fc54bc9',
   'home-models/repairs.png': 'photo-1621905252507-b35492cc74b4',
-  'services/beauty/haircut-women.png': 'photo-1560066984-138dadb4c035',
+  'services/beauty/haircut-women.png': 'photo-1734111719430-fe4a3973f8af',
   'services/beauty/haircut-men.png': 'photo-1507003211169-0a1dd7228f2d',
   'services/beauty/beard-grooming.png': 'photo-1507003211169-0a1dd7228f2d',
   'services/beauty/mens-facial.png': 'photo-1507679799987-c73779587ccf',
