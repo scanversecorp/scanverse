@@ -1835,12 +1835,31 @@ function profileLooksRegistered(p) {
   return !!(p?.first_name?.trim() || p?.name?.trim());
 }
 
-/** True when OTP sign-in created a shell profile (auth trigger) or profile is missing DOB */
+function profileHasAddress(p) {
+  return !!(
+    String(p?.address || '').trim()
+    && String(p?.city || '').trim()
+    && String(p?.pincode || '').replace(/\D/g, '').length >= 6
+  );
+}
+
+function profileHasDob(p) {
+  return !!(p?.date_of_birth && ageFromDob(p.date_of_birth));
+}
+
+/** Which core fields still need capture after OTP */
+function missingProfileFields(p) {
+  const missing = [];
+  if (!profileLooksRegistered(p)) missing.push('name');
+  if (!profileHasDob(p)) missing.push('dob');
+  if (!profileHasAddress(p)) missing.push('address');
+  return missing;
+}
+
+/** Ask for details only when name, address, or DOB is missing */
 function profileNeedsEnrollment(p) {
   if (!p?.id) return true;
-  if (!profileLooksRegistered(p)) return true;
-  if (!p.date_of_birth) return true;
-  return false;
+  return missingProfileFields(p).length > 0;
 }
 
 const DUPLICATE_PHONE_MSG = 'This number is already registered. Please try login.';
@@ -4578,6 +4597,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const [waToken, setWaToken]     = useState('');
   const [waChecking, setWaChecking] = useState(false);
   const [pendingLoginProfile, setPendingLoginProfile] = useState(null);
+  const [completeProfileMode, setCompleteProfileMode] = useState('login'); // login | booking
   const [termsAccepted, setTermsAccepted] = useState(!!localStorage.getItem('scanv_terms_accepted'));
   const acceptTerms = () => { localStorage.setItem('scanv_terms_accepted', new Date().toISOString()); setTermsAccepted(true); };
 
@@ -4602,8 +4622,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     const uid = localStorage.getItem('scanv_uid');
     if (!uid) { setBrowseAuthed(false); return; }
     let cancelled = false;
-    sb().from('profiles').select('first_name').eq('id', uid).maybeSingle()
-      .then(({ data }) => { if (!cancelled) setBrowseAuthed(!!data?.first_name); })
+    sb().from('profiles').select('first_name,last_name,date_of_birth,address,city,pincode').eq('id', uid).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setBrowseAuthed(!!data && !profileNeedsEnrollment(data)); })
       .catch(() => { if (!cancelled) setBrowseAuthed(false); });
     return () => { cancelled = true; };
   }, [screen]);
@@ -4773,6 +4793,20 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     finally { setLoading(false); }
   };
 
+  const beginCompleteProfile = (prof, mode) => {
+    setPendingLoginProfile(prof);
+    setCompleteProfileMode(mode);
+    setFirstName(prof.first_name || firstName || '');
+    setLastName(prof.last_name || lastName || '');
+    setDateOfBirth(prof.date_of_birth || dateOfBirth || '');
+    setAddress(prof.address || address || silentGeo?.address || '');
+    setVillage(prof.village || village || silentGeo?.village || '');
+    setCity(prof.city || city || silentGeo?.city || '');
+    setPincode(prof.pincode || pincode || silentGeo?.pincode || '');
+    resetOtpFlow();
+    setScreen('complete-profile');
+  };
+
   const verifyProfile = async (waVerified=false) => {
     if (!waVerified) {
       const code = otpCode.join('');
@@ -4818,6 +4852,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         pendingProfile: profile,
         bookingDetail,
       });
+      if (profileNeedsEnrollment(profile)) {
+        beginCompleteProfile(profile, 'booking');
+        addToast?.('Mobile verified — add missing profile details to continue', 'success');
+        return;
+      }
       setScreen('schedule');
       addToast?.('Mobile verified — pick date & time before payment', 'success');
     } catch(e) { setErr(e.message||'Verification failed.'); }
@@ -4887,16 +4926,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         }).then(() => {}).catch(() => {});
       }
       if (profileNeedsEnrollment(merged)) {
-        setPendingLoginProfile(merged);
-        setFirstName(merged.first_name || '');
-        setLastName(merged.last_name || '');
-        setDateOfBirth(merged.date_of_birth || '');
-        setAddress(merged.address || loginGeo?.address || silentGeo?.address || '');
-        setVillage(merged.village || loginGeo?.village || silentGeo?.village || '');
-        setCity(merged.city || loginGeo?.city || silentGeo?.city || '');
-        setPincode(merged.pincode || loginGeo?.pincode || silentGeo?.pincode || '');
-        resetOtpFlow();
-        setScreen('complete-profile');
+        beginCompleteProfile(merged, 'login');
         addToast?.('Mobile verified — complete your profile to continue', 'success');
         return;
       }
@@ -4927,12 +4957,24 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const completeLoginProfile = async () => {
     if (!pendingLoginProfile?.id) return setErr('Session expired — sign in again');
-    if (!firstName.trim()) return setErr('Enter your first name');
-    if (!lastName.trim()) return setErr('Enter your last name');
-    if (!dateOfBirth || !ageFromDob(dateOfBirth)) return setErr('Enter a valid date of birth (age 5–120)');
-    if (!address.trim()) return setErr('Enter your address');
-    if (!city.trim()) return setErr('Enter your city');
-    if (!pincode.trim() || pincode.length < 6) return setErr('Enter valid 6-digit PIN code');
+    const missing = missingProfileFields(pendingLoginProfile);
+    const saveFirst = missing.includes('name') ? firstName.trim() : (pendingLoginProfile.first_name || firstName || '').trim();
+    const saveLast = missing.includes('name') ? lastName.trim() : (pendingLoginProfile.last_name || lastName || '').trim();
+    const saveDob = missing.includes('dob') ? dateOfBirth : (pendingLoginProfile.date_of_birth || dateOfBirth || '');
+    const saveAddress = missing.includes('address') ? address.trim() : (pendingLoginProfile.address || address || '').trim();
+    const saveVillage = missing.includes('address') ? village.trim() : (pendingLoginProfile.village || village || '').trim();
+    const saveCity = missing.includes('address') ? city.trim() : (pendingLoginProfile.city || city || '').trim();
+    const savePin = missing.includes('address') ? pincode.trim() : (pendingLoginProfile.pincode || pincode || '').trim();
+    if (missing.includes('name')) {
+      if (!saveFirst) return setErr('Enter your first name');
+      if (!saveLast) return setErr('Enter your last name');
+    }
+    if (missing.includes('dob') && (!saveDob || !ageFromDob(saveDob))) return setErr('Enter a valid date of birth (age 5–120)');
+    if (missing.includes('address')) {
+      if (!saveAddress) return setErr('Enter your address');
+      if (!saveCity) return setErr('Enter your city');
+      if (!savePin || savePin.replace(/\D/g, '').length < 6) return setErr('Enter valid 6-digit PIN code');
+    }
     setLoading(true); setErr('');
     try {
       const mob = pendingLoginProfile.phone || normalizeMobileE164(mobile);
@@ -4942,16 +4984,16 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       const profileFields = {
         id: pendingLoginProfile.id,
         email: pendingLoginProfile.email || profileAuthEmail(mob),
-        name: `${firstName} ${lastName}`.trim(),
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
+        name: `${saveFirst} ${saveLast}`.trim(),
+        first_name: saveFirst,
+        last_name: saveLast,
         phone: mob,
-        address: address.trim(),
-        village: village.trim(),
-        city: city.trim(),
-        pincode: pincode.trim(),
-        date_of_birth: dateOfBirth,
-        age: ageFromDob(dateOfBirth),
+        address: saveAddress,
+        village: saveVillage,
+        city: saveCity,
+        pincode: savePin,
+        date_of_birth: saveDob || null,
+        age: saveDob ? ageFromDob(saveDob) : pendingLoginProfile.age ?? null,
         ip_address: ipAddr,
         last_lat: pendingLoginProfile.last_lat ?? silentGeo?.lat ?? null,
         last_lng: pendingLoginProfile.last_lng ?? silentGeo?.lng ?? null,
@@ -4969,10 +5011,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       const location = profileFields.last_lat != null && profileFields.last_lng != null ? {
         lat: profileFields.last_lat,
         lng: profileFields.last_lng,
-        address: address.trim(),
-        village: village.trim(),
-        city: city.trim(),
-        pincode: pincode.trim(),
+        address: saveAddress,
+        village: saveVillage,
+        city: saveCity,
+        pincode: savePin,
         source: 'gps',
       } : null;
       let profile;
@@ -4982,25 +5024,32 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         profile = await upsertCustomerProfile({
           id: pendingLoginProfile.id,
           mob,
-          firstName,
-          lastName,
-          address,
-          village,
-          city,
-          pincode,
+          firstName: saveFirst,
+          lastName: saveLast,
+          address: saveAddress,
+          village: saveVillage,
+          city: saveCity,
+          pincode: savePin,
           email: profileFields.email,
           lastLat: profileFields.last_lat,
           lastLng: profileFields.last_lng,
           dev,
           ip: ipAddr,
-          dateOfBirth,
+          dateOfBirth: saveDob,
           allowRegistered: true,
         });
       }
       setPendingLoginProfile(null);
       localStorage.setItem('scanv_uid', profile.id);
-      addToast?.(`Welcome, ${profile.first_name}!`, 'success');
-      onRegistered(profile, null, loginIntent);
+      if (completeProfileMode === 'booking') {
+        setUserId(profile.id);
+        setPendingProfile(profile);
+        setScreen('schedule');
+        addToast?.('Profile saved — pick date & time before payment', 'success');
+      } else {
+        addToast?.(`Welcome${profile.first_name ? `, ${profile.first_name}` : ''}!`, 'success');
+        onRegistered(profile, null, loginIntent);
+      }
     } catch (e) {
       setErr(friendlySignupError(e).message || 'Could not save profile');
     } finally {
@@ -5266,7 +5315,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     const mob = phoneFromProfileId(uid);
     if (mob) await ensureProfileAuthSession(mob);
     const { data: prof } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
-    if (!prof?.first_name) return false;
+    if (!prof || profileNeedsEnrollment(prof)) return false;
     onRegistered(prof, null, intent);
     return true;
   };
@@ -5780,32 +5829,49 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- COMPLETE PROFILE: after OTP login when auth trigger created empty shell ----
   if (screen === 'complete-profile') {
     const mob10 = (pendingLoginProfile?.phone || mobile || '').replace(/\D/g, '').slice(-10);
+    const missing = missingProfileFields(pendingLoginProfile || {});
+    const needsName = missing.includes('name');
+    const needsDob = missing.includes('dob');
+    const needsAddress = missing.includes('address');
+    const hint = needsName && needsDob && needsAddress
+      ? 'Add your name, date of birth, and address to continue.'
+      : needsDob && !needsName && !needsAddress
+        ? 'Add your date of birth to continue.'
+        : 'Fill in the missing details below to continue.';
     return browseWrap(
       <>
         <BrowseFixedHeader>
-          <button type="button" aria-label="Go back" onClick={() => { setPendingLoginProfile(null); setScreen('login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
+          <button type="button" aria-label="Go back" onClick={() => { setPendingLoginProfile(null); setScreen(completeProfileMode === 'booking' ? 'verify' : 'login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Complete your profile</div>
         </BrowseFixedHeader>
         <div style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
           {err && <div style={S.err}>{err}</div>}
           <div style={{ color: C.sub, fontSize: 12, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
-            Mobile +91 {mob10 || '—'} verified. Add your name, date of birth, and address to finish sign-in.
+            Mobile +91 {mob10 || '—'} verified. {hint}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
-            <Field label="First name" req><input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()} /></Field>
-            <Field label="Last name" req><input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Sharma" style={S.inp()} /></Field>
-          </div>
-          <Field label="Date of birth" req>
-            <input type="date" min={minDobInput()} max={maxDobInput()} value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={S.inp()} />
-          </Field>
-          <Field label="Address" req note="House no, street, area">
-            <input value={address} {...browseBind('address', e => setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')} />
-          </Field>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
-            <Field label="City" req><input value={city} {...browseBind('city', e => setCity(e.target.value))} placeholder="Your city" style={inpStyle('city')} /></Field>
-            <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6)))} placeholder="411018" style={inpStyle('pincode')} /></Field>
-          </div>
-          <Btn full onClick={completeLoginProfile} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : 'Save & continue →'}</Btn>
+          {needsName && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
+              <Field label="First name" req><input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()} /></Field>
+              <Field label="Last name" req><input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Sharma" style={S.inp()} /></Field>
+            </div>
+          )}
+          {needsDob && (
+            <Field label="Date of birth" req>
+              <input type="date" min={minDobInput()} max={maxDobInput()} value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={S.inp()} />
+            </Field>
+          )}
+          {needsAddress && (
+            <>
+              <Field label="Address" req note="House no, street, area">
+                <input value={address} {...browseBind('address', e => setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')} />
+              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
+                <Field label="City" req><input value={city} {...browseBind('city', e => setCity(e.target.value))} placeholder="Your city" style={inpStyle('city')} /></Field>
+                <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6)))} placeholder="411018" style={inpStyle('pincode')} /></Field>
+              </div>
+            </>
+          )}
+          <Btn full onClick={completeLoginProfile} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : (completeProfileMode === 'booking' ? 'Save & continue booking →' : 'Save & continue →')}</Btn>
         </div>
       </>
     );
@@ -14702,7 +14768,7 @@ export default function App() {
         const {data:{session}}=await sb().auth.getSession();
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
-          if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
+          if (p&&p.status!=='suspended'&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
             await finishAppBoot(p);
             return;
           }
@@ -14712,7 +14778,7 @@ export default function App() {
           const mob = phoneFromProfileId(uid);
           if (mob) await ensureProfileAuthSession(mob);
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
-          if (p&&p.status!=='suspended'&&p.mobile_verified&&p.first_name) {
+          if (p&&p.status!=='suspended'&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
             await finishAppBoot(p);
             return;
           }
