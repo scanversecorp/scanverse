@@ -14,7 +14,7 @@ const UNSPLASH = {
   'services/beauty/beard-grooming.png': 'photo-1507003211169-0a1dd7228f2d',
   'services/beauty/mens-facial.png': 'photo-1507679799987-c73779587ccf',
   'services/beauty/makeup.png': 'photo-1562322140-8baeececf3df',
-  'services/beauty/threading.png': 'photo-1562322140-8baeececf3df',
+  'services/beauty/threading.png': 'photo-1733145820333-6fa6ed6f8f5d',
   'services/beauty/mani-pedi.png': 'photo-1632345031435-8727f6897d53',
   'services/beauty/facial.png': 'photo-1731514771613-991a02407132',
   'services/beauty/massage.png': 'photo-1775133263816-8b2a1c5d13e8',
