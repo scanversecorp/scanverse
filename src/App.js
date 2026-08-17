@@ -3362,14 +3362,12 @@ const BROWSE_HOME_STACK = {
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
 const BROWSE_PROMO_BANNER = {
   ...BROWSE_HOME_STACK_ITEM,
-  width: '86%',
-  maxWidth: 320,
-  margin: '0 auto',
   borderRadius: 12,
   background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,
-  padding: '6px 12px',
+  padding: '7px 12px',
   color: '#fff',
   boxShadow: '0 4px 16px rgba(214,58,86,0.2)',
+  textAlign: 'center',
 };
 /** Layout-only shell props — frame size/radius live in .scanv-shell CSS */
 const APP_SHELL = {
