@@ -856,6 +856,32 @@ const HOME_CARD_TITLE = {
 
 const DISC_PCT = 0.25;
 const discPaise = (mrpPaise) => Math.round(mrpPaise * (1 - DISC_PCT));
+const ageFromDob = (dobStr) => {
+  if (!dobStr) return null;
+  const d = new Date(dobStr);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const md = today.getMonth() - d.getMonth();
+  if (md < 0 || (md === 0 && today.getDate() < d.getDate())) age -= 1;
+  return age >= 0 && age <= 120 ? age : null;
+};
+const fmtDob = (dobStr) => {
+  if (!dobStr) return '—';
+  const d = new Date(dobStr);
+  if (Number.isNaN(d.getTime())) return String(dobStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+const maxDobInput = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 5);
+  return d.toISOString().slice(0, 10);
+};
+const minDobInput = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 120);
+  return d.toISOString().slice(0, 10);
+};
 const fmtRs = (paise) => ((Number(paise) || 0) / 100).toLocaleString('en-IN');
 const svcDisc = (mrpRupees) => ({ mrp: mrpRupees * 100, price: discPaise(mrpRupees * 100) });
 
@@ -1202,16 +1228,23 @@ const FOUR_WHEELER_SVCS = [
 ];
 
 const BT_THEME = {
-  salon:   { id:'salon',   label:'Salon at home', color:'#DB2777', bg:'#FCE7F3', border:'#F9A8D4', gradFrom:'#FBCFE8', gradTo:'#F472B6', tagline:'Hair · grooming · nails · verified stylists' },
+  salon:   { id:'salon',   label:'Salon at home', color:'#DB2777', bg:'#FCE7F3', border:'#F9A8D4', gradFrom:'#FBCFE8', gradTo:'#F472B6', tagline:'Hair · threading · nails · verified stylists' },
+  men:     { id:'men',     label:'Men\'s grooming', color:'#1D4ED8', bg:'#DBEAFE', border:'#93C5FD', gradFrom:'#BFDBFE', gradTo:'#3B82F6', tagline:'Haircut · beard · champi · men\'s facial' },
   occasion:{ id:'occasion',label:'Occasion & care', color:'#BE185D', bg:'#FFF1F2', border:'#FDA4AF', gradFrom:'#FFE4E6', gradTo:'#FB7185', tagline:'Makeup · facial · mehendi · wellness' },
 };
 const BEAUTY_SVCS = [
   { id:'bt-haircut-women', parent:'beauty', theme:'salon', icon:'💇‍♀️', img:'/services/beauty/haircut-women.png', name:'Women\'s Haircut & Styling', sub:'Cut · blow-dry · basic styling · 45–60 min', unit:'visit', mrp:79900, price:discPaise(79900), cash:false,
     desc:'ScanV salon at home — verified stylists for women\'s haircut, wash, and blow-dry in the comfort of your home across local communities.',
     features:['Verified home stylists','Hygiene kit carried','Wash & blow-dry','Basic styling included','Same-day slots'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,800+' },
-  { id:'bt-haircut-men', parent:'beauty', theme:'salon', icon:'💈', img:'/services/beauty/haircut-men.png', name:'Men\'s Haircut & Beard', sub:'Haircut · beard trim · styling · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
-    desc:'ScanV men\'s grooming — doorstep haircut and beard trim from verified barbers with clean tools and disposable liners.',
-    features:['Doorstep barber visit','Beard trim & shape','Disposable hygiene liners','UPI at booking','Evening slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,400+' },
+  { id:'bt-haircut-men', parent:'beauty', theme:'men', icon:'💈', img:'/services/beauty/haircut-men.png', name:'Men\'s Haircut & Styling', sub:'Haircut · styling · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+    desc:'ScanV men\'s grooming — doorstep haircut from verified barbers with clean tools and disposable liners.',
+    features:['Doorstep barber visit','Fresh styling','Disposable hygiene liners','UPI at booking','Evening slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,400+' },
+  { id:'bt-beard-grooming', parent:'beauty', theme:'men', icon:'🧔', img:'/services/beauty/beard-grooming.png', name:'Beard Trim & Shave', sub:'Beard shape · trim · shave · 20 min', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
+    desc:'ScanV beard grooming — shape, trim, and clean shave at home from verified barbers with hygienic kits.',
+    features:['Beard shaping','Hot towel shave option','Trim & line-up','Disposable blades','Combo with haircut'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'2,600+' },
+  { id:'bt-mens-facial', parent:'beauty', theme:'men', icon:'🧖‍♂️', img:'/services/beauty/mens-facial.png', name:'Men\'s Facial & Cleanup', sub:'Deep cleanse · de-tan · 45 min', unit:'visit', mrp:59900, price:discPaise(59900), cash:false,
+    desc:'ScanV men\'s facial — deep cleanse, de-tan, and glow treatment tailored for men\'s skin at home.',
+    features:['Men\'s skin assessment','Deep cleanse & scrub','De-tan mask','Acne-safe options','Monthly plan'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'1,800+' },
   { id:'bt-threading', parent:'beauty', theme:'salon', icon:'✨', img:'/services/beauty/threading.png', name:'Threading & Waxing', sub:'Eyebrow · upper lip · arms · hygienic', unit:'visit', mrp:39900, price:discPaise(39900), cash:false,
     desc:'ScanV threading & waxing — trained beauticians for eyebrow shaping, facial threading, and waxing with single-use supplies where required.',
     features:['Eyebrow & facial threading','Arms & legs waxing','Hygienic disposables','Female beauticians on request','Combo packages'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,100+' },
@@ -1224,7 +1257,7 @@ const BEAUTY_SVCS = [
   { id:'bt-facial', parent:'beauty', theme:'occasion', icon:'🧖‍♀️', img:'/services/beauty/facial.png', name:'Facial & Cleanup', sub:'Deep cleanse · glow · acne-safe · 45 min', unit:'visit', mrp:69900, price:discPaise(69900), cash:false,
     desc:'ScanV facial at home — deep cleanse, steam, extraction, and mask tailored to skin type with dermatologist-approved products.',
     features:['Skin-type assessment','Steam & extraction','Glow mask finish','Acne-safe options','Monthly plan'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,600+' },
-  { id:'bt-massage', parent:'beauty', theme:'occasion', icon:'💆', img:'/services/beauty/massage.png', name:'Head Massage (Champi)', sub:'Oil champi · stress relief · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+  { id:'bt-massage', parent:'beauty', theme:'men', icon:'💆', img:'/services/beauty/massage.png', name:'Head Massage (Champi)', sub:'Oil champi · stress relief · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV head massage — traditional oil champi for stress relief and hair nourishment from trained therapists at your home.',
     features:['Ayurvedic oil option','30-min session','Neck & shoulder add-on','Female therapists available','Evening slots'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'3,200+' },
   { id:'bt-mehendi', parent:'beauty', theme:'occasion', icon:'🌸', img:'/services/beauty/mehendi.png', name:'Mehendi at Home', sub:'Bridal · party · Arabic · cone art', unit:'visit', mrp:89900, price:discPaise(89900), cash:false,
@@ -1274,7 +1307,7 @@ const SUB_CATEGORIES = {
   food:      { title:'Food', subtitle:'Tiffin · restaurants · bars · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
   'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · polish · 8 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
   'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 8 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
-  beauty: { title:'Beauty & Personal Care', subtitle:'Salon · grooming · makeup at home · 25% off', cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','occasion'] },
+  beauty: { title:'Beauty & Personal Care', subtitle:'Salon · men\'s grooming · makeup at home · 25% off', cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','men','occasion'] },
   repairs: { title:'Repairs & Handyman', subtitle:'Electric · plumbing · AC · appliances · 25% off', cat:'Repairs & Handyman', themes:RP_THEME, svcs:REPAIRS_SVCS, themeOrder:['fix','appliances'] },
 };
 
@@ -2817,7 +2850,7 @@ const SVCS = [
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 8 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 6 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
-  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:'Salon · grooming · makeup · 8 services', cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
+  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:'Salon · men\'s grooming · makeup · 10 services', cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurants · bars · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
   { id:'repairs',  icon:'🔧', name:'Repairs & Handyman', sub:'Electric · plumbing · AC · 8 services', cat:'Repairs & Handyman', cash:false, ...svcDisc(299), repairs:true },
@@ -2854,7 +2887,7 @@ const HOME_CARD_META = {
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
   property: { commitment:'Find home. Find peace.',          face:'Verified listings · local' },
   household:{ commitment:'A lighter home. A lighter heart.',face:'Deep clean & home help · 12 services' },
-  beauty:   { commitment:'Look good. Feel confident.',     face:'Salon & grooming · 8 services' },
+  beauty:   { commitment:'Look good. Feel confident.',     face:'Salon · men\'s grooming · 10 services' },
   delivery: { commitment:'On time. With a smile.',          face:'Vikram · local delivery' },
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
   repairs:  { commitment:'Fixed right. Stress gone.',       face:'Electric · plumbing · AC · 8 services' },
@@ -4286,7 +4319,7 @@ async function resolveCustomerProfileId(mob) {
 async function upsertCustomerProfile({
   id, mob, firstName, lastName, address, village, city, pincode, email,
   lastLat, lastLng, silentGeo, ip, dev, mobileVerified = true,
-  allowRegistered = false,
+  allowRegistered = false, dateOfBirth, gender, age,
 }) {
   const normMob = normalizeMobileE164(mob);
   const fakeEmail = email || profileAuthEmail(mob);
@@ -4301,6 +4334,7 @@ async function upsertCustomerProfile({
   }
 
   const targetId = existingByPhone?.id || id || customerProfileId(mob);
+  const resolvedAge = age ?? ageFromDob(dateOfBirth);
   const row = {
     id: targetId,
     email: fakeEmail,
@@ -4312,6 +4346,9 @@ async function upsertCustomerProfile({
     village: village || '',
     city: city || '',
     pincode: pincode || '',
+    date_of_birth: dateOfBirth || null,
+    age: resolvedAge,
+    gender: gender || null,
     ip_address: ipAddr,
     last_lat: lastLat ?? silentGeo?.lat ?? null,
     last_lng: lastLng ?? silentGeo?.lng ?? null,
@@ -4504,6 +4541,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // Mini registration state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [mobile, setMobile]       = useState('');
   const [address, setAddress]     = useState(silentGeo?.address||'');
   const [village, setVillage]     = useState(silentGeo?.village||'');
@@ -5706,7 +5744,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const [loginPrompt, setLoginPrompt] = useState(false);
 
   const [form, setForm] = useState({
-    firstName:'', lastName:'', age:'', mobile:'', email:'',
+    firstName:'', lastName:'', dateOfBirth:'', mobile:'', email:'',
     address:prefill?.geo?.address||'',
     village:prefill?.geo?.village||'',
     city:prefill?.geo?.city||'',
@@ -5809,7 +5847,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const sendOTP = async () => {
     if (!form.firstName.trim()) return setErr('Enter your first name');
     if (!form.lastName.trim())  return setErr('Enter your last name');
-    if (!form.age||form.age<5||form.age>120) return setErr('Enter a valid age');
+    if (!form.dateOfBirth || !ageFromDob(form.dateOfBirth)) return setErr('Enter a valid date of birth (age 5–120)');
     if (!form.mobile)           return setErr('Enter your mobile number');
     if (!form.city.trim())      return setErr('Enter your city');
     if (!form.pincode.trim())   return setErr('Enter PIN code');
@@ -5923,6 +5961,9 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         village: form.village || '',
         city: form.city || '',
         pincode: form.pincode || '',
+        date_of_birth: form.dateOfBirth || null,
+        age: ageFromDob(form.dateOfBirth),
+        gender: form.gender || null,
         ip_address: ipAddr,
         last_lat: geo?.lat ?? null,
         last_lng: geo?.lng ?? null,
@@ -5965,6 +6006,8 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
           lastLng: geo?.lng,
           dev,
           ip,
+          dateOfBirth: form.dateOfBirth,
+          gender: form.gender,
         });
         if (location) {
           await sb().from('user_locations').insert({
@@ -5988,8 +6031,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       if (prefill?.scanId) {
         await sb().from('qr_scans').update({
           user_id:profile.id, mobile:mob, first_name:form.firstName.trim(),
-          last_name:form.lastName.trim(), age:parseInt(form.age)||null,
-          gender:form.gender||'', verified:true, verified_at:new Date().toISOString(),
+          last_name:form.lastName.trim(), age:ageFromDob(form.dateOfBirth), gender:form.gender||'', verified:true, verified_at:new Date().toISOString(),
         }).eq('id', prefill.scanId).then(()=>{});
       }
 
@@ -6131,7 +6173,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         <Field label="Last name" req><input value={form.lastName} onChange={e=>f('lastName',e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <Field label="Age" req><input type="number" min="5" max="120" value={form.age} onChange={e=>f('age',e.target.value)} placeholder="32" style={S.inp()}/></Field>
+        <Field label="Date of birth" req><input type="date" min={minDobInput()} max={maxDobInput()} value={form.dateOfBirth} onChange={e=>f('dateOfBirth',e.target.value)} style={S.inp()}/></Field>
         <Field label="Gender">
           <select value={form.gender} onChange={e=>f('gender',e.target.value)} style={S.inp()}>
             <option value="">Select</option>
@@ -6155,7 +6197,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       </div>
 
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:11,color:C.dim}}>
-        🔒 Name, age, mobile, location & device stored in India per DPDP Act 2023
+        🔒 Name, date of birth, mobile, location & device stored in India per DPDP Act 2023
       </div>
       <Btn full onClick={sendOTP} disabled={loading}>
         {loading?<><Spin size={16}/>Sending OTP…</>:'Send OTP →'}
@@ -6403,7 +6445,7 @@ const SVC_DETAIL = {
   health:   { desc:'Doctors at home, lab tests, pharmacy delivery, nursing, and vaccinations — 8 health services · 25% off.', features:['Doctor at home','Lab tests at doorstep','Pharmacy delivery','Nursing care at home','Vaccination at home'], turnaround:'Within 2 hours', rating:'4.7 ⭐', bookings:'5,200+' },
   property: { desc:'Buy, sell, rent, verify, and finance property in local communities — 6 property services · 25% off.', features:['Buy / sell assistance','Rent & PG finder','Commercial space search','Legal verification','Home loan assistance'], turnaround:'24-48 hours', rating:'4.6 ⭐', bookings:'3,100+' },
   household:{ desc:'Professional home cleaning and hourly home help through ScanV verified partners. 14 services · 25% off.', features:['Deep cleaning visits','Sofa & upholstery clean','Hourly home help','Ironing & pressing','Same-day booking'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
-  beauty:   { desc:'Salon at home, grooming, makeup, facial, and mehendi from verified beauticians — 8 beauty services · 25% off.', features:['Haircut & styling','Threading & waxing','Party & bridal makeup','Facial & cleanup','Mehendi at home'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,200+' },
+  beauty:   { desc:'Salon at home, men\'s grooming, makeup, facial, and mehendi from verified partners — 10 beauty services · 25% off.', features:['Women\'s & men\'s haircut','Beard trim & shave','Threading & waxing','Party & bridal makeup','Mehendi at home'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'4,200+' },
   delivery: { desc:'Same-day courier, documents, parcels, groceries, and inter-city express — 6 delivery services · 25% off.', features:['Same-day pickup','Document handover','Grocery & essentials run','Inter-city express','Business bulk SLAs'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'12,000+' },
   food:     { desc:'Home tiffin, breakfast plans, restaurant orders, office lunch, and catering — 6 food services · 25% off.', features:['Monthly tiffin plans','Breakfast & snacks plan','Restaurant delivery','Office lunch boxes','Party catering'], turnaround:'30-60 min', rating:'4.6 ⭐', bookings:'18,000+' },
   repairs:  { desc:'Electrician, plumber, carpenter, AC service, and appliance repairs at home — 8 handyman services · 25% off.', features:['Electrician & plumber visits','AC service & gas check','Washing machine & RO repair','Geyser & TV mount','Same-day slots'], turnaround:'Same day', rating:'4.7 ⭐', bookings:'3,800+' },
@@ -8285,7 +8327,7 @@ function CRMScreen() {
 function ProfileScreen() {
   const {user,setUser,addToast,logout,setScreen}=useApp();
   const hasRealEmail=user?.email&&!user.email.endsWith('@scanv.app');
-  const [frm,setFrm]=useState({firstName:user?.first_name||'',lastName:user?.last_name||'',phone:user?.phone||'',email:hasRealEmail?user.email:'',age:user?.age||'',gender:user?.gender||'',upi_id:user?.upi_id||'',address:user?.address||'',village:user?.village||'',city:user?.city||'',pincode:user?.pincode||''});
+  const [frm,setFrm]=useState({firstName:user?.first_name||'',lastName:user?.last_name||'',phone:user?.phone||'',email:hasRealEmail?user.email:'',dateOfBirth:user?.date_of_birth||'',gender:user?.gender||'',upi_id:user?.upi_id||'',address:user?.address||'',village:user?.village||'',city:user?.city||'',pincode:user?.pincode||''});
   const [saving,setSaving]=useState(false);
   const f=(k,v)=>setFrm(p=>({...p,[k]:v}));
   const readOnlyInp={...S.inp(),background:C.deep,color:C.sub,cursor:'not-allowed'};
@@ -8302,13 +8344,15 @@ function ProfileScreen() {
           <Badge label={user?.role==='admin'?'Leader':user?.role} color={rc}/>
           <div style={{color:C.sub,fontSize:12,marginTop:6}}>{user?.phone}{user?.mobile_verified?' · 📱 Verified':''}</div>
           <div style={{color:C.dim,fontSize:11,marginTop:4}}>📍 {[user?.village,user?.city,user?.pincode].filter(Boolean).join(', ')||'Not set'}</div>
-          <div style={{color:C.dim,fontSize:10,marginTop:2}}>💻 {user?.device_type} · {user?.os_name} · {user?.browser}</div>
-          <div style={{color:C.dim,fontSize:10,marginTop:2}}>🌐 IP: {user?.ip_address||'—'} · Age: {user?.age||'—'}</div>
+          {(user?.date_of_birth || user?.age) && (
+            <div style={{color:C.dim,fontSize:10,marginTop:4}}>🎂 DOB: {fmtDob(user?.date_of_birth)}{user?.age ? ` · Age ${user.age}` : ''}</div>
+          )}
         </div>
         {user.role==='admin'&&<div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}><span style={{fontSize:22}}>📲</span><div style={{color:C.txt,fontSize:13,fontWeight:600}}>View QR Code & share</div><span style={{marginLeft:'auto',color:C.acc}}>→</span></div>}
         <div style={{...S.card(),marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:600,color:C.txt,marginBottom:14}}>Edit profile</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} readOnly style={readOnlyInp}/>{verifiedNote}</Field><Field label="Last name"><input value={frm.lastName} readOnly style={readOnlyInp}/>{verifiedNote}</Field></div>
+          <Field label="Date of birth"><input value={frm.dateOfBirth ? fmtDob(frm.dateOfBirth) : '—'} readOnly style={readOnlyInp}/>{verifiedNote}</Field>
           <Field label="Mobile"><input value={frm.phone} readOnly style={readOnlyInp}/>{verifiedNote}</Field>
           {hasRealEmail&&<Field label="Email"><input value={frm.email} onChange={e=>f('email',e.target.value)} style={S.inp()}/></Field>}
           <Field label="Address"><input value={frm.address} onChange={e=>f('address',e.target.value)} style={S.inp()}/></Field>
@@ -9344,6 +9388,7 @@ function VendorOnboardPage() {
   const [addServicesMode, setAddServicesMode] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [contactName, setContactName] = useState('');
   const [mobile2, setMobile2] = useState('');
@@ -9614,6 +9659,7 @@ function VendorOnboardPage() {
         phone: mobileE164(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
+        date_of_birth: dateOfBirth || null,
         contact_name: fullContact,
         mobile2: mobile2.replace(/\D/g, '').length === 10 ? '+91' + mobile2.replace(/\D/g, '') : null,
         business_name: businessName,
@@ -9693,6 +9739,9 @@ function VendorOnboardPage() {
         {step === 2 && <>
           <Field label="First name" req><input value={firstName} onChange={e => setFirstName(e.target.value)} style={S.inp()} placeholder="Rahul" /></Field>
           <Field label="Last name" req><input value={lastName} onChange={e => setLastName(e.target.value)} style={S.inp()} placeholder="Sharma" /></Field>
+          <Field label="Date of birth" req note="Must be 18+ for partner onboarding">
+            <input type="date" min={minDobInput()} max={maxDobInput()} value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={S.inp()} />
+          </Field>
           <Field label="Business / shop name" req><input value={businessName} onChange={e => setBusinessName(e.target.value)} style={S.inp()} placeholder="Sharma Home Services" /></Field>
           <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={S.inp()} placeholder="partner@example.com" /></Field>
           <Field label="Alternate mobile (optional)" note="Second contact number">
@@ -9714,6 +9763,7 @@ function VendorOnboardPage() {
           )}
           <Btn full onClick={() => {
             if (!firstName.trim() || !lastName.trim() || !businessName.trim()) return setErr('First name, last name, and business name are required');
+            if (!dateOfBirth || (ageFromDob(dateOfBirth) ?? 0) < 18) return setErr('Enter date of birth — partners must be 18 or older');
             setContactName(`${firstName.trim()} ${lastName.trim()}`.trim());
             setStep(3); setErr('');
           }}>Continue →</Btn>

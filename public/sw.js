@@ -1,6 +1,6 @@
-/* ScanV Service Worker v10 — precache webp tiles + stale-while-revalidate images */
-const CACHE = 'scanv-v10';
-const IMAGE_CACHE = 'scanv-v10-images';
+/* ScanV Service Worker v11 — precache webp tiles + stale-while-revalidate images */
+const CACHE = 'scanv-v11';
+const IMAGE_CACHE = 'scanv-v11-images';
 
 const PRECACHE_IMAGES = [
   '/home-models/beauty.webp',
@@ -17,11 +17,13 @@ const PRECACHE_IMAGES = [
   '/home-models/vip.webp',
   '/services/bathroom-deep.webp',
   '/services/bathroom-help.webp',
+  '/services/beauty/beard-grooming.webp',
   '/services/beauty/facial.webp',
   '/services/beauty/haircut-men.webp',
   '/services/beauty/haircut-women.webp',
   '/services/beauty/makeup.webp',
   '/services/beauty/mani-pedi.webp',
+  '/services/beauty/mens-facial.webp',
   '/services/beauty/massage.webp',
   '/services/beauty/mehendi.webp',
   '/services/beauty/threading.webp',

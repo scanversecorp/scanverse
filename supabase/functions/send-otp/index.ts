@@ -523,6 +523,20 @@ Deno.serve(async (req: Request) => {
           village: String(incoming.village || ""),
           city: String(incoming.city || ""),
           pincode: String(incoming.pincode || ""),
+          date_of_birth: incoming.date_of_birth ? String(incoming.date_of_birth).slice(0, 10) : null,
+          age: (() => {
+            if (incoming.age != null && !Number.isNaN(Number(incoming.age))) return Number(incoming.age);
+            const dob = incoming.date_of_birth ? String(incoming.date_of_birth).slice(0, 10) : "";
+            if (!dob) return null;
+            const d = new Date(dob);
+            if (Number.isNaN(d.getTime())) return null;
+            const today = new Date();
+            let age = today.getFullYear() - d.getFullYear();
+            const md = today.getMonth() - d.getMonth();
+            if (md < 0 || (md === 0 && today.getDate() < d.getDate())) age -= 1;
+            return age >= 0 && age <= 120 ? age : null;
+          })(),
+          gender: incoming.gender ? String(incoming.gender) : null,
           ip_address: incoming.ip_address ?? null,
           last_lat: incoming.last_lat ?? null,
           last_lng: incoming.last_lng ?? null,

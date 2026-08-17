@@ -405,6 +405,7 @@ type VendorRow = {
   contact_name?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  date_of_birth?: string | null;
   business_name?: string | null;
   shop_or_flat?: string | null;
   street_name?: string | null;
@@ -558,6 +559,7 @@ async function ensurePartnerProfile(
     village: vendor.village || "",
     last_lat: vendor.address_lat ?? null,
     last_lng: vendor.address_lng ?? null,
+    date_of_birth: vendor.date_of_birth ? String(vendor.date_of_birth).slice(0, 10) : null,
     status: "active",
   }, { onConflict: "id" });
   if (error) throw error;
@@ -926,6 +928,7 @@ Deno.serve(async (req: Request) => {
         contact_name: profileFields.contact_name.trim(),
         first_name: profileFields.first_name,
         last_name: profileFields.last_name,
+        date_of_birth: body.date_of_birth ? String(body.date_of_birth).slice(0, 10) : null,
         phone: mobile,
         mobile2: profileFields.mobile2,
         phone_verified: true,
@@ -1352,6 +1355,7 @@ Deno.serve(async (req: Request) => {
         contact_name: contactName,
         first_name: profileFields.first_name,
         last_name: profileFields.last_name,
+        date_of_birth: body.date_of_birth ? String(body.date_of_birth).slice(0, 10) : null,
         phone: mobile,
         mobile2: profileFields.mobile2,
         phone_verified: true,
