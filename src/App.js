@@ -5182,8 +5182,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       </div>
       <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
         <div style={BROWSE_PROMO_BANNER}>
-          <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.2, fontFamily: FF }}>Book services with a smile</div>
-          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 2, lineHeight: 1.25 }}>Verified partners · 25% Off | Support Local Community</div>
+          <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
+          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
         </div>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
