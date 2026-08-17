@@ -18,6 +18,7 @@ import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
+import { StudentCloudAdmitScreen } from './student-cloud';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -27,6 +28,7 @@ const AdminServiceScheduleTabLazy = lazy(() => import('./admin-service-schedule'
 const AdminBusinessCommandTab = lazy(() => import('./admin-business-command').then((m) => ({ default: m.AdminBusinessCommandTab })));
 const AdminIamTab = lazy(() => import('./admin-iam').then((m) => ({ default: m.AdminIamTab })));
 const AdminAddUserPanel = lazy(() => import('./admin-add-user').then((m) => ({ default: m.AdminAddUserPanel })));
+const AdminStudentCloudTab = lazy(() => import('./student-cloud').then((m) => ({ default: m.AdminStudentCloudTab })));
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://scanv-tau.vercel.app';
@@ -3191,21 +3193,21 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
 
   if (hero && !compact) {
     return (
-      <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .4s ease ${index * 0.04}s both`, height:168, minHeight:168, maxHeight:168 }}>
-        <div style={{ display:'flex', alignItems:'stretch', height:'100%', background:C.card }}>
-          <div style={{ flex:1, minWidth:0, padding:'16px 16px 14px', display:'flex', flexDirection:'column', justifyContent:'center', gap:6, overflow:'hidden' }}>
+      <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, height:'100%', width:'100%', maxWidth:'100%', minWidth:0, boxSizing:'border-box' }}>
+        <div style={{ display:'flex', alignItems:'stretch', height:'100%', width:'100%', minWidth:0, background:C.card }}>
+          <div style={{ flex:1, minWidth:0, padding:'12px 12px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:5, overflow:'hidden' }}>
             {badgeRow(false)}
             <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>&ldquo;{meta.commitment}&rdquo;</div>
-            <div style={{ color:C.txt, fontWeight:800, fontSize:17, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
+            <div style={{ color:C.txt, fontWeight:800, fontSize:16, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
             <div style={{ color:C.sub, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>
-            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'nowrap', marginTop:2, minWidth:0 }}>
-              <span style={{ color:C.acc, fontSize:14, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'nowrap', marginTop:2, minWidth:0 }}>
+              <span style={{ color:C.acc, fontSize:13, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
               <span style={{ color:C.dim, fontSize:10, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {d.rating||'4.8 ⭐'} · {subSvcCount(svc) ? `${subSvcCount(svc)} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
               </span>
             </div>
           </div>
-          <div style={{ width:148, flexShrink:0, position:'relative', background:C.deep, height:'100%' }}>
+          <div style={{ flex:'0 0 36%', width:'36%', maxWidth:132, minWidth:0, position:'relative', background:C.deep, height:'100%', overflow:'hidden' }}>
             <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
           </div>
         </div>
@@ -3250,11 +3252,27 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   );
 }
 
-/** Auto-rotating hero carousel — slides all service cards right to left */
+/** Auto-rotating hero carousel — one full-width card at a time (no peek) */
 function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
   const [idx, setIdx] = useState(0);
   const n = services.length;
   const pauseRef = useRef(false);
+  const viewRef = useRef(null);
+  const [slideW, setSlideW] = useState(0);
+
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return undefined;
+    const measure = () => setSlideW(Math.round(el.getBoundingClientRect().width));
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
 
   useEffect(() => {
     if (n <= 1) return undefined;
@@ -3268,7 +3286,7 @@ function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
 
   return (
     <div
-      style={{ marginBottom: 14 }}
+      style={{ marginBottom: 14, width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
       onMouseEnter={() => { pauseRef.current = true; }}
       onMouseLeave={() => { pauseRef.current = false; }}
       onTouchStart={() => { pauseRef.current = true; }}
@@ -3278,23 +3296,28 @@ function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
         <div style={{ color:C.dim, fontSize:10, fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase' }}>Featured · swipe of care</div>
         <div style={{ color:C.dim, fontSize:10, fontWeight:700 }}>{idx + 1} / {n}</div>
       </div>
-      <div style={{ overflow:'hidden', borderRadius:20, height:168 }}>
+      <div
+        ref={viewRef}
+        style={{ overflow:'hidden', borderRadius:16, height:168, width:'100%', maxWidth:'100%', position:'relative', isolation:'isolate', clipPath:'inset(0 round 16px)' }}
+      >
         <div
           style={{
             display:'flex',
-            transform:`translateX(-${idx * 100}%)`,
-            transition:'transform 0.72s cubic-bezier(0.4, 0, 0.2, 1)',
             height:'100%',
+            width: slideW ? slideW * n : '100%',
+            transform: slideW ? `translate3d(-${idx * slideW}px,0,0)` : 'none',
+            transition:'transform 0.72s cubic-bezier(0.4, 0, 0.2, 1)',
+            willChange:'transform',
           }}
         >
           {services.map((svc, i) => (
-            <div key={svc.id} style={{ minWidth:'100%', flexShrink:0, height:168 }}>
+            <div key={svc.id} style={{ width: slideW || '100%', minWidth: slideW || '100%', maxWidth: slideW || '100%', height:168, flexShrink:0, overflow:'hidden', boxSizing:'border-box' }}>
               <HomeModelCard svc={svc} onClick={() => onSelect(svc)} hero index={i} />
             </div>
           ))}
         </div>
       </div>
-      <div style={{ display:'flex', justifyContent:'center', gap:6, marginTop:10 }}>
+      <div style={{ display:'flex', justifyContent:'center', flexWrap:'wrap', gap:5, marginTop:10, width:'100%' }}>
         {services.map((svc, i) => (
           <button
             key={svc.id}
@@ -3384,7 +3407,7 @@ function CategorySvcCard({ categoryId, svc, onClick, compact }) {
 function HouseholdSvcCard(props) { return <CategorySvcCard categoryId="household" {...props} />; }
 function CloudSvcCard(props) { return <CategorySvcCard categoryId="cloud" {...props} />; }
 
-function CategoryListBody({ categoryId, onSelect }) {
+function CategoryListBody({ categoryId, onSelect, onAdmit }) {
   const cfg = SUB_CATEGORIES[categoryId];
   const [filter, setFilter] = useState('all');
   if (!cfg) return null;
@@ -3405,6 +3428,13 @@ function CategoryListBody({ categoryId, onSelect }) {
   }
   return (
     <div style={{ padding: '14px 16px 24px' }}>
+      {categoryId === 'cloud' && onAdmit && (
+        <button type="button" onClick={onAdmit} style={{ width: '100%', textAlign: 'left', marginBottom: 14, border: '1.5px solid #93C5FD', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', borderRadius: 14, padding: '14px 14px', cursor: 'pointer', fontFamily: FF }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Student admission</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginTop: 4 }}>Skill Gap Review (SGR) · ₹500.00</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>Verify mobile · book a schedule · Razorpay. A consultant calls you within 72 hours.</div>
+        </button>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
         {pills.map(([k, l, col, bg]) => (
           <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
@@ -5432,6 +5462,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       if (loginIntent === 'profile') return browseAuthed ? 'profile' : 'login';
       return 'login';
     }
+    if (screen === 'cloud-admit') return 'home';
     if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'home';
     if (screen.startsWith('trust-')) return 'home';
     if (screen === 'services') return 'home';
@@ -5499,6 +5530,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
 
   const startBrowseBook = () => {
     if (!guardBookStart(activeSvc, addToast)) return;
+    if (activeSvc?.parent === 'cloud' || activeSvc?.id === 'cloud') {
+      setScreen('cloud-admit');
+      return;
+    }
     setScreen('verify');
   };
 
@@ -5512,6 +5547,20 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   }, [screen, activeSvc, addToast]);
 
   const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
+
+  if (screen === 'cloud-admit') {
+    return browseWrap(
+      <StudentCloudAdmitScreen
+        silentGeo={silentGeo}
+        initialCourse={activeSvc}
+        courses={CLOUD_SVCS}
+        onBack={() => setScreen('cloud-list')}
+        addToast={addToast}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, captureFreshGps, SB_KEY }}
+      />
+    );
+  }
+
   if (listCatId && SUB_CATEGORIES[listCatId]) {
     const cfg = SUB_CATEGORIES[listCatId];
     return browseWrap(
@@ -5521,7 +5570,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         subtitle={cfg.subtitle}
         onBack={() => { setScreen('services'); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
       >
-        <CategoryListBody categoryId={listCatId} onSelect={(svc) => openSubSvc(listCatId, svc)} />
+        <CategoryListBody
+          categoryId={listCatId}
+          onSelect={(svc) => openSubSvc(listCatId, svc)}
+          onAdmit={listCatId === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setScreen('cloud-admit'); } : undefined}
+        />
       </BrowseCategoryShell>
     );
   }
@@ -5549,7 +5602,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
       </div>
-      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`12px ${BROWSE_HOME_INSET}px 16px`}}>
+      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`12px ${BROWSE_HOME_INSET}px 24px`,overflowX:'hidden'}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -6801,10 +6854,11 @@ function TopRatedScreen() {
 }
 
 function ServicesScreen() {
-  const {setActiveSvc,setScreen,activeSvc,addToast}=useApp();
+  const {setActiveSvc,setScreen,activeSvc,addToast,silentGeo}=useApp();
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [subListCat,setSubListCat]=useState(null);
+  const [cloudAdmit,setCloudAdmit]=useState(false);
   const scrollRef = useRef(null);
   const searchResult = searchAllServices(search);
   const { categories: list, ...searchSubs } = searchResult;
@@ -6837,6 +6891,19 @@ function ServicesScreen() {
     requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
   };
 
+  if (cloudAdmit) {
+    return (
+      <StudentCloudAdmitScreen
+        silentGeo={silentGeo}
+        initialCourse={activeSvc || detail}
+        courses={CLOUD_SVCS}
+        onBack={() => setCloudAdmit(false)}
+        addToast={addToast}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, captureFreshGps, SB_KEY }}
+      />
+    );
+  }
+
   if (subListCat && SUB_CATEGORIES[subListCat]) {
     const cfg = SUB_CATEGORIES[subListCat];
     return (
@@ -6847,7 +6914,11 @@ function ServicesScreen() {
         subtitle={cfg.subtitle}
         onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
       >
-        <CategoryListBody categoryId={subListCat} onSelect={(svc) => openSubSvc(subListCat, svc)} />
+        <CategoryListBody
+          categoryId={subListCat}
+          onSelect={(svc) => openSubSvc(subListCat, svc)}
+          onAdmit={subListCat === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setCloudAdmit(true); } : undefined}
+        />
       </BrowseCategoryShell>
     );
   }
@@ -6894,6 +6965,7 @@ function ServicesScreen() {
             const cfg = SUB_CATEGORIES[detail.parent];
             const payload = isSubSvc ? {...detail, cat: cfg?.cat || detail.cat, cash:false} : detail;
             setActiveSvc(payload);
+            if (payload.parent === 'cloud' || payload.id === 'cloud') { setCloudAdmit(true); return; }
             setScreen('book');
           }}>Book now →</Btn>
         </div>
@@ -12495,6 +12567,7 @@ const ADMIN_TABS = [
   { id: 'vendors', label: 'Vendors & Dispatch', icon: '🚚' },
   { id: 'gps', label: 'GPS Status', icon: '📍' },
   { id: 'bookings', label: 'Bookings & Payments', icon: '📋' },
+  { id: 'student-cloud', label: 'Student Cloud', icon: '🎓' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
   { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
@@ -14591,6 +14664,12 @@ function AdminControlCenter({ onPricesUpdated }) {
         {tab === 'gps' && <AdminGpsStatusTab pin={usePin} />}
 
         {tab === 'bookings' && <AdminBookingsTab pin={usePin} />}
+
+        {tab === 'student-cloud' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading Student Cloud…</div>}>
+            <AdminStudentCloudTab pin={usePin} apikey={SB_KEY} courses={CLOUD_SVCS} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
+          </Suspense>
+        )}
 
         {tab === 'refunds' && (
           <RefundDeskPanel

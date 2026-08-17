@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.platform-config]
 verify_jwt = false
+
+[functions.student-cloud]
+verify_jwt = false
