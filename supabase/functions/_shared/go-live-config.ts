@@ -118,6 +118,7 @@ const SECRET_CHECKS: Array<{
   { key: "PRICING_ADMIN_PIN", functions: "pricing-admin · admin-hub", description: "Pricing admin PIN", required: true, check: () => envConfigured("PRICING_ADMIN_PIN") },
   { key: "VENDOR_ADMIN_PIN", functions: "vendor-admin · admin-hub", description: "Vendor admin PIN", required: true, check: () => envConfigured("VENDOR_ADMIN_PIN") },
   { key: "PRICING_2FA_RESET_MOBILE", functions: "admin-hub", description: "Owner mobile for pricing 2FA reset OTP", required: true, check: () => envConfigured("PRICING_2FA_RESET_MOBILE") || envConfigured("ADMIN_OWNER_MOBILE") },
+  { key: "REFUND_APPROVAL_MOBILE", functions: "admin-hub · customer-support", description: "Second-line refund approval OTP (default 8484850288 in platform_settings)", required: true, check: () => envConfigured("REFUND_APPROVAL_MOBILE") || envConfigured("PRICING_2FA_RESET_MOBILE") || envConfigured("ADMIN_OWNER_MOBILE") },
   { key: "MSG91_AUTH_KEY", functions: "send-otp · whatsapp-verify", description: "MSG91 SMS / WhatsApp fallback", required: false, check: () => envConfigured("MSG91_AUTH_KEY") },
   { key: "MSG91_WHATSAPP_INTEGRATED_NUMBER", functions: "whatsapp-verify", description: "WhatsApp business number (919270194842)", required: false, check: () => envConfigured("MSG91_WHATSAPP_INTEGRATED_NUMBER") },
   { key: "WHATSAPP_WEBHOOK_SECRET", functions: "whatsapp-verify", description: "Inbound WhatsApp webhook auth", required: false, check: () => envConfigured("WHATSAPP_WEBHOOK_SECRET") },

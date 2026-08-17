@@ -678,7 +678,7 @@ async function handleCancel(
     refund_status: result.refund_status,
     refund_due_by: result.refund_due_by,
     message:
-      "Refund will be processed manually by our support team within 7 business days.",
+      "Refund queued for review. Owner OTP approval is required before payout (within 7 business days).",
   });
 }
 

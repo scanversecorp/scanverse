@@ -121,7 +121,7 @@
         "id": "refunds",
         "title": "Cancellation and refunds",
         "desc": "Customer cancel fee · admin refund desk.",
-        "mermaid": "flowchart TD\n    C[Customer cancel] --> CALC[fee and refund calc]\n    CALC --> REQ[cancellation request]\n    REQ --> ADM[Admin Refunds tab]\n    ADM --> MAN[Manual refund]\n    MAN --> UPD[booking cancelled]"
+        "mermaid": "flowchart TD\n    C[Customer cancel] --> CALC[fee and refund calc]\n    CALC --> L1[Line 1 support review]\n    L1 --> OTP[Owner OTP approval]\n    OTP --> RZP[Razorpay refund API]\n    RZP --> DONE[Mark complete]"
       }
     ]
   },

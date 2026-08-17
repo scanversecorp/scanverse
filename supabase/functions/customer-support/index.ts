@@ -9,8 +9,11 @@
  *   booking_detail  — { booking_id }
  *   update_booking  — { booking_id, patch }  admin only
  *   cancel_booking  — { booking_id, cancel_reason? }  agent or admin
- *   list_pending_refunds — queue of refund_pending / processing cancellations
- *   update_refund — { cancellation_id, refund_status, process_note? } agent or admin
+ *   list_pending_refunds — cancellation refund queue (two-line approval)
+ *   update_refund — line-1 status updates (submit for approval, complete, etc.)
+ *   refund_approval_send — OTP to REFUND_APPROVAL_MOBILE (admin only)
+ *   refund_approval_confirm — { cancellation_id, otp, decision: approve|reject }
+ *   issue_razorpay_refund — Razorpay API refund after approval (admin only)
  *
  * Auth: x-support-pin header
  *   SUPPORT_AGENT_PIN  → read-only (search, detail)
@@ -28,6 +31,13 @@ import {
   listInvestmentRequests,
   respondInvestmentRequest,
 } from "../_shared/investments-admin.ts";
+import {
+  issueRazorpayRefundDesk,
+  listPendingRefundsDesk,
+  refundApprovalConfirmDesk,
+  refundApprovalSendDesk,
+  updateRefundDesk,
+} from "../_shared/refund-desk.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -262,120 +272,6 @@ async function adminUpdate(
   return json({ success: true, updated });
 }
 
-const REFUND_STATUSES = new Set([
-  "refund_pending",
-  "processing",
-  "completed",
-  "rejected",
-]);
-
-async function listPendingRefunds(
-  sb: ReturnType<typeof adminSb>,
-  body: Record<string, unknown>,
-) {
-  const statusFilter = String(body.status || "open");
-  let query = sb
-    .from("booking_cancellations")
-    .select("*")
-    .order("created_at", { ascending: true })
-    .limit(Math.min(Number(body.limit) || 100, 200));
-
-  if (statusFilter === "open") {
-    query = query.in("refund_status", ["refund_pending", "processing"]);
-  } else if (statusFilter !== "all" && REFUND_STATUSES.has(statusFilter)) {
-    query = query.eq("refund_status", statusFilter);
-  }
-
-  const { data, error } = await query;
-  if (error) return json({ error: error.message }, 500);
-
-  const rows = data || [];
-  const bookingIds = [...new Set(rows.map((r: { booking_id: string }) => r.booking_id))];
-  const customerIds = [...new Set(rows.map((r: { customer_id: string }) => r.customer_id))];
-
-  const [{ data: bookings }, { data: profiles }] = await Promise.all([
-    bookingIds.length
-      ? sb.from("bookings").select("id, service_name, date, time, customer_name").in("id", bookingIds)
-      : Promise.resolve({ data: [] }),
-    customerIds.length
-      ? sb.from("profiles").select("id, first_name, last_name, phone, email").in("id", customerIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const bookingById = Object.fromEntries((bookings || []).map((b: { id: string }) => [b.id, b]));
-  const profileById = Object.fromEntries((profiles || []).map((p: { id: string }) => [p.id, p]));
-  const now = Date.now();
-
-  const enriched = rows.map((row: Record<string, unknown>) => ({
-    ...row,
-    booking: bookingById[String(row.booking_id)] || null,
-    customer: profileById[String(row.customer_id)] || null,
-    overdue: row.refund_due_by
-      ? new Date(String(row.refund_due_by)).getTime() < now &&
-        row.refund_status !== "completed" &&
-        row.refund_status !== "rejected"
-      : false,
-  }));
-
-  return json({
-    cancellations: enriched,
-    count: enriched.length,
-    open_count: enriched.filter((r: { refund_status: string }) =>
-      r.refund_status === "refund_pending" || r.refund_status === "processing"
-    ).length,
-  });
-}
-
-async function updateRefund(
-  sb: ReturnType<typeof adminSb>,
-  body: Record<string, unknown>,
-  actor: string,
-) {
-  const cancellationId = String(body.cancellation_id || "");
-  const newStatus = String(body.refund_status || "");
-  const processNote = body.process_note != null
-    ? String(body.process_note).trim()
-    : null;
-
-  if (!cancellationId) return json({ error: "cancellation_id required" }, 400);
-  if (!REFUND_STATUSES.has(newStatus)) {
-    return json({ error: "Invalid refund_status" }, 400);
-  }
-  if (
-    (newStatus === "completed" || newStatus === "rejected") &&
-    !processNote
-  ) {
-    return json({ error: "process_note required when completing or rejecting" }, 400);
-  }
-
-  const { data: existing, error: fetchErr } = await sb
-    .from("booking_cancellations")
-    .select("*")
-    .eq("id", cancellationId)
-    .maybeSingle();
-  if (fetchErr) return json({ error: fetchErr.message }, 500);
-  if (!existing) return json({ error: "Cancellation not found" }, 404);
-
-  const patch: Record<string, unknown> = {
-    refund_status: newStatus,
-    ...(processNote ? { process_note: processNote } : {}),
-  };
-  if (newStatus === "completed" || newStatus === "rejected") {
-    patch.processed_by = actor;
-    patch.processed_at = new Date().toISOString();
-  }
-
-  const { data, error } = await sb
-    .from("booking_cancellations")
-    .update(patch)
-    .eq("id", cancellationId)
-    .select()
-    .single();
-  if (error) return json({ error: error.message }, 500);
-
-  return json({ success: true, cancellation: data });
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -416,11 +312,35 @@ Deno.serve(async (req) => {
   }
 
   if (action === "list_pending_refunds") {
-    return listPendingRefunds(sb, body);
+    return listPendingRefundsDesk(sb, body);
   }
 
   if (action === "update_refund") {
-    return updateRefund(sb, body, role);
+    if (role !== "support_admin") {
+      return json({ error: "Admin PIN required for refund updates" }, 403);
+    }
+    return updateRefundDesk(sb, body, role);
+  }
+
+  if (action === "refund_approval_send") {
+    if (role !== "support_admin") {
+      return json({ error: "Admin PIN required for refund approval OTP" }, 403);
+    }
+    return refundApprovalSendDesk(sb, body);
+  }
+
+  if (action === "refund_approval_confirm") {
+    if (role !== "support_admin") {
+      return json({ error: "Admin PIN required for refund approval" }, 403);
+    }
+    return refundApprovalConfirmDesk(sb, body);
+  }
+
+  if (action === "issue_razorpay_refund") {
+    if (role !== "support_admin") {
+      return json({ error: "Admin PIN required to issue Razorpay refund" }, 403);
+    }
+    return issueRazorpayRefundDesk(sb, body, role);
   }
 
   if (action === "search_bookings") {

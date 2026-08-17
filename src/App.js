@@ -689,7 +689,7 @@ async function invokeCancelBooking(bookingId, addToast) {
     const refundRu = fmtRs(bd.refund_paise || 0);
     const feeRu = fmtRs(bd.cancel_fee_paise || 0);
     addToast?.(
-      `Booking cancelled · ₹${refundRu} refund pending (fee ₹${feeRu}). Our team will process it manually within 7 business days.`,
+      `Booking cancelled · ₹${refundRu} refund queued for review (fee ₹${feeRu}). Owner approval required before payout.`,
       'success',
     );
     return r.data;
@@ -11229,7 +11229,7 @@ function TicketDeskPanel({ pin, useAdminPin = false, readOnly = false }) {
 }
 
 /* ================================================================
-   REFUND DESK — pending cancellation refunds (support + admin)
+   REFUND DESK — two-line approval + Razorpay refund (support + admin)
 ================================================================ */
 function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
   const [rows, setRows] = useState([]);
@@ -11239,6 +11239,9 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
   const [msg, setMsg] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [notes, setNotes] = useState({});
+  const [reviewNotes, setReviewNotes] = useState({});
+  const [approvalOtps, setApprovalOtps] = useState({});
+  const [approverMasked, setApproverMasked] = useState(null);
 
   const load = useCallback(async () => {
     if (!pin) return;
@@ -11246,14 +11249,16 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
     try {
       const data = await fetchFn('list_pending_refunds', { status: filter }, pin);
       setRows(data.cancellations || []);
+      if (data.approver_mobile_masked) setApproverMasked(data.approver_mobile_masked);
     } catch (e) { setErr(e.message); setRows([]); }
     finally { setLoading(false); }
   }, [fetchFn, pin, filter]);
 
   useEffect(() => { load(); }, [load]);
 
-  const act = async (row, refundStatus) => {
+  const act = async (row, refundStatus, extra = {}) => {
     const note = (notes[row.id] || '').trim();
+    const reviewNote = (reviewNotes[row.id] || '').trim();
     if ((refundStatus === 'completed' || refundStatus === 'rejected') && !note) {
       setErr('Add a process note before completing or rejecting');
       return;
@@ -11264,27 +11269,96 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
         cancellation_id: row.id,
         refund_status: refundStatus,
         ...(note ? { process_note: note } : {}),
+        ...(reviewNote ? { review_note: reviewNote } : {}),
+        ...extra,
       }, pin);
       setMsg(`Refund → ${refundStatus.replace(/_/g, ' ')}`);
+      setNotes(n => ({ ...n, [row.id]: '' }));
+      setReviewNotes(n => ({ ...n, [row.id]: '' }));
+      load();
+    } catch (e) { setErr(e.message); }
+    finally { setBusyId(null); }
+  };
+
+  const sendApprovalOtp = async (row) => {
+    setBusyId(row.id); setErr('');
+    try {
+      const data = await fetchFn('refund_approval_send', { cancellation_id: row.id }, pin);
+      setApproverMasked(data.approver_mobile_masked || approverMasked);
+      setMsg(data.dev_otp
+        ? `Approval OTP sent (dev: ${data.dev_otp}) to ${data.approver_mobile_masked}`
+        : `Approval OTP sent to ${data.approver_mobile_masked}`);
+    } catch (e) { setErr(e.message); }
+    finally { setBusyId(null); }
+  };
+
+  const confirmApproval = async (row, decision) => {
+    const otp = (approvalOtps[row.id] || '').replace(/\D/g, '');
+    const note = (notes[row.id] || '').trim();
+    if (otp.length !== 6) { setErr('Enter 6-digit approval OTP from owner mobile'); return; }
+    if (decision === 'reject' && !note) { setErr('Add a rejection note'); return; }
+    setBusyId(row.id); setErr('');
+    try {
+      await fetchFn('refund_approval_confirm', {
+        cancellation_id: row.id,
+        otp,
+        decision,
+        ...(note ? { process_note: note } : {}),
+      }, pin);
+      setMsg(decision === 'approve' ? 'Second-line approval recorded' : 'Refund rejected at approval');
+      setApprovalOtps(n => ({ ...n, [row.id]: '' }));
       setNotes(n => ({ ...n, [row.id]: '' }));
       load();
     } catch (e) { setErr(e.message); }
     finally { setBusyId(null); }
   };
 
+  const issueRazorpay = async (row) => {
+    setBusyId(row.id); setErr('');
+    try {
+      const data = await fetchFn('issue_razorpay_refund', { cancellation_id: row.id }, pin);
+      setMsg(data.already_issued
+        ? `Razorpay refund already issued: ${data.razorpay_refund_id}`
+        : `Razorpay refund issued: ${data.razorpay_refund_id}`);
+      load();
+    } catch (e) {
+      if (e.message?.includes('manual')) {
+        setErr(`${e.message} — use Mark manual processing instead`);
+      } else setErr(e.message);
+    }
+    finally { setBusyId(null); }
+  };
+
   const refundStatusColor = {
     refund_pending: C.gold,
+    pending_approval: C.acc,
+    approved: C.cyan,
     processing: C.cyan,
     completed: C.grn,
     rejected: C.red,
   };
 
+  const filterTabs = [
+    ['open', 'Open queue'],
+    ['refund_pending', 'Line 1'],
+    ['pending_approval', 'Awaiting approval'],
+    ['approved', 'Approved'],
+    ['processing', 'Processing'],
+    ['completed', 'Completed'],
+    ['all', 'All'],
+  ];
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-        <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{title}</div>
+        <div>
+          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{title}</div>
+          <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+            Line 1: submit for approval · Line 2: OTP on {approverMasked || '******0288'} · then Razorpay refund
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {[['open', 'Open queue'], ['refund_pending', 'Pending'], ['processing', 'Processing'], ['completed', 'Completed'], ['all', 'All']].map(([k, l]) => (
+          {filterTabs.map(([k, l]) => (
             <button key={k} type="button" onClick={() => setFilter(k)} style={{ padding: '4px 10px', borderRadius: 14, border: `1.5px solid ${filter === k ? C.acc : C.bdr}`, background: filter === k ? `${C.acc}18` : C.surf, color: filter === k ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{l}</button>
           ))}
           <Btn sm v="outline" onClick={load} disabled={loading}>Refresh</Btn>
@@ -11297,35 +11371,77 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
       ) : rows.map(row => {
         const cust = row.customer || {};
         const bk = row.booking || {};
+        const pi = row.payment_intent || {};
         const custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || bk.customer_name || row.customer_id;
+        const st = row.refund_status;
         return (
           <div key={row.id} style={{ ...S.card(), marginBottom: 10, padding: 14, border: row.overdue ? `1.5px solid ${C.red}55` : undefined }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
               <div>
                 <div style={{ fontWeight: 800, color: C.txt }}>{bk.service_name || 'Booking'} · {row.txn_id || '—'}</div>
                 <div style={{ fontSize: 12, color: C.sub }}>{custName} · {cust.phone || '—'}</div>
-                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Cancelled {fmtDt(row.created_at)} · Due {fmtDt(row.refund_due_by)}{row.overdue ? ' · OVERDUE' : ''}</div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                  Cancelled {fmtDt(row.created_at)} · Due {fmtDt(row.refund_due_by)}{row.overdue ? ' · OVERDUE' : ''}
+                </div>
+                {(pi.razorpay_payment_id || pi.payer_vpa) && (
+                  <div style={{ fontSize: 10, color: C.cyan, marginTop: 4 }}>
+                    {pi.razorpay_payment_id ? `pay ${pi.razorpay_payment_id}` : ''}
+                    {pi.payer_vpa ? ` · ${pi.payer_vpa}` : ''}
+                  </div>
+                )}
               </div>
-              <Badge label={row.refund_status.replace(/_/g, ' ')} color={refundStatusColor[row.refund_status] || C.dim} />
+              <Badge label={st.replace(/_/g, ' ')} color={refundStatusColor[st] || C.dim} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8, fontSize: 11, marginBottom: 10 }}>
               <div><span style={{ color: C.dim }}>Paid </span><strong>₹{fmtRs(row.total_paid_paise)}</strong></div>
               <div><span style={{ color: C.dim }}>Fee (30%) </span><strong style={{ color: C.red }}>₹{fmtRs(row.cancel_fee_paise)}</strong></div>
-              <div><span style={{ color: C.dim }}>GST </span>₹{fmtRs(row.cancel_fee_gst_paise)}</div>
-              <div><span style={{ color: C.dim }}>Platform </span>₹{fmtRs(row.cancel_fee_platform_paise)}</div>
               <div><span style={{ color: C.dim }}>Refund </span><strong style={{ color: C.grn }}>₹{fmtRs(row.refund_paise)}</strong></div>
             </div>
+            {row.review_note && <div style={{ fontSize: 11, color: C.sub, marginBottom: 6 }}>Review: {row.review_note}</div>}
+            {row.approved_by && row.approved_at && (
+              <div style={{ fontSize: 11, color: C.cyan, marginBottom: 6 }}>Approved by {row.approved_by} · {fmtDt(row.approved_at)}</div>
+            )}
+            {row.razorpay_refund_id && <div style={{ fontSize: 11, color: C.grn, marginBottom: 6 }}>Razorpay: {row.razorpay_refund_id}</div>}
             {row.process_note && <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>Note: {row.process_note}{row.processed_at ? ` · ${fmtDt(row.processed_at)}` : ''}</div>}
-            {(row.refund_status === 'refund_pending' || row.refund_status === 'processing') && (
+
+            {st === 'refund_pending' && (
               <>
-                <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Process note (required for complete/reject) — e.g. UPI ref, Razorpay refund ID" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
+                <input value={reviewNotes[row.id] || ''} onChange={e => setReviewNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Line-1 review note (optional)" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
+                <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Rejection note (required if rejecting)" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {row.refund_status === 'refund_pending' && (
-                    <Btn sm v="outline" disabled={busyId === row.id} onClick={() => act(row, 'processing')}>Mark processing</Btn>
-                  )}
-                  <Btn sm disabled={busyId === row.id} onClick={() => act(row, 'completed')}>{busyId === row.id ? 'Saving…' : 'Mark refund complete'}</Btn>
+                  <Btn sm v="primary" disabled={busyId === row.id} onClick={() => act(row, 'pending_approval')}>Submit for 2nd-line approval</Btn>
                   <Btn sm v="danger" disabled={busyId === row.id} onClick={() => act(row, 'rejected')}>Reject</Btn>
                 </div>
+              </>
+            )}
+
+            {st === 'pending_approval' && (
+              <>
+                <input value={approvalOtps[row.id] || ''} onChange={e => setApprovalOtps(n => ({ ...n, [row.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))} placeholder="Owner approval OTP (6 digits)" style={{ ...S.inp(), marginBottom: 8, fontSize: 12, letterSpacing: 4 }} inputMode="numeric" />
+                <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Rejection note (required if rejecting)" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Btn sm v="outline" disabled={busyId === row.id} onClick={() => sendApprovalOtp(row)}>Send OTP to owner</Btn>
+                  <Btn sm disabled={busyId === row.id} onClick={() => confirmApproval(row, 'approve')}>Approve refund</Btn>
+                  <Btn sm v="danger" disabled={busyId === row.id} onClick={() => confirmApproval(row, 'reject')}>Reject</Btn>
+                </div>
+              </>
+            )}
+
+            {st === 'approved' && (
+              <>
+                <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>Approved — issue Razorpay refund or mark manual processing for Vyapar/UPI.</div>
+                <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Manual processing note (non-Razorpay)" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Btn sm v="primary" disabled={busyId === row.id} onClick={() => issueRazorpay(row)}>Issue Razorpay refund</Btn>
+                  <Btn sm v="outline" disabled={busyId === row.id} onClick={() => act(row, 'processing', { process_note: notes[row.id] || 'Manual refund in progress' })}>Mark manual processing</Btn>
+                </div>
+              </>
+            )}
+
+            {st === 'processing' && (
+              <>
+                <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Completion note — e.g. confirmed in bank" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
+                <Btn sm disabled={busyId === row.id} onClick={() => act(row, 'completed')}>{busyId === row.id ? 'Saving…' : 'Mark refund complete'}</Btn>
               </>
             )}
           </div>
@@ -14525,6 +14641,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 ['PRICING_ADMIN_PIN', 'Pricing admin + hub access (cannot reset 2FA alone)'],
                 ['VENDOR_ADMIN_PIN', 'Vendor admin + hub access'],
                 ['PRICING_2FA_RESET_MOBILE', 'Owner mobile for pricing 2FA reset OTP (10 digits, e.g. 9270194842)'],
+                ['REFUND_APPROVAL_MOBILE', 'Second-line refund approval OTP (testing: 8484850288)'],
               ].map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.bdr}`, fontSize: 12 }}>
                   <code style={{ color: C.acc }}>{key}</code>
@@ -14611,7 +14728,7 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ When you cancel a confirmed booking in the app, ScanV refunds <strong>70% of your total paid amount</strong> after manual review. A <strong>30% cancellation charge</strong> applies (18% GST + 12% platform service, each calculated on your total paid amount). Refunds are <strong>not automatic</strong> — our support team processes them within <strong>7 business days</strong>.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ When you cancel a confirmed booking in the app, ScanV refunds <strong>70% of your total paid amount</strong> after a <strong>two-step review</strong> (support review + owner OTP approval). A <strong>30% cancellation charge</strong> applies (18% GST + 12% platform service). Razorpay refunds return to your original payment method within <strong>3–7 business days</strong> after approval.</p>
           </div>
           <div style={{marginBottom:20}}>
             <div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>In-app cancellation (confirmed / in-progress bookings)</div>
@@ -14636,7 +14753,7 @@ function LegalPage({page}) {
             ['What DCORE Refunds','In-app customer cancellation (70% of total paid) · DCORE cancels due to unavailable Partner · Technical error causing incorrect charge · Duplicate payment · Payment processed but no booking confirmed'],
             ['What DCORE Does Not Refund','The 30% cancellation fee on customer-initiated cancels · Service quality disputes (User vs Partner) · User no-show · Change of mind after service started · Cash payments to Partners · Professional service outcomes (legal, medical, training)'],
             ['Non-Refundable Categories','Legal consultations (once conducted) · Cloud training (once batch started) · VIP appointments (deposit within 24hrs) · Food (once preparation started) · Healthcare (once consultation complete)'],
-            ['Refund Processing','Manual review by Customer Support or Admin · SLA: within 7 business days of cancellation · Returned to original payment method · UPI refunds: 3–5 business days after support marks complete · GST credit note issued'],
+            ['Refund Processing','Line 1: support submits cancellation refund for review · Line 2: owner OTP approval on registered mobile · Razorpay refund issued after approval · SLA: within 7 business days of cancellation · Returned to original payment method'],
             ['How to Request','App: Bookings or Track → Cancel booking (instant fee breakdown, manual refund queue) · Support desk processes the refund · Email: refunds@dcoreglobal.com with TXN-XXXXXXXX'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
