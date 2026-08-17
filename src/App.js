@@ -656,6 +656,34 @@ function calcCancellationBreakdown(totalPaidPaise) {
   return { totalPaid, cancelFeePaise, cancelFeeGstPaise, cancelFeePlatformPaise, refundPaise };
 }
 
+const REFUND_PENDING_STATUSES = new Set(['refund_pending', 'pending_approval', 'approved', 'processing']);
+
+/** Customer-facing refund queue label */
+function refundStatusCustomerLabel(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'completed') return 'Refund Complete';
+  if (s === 'rejected') return 'Refund declined';
+  if (REFUND_PENDING_STATUSES.has(s)) return 'Pending Refund Payment';
+  return s.replace(/_/g, ' ');
+}
+
+/** Admin desk refund label (maps internal statuses to customer wording) */
+function refundStatusDeskLabel(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'completed') return 'Refund Complete';
+  if (REFUND_PENDING_STATUSES.has(s)) return 'Pending Refund Payment';
+  if (s === 'rejected') return 'Rejected';
+  return s.replace(/_/g, ' ');
+}
+
+function refundStatusDisplayColor(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'completed') return C.grn;
+  if (s === 'rejected') return C.red;
+  if (REFUND_PENDING_STATUSES.has(s)) return C.gold;
+  return C.dim;
+}
+
 function isCancellableBooking(booking) {
   if (!booking) return false;
   const s = (booking.status || '').toLowerCase();
@@ -8188,6 +8216,7 @@ function BookingsScreen() {
   const [completingId,setCompletingId]=useState(null);
   const [cancelModalBooking,setCancelModalBooking]=useState(null);
   const [cancellingId,setCancellingId]=useState(null);
+  const [refundsByBooking,setRefundsByBooking]=useState({});
   const autoRecoverRef = useRef(false);
 
   const load=useCallback(async()=>{
@@ -8195,6 +8224,17 @@ function BookingsScreen() {
     const{data}=await sb().from('bookings').select('*').eq(col,user.id).order('created_at',{ascending:false});
     const visible = user.role === 'customer' ? dedupeBookingsForDisplay(data || []) : (data || []);
     setBookings(visible);
+    const cancelledIds = visible.filter(b => (b.status || '').toLowerCase() === 'cancelled').map(b => b.id);
+    if (cancelledIds.length) {
+      const { data: cancels } = await sb().from('booking_cancellations')
+        .select('booking_id, refund_status, refund_paise, refund_due_by, razorpay_refund_id')
+        .in('booking_id', cancelledIds);
+      const rmap = {};
+      (cancels || []).forEach(c => { rmap[c.booking_id] = c; });
+      setRefundsByBooking(rmap);
+    } else {
+      setRefundsByBooking({});
+    }
     if (user.role === 'customer') {
       let pending = await findOrphanPaidIntents(user.id);
       if (pending.length && !autoRecoverRef.current) {
@@ -8380,16 +8420,30 @@ function BookingsScreen() {
     } finally { setCancellingId(null); }
   };
 
-  const renderBookingCard=(b)=>(
+  const renderBookingCard=(b)=>{
+    const refundRec = refundsByBooking[b.id];
+    const refundLabel = refundRec ? refundStatusCustomerLabel(refundRec.refund_status) : null;
+    return (
     <div key={b.id} style={{...S.card(),marginBottom:10}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
         <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{user.role==='partner'&&b.partner_id===user.id&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:700,fontFamily:'monospace'}}>Booking {formatBookingRef(b)}</div>}{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
         <div style={{textAlign:'right'}}>
           <div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div>
           <Badge label={bookingStatusGroup(b.status).label} color={bookingStatusGroup(b.status).color}/>
+          {refundLabel && (
+            <div style={{ marginTop: 6 }}>
+              <Badge label={refundLabel} color={refundStatusDisplayColor(refundRec.refund_status)} />
+            </div>
+          )}
           <div style={{fontSize:10,color:C.dim,marginTop:4,textTransform:'capitalize'}}>{b.status?.replace(/_/g,' ')}</div>
         </div>
       </div>
+      {refundRec && (
+        <div style={{ fontSize: 11, color: refundRec.refund_status === 'completed' ? C.grn : C.gold, marginBottom: 8 }}>
+          Refund ₹{fmtRs(refundRec.refund_paise)} · {refundLabel}
+          {refundRec.refund_status !== 'completed' && refundRec.refund_due_by ? ` · due ${fmtDt(refundRec.refund_due_by)}` : ''}
+        </div>
+      )}
       {showTrackMap(b) && (
         <LiveVendorMap
           live={liveLocs[b.id]}
@@ -8422,7 +8476,7 @@ function BookingsScreen() {
       )}
       {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sbIgnore(sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id));addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
     </div>
-  );
+  );};
 
   const markComplete=async(b)=>{
     if (b.partner_id !== user.id || b.status !== 'confirmed') return addToast('Only your active assigned booking can be completed', 'error');
@@ -11308,7 +11362,7 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
       if (decision === 'approve') {
         const ar = data.auto_refund;
         if (ar?.success && ar.razorpay_refund_id) {
-          setMsg(`Approved · Razorpay refund auto-issued: ${ar.razorpay_refund_id}`);
+          setMsg(`Approved · Razorpay refund issued · ${refundStatusCustomerLabel('completed')}`);
         } else if (ar?.manual_required) {
           setMsg('Approved · no Razorpay pay ID — use Mark manual processing');
         } else if (ar?.error) {
@@ -11331,8 +11385,8 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
     try {
       const data = await fetchFn('issue_razorpay_refund', { cancellation_id: row.id }, pin);
       setMsg(data.already_issued
-        ? `Razorpay refund already issued: ${data.razorpay_refund_id}`
-        : `Razorpay refund issued: ${data.razorpay_refund_id}`);
+        ? `Razorpay refund already issued · ${refundStatusCustomerLabel('completed')}`
+        : `Razorpay refund issued · ${refundStatusCustomerLabel('completed')}: ${data.razorpay_refund_id}`);
       load();
     } catch (e) {
       if (e.message?.includes('manual')) {
@@ -11344,12 +11398,14 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
 
   const refundStatusColor = {
     refund_pending: C.gold,
-    pending_approval: C.acc,
-    approved: C.cyan,
-    processing: C.cyan,
+    pending_approval: C.gold,
+    approved: C.gold,
+    processing: C.gold,
     completed: C.grn,
     rejected: C.red,
   };
+
+  const refundBadgeLabel = (st) => refundStatusDeskLabel(st);
 
   const filterTabs = [
     ['open', 'Open queue'],
@@ -11367,7 +11423,7 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
         <div>
           <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{title}</div>
           <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
-            Line 1: submit for approval · Line 2: OTP on {approverMasked || '******0288'} · Razorpay refund auto on approve
+            Line 1: submit for approval · Line 2: OTP on {approverMasked || '******0288'} · Razorpay auto → Refund Complete
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -11403,7 +11459,7 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
                   </div>
                 )}
               </div>
-              <Badge label={st.replace(/_/g, ' ')} color={refundStatusColor[st] || C.dim} />
+              <Badge label={refundBadgeLabel(st)} color={refundStatusColor[st] || refundStatusDisplayColor(st)} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8, fontSize: 11, marginBottom: 10 }}>
               <div><span style={{ color: C.dim }}>Paid </span><strong>₹{fmtRs(row.total_paid_paise)}</strong></div>
@@ -14130,7 +14186,7 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                   {detail?.live_location?.tracking_active && <div style={{ color: C.gold }}>GPS tracking active</div>}
                   {cancelRec && (
                     <div style={{ marginTop: 8, padding: 10, background: `${C.gold}12`, borderRadius: 8, fontSize: 11 }}>
-                      Cancelled · refund ₹{fmtRs(cancelRec.refund_paise)} ({cancelRec.refund_status}) · due {fmtDt(cancelRec.refund_due_by)}
+                      Cancelled · refund ₹{fmtRs(cancelRec.refund_paise)} · {refundStatusDeskLabel(cancelRec.refund_status)}{cancelRec.refund_status !== 'completed' && cancelRec.refund_due_by ? ` · due ${fmtDt(cancelRec.refund_due_by)}` : ''}
                     </div>
                   )}
                 </div>

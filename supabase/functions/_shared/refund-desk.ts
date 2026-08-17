@@ -3,8 +3,8 @@
  *
  * Flow:
  *   refund_pending → pending_approval (line 1)
- *   pending_approval → processing | approved | rejected (line 2 OTP; Razorpay auto on approve)
- *   approved → processing (manual retry or Vyapar/UPI)
+ *   pending_approval → completed | approved | rejected (line 2 OTP; Razorpay auto → completed)
+ *   approved → processing | completed (manual Vyapar/UPI path)
  *   processing → completed
  */
 
@@ -524,15 +524,17 @@ async function executeRazorpayRefundForCancellation(
   }
 
   const refundId = String(result.refund?.id || "");
+  const now = new Date().toISOString();
   const note = `Razorpay refund ${refundId} · ₹${(refundPaise / 100).toFixed(2)} (auto after owner OTP)`;
 
   const { data, error } = await sb
     .from("booking_cancellations")
     .update({
-      refund_status: "processing",
+      refund_status: "completed",
       razorpay_refund_id: refundId || null,
       process_note: note,
       processed_by: actor,
+      processed_at: now,
     })
     .eq("id", cancellationId)
     .select()
