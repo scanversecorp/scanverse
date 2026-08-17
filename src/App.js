@@ -2838,7 +2838,7 @@ const SVC_CARD_THEME = {
   vip:      { bgFrom:'#FEF3C7', bgTo:'#FDE68A', b1:'#FBBF24', b2:'#D97706', glow:'rgba(217,119,6,0.2)',  tag:'👑 Premium', img:'/home-models/vip.png' },
   health:   { bgFrom:'#FEE2E2', bgTo:'#FECACA', b1:'#F87171', b2:'#DC2626', glow:'rgba(220,38,38,0.16)', img:'/home-models/health.png' },
   property: { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)', img:'/home-models/property.png' },
-  household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/home-models/household.png' },
+  household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/home-models/household.png', imgPos:'center top' },
   beauty:   { bgFrom:'#FCE7F3', bgTo:'#FFE4E6', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.2)', tag:'💄 Glow', img:'/home-models/beauty.png' },
   delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)', img:'/home-models/delivery.png' },
   food:     { bgFrom:'#FCE7F3', bgTo:'#FBCFE8', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.18)', img:'/home-models/food.png' },
@@ -3078,31 +3078,36 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   const meta = HOME_CARD_META[svc.id] || {};
   const d = SVC_DETAIL[svc.id] || {};
   const title = HOME_CARD_TITLE[svc.id] || svc.name;
+  const imgPos = theme.imgPos || 'center 12%';
   const imgH = compact ? 72 : hero ? 168 : 132;
+  const badgeRow = (sm) => (
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:6, width:'100%' }}>
+      <span style={{ background: sm ? 'rgba(255,255,255,0.95)' : '#fef3c7', color:'#b45309', fontSize: sm ? 8 : 9, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99, border: sm ? IG_TILE.border : 'none', flexShrink:0 }}>25% OFF</span>
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', justifyContent:'flex-end' }}>
+        {svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize: sm ? 8 : 9, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99 }}>☁️ ENTERPRISE</span>}
+        {theme.tag && !svc.cloud && <span style={{ background: sm ? 'rgba(255,255,255,0.95)' : theme.b2, color: sm ? theme.b2 : '#fff', fontSize: sm ? 8 : 9, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99, border: sm ? IG_TILE.border : 'none' }}>{theme.tag}</span>}
+      </div>
+    </div>
+  );
 
   if (hero && !compact) {
     return (
-      <div onClick={onClick} style={{ gridColumn:'1 / -1', borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .4s ease ${index * 0.04}s both` }}>
-        <div style={{ display:'flex', alignItems:'stretch', minHeight:168, background:C.card }}>
-          <div style={{ flex:1, padding:'18px 18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', gap:7 }}>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {svc.household && <span style={{ background:C.acc, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>✨ MOST LOVED</span>}
-              {svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>☁️ ENTERPRISE</span>}
-              {theme.tag && !svc.household && !svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>{theme.tag}</span>}
-              <span style={{ background:'#fef3c7', color:'#b45309', fontSize:9, fontWeight:800, padding:'3px 9px', borderRadius:99 }}>25% OFF</span>
-            </div>
-            <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
-            <div style={{ color:C.txt, fontWeight:800, fontSize:18, lineHeight:1.2 }}>{title}</div>
-            <div style={{ color:C.sub, fontSize:11, fontWeight:600 }}>{meta.face}</div>
-            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:2 }}>
-              <span style={{ color:C.acc, fontSize:14, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
-              <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>
+      <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .4s ease ${index * 0.04}s both`, height:168, minHeight:168, maxHeight:168 }}>
+        <div style={{ display:'flex', alignItems:'stretch', height:'100%', background:C.card }}>
+          <div style={{ flex:1, minWidth:0, padding:'16px 16px 14px', display:'flex', flexDirection:'column', justifyContent:'center', gap:6, overflow:'hidden' }}>
+            {badgeRow(false)}
+            <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>&ldquo;{meta.commitment}&rdquo;</div>
+            <div style={{ color:C.txt, fontWeight:800, fontSize:17, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
+            <div style={{ color:C.sub, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'nowrap', marginTop:2, minWidth:0 }}>
+              <span style={{ color:C.acc, fontSize:14, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
+              <span style={{ color:C.dim, fontSize:10, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {d.rating||'4.8 ⭐'} · {subSvcCount(svc) ? `${subSvcCount(svc)} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
               </span>
             </div>
           </div>
-          <div style={{ width:148, flexShrink:0, position:'relative', background:C.deep }}>
-            <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
+          <div style={{ width:148, flexShrink:0, position:'relative', background:C.deep, height:'100%' }}>
+            <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
           </div>
         </div>
       </div>
@@ -3113,7 +3118,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
     return (
       <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
         <div style={{ width:72, flexShrink:0, position:'relative', background:C.deep }}>
-          <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%', filter:IG_TILE.imgFilter }} />
+          <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
         </div>
         <div style={{ flex:1, padding:'10px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:3 }}>
           <div style={{ color:theme.b2, fontSize:10, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
@@ -3127,10 +3132,9 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   return (
     <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column', height:'100%', width:'100%', minWidth:0 }}>
       <div style={{ position:'relative', height:imgH, minHeight:imgH, flexShrink:0, background:C.deep }}>
-        <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 12%', filter:IG_TILE.imgFilter }} />
-        <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4, flexWrap:'wrap' }}>
-          {theme.tag && <span style={{ background:'rgba(255,255,255,0.95)', color:theme.b2, fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>{theme.tag}</span>}
-          <span style={{ background:'rgba(255,255,255,0.95)', color:'#b45309', fontSize:8, fontWeight:800, padding:'2px 7px', borderRadius:99, border:IG_TILE.border }}>25% OFF</span>
+        <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
+        <div style={{ position:'absolute', top:8, left:8, right:8 }}>
+          {badgeRow(true)}
         </div>
       </div>
       <div style={{ padding:'11px 12px 13px', background:C.card, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
@@ -3175,16 +3179,17 @@ function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
         <div style={{ color:C.dim, fontSize:10, fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase' }}>Featured · swipe of care</div>
         <div style={{ color:C.dim, fontSize:10, fontWeight:700 }}>{idx + 1} / {n}</div>
       </div>
-      <div style={{ overflow:'hidden', borderRadius:20 }}>
+      <div style={{ overflow:'hidden', borderRadius:20, height:168 }}>
         <div
           style={{
             display:'flex',
             transform:`translateX(-${idx * 100}%)`,
             transition:'transform 0.72s cubic-bezier(0.4, 0, 0.2, 1)',
+            height:'100%',
           }}
         >
           {services.map((svc, i) => (
-            <div key={svc.id} style={{ minWidth:'100%', flexShrink:0 }}>
+            <div key={svc.id} style={{ minWidth:'100%', flexShrink:0, height:168 }}>
               <HomeModelCard svc={svc} onClick={() => onSelect(svc)} hero index={i} />
             </div>
           ))}
