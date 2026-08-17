@@ -8550,7 +8550,24 @@ function ProfileScreen() {
   const f=(k,v)=>setFrm(p=>({...p,[k]:v}));
   const readOnlyInp={...S.inp(),background:C.deep,color:C.sub,cursor:'not-allowed'};
   const verifiedNote=<div style={{fontSize:10,color:C.dim,marginTop:4}}>🔒 Verified — contact support to change</div>;
-  const save=async()=>{setSaving(true);try{const updates={address:frm.address,village:frm.village,city:frm.city,pincode:frm.pincode};if(hasRealEmail&&frm.email)updates.email=frm.email;if(user.role==='partner')updates.upi_id=frm.upi_id;const{data}=await sb().from('profiles').update(updates).eq('id',user.id).select().single();setUser(data);addToast('Address saved ✅','success');}catch(e){addToast(e.message||'Save failed','error');}finally{setSaving(false);}};
+  const dobMissing = !profileHasDob(user);
+  const save=async()=>{
+    setSaving(true);
+    try{
+      const updates={address:frm.address,village:frm.village,city:frm.city,pincode:frm.pincode};
+      if(hasRealEmail&&frm.email)updates.email=frm.email;
+      if(user.role==='partner')updates.upi_id=frm.upi_id;
+      if(dobMissing) {
+        if(!frm.dateOfBirth || !ageFromDob(frm.dateOfBirth)) throw new Error('Enter a valid date of birth (age 5–120)');
+        updates.date_of_birth = frm.dateOfBirth;
+        updates.age = ageFromDob(frm.dateOfBirth);
+      }
+      const{data}=await sb().from('profiles').update(updates).eq('id',user.id).select().single();
+      setUser(data);
+      addToast(dobMissing ? 'Profile saved ✅' : 'Address saved ✅','success');
+    }catch(e){addToast(e.message||'Save failed','error');}
+    finally{setSaving(false);}
+  };
   const rc=user.role==='admin'?C.gold:user.role==='partner'?C.cyan:user.role==='candidate'?C.vio:C.acc;
   return (
     <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
@@ -8567,17 +8584,35 @@ function ProfileScreen() {
           )}
         </div>
         {user.role==='admin'&&<div onClick={()=>setScreen('qr')} style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:12,padding:'12px 16px',marginBottom:16,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}><span style={{fontSize:22}}>📲</span><div style={{color:C.txt,fontSize:13,fontWeight:600}}>View QR Code & share</div><span style={{marginLeft:'auto',color:C.acc}}>→</span></div>}
+        {dobMissing && (
+          <div style={{ ...S.card(), marginBottom: 16, padding: 12, border: `1.5px solid ${C.gold}55`, background: `${C.gold}12` }}>
+            <div style={{ fontSize: 12, color: C.txt, fontWeight: 600, marginBottom: 4 }}>Add your date of birth</div>
+            <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.5 }}>Required for bookings and account verification. You can add it below — name and mobile stay locked after OTP.</div>
+          </div>
+        )}
         <div style={{...S.card(),marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:600,color:C.txt,marginBottom:14}}>Edit profile</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="First name"><input value={frm.firstName} readOnly style={readOnlyInp}/>{verifiedNote}</Field><Field label="Last name"><input value={frm.lastName} readOnly style={readOnlyInp}/>{verifiedNote}</Field></div>
-          <Field label="Date of birth"><input value={frm.dateOfBirth ? fmtDob(frm.dateOfBirth) : '—'} readOnly style={readOnlyInp}/>{verifiedNote}</Field>
+          <Field label="Date of birth" req={dobMissing}>
+            {dobMissing ? (
+              <>
+                <input type="date" min={minDobInput()} max={maxDobInput()} value={frm.dateOfBirth} onChange={e=>f('dateOfBirth',e.target.value)} style={S.inp()} />
+                <div style={{ fontSize: 10, color: C.gold, marginTop: 4 }}>Not set yet — add once, then it is locked like mobile</div>
+              </>
+            ) : (
+              <>
+                <input value={fmtDob(frm.dateOfBirth)} readOnly style={readOnlyInp} />
+                {verifiedNote}
+              </>
+            )}
+          </Field>
           <Field label="Mobile"><input value={frm.phone} readOnly style={readOnlyInp}/>{verifiedNote}</Field>
           {hasRealEmail&&<Field label="Email"><input value={frm.email} onChange={e=>f('email',e.target.value)} style={S.inp()}/></Field>}
           <Field label="Address"><input value={frm.address} onChange={e=>f('address',e.target.value)} style={S.inp()}/></Field>
           <Field label="Village / Area"><input value={frm.village} onChange={e=>f('village',e.target.value)} style={S.inp()}/></Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><Field label="City"><input value={frm.city} onChange={e=>f('city',e.target.value)} style={S.inp()}/></Field><Field label="PIN code"><input value={frm.pincode} onChange={e=>f('pincode',e.target.value)} style={S.inp()}/></Field></div>
           {user.role==='partner'&&<Field label="UPI ID"><input value={frm.upi_id} onChange={e=>f('upi_id',e.target.value)} placeholder="yourname@upi" style={S.inp()}/></Field>}
-          <Btn onClick={save} disabled={saving}>{saving?'Saving…':'Save address'}</Btn>
+          <Btn onClick={save} disabled={saving}>{saving?'Saving…':(dobMissing ? 'Save profile' : 'Save address')}</Btn>
         </div>
         <AssistBanner/>
         <Btn full v="outline" onClick={logout}>Sign out</Btn>
