@@ -3360,6 +3360,17 @@ const BROWSE_HOME_STACK = {
   width: '100%',
 };
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
+const BROWSE_PROMO_BANNER = {
+  ...BROWSE_HOME_STACK_ITEM,
+  width: '86%',
+  maxWidth: 320,
+  margin: '0 auto',
+  borderRadius: 14,
+  background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,
+  padding: '10px 14px',
+  color: '#fff',
+  boxShadow: '0 6px 20px rgba(214,58,86,0.22)',
+};
 /** Layout-only shell props — frame size/radius live in .scanv-shell CSS */
 const APP_SHELL = {
   display: 'flex',
@@ -5172,7 +5183,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         </div>
       </div>
       <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 14, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '10px 14px', color: '#fff', boxShadow: '0 6px 20px rgba(214,58,86,0.22)' }}>
+        <div style={BROWSE_PROMO_BANNER}>
           <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a smile</div>
           <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.92, marginTop: 4 }}>Verified partners · 25% off</div>
         </div>
