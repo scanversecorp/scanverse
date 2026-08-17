@@ -1,7 +1,9 @@
 /** Student Cloud — AI / Cloud / Data Center admission + admin fee tracker */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export const CLOUD_SGR_FEE_PAISE = 50000;
+export const SGR_FEE_FALLBACK_PAISE = 50000;
+/** @deprecated use sgrFeePaise prop / pricing catalog */
+export const CLOUD_SGR_FEE_PAISE = SGR_FEE_FALLBACK_PAISE;
 const STUDENT_CLOUD_FN = 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/student-cloud';
 
 function fmtRs(paise) {
@@ -10,6 +12,59 @@ function fmtRs(paise) {
 
 function digits10(raw) {
   return String(raw || '').replace(/\D/g, '').slice(-10);
+}
+
+function parseIsoDate(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || '').trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function scheduleBounds() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const max = new Date(today);
+  max.setFullYear(max.getFullYear() + 1);
+  return {
+    today,
+    max,
+    minStr: today.toISOString().slice(0, 10),
+    maxStr: max.toISOString().slice(0, 10),
+  };
+}
+
+function validateSgrDob(dateStr, ageFromDob) {
+  if (!dateStr) return 'Enter date of birth';
+  if (!parseIsoDate(dateStr)) return 'Enter a valid date of birth';
+  if (!ageFromDob?.(dateStr)) return 'Enter a valid date of birth (age 5–120)';
+  return '';
+}
+
+function validateSgrSchedule(dateStr, timeStr) {
+  if (!dateStr) return 'Pick a schedule date';
+  const dt = parseIsoDate(dateStr);
+  if (!dt) return 'Enter a valid schedule date — check day and month';
+  const { today, max } = scheduleBounds();
+  if (dt < today) return 'Schedule date cannot be in the past';
+  if (dt > max) return 'Schedule date must be within the next 12 months';
+  if (!timeStr) return 'Pick a schedule time';
+  const tm = /^(\d{2}):(\d{2})$/.exec(String(timeStr).trim());
+  if (!tm) return 'Pick a valid schedule time';
+  const hh = Number(tm[1]);
+  const mm = Number(tm[2]);
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return 'Pick a valid schedule time';
+  if (dt.getTime() === today.getTime()) {
+    const slot = new Date(dt);
+    slot.setHours(hh, mm, 0, 0);
+    if (slot <= new Date()) return 'Schedule time must be later today';
+  }
+  return '';
 }
 
 async function studentCloudFetch(action, payload, { pin, apikey } = {}) {
@@ -34,12 +89,12 @@ function otpChange(i, raw, digits, setDigits, prefix) {
 }
 
 export function StudentCloudAdmitScreen({
-  silentGeo, initialCourse, courses, onBack, addToast, kit,
+  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, kit,
 }) {
   const {
     C, S, FF, Field, Btn, Spin, BDR,
     invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified,
-    minDobInput, maxDobInput, captureFreshGps, SB_KEY,
+    minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY,
   } = kit;
 
   const courseList = courses || [];
@@ -65,6 +120,9 @@ export function StudentCloudAdmitScreen({
   const [txnId, setTxnId] = useState(null);
   const [payUrl, setPayUrl] = useState(null);
   const [paid, setPaid] = useState(false);
+  const [sgrFeeLocked, setSgrFeeLocked] = useState(null);
+  const effectiveSgrFee = sgrFeeLocked ?? sgrFeePaise;
+  const sgrFeeLabel = useMemo(() => fmtRs(effectiveSgrFee), [effectiveSgrFee]);
   const [done, setDone] = useState(false);
   const [doneMsg, setDoneMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -128,16 +186,20 @@ export function StudentCloudAdmitScreen({
     }
   }, [silentGeo]);
 
+  const schedBounds = scheduleBounds();
+
   const validateForm = () => {
     if (!firstName.trim()) return 'Enter first name';
     if (!lastName.trim()) return 'Enter last name';
     if (!experience.trim()) return 'Enter your experience';
-    if (!dob) return 'Enter date of birth';
+    const dobErr = validateSgrDob(dob, ageFromDob);
+    if (dobErr) return dobErr;
     if (digits10(mobile).length !== 10) return 'Enter valid 10-digit mobile';
     if (!address.trim()) return 'Enter address';
     if (!city.trim()) return 'Enter city';
     if (!state.trim()) return 'Enter state';
-    if (!scheduleDate) return 'Pick a schedule date';
+    const schedErr = validateSgrSchedule(scheduleDate, scheduleTime);
+    if (schedErr) return schedErr;
     return '';
   };
 
@@ -154,11 +216,11 @@ export function StudentCloudAdmitScreen({
     } finally { setLoading(false); }
   };
 
-  const preparePayLink = useCallback(async (tid) => {
-    const pay = await registerPaymentIntent(tid, CLOUD_SGR_FEE_PAISE, null, {
+  const preparePayLink = useCallback(async (tid, feePaise) => {
+    const pay = await registerPaymentIntent(tid, feePaise, null, {
       serviceId: 'cl-sgr',
       serviceName: 'Skill Gap Review (SGR)',
-      servicePricePaise: CLOUD_SGR_FEE_PAISE,
+      servicePricePaise: feePaise,
     });
     if (pay?.txn_id && pay.txn_id !== tid) setTxnId(pay.txn_id);
     if (pay?.payment_link_url) {
@@ -180,6 +242,8 @@ export function StudentCloudAdmitScreen({
   const verifyAndSubmit = async () => {
     const code = otpCode.join('');
     if (code.length < 6) return setErr('Enter 6-digit OTP');
+    const formErr = validateForm();
+    if (formErr) return setErr(formErr);
     setLoading(true); setErr('');
     try {
       const r = await studentCloudFetch('submit', {
@@ -202,11 +266,13 @@ export function StudentCloudAdmitScreen({
       }, { apikey: SB_KEY });
       setOtpVerified(true);
       setStudent(r.student);
+      const lockedFee = Number(r.sgr_fee_paise) >= 100 ? Number(r.sgr_fee_paise) : sgrFeePaise;
+      setSgrFeeLocked(lockedFee);
       const tid = `TXN-SGR-${Date.now()}`;
       setTxnId(tid);
       setPayUrl(null);
-      const ok = await preparePayLink(tid);
-      if (ok && !paid) addToast?.('Mobile verified — pay ₹500.00 SGR', 'success');
+      const ok = await preparePayLink(tid, lockedFee);
+      if (ok && !paid) addToast?.('Mobile verified — continue to Razorpay', 'success');
     } catch (e) {
       setErr(e.message || 'Could not submit form');
     } finally { setLoading(false); }
@@ -222,7 +288,7 @@ export function StudentCloudAdmitScreen({
     if (!txnId || !student?.id || paid || done) return undefined;
     let cancelled = false;
     const poll = async () => {
-      const ok = await checkPaymentVerified(txnId, CLOUD_SGR_FEE_PAISE);
+      const ok = await checkPaymentVerified(txnId, effectiveSgrFee);
       if (cancelled || !ok) return;
       setPaid(true);
       try {
@@ -237,7 +303,7 @@ export function StudentCloudAdmitScreen({
     poll();
     const id = setInterval(poll, 3000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [txnId, student?.id, paid, done, checkPaymentVerified, addToast, SB_KEY]);
+  }, [txnId, student?.id, paid, done, effectiveSgrFee, checkPaymentVerified, addToast, SB_KEY]);
 
   if (done) {
     return (
@@ -248,7 +314,7 @@ export function StudentCloudAdmitScreen({
           <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.6, fontWeight: 600 }}>
             {doneMsg || 'Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours'}
           </div>
-          <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>₹500.00 paid · {courseName} · {scheduleDate} {scheduleTime}</div>
+          <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>₹{sgrFeeLabel} paid · {courseName} · {scheduleDate} {scheduleTime}</div>
           <Btn full onClick={onBack} style={{ marginTop: 18 }}>Back to Cloud courses</Btn>
         </div>
       </div>
@@ -264,7 +330,7 @@ export function StudentCloudAdmitScreen({
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px 28px' }}>
         {err && <div style={S.err}>{err}</div>}
         <div style={{ ...S.card(), padding: 14, marginBottom: 14, background: '#EFF6FF', border: '1.5px solid #93C5FD' }}>
-          <div style={{ fontWeight: 800, color: '#1D4ED8', fontSize: 14 }}>Skill Gap Review (SGR) · ₹500.00</div>
+          <div style={{ fontWeight: 800, color: '#1D4ED8', fontSize: 14 }}>Skill Gap Review (SGR)</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.5 }}>AI, Cloud & Data Center · verify mobile, book a schedule, then pay via Razorpay.</div>
         </div>
 
@@ -275,7 +341,7 @@ export function StudentCloudAdmitScreen({
         <Field label="Experience" req note="Years / domain — e.g. 2 yrs networking">
           <input value={experience} onChange={(e) => setExperience(e.target.value)} placeholder="Fresher / 3 years IT support" style={S.inp()} disabled={otpVerified} />
         </Field>
-        <Field label="Date of birth" req>
+        <Field label="Date of birth" req note="Age 5–120">
           <input type="date" min={minDobInput()} max={maxDobInput()} value={dob} onChange={(e) => setDob(e.target.value)} style={S.inp()} disabled={otpVerified} />
         </Field>
         <Field label="Mobile" req note="Verified by OTP">
@@ -304,7 +370,9 @@ export function StudentCloudAdmitScreen({
           </select>
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Field label="Schedule date" req><input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={S.inp()} disabled={otpVerified} /></Field>
+          <Field label="Schedule date" req note="Today or a future date within 12 months">
+            <input type="date" min={schedBounds.minStr} max={schedBounds.maxStr} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={S.inp()} disabled={otpVerified} />
+          </Field>
           <Field label="Time" req><input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} style={S.inp()} disabled={otpVerified} /></Field>
         </div>
 
@@ -320,22 +388,20 @@ export function StudentCloudAdmitScreen({
                   style={{ width: 44, height: 50, textAlign: 'center', border: d ? `2px solid ${C.acc}` : BDR, borderRadius: 10, fontSize: 20, fontWeight: 800, fontFamily: FF, color: C.acc }} />
               ))}
             </div>
-            <Btn full onClick={verifyAndSubmit} disabled={loading}>{loading ? <><Spin size={16} /> Saving…</> : 'Verify OTP & continue to pay ₹500 →'}</Btn>
+            <Btn full onClick={verifyAndSubmit} disabled={loading}>{loading ? <><Spin size={16} /> Saving…</> : 'Verify OTP & continue to pay →'}</Btn>
           </>
         )}
 
         {otpVerified && !done && (
           <div style={{ ...S.card(), padding: 16, marginTop: 8 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Pay Skill Gap Review (SGR)</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.acc, marginBottom: 8 }}>₹{fmtRs(CLOUD_SGR_FEE_PAISE)}</div>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>Razorpay · we confirm automatically after payment.</div>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
               <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 3, accentColor: C.acc, flexShrink: 0 }} />
               <span>I understand that SGR fees is non-refundable</span>
             </label>
-            <Btn full onClick={openPay} disabled={!payUrl || loading || !sgrFeeAck}>{payUrl ? 'Pay ₹500.00 with Razorpay →' : 'Preparing Razorpay…'}</Btn>
+            <Btn full onClick={openPay} disabled={!payUrl || loading || !sgrFeeAck}>{payUrl ? 'Pay with Razorpay →' : 'Preparing Razorpay…'}</Btn>
             {!payUrl && txnId && !paid && (
-              <Btn v="outline" full onClick={async () => { setLoading(true); await preparePayLink(txnId); setLoading(false); }} disabled={loading} style={{ marginTop: 8 }}>
+              <Btn v="outline" full onClick={async () => { setLoading(true); await preparePayLink(txnId, effectiveSgrFee); setLoading(false); }} disabled={loading} style={{ marginTop: 8 }}>
                 Retry Razorpay link
               </Btn>
             )}

@@ -1536,7 +1536,31 @@ const SUPPORT_TICKETS_FN = `${SB_URL}/functions/v1/support-tickets`;
 const DISPATCH_FN = `${SB_URL}/functions/v1/booking-dispatch`;
 const RAZORPAY_FN = `${SB_URL}/functions/v1/razorpay-payment`;
 
+const SGR_SERVICE_ID = 'cl-sgr';
+const SGR_FEE_FALLBACK_PAISE = 50000;
+const SGR_SVC = {
+  id: SGR_SERVICE_ID,
+  parent: 'cloud',
+  theme: 'care',
+  icon: '📋',
+  name: 'Skill Gap Review (SGR)',
+  sub: 'Form A1 · verify · schedule · Razorpay fee',
+  unit: 'fee',
+  mrp: SGR_FEE_FALLBACK_PAISE,
+  price: SGR_FEE_FALLBACK_PAISE,
+  cash: false,
+};
+
+function getSgrFeePaise() {
+  const p = Number(findSvcById(SGR_SERVICE_ID)?.price);
+  return p >= 100 ? p : SGR_FEE_FALLBACK_PAISE;
+}
+
 function findSvcById(id) {
+  if (id === SGR_SERVICE_ID) {
+    const fromCatalog = SVCS.find(s => s.id === id) || subByIdIndex[id];
+    return fromCatalog || SGR_SVC;
+  }
   return SVCS.find(s => s.id === id) || subByIdIndex[id] || null;
 }
 
@@ -2207,6 +2231,10 @@ function applyDbCatalog(rows) {
       svc.sub = resolveCatalogSvcSub(row, svc, displayName);
       if (row.price_paise != null) svc.price = row.price_paise;
       if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
+      if (row.service_id === SGR_SERVICE_ID && svc === SGR_SVC) {
+        if (row.service_name) SGR_SVC.name = row.service_name;
+        if (row.sub_service_name) SGR_SVC.sub = row.sub_service_name;
+      }
       if (isActive) svc.top_rated = flag;
       if (row.theme && row.theme !== 'default') {
         const parentId = row.parent_id || svc.parent;
@@ -3451,7 +3479,7 @@ function CategoryListBody({ categoryId, onSelect, onAdmit }) {
       {categoryId === 'cloud' && onAdmit && (
         <button type="button" onClick={onAdmit} style={{ width: '100%', textAlign: 'left', marginBottom: 14, border: '1.5px solid #93C5FD', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', borderRadius: 14, padding: '14px 14px', cursor: 'pointer', fontFamily: FF }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Skill Gap Review (SGR) - Form A1</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginTop: 4 }}>Skill Gap Review (SGR) · ₹500.00</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginTop: 4 }}>Skill Gap Review (SGR) · ₹{fmtRs(getSgrFeePaise())}</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>Verify mobile · book a schedule · Razorpay. A consultant calls you within 72 hours.</div>
         </button>
       )}
@@ -5585,9 +5613,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         silentGeo={silentGeo}
         initialCourse={activeSvc}
         courses={CLOUD_SVCS}
+        sgrFeePaise={getSgrFeePaise()}
         onBack={() => setScreen('cloud-list')}
         addToast={addToast}
-        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, captureFreshGps, SB_KEY }}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
       />
     );
   }
@@ -6928,9 +6957,10 @@ function ServicesScreen() {
         silentGeo={silentGeo}
         initialCourse={activeSvc || detail}
         courses={CLOUD_SVCS}
+        sgrFeePaise={getSgrFeePaise()}
         onBack={() => setCloudAdmit(false)}
         addToast={addToast}
-        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, captureFreshGps, SB_KEY }}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
       />
     );
   }

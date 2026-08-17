@@ -17,7 +17,8 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type, x-admin-pin",
 };
 
-const SGR_FEE_PAISE = 50000;
+const SGR_SERVICE_ID = "cl-sgr";
+const SGR_FEE_FALLBACK_PAISE = 50000;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SB_PUBLISHABLE_KEY") || "";
@@ -33,6 +34,20 @@ function adminSb() {
   return createClient(SUPABASE_URL, SERVICE_KEY);
 }
 
+function fmtRsPaise(paise: number): string {
+  return (paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function getSgrFeePaise(sb: ReturnType<typeof adminSb>): Promise<number> {
+  const { data } = await sb
+    .from("service_pricing")
+    .select("new_amount_paise")
+    .eq("service_id", SGR_SERVICE_ID)
+    .maybeSingle();
+  const p = Number(data?.new_amount_paise);
+  return p >= 100 ? p : SGR_FEE_FALLBACK_PAISE;
+}
+
 function adminPinOk(req: Request): boolean {
   const pin = req.headers.get("x-admin-pin") || "";
   if (!pin || pin.length < 6) return false;
@@ -45,6 +60,50 @@ function adminPinOk(req: Request): boolean {
 
 function digits10(raw: string): string {
   return String(raw || "").replace(/\D/g, "").slice(-10);
+}
+
+function parseIsoDate(dateStr: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || "").trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function ageFromDob(dobStr: string): number | null {
+  const dt = parseIsoDate(dobStr);
+  if (!dt) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dt.getFullYear();
+  const md = today.getMonth() - dt.getMonth();
+  if (md < 0 || (md === 0 && today.getDate() < dt.getDate())) age -= 1;
+  return age >= 5 && age <= 120 ? age : null;
+}
+
+function validateScheduleInput(dateStr: string, timeStr: string): string | null {
+  const dt = parseIsoDate(dateStr);
+  if (!dt) return "Enter a valid schedule date — check day and month";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const max = new Date(today);
+  max.setFullYear(max.getFullYear() + 1);
+  if (dt < today) return "Schedule date cannot be in the past";
+  if (dt > max) return "Schedule date must be within the next 12 months";
+  const tm = /^(\d{2}):(\d{2})$/.exec(String(timeStr || "").trim());
+  if (!tm) return "Pick a valid schedule time";
+  const hh = Number(tm[1]);
+  const mm = Number(tm[2]);
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return "Pick a valid schedule time";
+  if (dt.getTime() === today.getTime()) {
+    const slot = new Date(dt);
+    slot.setHours(hh, mm, 0, 0);
+    if (slot <= new Date()) return "Schedule time must be later today";
+  }
+  return null;
 }
 
 function pendingOf(row: Record<string, unknown>): number {
@@ -134,9 +193,19 @@ Deno.serve(async (req) => {
       if (!lastName) return json({ error: "Last name required" }, 400);
       if (!experience) return json({ error: "Experience required" }, 400);
       if (!dob) return json({ error: "Date of birth required" }, 400);
+      if (!parseIsoDate(dob) || ageFromDob(dob) == null) {
+        return json({ error: "Enter a valid date of birth (age 5–120)" }, 400);
+      }
       if (!address) return json({ error: "Address required" }, 400);
       if (!city) return json({ error: "City required" }, 400);
       if (!state) return json({ error: "State required" }, 400);
+      const scheduleDate = String(body.schedule_date || "").trim();
+      const scheduleTime = String(body.schedule_time || "").trim();
+      if (!scheduleDate || !scheduleTime) return json({ error: "Schedule date and time required" }, 400);
+      const scheduleErr = validateScheduleInput(scheduleDate, scheduleTime);
+      if (scheduleErr) return json({ error: scheduleErr }, 400);
+
+      const sgrFeePaise = await getSgrFeePaise(sb);
 
       const row = {
         mobile: digits10(mobile),
@@ -155,9 +224,9 @@ Deno.serve(async (req) => {
         lng: body.lng != null ? Number(body.lng) : null,
         course_id: String(body.course_id || "").trim() || null,
         course_name: String(body.course_name || "").trim() || null,
-        schedule_date: String(body.schedule_date || "").trim() || null,
-        schedule_time: String(body.schedule_time || "").trim() || null,
-        sgr_fee_paise: SGR_FEE_PAISE,
+        schedule_date: scheduleDate,
+        schedule_time: scheduleTime,
+        sgr_fee_paise: sgrFeePaise,
         consultant_due_at: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
       };
 
@@ -178,19 +247,25 @@ Deno.serve(async (req) => {
         student = data;
       }
 
-      return json({ success: true, student: withPending(student), sgr_fee_paise: SGR_FEE_PAISE });
+      return json({ success: true, student: withPending(student), sgr_fee_paise: sgrFeePaise });
     }
 
     if (action === "confirm_sgr") {
       const studentId = String(body.student_id || "");
       const txnId = String(body.txn_id || "");
       if (!studentId || !txnId) return json({ error: "student_id and txn_id required" }, 400);
-      const paid = await paymentCaptured(sb, txnId, SGR_FEE_PAISE);
-      if (!paid) return json({ error: "Razorpay payment of ₹500.00 not confirmed yet" }, 400);
-
       const { data: student, error: se } = await sb.from("student_cloud").select("*").eq("id", studentId).maybeSingle();
       if (se || !student) return json({ error: "Student not found" }, 404);
-      if (Number(student.sgr_paid_paise || 0) >= SGR_FEE_PAISE) {
+
+      const expectedFee = Number(student.sgr_fee_paise) >= 100
+        ? Number(student.sgr_fee_paise)
+        : await getSgrFeePaise(sb);
+      const paid = await paymentCaptured(sb, txnId, expectedFee);
+      if (!paid) {
+        return json({ error: `Razorpay payment of ₹${fmtRsPaise(expectedFee)} not confirmed yet` }, 400);
+      }
+
+      if (Number(student.sgr_paid_paise || 0) >= expectedFee) {
         return json({
           success: true,
           student: withPending(student),
@@ -201,7 +276,7 @@ Deno.serve(async (req) => {
       const { error: pe } = await sb.from("student_cloud_payments").insert({
         student_id: studentId,
         kind: "sgr",
-        amount_paise: SGR_FEE_PAISE,
+        amount_paise: expectedFee,
         txn_id: txnId,
         status: "captured",
         note: "Skill Gap Review (SGR)",
@@ -209,9 +284,9 @@ Deno.serve(async (req) => {
       });
       if (pe && !/duplicate/i.test(pe.message || "")) throw pe;
 
-      const nextStatus = student.sgr_paid_paise >= SGR_FEE_PAISE ? student.status : "sgr_paid";
+      const nextStatus = student.sgr_paid_paise >= expectedFee ? student.status : "sgr_paid";
       const { data: updated, error } = await sb.from("student_cloud").update({
-        sgr_paid_paise: SGR_FEE_PAISE,
+        sgr_paid_paise: expectedFee,
         sgr_txn_id: txnId,
         sgr_paid_at: new Date().toISOString(),
         status: student.status === "sgr_pending" ? "sgr_paid" : nextStatus,
@@ -276,7 +351,7 @@ Deno.serve(async (req) => {
       const patch: Record<string, unknown> = {};
       if (kind === "sgr") {
         patch.sgr_paid_paise = Number(student.sgr_paid_paise || 0) + amount;
-        if (Number(patch.sgr_paid_paise) >= Number(student.sgr_fee_paise || SGR_FEE_PAISE) && student.status === "sgr_pending") {
+        if (Number(patch.sgr_paid_paise) >= Number(student.sgr_fee_paise || SGR_FEE_FALLBACK_PAISE) && student.status === "sgr_pending") {
           patch.status = "sgr_paid";
           patch.sgr_paid_at = new Date().toISOString();
         }
