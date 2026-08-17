@@ -1,6 +1,6 @@
-/* ScanV Service Worker v7 — precache webp tiles + stale-while-revalidate images */
-const CACHE = 'scanv-v7';
-const IMAGE_CACHE = 'scanv-v7-images';
+/* ScanV Service Worker v8 — precache webp tiles + stale-while-revalidate images */
+const CACHE = 'scanv-v8';
+const IMAGE_CACHE = 'scanv-v8-images';
 
 const PRECACHE_IMAGES = [
   '/home-models/cloud.webp',
@@ -194,6 +194,16 @@ self.addEventListener('fetch', e => {
 
   e.respondWith(
     caches.match(e.request).then(cached => {
+      const isMainJs = /\/static\/js\/main\.[a-f0-9]+\.js$/i.test(new URL(url).pathname);
+      if (isMainJs) {
+        return fetch(e.request).then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return response;
+        }).catch(() => cached);
+      }
       if (cached) return cached;
       return fetch(e.request).then(response => {
         if (!response || response.status !== 200) return response;

@@ -2865,23 +2865,31 @@ const APP_CSS = `
   #root{align-items:center;justify-content:center;background:#e8e6e1}
   .scanv-root{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .scanv-shell{
-    width:calc(100% - 16px) !important;
-    max-width:calc(100% - 16px) !important;
+    width:calc(100% - 24px) !important;
+    max-width:calc(100% - 24px) !important;
     flex:1;
     min-height:0;
     display:flex;
     flex-direction:column;
-    height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
-    max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
-    min-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
-    margin:calc(8px + env(safe-area-inset-top,0px)) auto calc(8px + env(safe-area-inset-bottom,0px)) !important;
+    height:calc(100svh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    max-height:calc(100svh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    min-height:calc(100svh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    margin:calc(12px + env(safe-area-inset-top,0px)) auto calc(12px + env(safe-area-inset-bottom,0px)) !important;
     background:${C.bg};
     overflow:hidden;
-    border-radius:28px;
-    box-shadow:0 6px 32px rgba(0,0,0,0.12);
+    border-radius:32px;
+    clip-path:inset(0 round 32px);
+    box-shadow:0 8px 36px rgba(0,0,0,0.14);
     isolation:isolate;
     transform:translateZ(0);
     -webkit-backface-visibility:hidden;
+  }
+  @supports not (height:100svh){
+    .scanv-shell{
+      height:calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+      max-height:calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+      min-height:calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    }
   }
   @media (min-width:481px){
     .scanv-shell{
@@ -5050,6 +5058,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   })();
 
   const browseWrap = (content, sticky=null) => (
+    <div className="scanv-root">
     <div className="scanv-shell" style={BROWSE_WRAP_SHELL}>
       <div className="scanv-mobile-zoom" style={APP_MAIN}>
         <div style={BROWSE_MAIN_INNER}>
@@ -5064,6 +5073,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         onBookings={goBrowseBookings}
         onProfile={goBrowseProfile}
       />
+    </div>
     </div>
   );
 
@@ -14559,14 +14569,12 @@ export default function App() {
   // BROWSE: Show services without registration wall
   if (state==='browse') return (
     <Boundary><CustomerShell toasts={toasts}>
-    <div className="scanv-root">
     <BrowseFlow
       silentGeo={silentGeo}
       onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='top-rated')setScreen('top-rated');else setScreen('services');}}
       onSignUp={()=>{ setQrPrefill({ geo: silentGeo, dev: silentGeo?.device }); setState('register'); }}
       addToast={addToast}
     />
-    </div>
     </CustomerShell></Boundary>
   );
 
