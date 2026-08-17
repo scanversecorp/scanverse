@@ -1355,7 +1355,16 @@ let subByIdIndex = {};
 function getAllSubSvcs() {
   return Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
 }
+function svcNameAsc(a, b) {
+  return String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' });
+}
+function sortSvcsByName(list) {
+  return (list || []).slice().sort(svcNameAsc);
+}
 function rebuildCatalogIndex() {
+  for (const cfg of Object.values(SUB_CATEGORIES)) {
+    if (Array.isArray(cfg.svcs)) cfg.svcs.sort(svcNameAsc);
+  }
   subByIdIndex = Object.fromEntries(getAllSubSvcs().map(s => [s.id, s]));
 }
 rebuildCatalogIndex();
@@ -2212,6 +2221,7 @@ function applyDbCatalog(rows) {
   }
   syncParentFromPrices(rows);
   rebuildCatalogIndex();
+  SVCS.sort(svcNameAsc);
 }
 
 /** @deprecated alias — use applyDbCatalog */
@@ -2919,6 +2929,7 @@ for (const s of SVCS) {
 for (const id of Object.keys(HOME_CARD_TITLE)) {
   if (SUB_CATEGORIES[id]) SUB_CATEGORIES[id].title = HOME_CARD_TITLE[id];
 }
+SVCS.sort(svcNameAsc);
 
 const SVC_CARD_THEME = {
   legal:    { bgFrom:'#EEF2FF', bgTo:'#E0E7FF', b1:'#818CF8', b2:'#6366F1', glow:'rgba(99,102,241,0.18)', img:'/home-models/legal.png' },
@@ -2954,15 +2965,15 @@ const HOME_CARD_META = {
 function searchAllServices(query) {
   const q = query.trim().toLowerCase();
   const emptySubs = Object.fromEntries(Object.keys(SUB_CATEGORIES).map(k => [k, []]));
-  if (!q) return { categories: SVCS, ...emptySubs };
+  if (!q) return { categories: sortSvcsByName(SVCS), ...emptySubs };
   const inText = (parts) => parts.filter(Boolean).join(' ').toLowerCase().includes(q);
-  const categories = visibleSvcs(SVCS.filter(s => {
+  const categories = sortSvcsByName(visibleSvcs(SVCS.filter(s => {
     const d = SVC_DETAIL[s.id] || {};
     return inText([s.name, s.sub, s.cat, SVC_SHORT[s.id], d.desc, ...(d.features || [])]);
-  }));
+  })));
   const subs = {};
   for (const [id, cfg] of Object.entries(SUB_CATEGORIES)) {
-    subs[id] = visibleSvcs(cfg.svcs.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])])));
+    subs[id] = sortSvcsByName(visibleSvcs(cfg.svcs.filter(s => inText([s.name, s.sub, s.desc, ...(s.features || [])]))));
   }
   return { categories, ...subs };
 }
@@ -3402,7 +3413,7 @@ function CategoryListBody({ categoryId, onSelect }) {
         ))}
       </div>
       {renderThemes.map(theme => {
-        const items = list.filter(s => s.theme === theme);
+        const items = sortSvcsByName(list.filter(s => s.theme === theme));
         if (!items.length) return null;
         const t = cfg.themes[theme] || { label: theme, color: accent, bg: C.surf, tagline: '' };
         return (
@@ -3429,8 +3440,9 @@ function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderC
   const q = query.trim();
   if (!q) return null;
   const subBlocks = Object.entries(SUB_CATEGORIES)
-    .map(([id, cfg]) => ({ id, title: cfg.title, items: searchSubs[id] || [] }))
-    .filter(b => b.items.length > 0);
+    .map(([id, cfg]) => ({ id, title: cfg.title, items: sortSvcsByName(searchSubs[id] || []) }))
+    .filter(b => b.items.length > 0)
+    .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'en', { sensitivity: 'base' }));
   const total = categories.length + subBlocks.reduce((a, b) => a + b.items.length, 0);
   if (!total) {
     return (
@@ -6685,7 +6697,7 @@ function HomeScreen() {
             <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.acc,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>View all</button>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {[...SVCS].sort((a,b)=>(b.household?1:0)-(a.household?1:0)).map((s,i)=>(
+            {sortSvcsByName(SVCS).map((s,i)=>(
               <HomeModelCard key={s.id} svc={s} compact index={i} onClick={()=>{setActiveSvc(s);setScreen(SUB_CATEGORIES[s.id]?'services':'book');}} />
             ))}
           </div>
