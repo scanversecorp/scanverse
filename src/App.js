@@ -3479,7 +3479,6 @@ function CategoryListBody({ categoryId, onSelect, onAdmit }) {
       {categoryId === 'cloud' && onAdmit && (
         <button type="button" onClick={onAdmit} style={{ width: '100%', textAlign: 'left', marginBottom: 14, border: '1.5px solid #93C5FD', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', borderRadius: 14, padding: '14px 14px', cursor: 'pointer', fontFamily: FF }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Skill Gap Review (SGR) - Form A1</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginTop: 4 }}>Skill Gap Review (SGR) · ₹{fmtRs(getSgrFeePaise())}</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>Verify mobile · book a schedule · Razorpay. A consultant calls you within 72 hours.</div>
         </button>
       )}
