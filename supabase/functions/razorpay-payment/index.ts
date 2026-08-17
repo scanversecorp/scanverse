@@ -335,6 +335,19 @@ function paymentLinkReferenceId(txnId: string, amountPaise: number): string {
   return `${txnId}#${amountPaise}`;
 }
 
+/** Legacy SGR admission used SGR-* ids; Razorpay register requires TXN-* prefix. */
+function normalizeTxnId(raw: unknown): string {
+  const txnId = String(raw || "").trim();
+  if (!txnId) return "";
+  if (txnId.startsWith("TXN-")) return txnId;
+  if (txnId.startsWith("SGR-")) return `TXN-${txnId}`;
+  return txnId;
+}
+
+function isValidTxnId(txnId: string): boolean {
+  return txnId.startsWith("TXN-") && txnId.length > 5;
+}
+
 async function listPaymentLinksByReference(
   auth: string,
   referenceId: string,
@@ -417,7 +430,7 @@ async function handleRegister(
   supabase: ReturnType<typeof createClient>,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const txnId = String(body.txn_id || "");
+  let txnId = normalizeTxnId(body.txn_id);
   const amountPaise = Number(body.amount_paise);
   const userId = body.user_id ? String(body.user_id).trim() || null : null;
   const serviceId = body.service_id ? String(body.service_id).trim() || null : null;
@@ -427,7 +440,7 @@ async function handleRegister(
     : inferServicePriceFromTotal(amountPaise);
   const split = calcRouteSplit(servicePricePaise);
 
-  if (!txnId.startsWith("TXN-") || !Number.isFinite(amountPaise) || amountPaise <= 0) {
+  if (!isValidTxnId(txnId) || !Number.isFinite(amountPaise) || amountPaise <= 0) {
     return json({ error: "Invalid txn_id or amount_paise" }, 400);
   }
 
@@ -504,7 +517,7 @@ async function handleCheck(
   supabase: ReturnType<typeof createClient>,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const txnId = String(body.txn_id || "");
+  const txnId = normalizeTxnId(body.txn_id);
   const clientExpectedPaise = body.amount_paise != null
     ? Number(body.amount_paise)
     : null;

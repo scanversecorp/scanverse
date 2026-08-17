@@ -154,6 +154,29 @@ export function StudentCloudAdmitScreen({
     } finally { setLoading(false); }
   };
 
+  const preparePayLink = useCallback(async (tid) => {
+    const pay = await registerPaymentIntent(tid, CLOUD_SGR_FEE_PAISE, null, {
+      serviceId: 'cl-sgr',
+      serviceName: 'Skill Gap Review (SGR)',
+      servicePricePaise: CLOUD_SGR_FEE_PAISE,
+    });
+    if (pay?.txn_id && pay.txn_id !== tid) setTxnId(pay.txn_id);
+    if (pay?.payment_link_url) {
+      setPayUrl(pay.payment_link_url);
+      setErr('');
+      return true;
+    }
+    if (pay?.already_paid) {
+      setPaid(true);
+      setErr('');
+      return true;
+    }
+    const payErr = pay?.error || pay?.razorpay_error || 'Could not prepare Razorpay link';
+    setErr(payErr);
+    addToast?.(payErr, 'error');
+    return false;
+  }, [registerPaymentIntent, addToast]);
+
   const verifyAndSubmit = async () => {
     const code = otpCode.join('');
     if (code.length < 6) return setErr('Enter 6-digit OTP');
@@ -179,17 +202,11 @@ export function StudentCloudAdmitScreen({
       }, { apikey: SB_KEY });
       setOtpVerified(true);
       setStudent(r.student);
-      const tid = `SGR-${Date.now()}`;
+      const tid = `TXN-SGR-${Date.now()}`;
       setTxnId(tid);
-      const pay = await registerPaymentIntent(tid, CLOUD_SGR_FEE_PAISE, null, {
-        serviceId: 'cl-sgr',
-        serviceName: 'Skill Gap Review (SGR)',
-        servicePricePaise: CLOUD_SGR_FEE_PAISE,
-      });
-      if (pay?.payment_link_url) setPayUrl(pay.payment_link_url);
-      else if (pay?.already_paid) setPaid(true);
-      else if (pay?.error) addToast?.(pay.error, 'error');
-      addToast?.('Mobile verified — pay ₹500.00 SGR', 'success');
+      setPayUrl(null);
+      const ok = await preparePayLink(tid);
+      if (ok && !paid) addToast?.('Mobile verified — pay ₹500.00 SGR', 'success');
     } catch (e) {
       setErr(e.message || 'Could not submit form');
     } finally { setLoading(false); }
@@ -317,6 +334,11 @@ export function StudentCloudAdmitScreen({
               <span>I understand that SGR fees is non-refundable</span>
             </label>
             <Btn full onClick={openPay} disabled={!payUrl || loading || !sgrFeeAck}>{payUrl ? 'Pay ₹500.00 with Razorpay →' : 'Preparing Razorpay…'}</Btn>
+            {!payUrl && txnId && !paid && (
+              <Btn v="outline" full onClick={async () => { setLoading(true); await preparePayLink(txnId); setLoading(false); }} disabled={loading} style={{ marginTop: 8 }}>
+                Retry Razorpay link
+              </Btn>
+            )}
             {paid && <div style={{ fontSize: 12, color: C.grn, marginTop: 8, fontWeight: 700 }}>Payment seen — confirming…</div>}
           </div>
         )}
