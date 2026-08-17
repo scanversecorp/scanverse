@@ -17,9 +17,9 @@ export async function searchDirectoryAdmin(
   const status = body.status ? String(body.status) : null;
   const limit = Math.min(Number(body.limit) || 50, 100);
 
-  if (!q || q.length < 2) throw new Error("Query must be at least 2 characters");
+  if (q.length === 1) throw new Error("Query must be at least 2 characters");
 
-  const like = `%${escIlike(q)}%`;
+  const like = q ? `%${escIlike(q)}%` : null;
   const results: Array<Record<string, unknown>> = [];
 
   if (kind === "all" || kind === "users" || kind === "customers") {
@@ -30,17 +30,19 @@ export async function searchDirectoryAdmin(
       .limit(limit)
       .order("created_at", { ascending: false });
     if (status && status !== "all") query = query.eq("status", status);
-    const parts = [
-      `name.ilike.${like}`,
-      `first_name.ilike.${like}`,
-      `last_name.ilike.${like}`,
-      `email.ilike.${like}`,
-      `city.ilike.${like}`,
-    ];
-    if (d.length >= 6) parts.push(`phone.ilike.%${d}%`);
-    else parts.push(`phone.ilike.${like}`);
-    if (q.startsWith("cust_") || q.startsWith("part_")) parts.push(`id.ilike.${like}`);
-    query = query.or(parts.join(","));
+    if (like) {
+      const parts = [
+        `name.ilike.${like}`,
+        `first_name.ilike.${like}`,
+        `last_name.ilike.${like}`,
+        `email.ilike.${like}`,
+        `city.ilike.${like}`,
+      ];
+      if (d.length >= 6) parts.push(`phone.ilike.%${d}%`);
+      else parts.push(`phone.ilike.${like}`);
+      if (q.startsWith("cust_") || q.startsWith("part_")) parts.push(`id.ilike.${like}`);
+      query = query.or(parts.join(","));
+    }
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     for (const p of data || []) {
@@ -64,9 +66,11 @@ export async function searchDirectoryAdmin(
       .limit(limit)
       .order("created_at", { ascending: false });
     if (status && status !== "all") query = query.eq("status", status);
-    query = query.or(
-      `business_name.ilike.${like},contact_name.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},phone.ilike.${like},city.ilike.${like},email.ilike.${like}`,
-    );
+    if (like) {
+      query = query.or(
+        `business_name.ilike.${like},contact_name.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},phone.ilike.${like},city.ilike.${like},email.ilike.${like}`,
+      );
+    }
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     for (const v of data || []) {

@@ -34,7 +34,7 @@
  *   dispatch_detail    — { dispatch_id? | booking_id? }
  *   update_dispatch    — { dispatch_id, patch }
  *   dispatch_control   — { op: create|pause|resume|stop|restart|delete|assign_vendor, dispatch_id?, booking_id?, vendor_id?, force? }
- *   search_directory   — { q, kind?: all|users|vendors, status?, limit? }
+ *   search_directory   — { q?, kind?: all|users|vendors, status?, limit? } omit q to list recent
  *   directory_detail   — { profile_id? | vendor_id? }
  *   update_profile     — { profile_id, patch }
  *   list_vendors_brief — { status?, limit? } active vendors for assign dropdown

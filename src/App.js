@@ -13328,17 +13328,27 @@ function AdminDirectoryTab({ pin }) {
   const [profilePatch, setProfilePatch] = useState({});
   const [vendors, setVendors] = useState([]);
 
-  const search = useCallback(async () => {
-    if (!pin || q.trim().length < 2) return setErr('Enter at least 2 characters');
+  const loadDirectory = useCallback(async (searchQ = '') => {
+    if (!pin) return setErr('Admin PIN required');
+    const trimmed = String(searchQ).trim();
+    if (trimmed.length === 1) return setErr('Enter at least 2 characters to filter');
     setLoading(true); setErr(''); setMsg('');
     try {
-      const { results: data } = await adminHubFetch('search_directory', { q: q.trim(), kind }, pin);
+      const payload = { kind, limit: 100 };
+      if (trimmed) payload.q = trimmed;
+      const { results: data } = await adminHubFetch('search_directory', payload, pin);
       setResults(data || []);
       setSelected(null);
       setDetail(null);
     } catch (e) { setErr(e.message); setResults([]); }
     finally { setLoading(false); }
-  }, [pin, q, kind]);
+  }, [pin, kind]);
+
+  useEffect(() => {
+    if (pin) loadDirectory('');
+  }, [pin, kind, loadDirectory]);
+
+  const search = () => loadDirectory(q);
 
   const loadDetail = useCallback(async (item) => {
     if (!pin || !item) return;
@@ -13438,7 +13448,7 @@ function AdminDirectoryTab({ pin }) {
       <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.gold}44` }}>
         <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Users &amp; Vendors Directory</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
-          All registered customers and partners · bookings · dispatch history · edit / pause / assign vendor.
+          All registered customers and partners load automatically · filter by name, mobile, email, or city · click a row for bookings, dispatch, and edits.
           Bookmark: <code style={{ color: C.acc }}>{adminTabUrl('directory')}</code>
         </div>
       </div>
@@ -13450,11 +13460,14 @@ function AdminDirectoryTab({ pin }) {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-            <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Name, mobile, email, city, business…" style={{ ...S.inp(), flex: '1 1 180px' }} />
-            <Btn onClick={search} disabled={loading}>{loading ? '…' : 'Search'}</Btn>
+            <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Filter by name, mobile, email, city, business…" style={{ ...S.inp(), flex: '1 1 180px' }} />
+            <Btn onClick={search} disabled={loading}>{loading ? '…' : q.trim() ? 'Filter' : 'Refresh'}</Btn>
           </div>
           {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
           {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {!loading && results.length > 0 && (
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>{results.length} record{results.length === 1 ? '' : 's'}{q.trim() ? ` matching “${q.trim()}”` : ' · newest first'}</div>
+          )}
           {results.map(row => (
             <div key={`${row.kind}-${row.id}`} onClick={() => loadDetail(row)} style={{ ...S.card(), marginBottom: 8, padding: 12, cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -13467,7 +13480,7 @@ function AdminDirectoryTab({ pin }) {
               </div>
             </div>
           ))}
-          {!loading && q.length >= 2 && !results.length && <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>No matches</div>}
+          {!loading && !results.length && <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>{q.trim().length >= 2 ? 'No matches' : 'No users or vendors registered yet'}</div>}
         </>
       ) : (
         <>
