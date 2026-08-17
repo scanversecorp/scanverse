@@ -3728,12 +3728,15 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
   );
 }
 
-function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onProfile }) {
+function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onLogin, onProfile, loggedIn }) {
+  const authTab = loggedIn
+    ? { id: 'profile', icon: '👤', label: 'Profile', go: onProfile }
+    : { id: 'login', icon: '🔐', label: 'Login', go: onLogin };
   const tabs = [
     {id:'home', icon:'🏠', label:'Home', go:onHome},
     {id:'top-rated', icon:'⭐', label:'Top Rated', go:onTopRated},
     {id:'bookings', icon:'📅', label:'Bookings', go:onBookings},
-    {id:'profile', icon:'👤', label:'Profile', go:onProfile},
+    authTab,
   ];
   return (
     <div className="scanv-bottom-nav" style={{ flexShrink: 0, background: C.surf, borderTop: BDR, boxShadow: '0 -4px 16px rgba(18,18,18,0.08)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -4460,6 +4463,17 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const autoPayContinueRef = useRef(false);
   const browseScrollRef = useRef(null);
   const browseHomeScrollRef = useRef(null);
+  const [browseAuthed, setBrowseAuthed] = useState(() => !!localStorage.getItem('scanv_uid'));
+
+  useEffect(() => {
+    const uid = localStorage.getItem('scanv_uid');
+    if (!uid) { setBrowseAuthed(false); return; }
+    let cancelled = false;
+    sb().from('profiles').select('first_name').eq('id', uid).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setBrowseAuthed(!!data?.first_name); })
+      .catch(() => { if (!cancelled) setBrowseAuthed(false); });
+    return () => { cancelled = true; };
+  }, [screen]);
 
   useEffect(() => {
     if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop(browseScrollRef.current);
@@ -5049,12 +5063,16 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   };
 
   const guestActiveTab = (() => {
-    if (screen === 'login') return loginIntent === 'home' ? 'home' : (loginIntent || 'bookings');
+    if (screen === 'login') {
+      if (loginIntent === 'bookings') return 'bookings';
+      if (loginIntent === 'profile') return browseAuthed ? 'profile' : 'login';
+      return 'login';
+    }
     if (['detail', 'verify', 'payment', 'schedule'].includes(screen) || screen.endsWith('-list')) return 'home';
     if (screen.startsWith('trust-')) return 'home';
     if (screen === 'services') return 'home';
     if (screen === 'top-rated') return 'top-rated';
-    return navTab;
+    return navTab === 'profile' && !browseAuthed ? 'login' : navTab;
   })();
 
   const browseWrap = (content, sticky=null) => (
@@ -5068,9 +5086,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       </div>
       <GuestBottomNav
         activeTab={guestActiveTab}
+        loggedIn={browseAuthed}
         onHome={goBrowseHome}
         onTopRated={goBrowseTopRated}
         onBookings={goBrowseBookings}
+        onLogin={goBrowseLogin}
         onProfile={goBrowseProfile}
       />
     </div>
@@ -5151,15 +5171,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
-      <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0 }}>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 20, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '18px 20px', color: '#fff', boxShadow: '0 10px 28px rgba(214,58,86,0.28)' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.92, marginBottom: 6 }}>Real people · Real care</div>
-          <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.28, marginBottom: 6, fontFamily: FF }}>Book services with a smile</div>
-          <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.94, lineHeight: 1.45 }}>Happy faces behind every category · verified partners · 25% off · UPI at booking</div>
-        </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, display: 'flex', gap: 10, padding: 0 }}>
-          <Btn v="outline" onClick={goBrowseLogin} sm style={{ flex: 1, boxSizing: 'border-box' }}>Log in</Btn>
-          <Btn onClick={() => onSignUp?.()} sm style={{ flex: 1, boxSizing: 'border-box' }}>Sign up</Btn>
+      <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, borderRadius: 14, background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`, padding: '10px 14px', color: '#fff', boxShadow: '0 6px 20px rgba(214,58,86,0.22)' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a smile</div>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.92, marginTop: 4 }}>Verified partners · 25% off</div>
         </div>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
