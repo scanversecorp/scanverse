@@ -6891,7 +6891,7 @@ function ServicesScreen() {
 
   return (
     <div ref={scrollRef} style={{fontFamily:"'DM Sans',sans-serif"}}>
-      <TopBar title="Home"/>
+      <TopBar />
       <div style={{padding:16}}>
         <div style={{ ...BROWSE_PROMO_BANNER, marginBottom: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
