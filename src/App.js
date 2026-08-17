@@ -3362,6 +3362,9 @@ const BROWSE_HOME_STACK = {
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
 const BROWSE_PROMO_BANNER = {
   ...BROWSE_HOME_STACK_ITEM,
+  width: '86%',
+  maxWidth: 320,
+  margin: '0 auto',
   borderRadius: 14,
   background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,
   padding: '10px 14px',
@@ -5173,9 +5176,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={BROWSE_HOME_TOPBAR}>
-        <ScanVLogoMark size={48} />
-        <div style={BROWSE_LOC_PILL}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
+        <ScanVLogoMark size={LOGO_SIZE.md} />
+        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
