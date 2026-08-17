@@ -411,9 +411,9 @@ export function StudentCloudAdmitScreen({
         {otpVerified && !done && (
           <div style={{ ...S.card(), padding: 16, marginTop: 8 }}>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>Razorpay · we confirm automatically after payment.</div>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
-              <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 3, accentColor: C.acc, flexShrink: 0 }} />
-              <span>I understand that SGR fees is non-refundable</span>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 11, color: C.dim, lineHeight: 1.45 }}>
+              <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 2, accentColor: C.acc, flexShrink: 0 }} />
+              <span>I understand that SGR fees ₹{sgrFeeLabel} is non-refundable</span>
             </label>
             <Btn full onClick={openPay} disabled={!payUrl || loading || !sgrFeeAck}>{payUrl ? 'Pay with Razorpay →' : 'Preparing Razorpay…'}</Btn>
             {!payUrl && txnId && !paid && (
