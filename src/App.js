@@ -3349,8 +3349,37 @@ function captureFreshGps(fallbackGeo = null) {
 }
 
 /** Fixed browse header — shell margin handles safe-area; keep header padding modest */
-const BROWSE_HDR_PAD = '10px';
+const BROWSE_HDR_PAD = '8px';
 const BROWSE_HOME_INSET = 12;
+const BROWSE_HOME_TOPBAR = {
+  flexShrink: 0,
+  background: C.surf,
+  borderBottom: BDR,
+  padding: '4px 12px',
+  paddingTop: BROWSE_HDR_PAD,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  width: '88%',
+  maxWidth: 336,
+  margin: '0 auto',
+  boxSizing: 'border-box',
+};
+const BROWSE_LOC_PILL = {
+  fontSize: 9,
+  fontWeight: 700,
+  color: C.cyan,
+  background: '#dce8f7',
+  padding: '3px 8px',
+  borderRadius: 99,
+  border: BDR,
+  maxWidth: '56%',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  flexShrink: 1,
+};
 const BROWSE_HOME_STACK = {
   display: 'grid',
   gridTemplateColumns: '1fr',
@@ -3362,9 +3391,6 @@ const BROWSE_HOME_STACK = {
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
 const BROWSE_PROMO_BANNER = {
   ...BROWSE_HOME_STACK_ITEM,
-  width: '86%',
-  maxWidth: 320,
-  margin: '0 auto',
   borderRadius: 14,
   background: `linear-gradient(135deg, ${C.acc} 0%, #9f1239 55%, #7c2d12 100%)`,
   padding: '10px 14px',
@@ -5176,9 +5202,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
-        <ScanVLogoMark size={LOGO_SIZE.md} />
-        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+      <div style={BROWSE_HOME_TOPBAR}>
+        <ScanVLogoMark size={48} />
+        <div style={BROWSE_LOC_PILL}>
           📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
         </div>
       </div>
