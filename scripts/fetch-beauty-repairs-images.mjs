@@ -22,7 +22,7 @@ const UNSPLASH = {
   'services/repairs/electrician.png': 'photo-1621905252507-b35492cc74b4',
   'services/repairs/plumber.png': 'photo-1558618666-fcd25c85cd64',
   'services/repairs/carpenter.png': 'photo-1581094794329-c8112a89af12',
-  'services/repairs/ac-service.png': 'photo-1604636559893-a748bfecfa0e',
+  'services/repairs/ac-service.png': 'photo-1545649311-24d0ac00ae82',
   'services/repairs/washing-machine.png': 'photo-1585314293845-4db3b9d0c6e9',
   'services/repairs/ro-purifier.png': 'photo-1669211659110-3f3db4119b65',
   'services/repairs/geyser.png': 'photo-1616996691973-0560486764f7',
