@@ -2865,29 +2865,32 @@ const APP_CSS = `
   #root{align-items:center;justify-content:center;background:#e8e6e1}
   .scanv-root{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .scanv-shell{
-    width:calc(100% - 16px);
-    max-width:calc(100% - 16px);
+    width:calc(100% - 16px) !important;
+    max-width:calc(100% - 16px) !important;
     flex:1;
     min-height:0;
     display:flex;
     flex-direction:column;
-    height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
-    max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
-    min-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
-    margin:calc(8px + env(safe-area-inset-top,0px)) auto calc(8px + env(safe-area-inset-bottom,0px));
+    height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    min-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    margin:calc(8px + env(safe-area-inset-top,0px)) auto calc(8px + env(safe-area-inset-bottom,0px)) !important;
     background:${C.bg};
     overflow:hidden;
     border-radius:28px;
     box-shadow:0 6px 32px rgba(0,0,0,0.12);
+    isolation:isolate;
+    transform:translateZ(0);
+    -webkit-backface-visibility:hidden;
   }
   @media (min-width:481px){
     .scanv-shell{
-      width:100%;
-      max-width:480px;
-      height:100dvh;
-      max-height:100dvh;
-      min-height:100dvh;
-      margin:0 auto;
+      width:100% !important;
+      max-width:480px !important;
+      height:100dvh !important;
+      max-height:100dvh !important;
+      min-height:100dvh !important;
+      margin:0 auto !important;
       border-radius:22px;
       box-shadow:0 8px 40px rgba(0,0,0,0.1);
     }
@@ -2896,7 +2899,7 @@ const APP_CSS = `
   .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
   @media (max-width:480px){
     body{font-size:16px;-webkit-text-size-adjust:100%}
-    .scanv-mobile-zoom{zoom:1.08}
+    .scanv-mobile-zoom{font-size:108%;line-height:1.35}
     .trust-pills-row{gap:4px!important;padding:10px 8px 12px!important}
     .trust-pills-row button{font-size:8px!important;padding:5px 3px!important;line-height:1.3!important}
     .browse-home-stack{gap:12px!important;padding-left:14px!important;padding-right:14px!important}
@@ -3337,8 +3340,8 @@ function captureFreshGps(fallbackGeo = null) {
   });
 }
 
-/** Fixed browse header — sticky breaks on mobile when inner panels scroll */
-const BROWSE_HDR_PAD = 'max(10px, env(safe-area-inset-top, 0px))';
+/** Fixed browse header — shell margin handles safe-area; keep header padding modest */
+const BROWSE_HDR_PAD = '10px';
 const BROWSE_HOME_INSET = 12;
 const BROWSE_HOME_STACK = {
   display: 'grid',
@@ -3349,7 +3352,7 @@ const BROWSE_HOME_STACK = {
   width: '100%',
 };
 const BROWSE_HOME_STACK_ITEM = { width: '100%', boxSizing: 'border-box', margin: 0 };
-/** iPhone-style rounded shell; frame sizing lives in .scanv-shell CSS */
+/** Layout-only shell props — frame size/radius live in .scanv-shell CSS */
 const APP_SHELL = {
   display: 'flex',
   flexDirection: 'column',
@@ -3357,9 +3360,6 @@ const APP_SHELL = {
   overflow: 'hidden',
   boxSizing: 'border-box',
   fontFamily: FF,
-  flex: 1,
-  minHeight: 0,
-  width: '100%',
 };
 /** Full-page admin / desk layouts — sticky header + scrollable body (Safari-safe). */
 const ADMIN_PAGE_SHELL = {
@@ -14201,6 +14201,7 @@ function LegalPage({page}) {
   const pg = pages[page];
   if (!pg) return null;
   return (
+    <div className="scanv-root">
     <div className="scanv-shell" style={APP_SHELL}>
       {/* Header */}
       <div style={{flexShrink:0,background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
@@ -14226,6 +14227,7 @@ function LegalPage({page}) {
         <CopyrightLine style={{ marginTop: 16 }} />
       </div>
       </div>
+    </div>
     </div>
   );
 }
