@@ -3427,7 +3427,7 @@ const TRUST_PILLS_ROW = {
   width: '100%',
   boxSizing: 'border-box',
   margin: 0,
-  padding: '8px 8px 10px',
+  padding: '6px 8px 8px',
   borderTop: BDR,
 };
 const TRUST_PILL = {
@@ -5185,11 +5185,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
           <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
         </div>
-        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxSizing: 'border-box' }}>
-            <span>🔍</span>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box' }} />
-            {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
+        <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>🔍</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13, fontFamily: FF, color: C.txt, boxSizing: 'border-box', padding: 0, lineHeight: 1.3 }} />
+            {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
           </div>
           <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
