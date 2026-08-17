@@ -1835,6 +1835,14 @@ function profileLooksRegistered(p) {
   return !!(p?.first_name?.trim() || p?.name?.trim());
 }
 
+/** True when OTP sign-in created a shell profile (auth trigger) or profile is missing DOB */
+function profileNeedsEnrollment(p) {
+  if (!p?.id) return true;
+  if (!profileLooksRegistered(p)) return true;
+  if (!p.date_of_birth) return true;
+  return false;
+}
+
 const DUPLICATE_PHONE_MSG = 'This number is already registered. Please try login.';
 
 function friendlySignupError(error) {
@@ -4569,6 +4577,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   const [search, setSearch]               = useState('');
   const [waToken, setWaToken]     = useState('');
   const [waChecking, setWaChecking] = useState(false);
+  const [pendingLoginProfile, setPendingLoginProfile] = useState(null);
   const [termsAccepted, setTermsAccepted] = useState(!!localStorage.getItem('scanv_terms_accepted'));
   const acceptTerms = () => { localStorage.setItem('scanv_terms_accepted', new Date().toISOString()); setTermsAccepted(true); };
 
@@ -4831,7 +4840,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       }
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
       let existing = await resolveLoginProfile(mob);
-      if (!existing?.id) throw new Error('No account found. Sign up first or book a service to create your profile.');
+      if (!existing?.id) {
+        existing = {
+          id: customerProfileId(mob),
+          phone: mob,
+          email: profileAuthEmail(mob),
+        };
+      }
       if (!profileLooksRegistered(existing)) {
         const patch = {
           email: existing.email || profileAuthEmail(mob),
@@ -4855,7 +4870,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         if (loginGeo.city) geoUpdates.city = loginGeo.city;
         if (loginGeo.pincode) geoUpdates.pincode = loginGeo.pincode;
       }
-      const {data:prof} = await sb().from('profiles').update(geoUpdates).eq('id', existing.id).select().single();
+      const { data: prof } = await sb().from('profiles').update(geoUpdates).eq('id', existing.id).select().single();
+      const merged = prof || { ...existing, ...geoUpdates };
       if (loginGeo?.lat != null && loginGeo?.lng != null) {
         await sb().from('user_locations').insert({
           user_id: existing.id,
@@ -4870,10 +4886,24 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           consent_at: new Date().toISOString(),
         }).then(() => {}).catch(() => {});
       }
-      localStorage.setItem('scanv_uid', existing.id);
-      const welcomeName = (existing.first_name || existing.name || '').trim() || 'there';
+      if (profileNeedsEnrollment(merged)) {
+        setPendingLoginProfile(merged);
+        setFirstName(merged.first_name || '');
+        setLastName(merged.last_name || '');
+        setDateOfBirth(merged.date_of_birth || '');
+        setAddress(merged.address || loginGeo?.address || silentGeo?.address || '');
+        setVillage(merged.village || loginGeo?.village || silentGeo?.village || '');
+        setCity(merged.city || loginGeo?.city || silentGeo?.city || '');
+        setPincode(merged.pincode || loginGeo?.pincode || silentGeo?.pincode || '');
+        resetOtpFlow();
+        setScreen('complete-profile');
+        addToast?.('Mobile verified — complete your profile to continue', 'success');
+        return;
+      }
+      localStorage.setItem('scanv_uid', merged.id);
+      const welcomeName = (merged.first_name || merged.name || '').trim() || 'there';
       addToast?.(`Welcome back, ${welcomeName}!`, 'success');
-      onRegistered(prof || { ...existing, ...geoUpdates }, null, loginIntent);
+      onRegistered(merged, null, loginIntent);
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
   };
@@ -4893,6 +4923,89 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         : (resend ? `OTP resent to +91 ${mobile}` : `OTP sent to +91 ${mobile}`), 'success');
     } catch(e) { setErr(e.message||'Could not send OTP'); if (!resend) resetOtpFlow(); }
     finally { setLoading(false); }
+  };
+
+  const completeLoginProfile = async () => {
+    if (!pendingLoginProfile?.id) return setErr('Session expired — sign in again');
+    if (!firstName.trim()) return setErr('Enter your first name');
+    if (!lastName.trim()) return setErr('Enter your last name');
+    if (!dateOfBirth || !ageFromDob(dateOfBirth)) return setErr('Enter a valid date of birth (age 5–120)');
+    if (!address.trim()) return setErr('Enter your address');
+    if (!city.trim()) return setErr('Enter your city');
+    if (!pincode.trim() || pincode.length < 6) return setErr('Enter valid 6-digit PIN code');
+    setLoading(true); setErr('');
+    try {
+      const mob = pendingLoginProfile.phone || normalizeMobileE164(mobile);
+      await ensureProfileAuthSession(mob);
+      const dev = detectDevice();
+      const ipAddr = await getIP();
+      const profileFields = {
+        id: pendingLoginProfile.id,
+        email: pendingLoginProfile.email || profileAuthEmail(mob),
+        name: `${firstName} ${lastName}`.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        phone: mob,
+        address: address.trim(),
+        village: village.trim(),
+        city: city.trim(),
+        pincode: pincode.trim(),
+        date_of_birth: dateOfBirth,
+        age: ageFromDob(dateOfBirth),
+        ip_address: ipAddr,
+        last_lat: pendingLoginProfile.last_lat ?? silentGeo?.lat ?? null,
+        last_lng: pendingLoginProfile.last_lng ?? silentGeo?.lng ?? null,
+        device_type: dev.deviceType,
+        os_name: dev.osName,
+        browser: dev.browser,
+        timezone: dev.timezone,
+        language: dev.language,
+        mobile_verified: true,
+        mobile_verified_at: new Date().toISOString(),
+        role: 'customer',
+        status: 'active',
+        avatar: '👤',
+      };
+      const location = profileFields.last_lat != null && profileFields.last_lng != null ? {
+        lat: profileFields.last_lat,
+        lng: profileFields.last_lng,
+        address: address.trim(),
+        village: village.trim(),
+        city: city.trim(),
+        pincode: pincode.trim(),
+        source: 'gps',
+      } : null;
+      let profile;
+      try {
+        profile = await saveCustomerProfileViaEdge(mob, profileFields, location);
+      } catch (edgeErr) {
+        profile = await upsertCustomerProfile({
+          id: pendingLoginProfile.id,
+          mob,
+          firstName,
+          lastName,
+          address,
+          village,
+          city,
+          pincode,
+          email: profileFields.email,
+          lastLat: profileFields.last_lat,
+          lastLng: profileFields.last_lng,
+          dev,
+          ip: ipAddr,
+          dateOfBirth,
+          allowRegistered: true,
+        });
+      }
+      setPendingLoginProfile(null);
+      localStorage.setItem('scanv_uid', profile.id);
+      addToast?.(`Welcome, ${profile.first_name}!`, 'success');
+      onRegistered(profile, null, loginIntent);
+    } catch (e) {
+      setErr(friendlySignupError(e).message || 'Could not save profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendLoginWA = async () => {
@@ -5187,6 +5300,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
   };
 
   const guestActiveTab = (() => {
+    if (screen === 'complete-profile') return loginIntent === 'bookings' ? 'bookings' : (loginIntent === 'profile' ? 'profile' : 'login');
     if (screen === 'login') {
       if (loginIntent === 'bookings') return 'bookings';
       if (loginIntent === 'profile') return browseAuthed ? 'profile' : 'login';
@@ -5658,6 +5772,40 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');resetOtpFlow();sendOTP();}}/>
           )}
+        </div>
+      </>
+    );
+  }
+
+  // -- COMPLETE PROFILE: after OTP login when auth trigger created empty shell ----
+  if (screen === 'complete-profile') {
+    const mob10 = (pendingLoginProfile?.phone || mobile || '').replace(/\D/g, '').slice(-10);
+    return browseWrap(
+      <>
+        <BrowseFixedHeader>
+          <button type="button" aria-label="Go back" onClick={() => { setPendingLoginProfile(null); setScreen('login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Complete your profile</div>
+        </BrowseFixedHeader>
+        <div style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
+          {err && <div style={S.err}>{err}</div>}
+          <div style={{ color: C.sub, fontSize: 12, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
+            Mobile +91 {mob10 || '—'} verified. Add your name, date of birth, and address to finish sign-in.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
+            <Field label="First name" req><input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()} /></Field>
+            <Field label="Last name" req><input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Sharma" style={S.inp()} /></Field>
+          </div>
+          <Field label="Date of birth" req>
+            <input type="date" min={minDobInput()} max={maxDobInput()} value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={S.inp()} />
+          </Field>
+          <Field label="Address" req note="House no, street, area">
+            <input value={address} {...browseBind('address', e => setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')} />
+          </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
+            <Field label="City" req><input value={city} {...browseBind('city', e => setCity(e.target.value))} placeholder="Your city" style={inpStyle('city')} /></Field>
+            <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6)))} placeholder="411018" style={inpStyle('pincode')} /></Field>
+          </div>
+          <Btn full onClick={completeLoginProfile} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : 'Save & continue →'}</Btn>
         </div>
       </>
     );
