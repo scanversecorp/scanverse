@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Beauty & Repairs tiles — Unsplash (verified) + curated copies from existing ScanV assets. */
+/** Beauty & Repairs tiles — verified Unsplash stock (no cross-category copies). */
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
@@ -12,24 +12,21 @@ const UNSPLASH = {
   'services/beauty/haircut-women.png': 'photo-1560066984-138dadb4c035',
   'services/beauty/haircut-men.png': 'photo-1507003211169-0a1dd7228f2d',
   'services/beauty/beard-grooming.png': 'photo-1507003211169-0a1dd7228f2d',
-  'services/beauty/mens-facial.png': 'photo-1522335789203-aabd1fc54bc9',
+  'services/beauty/mens-facial.png': 'photo-1507679799987-c73779587ccf',
   'services/beauty/makeup.png': 'photo-1562322140-8baeececf3df',
   'services/beauty/threading.png': 'photo-1562322140-8baeececf3df',
+  'services/beauty/mani-pedi.png': 'photo-1600880292203-757bb62b4baf',
+  'services/beauty/facial.png': 'photo-1556228720-195a672e8a03',
+  'services/beauty/massage.png': 'photo-1540555700478-4be289fbecef',
+  'services/beauty/mehendi.png': 'photo-1595515106969-1ce29566ff1c',
   'services/repairs/electrician.png': 'photo-1621905252507-b35492cc74b4',
   'services/repairs/plumber.png': 'photo-1558618666-fcd25c85cd64',
   'services/repairs/carpenter.png': 'photo-1581094794329-c8112a89af12',
-};
-
-const COPY_FROM = {
-  'services/beauty/mani-pedi.png': 'services/health/pharmacy.png',
-  'services/beauty/facial.png': 'services/health/checkup.png',
-  'services/beauty/massage.png': 'services/health/elder.png',
-  'services/beauty/mehendi.png': 'services/food/festival.png',
-  'services/repairs/ac-service.png': 'services/fan-clean.png',
-  'services/repairs/washing-machine.png': 'services/delivery/parcel.png',
-  'services/repairs/ro-purifier.png': 'services/health/lab.png',
-  'services/repairs/geyser.png': 'services/kitchen-deep.png',
-  'services/repairs/appliance-mount.png': 'services/four-wheeler/detailing.png',
+  'services/repairs/ac-service.png': 'photo-1604636559893-a748bfecfa0e',
+  'services/repairs/washing-machine.png': 'photo-1585314293845-4db3b9d0c6e9',
+  'services/repairs/ro-purifier.png': 'photo-1669211659110-3f3db4119b65',
+  'services/repairs/geyser.png': 'photo-1616996691973-0560486764f7',
+  'services/repairs/appliance-mount.png': 'photo-1521607630287-ee2e81ad3ced',
 };
 
 async function downloadUnsplash(rel, photoId) {
@@ -43,36 +40,17 @@ async function downloadUnsplash(rel, photoId) {
   console.log(`✓ ${rel} (unsplash)`);
 }
 
-async function copyLocal(rel, srcRel, { position = 'centre', modulate } = {}) {
-  const src = path.join(PUBLIC, srcRel);
-  const abs = path.join(PUBLIC, rel);
-  if (!fs.existsSync(src)) throw new Error(`Missing source ${srcRel}`);
-  fs.mkdirSync(path.dirname(abs), { recursive: true });
-  let pipe = sharp(src).rotate().resize(900, 600, { fit: 'cover', position });
-  if (modulate) pipe = pipe.modulate(modulate);
-  await pipe.png().toFile(abs);
-  console.log(`✓ ${rel} (from ${srcRel})`);
-}
-
 async function main() {
   for (const [rel, id] of Object.entries(UNSPLASH)) {
     await downloadUnsplash(rel, id);
   }
-  if (UNSPLASH['services/beauty/beard-grooming.png']) {
-    const beardPath = path.join(PUBLIC, 'services/beauty/beard-grooming.png');
-    const tmp = `${beardPath}.tmp.png`;
-    await sharp(beardPath)
-      .extract({ left: 120, top: 0, width: 660, height: 600 })
-      .toFile(tmp);
-    fs.renameSync(tmp, beardPath);
-  }
-  for (const [rel, src] of Object.entries(COPY_FROM)) {
-    await copyLocal(rel, src, {
-      position: rel.includes('geyser') ? 'right' : 'centre',
-      modulate: rel.includes('repairs') ? { saturation: 1.05 } : undefined,
-    });
-  }
-  console.log(`Done ${Object.keys(UNSPLASH).length + Object.keys(COPY_FROM).length} tiles`);
+  const beardPath = path.join(PUBLIC, 'services/beauty/beard-grooming.png');
+  const tmp = `${beardPath}.tmp.png`;
+  await sharp(beardPath)
+    .extract({ left: 120, top: 0, width: 660, height: 600 })
+    .toFile(tmp);
+  fs.renameSync(tmp, beardPath);
+  console.log(`Done ${Object.keys(UNSPLASH).length} tiles`);
 }
 
 main().catch((e) => {

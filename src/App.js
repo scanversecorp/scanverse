@@ -1257,7 +1257,7 @@ const BEAUTY_SVCS = [
   { id:'bt-facial', parent:'beauty', theme:'occasion', icon:'🧖‍♀️', img:'/services/beauty/facial.png', name:'Facial & Cleanup', sub:'Deep cleanse · glow · acne-safe · 45 min', unit:'visit', mrp:69900, price:discPaise(69900), cash:false,
     desc:'ScanV facial at home — deep cleanse, steam, extraction, and mask tailored to skin type with dermatologist-approved products.',
     features:['Skin-type assessment','Steam & extraction','Glow mask finish','Acne-safe options','Monthly plan'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'2,600+' },
-  { id:'bt-massage', parent:'beauty', theme:'men', icon:'💆', img:'/services/beauty/massage.png', name:'Head Massage (Champi)', sub:'Oil champi · stress relief · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
+  { id:'bt-massage', parent:'beauty', theme:'salon', icon:'💆‍♀️', img:'/services/beauty/massage.png', name:'Head Massage (Champi)', sub:'Oil champi · stress relief · 30 min', unit:'visit', mrp:49900, price:discPaise(49900), cash:false,
     desc:'ScanV head massage — traditional oil champi for stress relief and hair nourishment from trained therapists at your home.',
     features:['Ayurvedic oil option','30-min session','Neck & shoulder add-on','Female therapists available','Evening slots'], turnaround:'Same day', rating:'4.8 ⭐', bookings:'3,200+' },
   { id:'bt-mehendi', parent:'beauty', theme:'occasion', icon:'🌸', img:'/services/beauty/mehendi.png', name:'Mehendi at Home', sub:'Bridal · party · Arabic · cone art', unit:'visit', mrp:89900, price:discPaise(89900), cash:false,
@@ -6614,6 +6614,10 @@ function ServicesScreen() {
     <div ref={scrollRef} style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="Home"/>
       <div style={{padding:16}}>
+        <div style={{ ...BROWSE_PROMO_BANNER, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
+          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
+        </div>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
           <span>🔍</span>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{border:'none',outline:'none',background:'transparent',color:C.txt,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}/>
