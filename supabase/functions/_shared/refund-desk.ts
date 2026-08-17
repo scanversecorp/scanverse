@@ -3,8 +3,8 @@
  *
  * Flow:
  *   refund_pending → pending_approval (line 1)
- *   pending_approval → approved | rejected (line 2 OTP on REFUND_APPROVAL_MOBILE)
- *   approved → processing (issue_razorpay_refund or manual)
+ *   pending_approval → processing | approved | rejected (line 2 OTP; Razorpay auto on approve)
+ *   approved → processing (manual retry or Vyapar/UPI)
  *   processing → completed
  */
 
@@ -381,7 +381,7 @@ export async function refundApprovalConfirmDesk(
     return json({ success: true, decision: "reject", cancellation: data });
   }
 
-  const { data, error } = await sb
+  const { data: approvedRow, error: approveErr } = await sb
     .from("booking_cancellations")
     .update({
       refund_status: "approved",
@@ -391,9 +391,38 @@ export async function refundApprovalConfirmDesk(
     .eq("id", cancellationId)
     .select()
     .single();
-  if (error) return json({ error: error.message }, 500);
+  if (approveErr) return json({ error: approveErr.message }, 500);
 
-  return json({ success: true, decision: "approve", cancellation: data });
+  const auto = await executeRazorpayRefundForCancellation(
+    sb,
+    approvedRow,
+    approverLabel,
+  );
+
+  if (auto.success && auto.cancellation) {
+    return json({
+      success: true,
+      decision: "approve",
+      cancellation: auto.cancellation,
+      auto_refund: {
+        attempted: true,
+        success: true,
+        razorpay_refund_id: auto.razorpay_refund_id,
+      },
+    });
+  }
+
+  return json({
+    success: true,
+    decision: "approve",
+    cancellation: approvedRow,
+    auto_refund: {
+      attempted: auto.attempted,
+      success: false,
+      manual_required: auto.manual_required || false,
+      error: auto.error || null,
+    },
+  });
 }
 
 async function createRazorpayRefund(
@@ -427,6 +456,103 @@ async function createRazorpayRefund(
   }
 }
 
+type CancelRecord = Record<string, unknown>;
+
+type RazorpayRefundAttempt = {
+  attempted: boolean;
+  success: boolean;
+  manual_required?: boolean;
+  error?: string;
+  razorpay_refund_id?: string;
+  cancellation?: CancelRecord;
+};
+
+async function executeRazorpayRefundForCancellation(
+  sb: SupabaseClient,
+  row: CancelRecord,
+  actor: string,
+): Promise<RazorpayRefundAttempt> {
+  const cancellationId = String(row.id || "");
+  if (row.razorpay_refund_id) {
+    return {
+      attempted: false,
+      success: true,
+      razorpay_refund_id: String(row.razorpay_refund_id),
+      cancellation: row,
+    };
+  }
+
+  const txnId = String(row.txn_id || "");
+  const { data: intent } = txnId
+    ? await sb.from("payment_intents").select(
+      "razorpay_payment_id, verified_via, status",
+    ).eq("txn_id", txnId).maybeSingle()
+    : { data: null };
+
+  const paymentId = String(intent?.razorpay_payment_id || "");
+  const via = String(intent?.verified_via || "").toLowerCase();
+  if (!paymentId || via === "vyapar_webhook") {
+    return {
+      attempted: false,
+      success: false,
+      manual_required: true,
+      error: "No Razorpay payment on file — mark processing manually after UPI/bank refund",
+    };
+  }
+
+  const refundPaise = Number(row.refund_paise) || 0;
+  if (refundPaise <= 0) {
+    return {
+      attempted: false,
+      success: false,
+      error: "Refund amount is zero",
+    };
+  }
+
+  const result = await createRazorpayRefund(paymentId, refundPaise, {
+    booking_id: String(row.booking_id),
+    txn_id: txnId,
+    cancellation_id: cancellationId,
+  });
+
+  if (!result.ok) {
+    return {
+      attempted: true,
+      success: false,
+      error: result.error || "Razorpay refund failed",
+    };
+  }
+
+  const refundId = String(result.refund?.id || "");
+  const note = `Razorpay refund ${refundId} · ₹${(refundPaise / 100).toFixed(2)} (auto after owner OTP)`;
+
+  const { data, error } = await sb
+    .from("booking_cancellations")
+    .update({
+      refund_status: "processing",
+      razorpay_refund_id: refundId || null,
+      process_note: note,
+      processed_by: actor,
+    })
+    .eq("id", cancellationId)
+    .select()
+    .single();
+  if (error) {
+    return {
+      attempted: true,
+      success: false,
+      error: error.message,
+    };
+  }
+
+  return {
+    attempted: true,
+    success: true,
+    razorpay_refund_id: refundId,
+    cancellation: data,
+  };
+}
+
 export async function issueRazorpayRefundDesk(
   sb: SupabaseClient,
   body: Record<string, unknown>,
@@ -453,54 +579,17 @@ export async function issueRazorpayRefundDesk(
     });
   }
 
-  const txnId = String(row.txn_id || "");
-  const { data: intent } = txnId
-    ? await sb.from("payment_intents").select(
-      "razorpay_payment_id, verified_via, status",
-    ).eq("txn_id", txnId).maybeSingle()
-    : { data: null };
-
-  const paymentId = String(intent?.razorpay_payment_id || "");
-  const via = String(intent?.verified_via || "").toLowerCase();
-  if (!paymentId || via === "vyapar_webhook") {
+  const auto = await executeRazorpayRefundForCancellation(sb, row, actor);
+  if (auto.success && auto.cancellation) {
     return json({
-      error: "No Razorpay payment on file — mark processing manually after UPI/bank refund",
-      manual_required: true,
-    }, 400);
+      success: true,
+      razorpay_refund_id: auto.razorpay_refund_id,
+      cancellation: auto.cancellation,
+    });
   }
-
-  const refundPaise = Number(row.refund_paise) || 0;
-  if (refundPaise <= 0) return json({ error: "Refund amount is zero" }, 400);
-
-  const result = await createRazorpayRefund(paymentId, refundPaise, {
-    booking_id: String(row.booking_id),
-    txn_id: txnId,
-    cancellation_id: cancellationId,
-  });
-
-  if (!result.ok) {
-    return json({ error: result.error || "Razorpay refund failed" }, 502);
-  }
-
-  const refundId = String(result.refund?.id || "");
-  const note = `Razorpay refund ${refundId} · ₹${(refundPaise / 100).toFixed(2)}`;
-
-  const { data, error } = await sb
-    .from("booking_cancellations")
-    .update({
-      refund_status: "processing",
-      razorpay_refund_id: refundId || null,
-      process_note: note,
-      processed_by: actor,
-    })
-    .eq("id", cancellationId)
-    .select()
-    .single();
-  if (error) return json({ error: error.message }, 500);
 
   return json({
-    success: true,
-    razorpay_refund_id: refundId,
-    cancellation: data,
-  });
+    error: auto.error || "Razorpay refund failed",
+    manual_required: auto.manual_required || false,
+  }, auto.manual_required ? 400 : 502);
 }

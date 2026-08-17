@@ -11299,13 +11299,26 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
     if (decision === 'reject' && !note) { setErr('Add a rejection note'); return; }
     setBusyId(row.id); setErr('');
     try {
-      await fetchFn('refund_approval_confirm', {
+      const data = await fetchFn('refund_approval_confirm', {
         cancellation_id: row.id,
         otp,
         decision,
         ...(note ? { process_note: note } : {}),
       }, pin);
-      setMsg(decision === 'approve' ? 'Second-line approval recorded' : 'Refund rejected at approval');
+      if (decision === 'approve') {
+        const ar = data.auto_refund;
+        if (ar?.success && ar.razorpay_refund_id) {
+          setMsg(`Approved · Razorpay refund auto-issued: ${ar.razorpay_refund_id}`);
+        } else if (ar?.manual_required) {
+          setMsg('Approved · no Razorpay pay ID — use Mark manual processing');
+        } else if (ar?.error) {
+          setMsg(`Approved · auto-refund failed: ${ar.error} — retry Issue Razorpay refund`);
+        } else {
+          setMsg('Second-line approval recorded');
+        }
+      } else {
+        setMsg('Refund rejected at approval');
+      }
       setApprovalOtps(n => ({ ...n, [row.id]: '' }));
       setNotes(n => ({ ...n, [row.id]: '' }));
       load();
@@ -11354,7 +11367,7 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
         <div>
           <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{title}</div>
           <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
-            Line 1: submit for approval · Line 2: OTP on {approverMasked || '******0288'} · then Razorpay refund
+            Line 1: submit for approval · Line 2: OTP on {approverMasked || '******0288'} · Razorpay refund auto on approve
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -11429,10 +11442,12 @@ function RefundDeskPanel({ fetchFn, pin, title = 'Pending refunds' }) {
 
             {st === 'approved' && (
               <>
-                <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>Approved — issue Razorpay refund or mark manual processing for Vyapar/UPI.</div>
+                <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>
+                  Approved — auto-refund did not run (Vyapar/UPI or Razorpay error). Retry below or mark manual processing.
+                </div>
                 <input value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} placeholder="Manual processing note (non-Razorpay)" style={{ ...S.inp(), marginBottom: 8, fontSize: 12 }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <Btn sm v="primary" disabled={busyId === row.id} onClick={() => issueRazorpay(row)}>Issue Razorpay refund</Btn>
+                  <Btn sm v="primary" disabled={busyId === row.id} onClick={() => issueRazorpay(row)}>Retry Razorpay refund</Btn>
                   <Btn sm v="outline" disabled={busyId === row.id} onClick={() => act(row, 'processing', { process_note: notes[row.id] || 'Manual refund in progress' })}>Mark manual processing</Btn>
                 </div>
               </>
