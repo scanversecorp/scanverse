@@ -69,6 +69,7 @@ export function StudentCloudAdmitScreen({
   const [doneMsg, setDoneMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [sgrFeeAck, setSgrFeeAck] = useState(false);
   const [err, setErr] = useState('');
 
   const courseName = useMemo(
@@ -195,6 +196,7 @@ export function StudentCloudAdmitScreen({
   };
 
   const openPay = () => {
+    if (!sgrFeeAck) { addToast?.('Please confirm SGR fee is non-refundable', 'error'); return; }
     if (!payUrl) { addToast?.('Razorpay link not ready — wait a moment', 'error'); return; }
     window.open(payUrl, '_blank', 'noopener,noreferrer');
   };
@@ -240,7 +242,7 @@ export function StudentCloudAdmitScreen({
     <>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22 }}>←</button>
-        <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Student admission</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Skill Gap Review (SGR) - Form A1</div>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px 28px' }}>
         {err && <div style={S.err}>{err}</div>}
@@ -266,8 +268,7 @@ export function StudentCloudAdmitScreen({
           </div>
         </Field>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>Address (GPS auto-fill, editable)</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
           <button type="button" onClick={fillGps} disabled={gpsBusy || otpVerified} style={{ background: 'none', border: `1.5px solid ${C.acc}`, color: C.acc, borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>{gpsBusy ? 'Locating…' : '📍 Use GPS'}</button>
         </div>
         <Field label="Address" req><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House, street, area" style={S.inp()} disabled={otpVerified} /></Field>
@@ -311,7 +312,11 @@ export function StudentCloudAdmitScreen({
             <div style={{ fontWeight: 800, marginBottom: 6 }}>Pay Skill Gap Review (SGR)</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: C.acc, marginBottom: 8 }}>₹{fmtRs(CLOUD_SGR_FEE_PAISE)}</div>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>Razorpay · we confirm automatically after payment.</div>
-            <Btn full onClick={openPay} disabled={!payUrl || loading}>{payUrl ? 'Pay ₹500.00 with Razorpay →' : 'Preparing Razorpay…'}</Btn>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
+              <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 3, accentColor: C.acc, flexShrink: 0 }} />
+              <span>I understand that SGR fees is non-refundable</span>
+            </label>
+            <Btn full onClick={openPay} disabled={!payUrl || loading || !sgrFeeAck}>{payUrl ? 'Pay ₹500.00 with Razorpay →' : 'Preparing Razorpay…'}</Btn>
             {paid && <div style={{ fontSize: 12, color: C.grn, marginTop: 8, fontWeight: 700 }}>Payment seen — confirming…</div>}
           </div>
         )}

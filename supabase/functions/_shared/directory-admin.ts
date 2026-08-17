@@ -207,6 +207,129 @@ export async function updateProfileAdmin(
   return data;
 }
 
+const PROFILE_LIFECYCLE = new Set(["active", "paused"]);
+
+function digits10(value: unknown): string {
+  return String(value || "").replace(/\D/g, "").slice(-10);
+}
+
+function profileAuthEmailsFor(profile: Record<string, unknown>): string[] {
+  const emails = new Set<string>();
+  const d10 = digits10(profile.phone) || (String(profile.id || "").startsWith("cust_")
+    ? digits10(String(profile.id).slice(5))
+    : "");
+  if (d10.length === 10) {
+    emails.add(`${d10}@scanv.app`);
+    emails.add(`91${d10}@scanv.app`);
+    emails.add(`+91${d10}@scanv.app`);
+  }
+  if (profile.email) emails.add(String(profile.email).toLowerCase());
+  return [...emails];
+}
+
+async function deleteAuthUsersByEmail(
+  sb: ReturnType<typeof createClient>,
+  emails: string[],
+) {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const deleted: string[] = [];
+  for (const email of emails) {
+    const target = email.toLowerCase();
+    let userId: string | null = null;
+    if (url && key) {
+      const res = await fetch(
+        `${url}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=50`,
+        { headers: { Authorization: `Bearer ${key}`, apikey: key } },
+      );
+      if (res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        const users = (payload as { users?: Array<{ id: string; email?: string }> }).users || [];
+        const match = users.find((u) => (u.email || "").toLowerCase() === target);
+        if (match?.id) userId = match.id;
+      }
+    }
+    if (!userId) {
+      for (let page = 1; page <= 5; page++) {
+        const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error) break;
+        const match = (data.users || []).find((u) => (u.email || "").toLowerCase() === target);
+        if (match?.id) { userId = match.id; break; }
+        if (!data.users?.length || data.users.length < 1000) break;
+      }
+    }
+    if (!userId) continue;
+    const { error } = await sb.auth.admin.deleteUser(userId);
+    if (!error) deleted.push(email);
+  }
+  return deleted;
+}
+
+export async function setProfileStatusAdmin(
+  sb: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+) {
+  const profileId = String(body.profile_id || "").trim();
+  const status = String(body.status || "").trim().toLowerCase();
+  if (!profileId) throw new Error("profile_id required");
+  if (!PROFILE_LIFECYCLE.has(status)) throw new Error("status must be active or paused");
+
+  const { data: existing, error: loadErr } = await sb
+    .from("profiles")
+    .select("id, role, status")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (loadErr) throw new Error(loadErr.message);
+  if (!existing) throw new Error("Profile not found");
+  if (existing.role === "admin") throw new Error("Cannot change status of an admin profile");
+
+  const { data, error } = await sb
+    .from("profiles")
+    .update({ status })
+    .eq("id", profileId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteProfileAdmin(
+  sb: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+) {
+  const profileId = String(body.profile_id || "").trim();
+  if (!profileId) throw new Error("profile_id required");
+
+  const { data: profile, error: loadErr } = await sb
+    .from("profiles")
+    .select("id, role, phone, email")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (loadErr) throw new Error(loadErr.message);
+  if (!profile) throw new Error("Profile not found");
+  if (profile.role === "admin") throw new Error("Cannot delete an admin profile");
+
+  const d10 = digits10(profile.phone) || (profileId.startsWith("cust_") ? digits10(profileId.slice(5)) : "");
+  const mobiles = d10.length === 10
+    ? [...new Set([`+91${d10}`, `91${d10}`, d10, profile.phone].filter(Boolean))]
+    : [profile.phone].filter(Boolean);
+
+  if (mobiles.length) {
+    await sb.from("wa_verifications").delete().in("mobile", mobiles);
+  }
+  if (d10.length === 10) {
+    await sb.from("student_cloud").delete().eq("mobile_e164", `+91${d10}`);
+    await sb.from("student_cloud").delete().eq("mobile", d10);
+  }
+  await sb.from("user_locations").delete().eq("user_id", profileId);
+
+  const { error: delErr } = await sb.from("profiles").delete().eq("id", profileId);
+  if (delErr) throw new Error(delErr.message);
+
+  const authDeleted = await deleteAuthUsersByEmail(sb, profileAuthEmailsFor(profile));
+  return { deleted: true, profile_id: profileId, auth_deleted: authDeleted.length };
+}
+
 export async function listVendorsBriefAdmin(
   sb: ReturnType<typeof createClient>,
   body: Record<string, unknown>,

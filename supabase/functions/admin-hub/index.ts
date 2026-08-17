@@ -37,6 +37,8 @@
  *   search_directory   — { q?, kind?: all|users|vendors, status?, limit? } omit q to list recent
  *   directory_detail   — { profile_id? | vendor_id? }
  *   update_profile     — { profile_id, patch }
+ *   set_profile_status — { profile_id, status: active|paused }
+ *   delete_profile     — { profile_id } removes profile + auth user so they can re-register
  *   list_vendors_brief — { status?, limit? } active vendors for assign dropdown
  *   get_iam_catalog — roles, permissions, PIN→role map
  *   list_staff_users — staff IAM registry
@@ -63,9 +65,11 @@ import {
   updateDispatchAdmin,
 } from "../_shared/dispatch-admin.ts";
 import {
+  deleteProfileAdmin,
   directoryDetailAdmin,
   listVendorsBriefAdmin,
   searchDirectoryAdmin,
+  setProfileStatusAdmin,
   updateProfileAdmin,
 } from "../_shared/directory-admin.ts";
 import {
@@ -1297,6 +1301,26 @@ Deno.serve(async (req) => {
       return json({ success: true, profile });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Update failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "set_profile_status") {
+    try {
+      const profile = await setProfileStatusAdmin(sb, body);
+      return json({ success: true, profile, status: profile.status });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Status update failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "delete_profile") {
+    try {
+      const result = await deleteProfileAdmin(sb, body);
+      return json({ success: true, ...result });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Delete failed";
       return json({ error: msg }, 400);
     }
   }

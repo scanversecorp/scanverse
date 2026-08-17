@@ -63,7 +63,7 @@ async function findProfileByMobile(
   for (const ph of phoneLookupVariants(mobile)) {
     const { data } = await supabase
       .from("profiles")
-      .select("id,first_name,last_name,name,phone,email")
+      .select("id,first_name,last_name,name,phone,email,status")
       .eq("phone", ph)
       .maybeSingle();
     if (data?.id) return data;
@@ -71,7 +71,7 @@ async function findProfileByMobile(
   for (const email of profileAuthEmails(mobile)) {
     const { data } = await supabase
       .from("profiles")
-      .select("id,first_name,last_name,name,phone,email")
+      .select("id,first_name,last_name,name,phone,email,status")
       .eq("email", email)
       .maybeSingle();
     if (data?.id) return data;
@@ -410,6 +410,16 @@ Deno.serve(async (req: Request) => {
         return json({ success: false, error: "Verification required" });
       }
 
+      const blocked = await findProfileByMobile(supabase, mobile);
+      const blockedStatus = String(blocked?.status || "").toLowerCase();
+      if (blockedStatus === "paused" || blockedStatus === "suspended") {
+        return json({
+          success: false,
+          code: "account_paused",
+          error: "This account is paused. Contact ScanV support.",
+        }, 403);
+      }
+
       const { email } = await ensureProfileAuthUser(
         supabase,
         supabaseUrl,
@@ -443,6 +453,16 @@ Deno.serve(async (req: Request) => {
           return json({ success: false, error: "Invalid or expired verification" });
         }
 
+        const blocked = await findProfileByMobile(supabase, mobile);
+        const blockedStatus = String(blocked?.status || "").toLowerCase();
+        if (blockedStatus === "paused" || blockedStatus === "suspended") {
+          return json({
+            success: false,
+            code: "account_paused",
+            error: "This account is paused. Contact ScanV support.",
+          }, 403);
+        }
+
         const { email, password } = await ensureProfileAuthUser(
           supabase,
           supabaseUrl,
@@ -460,9 +480,12 @@ Deno.serve(async (req: Request) => {
 
     if (action === "check_mobile") {
       const existing = await findProfileByMobile(supabase, mobile);
+      const existingStatus = String(existing?.status || "").toLowerCase();
       return json({
         exists: !!existing,
         registered: !!(existing && profileLooksRegistered(existing)),
+        status: existing?.status || null,
+        paused: existingStatus === "paused" || existingStatus === "suspended",
       });
     }
 

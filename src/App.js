@@ -1902,6 +1902,20 @@ function profileNeedsEnrollment(p) {
 }
 
 const DUPLICATE_PHONE_MSG = 'This number is already registered. Please try login.';
+const ACCOUNT_PAUSED_MSG = 'This account is paused. Contact ScanV support.';
+
+function profileAccountBlocked(p) {
+  const st = String(p?.status || '').toLowerCase();
+  return st === 'paused' || st === 'suspended';
+}
+
+function directoryStatusColor(st) {
+  const s = String(st || '').toLowerCase();
+  if (s === 'active') return C.grn;
+  if (s === 'paused' || s === 'pending') return C.gold;
+  if (s === 'offboarded' || s === 'suspended') return C.red;
+  return C.acc;
+}
 
 function friendlySignupError(error) {
   const msg = error?.message || '';
@@ -1924,12 +1938,12 @@ async function findCustomerProfileByMobile(mob) {
     `${String(mob).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
   ];
   for (const email of emails) {
-    const { data } = await sb().from('profiles').select('id,phone,first_name,last_name,name,email')
+    const { data } = await sb().from('profiles').select('id,phone,first_name,last_name,name,email,status')
       .eq('email', email).maybeSingle();
     if (data?.id) return data;
   }
   for (const ph of phoneLookupVariants(mob)) {
-    const { data } = await sb().from('profiles').select('id,phone,first_name,last_name,name,email')
+    const { data } = await sb().from('profiles').select('id,phone,first_name,last_name,name,email,status')
       .eq('phone', ph).maybeSingle();
     if (data?.id) return data;
   }
@@ -3430,7 +3444,7 @@ function CategoryListBody({ categoryId, onSelect, onAdmit }) {
     <div style={{ padding: '14px 16px 24px' }}>
       {categoryId === 'cloud' && onAdmit && (
         <button type="button" onClick={onAdmit} style={{ width: '100%', textAlign: 'left', marginBottom: 14, border: '1.5px solid #93C5FD', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', borderRadius: 14, padding: '14px 14px', cursor: 'pointer', fontFamily: FF }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Student admission</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Skill Gap Review (SGR) - Form A1</div>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginTop: 4 }}>Skill Gap Review (SGR) · ₹500.00</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>Verify mobile · book a schedule · Razorpay. A consultant calls you within 72 hours.</div>
         </button>
@@ -4461,6 +4475,11 @@ async function upsertCustomerProfile({
   const ipAddr = ip || await getIP();
 
   const existingByPhone = await findCustomerProfileByMobile(mob);
+  if (profileAccountBlocked(existingByPhone)) {
+    const err = new Error(ACCOUNT_PAUSED_MSG);
+    err.code = 'ACCOUNT_PAUSED';
+    throw err;
+  }
   if (existingByPhone && profileLooksRegistered(existingByPhone) && !allowRegistered) {
     const err = new Error(DUPLICATE_PHONE_MSG);
     err.code = 'PHONE_EXISTS';
@@ -4992,6 +5011,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           phone: mob,
           email: profileAuthEmail(mob),
         };
+      }
+      if (profileAccountBlocked(existing)) {
+        try { await sb().auth.signOut(); } catch (_) {}
+        localStorage.removeItem('scanv_uid');
+        throw new Error(ACCOUNT_PAUSED_MSG);
       }
       if (!profileLooksRegistered(existing)) {
         const patch = {
@@ -13874,9 +13898,24 @@ function AdminDispatchDeskTab({ pin }) {
   );
 }
 
+function DirectoryLifecycleBtns({ status, loading, onActive, onPause, onDelete, compact }) {
+  const st = String(status || 'active').toLowerCase();
+  const wrap = compact
+    ? { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }
+    : { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 };
+  return (
+    <div style={wrap} onClick={e => e.stopPropagation()}>
+      <Btn v={st === 'active' ? 'primary' : 'outline'} sm onClick={onActive} disabled={loading || st === 'active'}>Active</Btn>
+      <Btn v={st === 'paused' ? 'primary' : 'outline'} sm onClick={onPause} disabled={loading || st !== 'active'}>Pause</Btn>
+      <Btn v="danger" sm onClick={onDelete} disabled={loading}>Delete</Btn>
+    </div>
+  );
+}
+
 function AdminDirectoryTab({ pin }) {
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -13886,21 +13925,24 @@ function AdminDirectoryTab({ pin }) {
   const [profilePatch, setProfilePatch] = useState({});
   const [vendors, setVendors] = useState([]);
 
-  const loadDirectory = useCallback(async (searchQ = '') => {
+  const loadDirectory = useCallback(async (searchQ = '', opts = {}) => {
     if (!pin) return setErr('Admin PIN required');
     const trimmed = String(searchQ).trim();
     if (trimmed.length === 1) return setErr('Enter at least 2 characters to filter');
-    setLoading(true); setErr(''); setMsg('');
+    setLoading(true); setErr('');
     try {
       const payload = { kind, limit: 100 };
       if (trimmed) payload.q = trimmed;
+      if (statusFilter && statusFilter !== 'all') payload.status = statusFilter;
       const { results: data } = await adminHubFetch('search_directory', payload, pin);
       setResults(data || []);
-      setSelected(null);
-      setDetail(null);
+      if (!opts.keepSelection) {
+        setSelected(null);
+        setDetail(null);
+      }
     } catch (e) { setErr(e.message); setResults([]); }
     finally { setLoading(false); }
-  }, [pin, kind]);
+  }, [pin, kind, statusFilter]);
 
   useEffect(() => {
     if (pin) loadDirectory('');
@@ -13943,27 +13985,78 @@ function AdminDirectoryTab({ pin }) {
     if (!profileId) return setErr('No profile to update');
     setLoading(true); setErr('');
     try {
-      await adminHubFetch('update_profile', { profile_id: profileId, patch: profilePatch }, pin);
+      const { status: _status, ...patch } = profilePatch;
+      await adminHubFetch('update_profile', { profile_id: profileId, patch }, pin);
       setMsg('Profile updated');
       await loadDetail(selected);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
-  const vendorAction = async (action, vendorId) => {
+  const refreshAfterAction = async (stayOnDetail) => {
+    if (stayOnDetail && selected) {
+      await loadDirectory(q, { keepSelection: true });
+      await loadDetail(selected);
+    } else {
+      await loadDirectory(q);
+    }
+  };
+
+  const setUserStatus = async (profileId, status, stayOnDetail) => {
+    if (!profileId) return;
+    const label = status === 'paused' ? 'Pause this user? They will not be able to log in until set Active.' : 'Set this user Active?';
+    if (!window.confirm(label)) return;
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('set_profile_status', { profile_id: profileId, status }, pin);
+      setMsg(status === 'paused' ? 'User paused' : 'User set Active');
+      await refreshAfterAction(stayOnDetail);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const deleteUser = async (profileId) => {
+    if (!profileId) return;
+    if (!window.confirm('Permanently delete this user? They can re-register with the same mobile number.')) return;
+    if (!window.confirm('This removes their profile and login. Bookings stay for records. Continue?')) return;
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('delete_profile', { profile_id: profileId }, pin);
+      setMsg('User deleted — they can register again');
+      await loadDirectory(q);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const vendorAction = async (action, vendorId, stayOnDetail) => {
     const confirms = {
-      activate: 'Activate this partner?',
-      pause: 'Pause partner — no new bookings?',
-      unpause: 'Unpause partner?',
-      offboard: 'Offboard partner permanently until re-activated?',
-      delete: 'Delete partner record (no dispatch history)?',
+      activate: 'Set this vendor Active? They will receive new bookings.',
+      pause: 'Pause this vendor? They will not receive new bookings until set Active.',
+      unpause: 'Set this vendor Active again?',
+      offboard: 'Offboard this vendor permanently until re-activated?',
+      delete: 'Delete this vendor? Partners with booking history will be offboarded instead.',
     };
     if (confirms[action] && !window.confirm(confirms[action])) return;
     setLoading(true); setErr('');
     try {
-      await vendorOnboardFetch(action, { vendor_id: vendorId }, pin);
-      setMsg(`Vendor ${action} OK`);
-      await loadDetail(selected);
+      if (action === 'delete') {
+        try {
+          await vendorOnboardFetch('delete', { vendor_id: vendorId }, pin);
+          setMsg('Vendor deleted');
+          await loadDirectory(q);
+          return;
+        } catch (e) {
+          if (!/offboard instead/i.test(e.message || '')) throw e;
+          await vendorOnboardFetch('offboard', { vendor_id: vendorId }, pin);
+          setMsg('Vendor offboarded (had booking history)');
+          await refreshAfterAction(stayOnDetail);
+          return;
+        }
+      }
+      const mapped = action === 'active' ? 'activate' : action;
+      await vendorOnboardFetch(mapped, { vendor_id: vendorId }, pin);
+      setMsg(mapped === 'activate' || mapped === 'unpause' ? 'Vendor set Active' : `Vendor ${mapped} OK`);
+      await refreshAfterAction(stayOnDetail);
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
@@ -14006,15 +14099,20 @@ function AdminDirectoryTab({ pin }) {
       <div style={{ ...S.card(), padding: 14, marginBottom: 14, border: `1.5px solid ${C.gold}44` }}>
         <div style={{ fontWeight: 800, color: C.txt, marginBottom: 6 }}>Users &amp; Vendors Directory</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
-          All registered customers and partners load automatically · filter by name, mobile, email, or city · click a row for bookings, dispatch, and edits.
+          All registered customers and partners load automatically · use Active, Pause, or Delete on each row · click a row for bookings and edits.
           Bookmark: <code style={{ color: C.acc }}>{adminTabUrl('directory')}</code>
         </div>
       </div>
       {!selected ? (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
             {['all', 'users', 'vendors'].map(k => (
               <button key={k} type="button" onClick={() => setKind(k)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${kind === k ? C.acc : C.bdr}`, background: kind === k ? `${C.acc}18` : C.surf, color: kind === k ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{k}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {['all', 'active', 'paused'].map(st => (
+              <button key={st} type="button" onClick={() => setStatusFilter(st)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${statusFilter === st ? C.acc : C.bdr}`, background: statusFilter === st ? `${C.acc}18` : C.surf, color: statusFilter === st ? C.acc : C.sub, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>{st}</button>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -14026,7 +14124,9 @@ function AdminDirectoryTab({ pin }) {
           {!loading && results.length > 0 && (
             <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>{results.length} record{results.length === 1 ? '' : 's'}{q.trim() ? ` matching “${q.trim()}”` : ' · newest first'}</div>
           )}
-          {results.map(row => (
+          {results.map(row => {
+            const isVendor = row.kind === 'vendor';
+            return (
             <div key={`${row.kind}-${row.id}`} onClick={() => loadDetail(row)} style={{ ...S.card(), marginBottom: 8, padding: 12, cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <div>
@@ -14034,10 +14134,19 @@ function AdminDirectoryTab({ pin }) {
                   <div style={{ fontSize: 11, color: C.sub }}>{row.phone || '—'} · {row.city || '—'}</div>
                   <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>{row.kind} · {row.id}</div>
                 </div>
-                <Badge label={row.status || row.role || '—'} color={C.acc} />
+                <Badge label={row.status || row.role || '—'} color={directoryStatusColor(row.status)} />
               </div>
+              <DirectoryLifecycleBtns
+                compact
+                status={row.status}
+                loading={loading}
+                onActive={() => isVendor ? vendorAction('activate', row.id, false) : setUserStatus(row.id, 'active', false)}
+                onPause={() => isVendor ? vendorAction('pause', row.id, false) : setUserStatus(row.id, 'paused', false)}
+                onDelete={() => isVendor ? vendorAction('delete', row.id, false) : deleteUser(row.id)}
+              />
             </div>
-          ))}
+            );
+          })}
           {!loading && !results.length && <div style={{ ...S.card(), padding: 32, textAlign: 'center', color: C.dim }}>{q.trim().length >= 2 ? 'No matches' : 'No users or vendors registered yet'}</div>}
         </>
       ) : (
@@ -14048,7 +14157,15 @@ function AdminDirectoryTab({ pin }) {
           {p && (
             <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
               <div style={{ fontWeight: 800, color: C.txt, marginBottom: 8 }}>Profile · {p.name || p.id}</div>
-              <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{p.phone} · {p.email || '—'} · {p.city || '—'} · role {p.role}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{p.phone} · {p.email || '—'} · {p.city || '—'} · role {p.role} · <Badge label={p.status || 'active'} color={directoryStatusColor(p.status)} /></div>
+              <DirectoryLifecycleBtns
+                status={p.status}
+                loading={loading}
+                onActive={() => setUserStatus(p.id, 'active', true)}
+                onPause={() => setUserStatus(p.id, 'paused', true)}
+                onDelete={() => deleteUser(p.id)}
+              />
+              <div style={{ height: 12 }} />
               <Field label="First name"><input value={profilePatch.first_name || ''} onChange={e => setProfilePatch(x => ({ ...x, first_name: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Last name"><input value={profilePatch.last_name || ''} onChange={e => setProfilePatch(x => ({ ...x, last_name: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Phone"><input value={profilePatch.phone || ''} onChange={e => setProfilePatch(x => ({ ...x, phone: e.target.value }))} style={S.inp()} /></Field>
@@ -14058,7 +14175,6 @@ function AdminDirectoryTab({ pin }) {
                 <Field label="City"><input value={profilePatch.city || ''} onChange={e => setProfilePatch(x => ({ ...x, city: e.target.value }))} style={S.inp()} /></Field>
                 <Field label="Pincode"><input value={profilePatch.pincode || ''} onChange={e => setProfilePatch(x => ({ ...x, pincode: e.target.value }))} style={S.inp()} /></Field>
               </div>
-              <Field label="Status"><input value={profilePatch.status || ''} onChange={e => setProfilePatch(x => ({ ...x, status: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Notes"><textarea value={profilePatch.notes || ''} onChange={e => setProfilePatch(x => ({ ...x, notes: e.target.value }))} rows={2} style={{ ...S.inp(), resize: 'vertical' }} /></Field>
               <Btn onClick={saveProfile} disabled={loading}>Save profile</Btn>
             </div>
@@ -14069,15 +14185,17 @@ function AdminDirectoryTab({ pin }) {
               <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
                 <div>{v.contact_name || `${v.first_name || ''} ${v.last_name || ''}`.trim()} · {v.phone}</div>
                 <div>{v.shop_or_flat}, {v.street_name}, {v.city} {v.pincode}</div>
-                <div>Status: <Badge label={v.status} color={C.acc} /> · Vehicle {v.vehicle_number || '—'}</div>
+                <div>Status: <Badge label={v.status} color={directoryStatusColor(v.status)} /> · Vehicle {v.vehicle_number || '—'}</div>
                 <div>Services: {(v.vendor_partner_services || []).filter(s => s.is_active).map(s => s.service_id).slice(0, 6).join(', ') || '—'}</div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {v.status !== 'active' && <Btn v="outline" sm onClick={() => vendorAction('activate', v.id)} disabled={loading}>Activate</Btn>}
-                {v.status === 'active' && <Btn v="outline" sm onClick={() => vendorAction('pause', v.id)} disabled={loading}>Pause</Btn>}
-                {v.status === 'paused' && <Btn v="outline" sm onClick={() => vendorAction('unpause', v.id)} disabled={loading}>Unpause</Btn>}
-                {v.status === 'active' && <Btn v="danger" sm onClick={() => vendorAction('offboard', v.id)} disabled={loading}>Offboard</Btn>}
-                {['pending', 'offboarded'].includes(v.status) && <Btn v="danger" sm onClick={() => vendorAction('delete', v.id)} disabled={loading}>Delete</Btn>}
+              <DirectoryLifecycleBtns
+                status={v.status}
+                loading={loading}
+                onActive={() => vendorAction(v.status === 'paused' ? 'unpause' : 'activate', v.id, true)}
+                onPause={() => vendorAction('pause', v.id, true)}
+                onDelete={() => vendorAction('delete', v.id, true)}
+              />
+              <div style={{ marginTop: 10 }}>
                 <AdminDeepLinkBtn hash="vendor-admin" label="Full vendor portal →" />
               </div>
             </div>
@@ -15119,7 +15237,7 @@ export default function App() {
         const {data:{session}}=await sb().auth.getSession();
         if (session) {
           const {data:p}=await sb().from('profiles').select('*').eq('id',session.user.id).single();
-          if (p&&p.status!=='suspended'&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
+          if (p&&!profileAccountBlocked(p)&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
             await finishAppBoot(p);
             return;
           }
@@ -15129,7 +15247,7 @@ export default function App() {
           const mob = phoneFromProfileId(uid);
           if (mob) await ensureProfileAuthSession(mob);
           const {data:p}=await sb().from('profiles').select('*').eq('id',uid).single();
-          if (p&&p.status!=='suspended'&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
+          if (p&&!profileAccountBlocked(p)&&p.mobile_verified&&!profileNeedsEnrollment(p)) {
             await finishAppBoot(p);
             return;
           }
