@@ -3952,26 +3952,56 @@ async function getIP() {
   catch(e) { return 'unknown'; }
 }
 
+/** India Post API spellings differ from OSM (e.g. Thathawade vs Tathawade). */
+function pinLookupQueries(name) {
+  const raw = String(name || '').trim();
+  if (!raw || raw.length < 3) return [];
+  const queries = new Set([raw]);
+  const compact = raw.toLowerCase().replace(/\s+/g, '');
+  if (compact === 'tathawade' || compact === 'thathawade') {
+    queries.add('Thathawade');
+    queries.add('Tathawade');
+  }
+  const base = raw.replace(/\s+subdistrict$/i, '').trim();
+  if (base.length >= 3 && base !== raw) queries.add(base);
+  return [...queries];
+}
+
+function pickIndiaPostPincode(offices, query, stateHint = 'Maharashtra') {
+  if (!offices?.length) return '';
+  const stateLow = (stateHint || '').toLowerCase();
+  const qLow = String(query || '').trim().toLowerCase();
+  const inState = offices.filter((o) => {
+    const st = String(o.State || '').toLowerCase();
+    return !stateLow || st === stateLow || st.includes(stateLow.slice(0, 4));
+  });
+  const pool = inState.length ? inState : offices;
+  const exact = pool.find((o) => String(o.Name || '').toLowerCase() === qLow);
+  if (exact?.Pincode) return String(exact.Pincode);
+  const contains = pool.find((o) => {
+    const n = String(o.Name || '').toLowerCase();
+    return n.includes(qLow) || qLow.includes(n);
+  });
+  if (contains?.Pincode) return String(contains.Pincode);
+  return pool[0]?.Pincode ? String(pool[0].Pincode) : '';
+}
+
 async function lookupPinByPlaceName(name, stateHint='Maharashtra') {
-  if (!name || name.length < 3) return '';
-  try {
-    const r=await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(name)}`);
-    const d=await r.json();
-    if (!d?.[0]||d[0].Status!=='Success'||!d[0].PostOffice?.length) return '';
-    const offices=d[0].PostOffice;
-    const stateLow=(stateHint||'').toLowerCase();
-    const nameLow=name.toLowerCase();
-    const exact=offices.find(o=>o.Name?.toLowerCase()===nameLow&&(!stateLow||o.State?.toLowerCase().includes(stateLow.slice(0,4))));
-    if (exact?.Pincode) return exact.Pincode;
-    const inState=offices.find(o=>!stateLow||o.State?.toLowerCase()===stateLow||o.State?.toLowerCase().includes(stateLow.slice(0,4)));
-    if (inState?.Pincode) return inState.Pincode;
-    return offices[0]?.Pincode||'';
-  } catch(e) { return ''; }
+  for (const q of pinLookupQueries(name)) {
+    try {
+      const r=await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(q)}`);
+      const d=await r.json();
+      if (!d?.[0]||d[0].Status!=='Success'||!d[0].PostOffice?.length) continue;
+      const pin = pickIndiaPostPincode(d[0].PostOffice, q, stateHint);
+      if (/^\d{6}$/.test(pin)) return pin;
+    } catch (_) { /* try next spelling */ }
+  }
+  return '';
 }
 
 async function reverseGeo(lat,lng) {
   try {
-    // Nominatim for address text — zoom=18 for locality; OSM postcodes are often wrong in India
+    // Nominatim for address text — OSM postcodes are unreliable in India; prefer India Post API
     const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en&zoom=18&addressdetails=1`,{
       headers:{'User-Agent':'ScanV/5.5 (https://scanv-tau.vercel.app; dcoreglobal.com)'}
     });
@@ -3981,16 +4011,23 @@ async function reverseGeo(lat,lng) {
 
     let pincode='';
     if (isIndia) {
-      const places=[a.village,a.suburb,a.neighbourhood,a.town,a.city_district]
-        .filter(Boolean)
-        .filter((v,i,arr)=>arr.indexOf(v)===i);
-      for (const place of places) {
-        pincode=await lookupPinByPlaceName(place,state);
+      // Village/neighbourhood before suburb — suburbs like Hinjawadi can share wrong PIN vs village (Tathawade 411033 vs 411057)
+      const placeTiers = [
+        [a.village, a.hamlet].filter(Boolean),
+        [a.neighbourhood].filter(Boolean),
+        [a.suburb, a.town, a.city_district].filter(Boolean),
+      ];
+      for (const tier of placeTiers) {
+        const names = [...new Set(tier.map((v) => String(v).trim()).filter((v) => v.length >= 3))];
+        for (const place of names) {
+          pincode = await lookupPinByPlaceName(place, state);
+          if (/^\d{6}$/.test(pincode)) break;
+        }
         if (/^\d{6}$/.test(pincode)) break;
-        pincode='';
       }
     }
-    if (!pincode) pincode=(a.postcode||'').replace(/\D/g,'').slice(0,6);
+    // OSM postcode last resort only — often wrong (e.g. 411057 for Tathawade; correct is 411033)
+    if (!pincode && !isIndia) pincode=(a.postcode||'').replace(/\D/g,'').slice(0,6);
 
     const street=[a.house_number,a.road].filter(Boolean).join(' ').trim();
     const locality=[a.suburb,a.village,a.neighbourhood].filter(Boolean).filter((v,i,arr)=>arr.indexOf(v)===i);
