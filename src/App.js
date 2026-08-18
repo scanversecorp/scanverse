@@ -2995,7 +2995,12 @@ const SVC_CARD_THEME = {
   cloud:    { bgFrom:'#DBEAFE', bgTo:'#BFDBFE', b1:'#60A5FA', b2:'#2563EB', glow:'rgba(37,99,235,0.18)', img:'/home-models/cloud.png' },
   vip:      { bgFrom:'#FEF3C7', bgTo:'#FDE68A', b1:'#FBBF24', b2:'#D97706', glow:'rgba(217,119,6,0.2)',  tag:'👑 Premium', img:'/home-models/vip.png' },
   health:   { bgFrom:'#FEE2E2', bgTo:'#FECACA', b1:'#F87171', b2:'#DC2626', glow:'rgba(220,38,38,0.16)', img:'/home-models/health.png' },
-  property: { bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)', img:'/home-models/property.png' },
+  property: {
+    bgFrom:'#FFEDD5', bgTo:'#FED7AA', b1:'#FB923C', b2:'#EA580C', glow:'rgba(234,88,12,0.18)',
+    img:'/home-models/property.png',
+    imgPos:'center 26%',
+    imgFilter:'brightness(1.08) contrast(1.05) saturate(1.02)',
+  },
   household:{ bgFrom:'#FFF1F5', bgTo:'#ECFDF5', b1:'#FFD6E8', b2:'#86EFAC', glow:'rgba(244,114,182,0.22)', tag:'✨ POPULAR', img:'/home-models/household.png', imgPos:'center top' },
   beauty:   { bgFrom:'#FCE7F3', bgTo:'#FFE4E6', b1:'#F472B6', b2:'#DB2777', glow:'rgba(219,39,119,0.2)', tag:'💄 Glow', img:'/home-models/beauty.png' },
   delivery: { bgFrom:'#CFFAFE', bgTo:'#A5F3FC', b1:'#22D3EE', b2:'#0891B2', glow:'rgba(8,145,178,0.18)', img:'/home-models/delivery.png' },
@@ -3237,6 +3242,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   const d = SVC_DETAIL[svc.id] || {};
   const title = HOME_CARD_TITLE[svc.id] || svc.name;
   const imgPos = theme.imgPos || 'center 12%';
+  const imgFilter = theme.imgFilter || IG_TILE.imgFilter;
   const imgH = compact ? 72 : hero ? 168 : 132;
   const badgeRow = (sm) => (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:6, width:'100%' }}>
@@ -3265,7 +3271,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             </div>
           </div>
           <div style={{ flex:'0 0 36%', width:'36%', maxWidth:132, minWidth:0, position:'relative', background:C.deep, height:'100%', overflow:'hidden' }}>
-            <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
+            <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:imgFilter }} />
           </div>
         </div>
       </div>
@@ -3276,7 +3282,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
     return (
       <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', alignItems:'stretch' }}>
         <div style={{ width:72, flexShrink:0, position:'relative', background:C.deep }}>
-          <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
+          <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:imgFilter }} />
         </div>
         <div style={{ flex:1, padding:'10px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:3 }}>
           <div style={{ color:theme.b2, fontSize:10, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
@@ -3290,7 +3296,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   return (
     <div onClick={onClick} style={{ borderRadius:IG_TILE.radius, overflow:'hidden', cursor:'pointer', border:IG_TILE.border, background:C.card, boxShadow:IG_TILE.shadow, animation:`fadeUp .35s ease ${index * 0.04}s both`, display:'flex', flexDirection:'column', height:'100%', width:'100%', minWidth:0 }}>
       <div style={{ position:'relative', height:imgH, minHeight:imgH, flexShrink:0, background:C.deep }}>
-        <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:IG_TILE.imgFilter }} />
+        <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:imgFilter }} />
         <div style={{ position:'absolute', top:8, left:8, right:8 }}>
           {badgeRow(true)}
         </div>
