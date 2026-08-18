@@ -3450,11 +3450,28 @@ function cloudCourseMatchesEnrollment(svc, feeView) {
   return enrolled && name && enrolled === name;
 }
 
-function CloudCoursePriceTag({ svc, sm, feeView }) {
+function CloudCoursePriceTag({ svc, sm, feeView, onFillSgr }) {
   const isEnrolledCourse = cloudCourseMatchesEnrollment(svc, feeView);
   if (!isEnrolledCourse) {
     return (
-      <span style={{ color: C.gold, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em' }}>Awaiting SGR</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onFillSgr?.(svc); }}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: onFillSgr ? 'pointer' : 'default',
+          color: C.gold,
+          fontSize: sm ? 11 : 12,
+          fontWeight: 800,
+          letterSpacing: '0.02em',
+          fontFamily: FF,
+          textDecoration: onFillSgr ? 'underline' : 'none',
+        }}
+      >
+        Fill SGR
+      </button>
     );
   }
   const feePaise = Number(feeView.course_fee_paise) > 0 ? Number(feeView.course_fee_paise) : svc.price;
@@ -3462,9 +3479,9 @@ function CloudCoursePriceTag({ svc, sm, feeView }) {
   return <PriceTag svc={priced} sm={sm} />;
 }
 
-function ServicePriceTag({ svc, sm, categoryId, cloudFeeView }) {
+function ServicePriceTag({ svc, sm, categoryId, cloudFeeView, onFillSgr }) {
   if (categoryId === 'cloud' && svc?.parent === 'cloud' && svc.id !== SGR_SERVICE_ID) {
-    return <CloudCoursePriceTag svc={svc} sm={sm} feeView={cloudFeeView} />;
+    return <CloudCoursePriceTag svc={svc} sm={sm} feeView={cloudFeeView} onFillSgr={onFillSgr} />;
   }
   return <PriceTag svc={svc} sm={sm} />;
 }
@@ -3483,7 +3500,7 @@ function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
   return <IconThumb svc={svc} categoryId={categoryId} height={height} fullBleed={fullBleed} />;
 }
 
-function CategorySvcCard({ categoryId, svc, onClick, compact, cloudFeeView }) {
+function CategorySvcCard({ categoryId, svc, onClick, compact, cloudFeeView, onFillSgr }) {
   const imgH = compact ? 104 : 120;
   return (
     <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow, minWidth: 0, height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -3494,7 +3511,7 @@ function CategorySvcCard({ categoryId, svc, onClick, compact, cloudFeeView }) {
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
         <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8, flex: 1 }}>{svc.sub}</div>
-        <ServicePriceTag svc={svc} sm={compact} categoryId={categoryId} cloudFeeView={cloudFeeView} />
+        <ServicePriceTag svc={svc} sm={compact} categoryId={categoryId} cloudFeeView={cloudFeeView} onFillSgr={onFillSgr} />
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
           <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
@@ -3506,7 +3523,7 @@ function CategorySvcCard({ categoryId, svc, onClick, compact, cloudFeeView }) {
 function HouseholdSvcCard(props) { return <CategorySvcCard categoryId="household" {...props} />; }
 function CloudSvcCard(props) { return <CategorySvcCard categoryId="cloud" {...props} />; }
 
-function CategoryListBody({ categoryId, onSelect, onAdmit, apikey, cloudFeeView: cloudFeeViewProp }) {
+function CategoryListBody({ categoryId, onSelect, onAdmit, onFillSgr, apikey, cloudFeeView: cloudFeeViewProp }) {
   const cfg = SUB_CATEGORIES[categoryId];
   const { feeView: fetchedCloudFeeView } = useStudentCloudFeeView(
     categoryId === 'cloud' && cloudFeeViewProp == null ? apikey : null,
@@ -3556,7 +3573,7 @@ function CategoryListBody({ categoryId, onSelect, onAdmit, apikey, cloudFeeView:
             </div>
             <SvcGrid2
               items={items}
-              renderItem={(svc) => <CategorySvcCard categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact cloudFeeView={cloudFeeView} />}
+              renderItem={(svc) => <CategorySvcCard categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact cloudFeeView={cloudFeeView} onFillSgr={onFillSgr} />}
             />
           </div>
         );
@@ -5778,6 +5795,12 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
 
   const listCatId = screen.endsWith('-list') ? screen.slice(0, -5) : null;
 
+  const openBrowseCloudSgr = useCallback((svc) => {
+    const cfg = SUB_CATEGORIES.cloud;
+    setActiveSvc({ ...svc, parent: 'cloud', cat: cfg?.cat || svc.cat, cash: false });
+    setScreen('cloud-admit');
+  }, []);
+
   if (screen === 'cloud-admit') {
     return browseWrap(
       <StudentCloudAdmitScreen
@@ -5805,6 +5828,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           categoryId={listCatId}
           onSelect={(svc) => openSubSvc(listCatId, svc)}
           onAdmit={listCatId === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setScreen('cloud-admit'); } : undefined}
+          onFillSgr={listCatId === 'cloud' ? openBrowseCloudSgr : undefined}
           apikey={SB_KEY}
           cloudFeeView={cloudFeeView}
         />
@@ -5957,7 +5981,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
             {isSubSvc && (
               <div style={{ marginBottom: 12 }}>
-                <ServicePriceTag svc={activeSvc} categoryId={parentCat} cloudFeeView={cloudFeeView} />
+                <ServicePriceTag svc={activeSvc} categoryId={parentCat} cloudFeeView={cloudFeeView} onFillSgr={parentCat === 'cloud' ? openBrowseCloudSgr : undefined} />
               </div>
             )}
             <div style={{display:'flex',justifyContent:'center',gap:22}}>
@@ -7120,6 +7144,12 @@ function ServicesScreen() {
     scrollBrowseTop(scrollRef.current);
   };
 
+  const openCloudSgr = useCallback((svc) => {
+    const cfg = SUB_CATEGORIES.cloud;
+    setActiveSvc({ ...svc, parent: 'cloud', cat: cfg?.cat || svc.cat, cash: false });
+    setCloudAdmit(true);
+  }, []);
+
   const openCategory = (s) => {
     if (SUB_CATEGORIES[s.id]) {
       setSubListCat(s.id);
@@ -7160,6 +7190,7 @@ function ServicesScreen() {
           categoryId={subListCat}
           onSelect={(svc) => openSubSvc(subListCat, svc)}
           onAdmit={subListCat === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setCloudAdmit(true); } : undefined}
+          onFillSgr={subListCat === 'cloud' ? openCloudSgr : undefined}
           apikey={SB_KEY}
           cloudFeeView={cloudFeeView}
         />
@@ -7189,7 +7220,7 @@ function ServicesScreen() {
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
             {isSubSvc ? (
               <div style={{ marginBottom: 12 }}>
-                <ServicePriceTag svc={detail} categoryId={parentCat} cloudFeeView={cloudFeeView} />
+                <ServicePriceTag svc={detail} categoryId={parentCat} cloudFeeView={cloudFeeView} onFillSgr={parentCat === 'cloud' ? openCloudSgr : undefined} />
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}><PriceTag svc={detail} sm /></div>
