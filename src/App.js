@@ -4078,6 +4078,64 @@ async function getIP() {
   catch(e) { return 'unknown'; }
 }
 
+const SILENT_GEO_CACHE_KEY = 'scanv_silent_geo';
+const SILENT_GEO_CACHE_MS = 60 * 60 * 1000;
+
+function loadCachedSilentGeo() {
+  try {
+    const raw = sessionStorage.getItem(SILENT_GEO_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.geo || Date.now() - (parsed.at || 0) > SILENT_GEO_CACHE_MS) return null;
+    return parsed.geo;
+  } catch { return null; }
+}
+
+function cacheSilentGeo(geo) {
+  if (!geo || (!geo.city && !geo.pincode && geo.lat == null && !geo.village)) return;
+  try {
+    sessionStorage.setItem(SILENT_GEO_CACHE_KEY, JSON.stringify({ geo, at: Date.now() }));
+  } catch (_) {}
+}
+
+async function resolveIpGeo(ipAddr) {
+  if (!ipAddr || ipAddr === 'unknown') return null;
+  try {
+    const ipGeo = await fetch(`https://ipapi.co/${ipAddr}/json/`).then((r) => r.json());
+    if (ipGeo?.error) return null;
+    const city = String(ipGeo.city || '').trim();
+    const pincode = String(ipGeo.postal || '').replace(/\D/g, '').slice(0, 6);
+    if (!city && !pincode) return null;
+    return {
+      city,
+      state: ipGeo.region || 'Maharashtra',
+      pincode,
+      country: ipGeo.country_name || 'India',
+      lat: ipGeo.latitude != null ? Number(ipGeo.latitude) : null,
+      lng: ipGeo.longitude != null ? Number(ipGeo.longitude) : null,
+      source: 'ip',
+    };
+  } catch { return null; }
+}
+
+/** Header pill: city + PIN, then village, then coarse GPS, else locating */
+function formatGeoBadge(geo) {
+  if (!geo) return 'Locating…';
+  const line = [geo.city, geo.pincode].filter(Boolean).join(' ');
+  if (line) return line;
+  if (geo.village) return geo.village;
+  if (geo.lat != null) return 'Near you';
+  return 'Locating…';
+}
+
+function mergeSilentGeo(setSilentGeo, patch) {
+  setSilentGeo((prev) => {
+    const next = { ...(prev || {}), ...patch };
+    cacheSilentGeo(next);
+    return next;
+  });
+}
+
 /** India Post API spellings differ from OSM (e.g. Thathawade vs Tathawade). */
 function pinLookupQueries(name) {
   const raw = String(name || '').trim();
@@ -5653,7 +5711,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
       <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
         <ScanVLogoMark size={LOGO_SIZE.md} />
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-          📍 {[silentGeo?.city, silentGeo?.pincode].filter(Boolean).join(' ') || 'Locating…'}
+          📍 {formatGeoBadge(silentGeo)}
         </div>
       </div>
       <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
@@ -15171,29 +15229,48 @@ export default function App() {
     setUser(null); setState('browse'); setScreen('services');
   },[]);
 
-  // Native GPS permission popup on app open (cached first, high-accuracy in background)
+  // Native GPS on app open — IP estimate first, then GPS refine (cached for repeat visits)
   useEffect(() => {
     if (isGpsPortalRoute()) return undefined;
     let cancelled = false;
+
+    const cached = loadCachedSilentGeo();
+    if (cached) setSilentGeo(cached);
+
     (async () => {
       const device = detectDevice();
       let ipAddr = '';
       try { ipAddr = await getIP(); } catch (_) { /* non-blocking */ }
+
+      if (!cancelled && ipAddr) {
+        const ipGeo = await resolveIpGeo(ipAddr);
+        if (ipGeo && !cancelled) {
+          mergeSilentGeo(setSilentGeo, { ...ipGeo, device, ip: ipAddr });
+        }
+      }
+
       requestNativeGps({
-        onFast: async ({ lat, lng }) => {
+        onFast: ({ lat, lng }) => {
           if (cancelled) return;
-          let geo = {};
-          try { geo = await reverseGeo(lat, lng); } catch (_) { /* non-blocking */ }
-          setSilentGeo((prev) => ({ ...(prev || {}), lat, lng, ...geo, device, ip: ipAddr }));
+          mergeSilentGeo(setSilentGeo, { lat, lng, device, ip: ipAddr, source: 'gps' });
+          reverseGeo(lat, lng).then((geo) => {
+            if (cancelled) return;
+            mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, ip: ipAddr, source: 'gps' });
+          }).catch(() => {});
         },
-        onAccurate: async ({ lat, lng }) => {
+        onAccurate: ({ lat, lng }) => {
           if (cancelled) return;
-          let geo = {};
-          try { geo = await reverseGeo(lat, lng); } catch (_) { /* non-blocking */ }
-          setSilentGeo((prev) => ({ ...(prev || {}), lat, lng, ...geo, device, ip: ipAddr }));
+          reverseGeo(lat, lng).then((geo) => {
+            if (cancelled) return;
+            mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, ip: ipAddr, source: 'gps' });
+          }).catch(() => {
+            if (!cancelled) mergeSilentGeo(setSilentGeo, { lat, lng, device, ip: ipAddr, source: 'gps' });
+          });
         },
+        onError: () => { /* IP estimate or session cache already shown */ },
       });
     })();
+
     return () => { cancelled = true; };
   }, []);
 
