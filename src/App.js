@@ -12877,10 +12877,34 @@ function AdminOtpDeliveryTab({ pin, showCallbackUrl }) {
 }
 
 function OtpDeliveryReportPage() {
-  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
+  const savedAuth = getAdminAuth();
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin || '');
+  const [totpCode, setTotpCode] = useState('');
+  const [authStep, setAuthStep] = useState('pin');
   const [authed, setAuthed] = useState(adminAuthOk());
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+
+  const usePin = pin || getAdminAuth()?.pin;
+  const activeTotp = totpCode.replace(/\D/g, '').slice(0, 6);
+
+  useEffect(() => {
+    if (adminAuthOk()) {
+      setPin(getAdminAuth().pin);
+      setAuthed(true);
+      setAuthStep('done');
+      return;
+    }
+    const savedPin = sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin;
+    if (!savedPin) return;
+    (async () => {
+      try {
+        const status = await adminHubTotp(savedPin, 'totp_status');
+        setPin(savedPin);
+        if (status.enrolled) setAuthStep('totp');
+      } catch { /* stay on pin */ }
+    })();
+  }, []);
 
   const login = async () => {
     if (!pin) { setErr('Enter admin PIN'); return; }
@@ -12888,15 +12912,42 @@ function OtpDeliveryReportPage() {
     try {
       await adminHubFetch('whoami', {}, pin);
       sessionStorage.setItem(ADMIN_PIN_KEY, pin);
-      setAdminAuth(pin);
-      setAuthed(true);
+      const status = await adminHubTotp(pin, 'totp_status');
+      if (!status.enrolled) {
+        setErr('Admin hub 2FA must be set up first at /#admin');
+        return;
+      }
+      setAuthStep('totp');
     } catch {
       setErr('Incorrect PIN — set ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN in Supabase secrets');
+      setAuthed(false);
+      sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    } finally { setLoading(false); }
+  };
+
+  const submitTotp = async () => {
+    if (activeTotp.length !== 6) { setErr('Enter 6-digit code'); return; }
+    setLoading(true); setErr('');
+    try {
+      const verified = await adminHubTotp(pin, 'totp_verify', {}, activeTotp);
+      setAdminAuth(pin, null, true, verified.session_token);
+      await adminHubFetch('otp_delivery_reports', { today_only: true, limit: 1 }, pin);
+      setAuthed(true);
+      setAuthStep('done');
+      setTotpCode('');
+    } catch (e) {
+      setErr(e.message || 'Invalid code');
       setAuthed(false);
     } finally { setLoading(false); }
   };
 
-  const usePin = pin || getAdminAuth()?.pin;
+  const lock = () => {
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    sessionStorage.removeItem(ADMIN_PIN_KEY);
+    setAuthed(false);
+    setAuthStep('pin');
+    setTotpCode('');
+  };
 
   if (!authed) {
     return (
@@ -12904,12 +12955,27 @@ function OtpDeliveryReportPage() {
         <div style={{ ...S.card(), maxWidth: 440, width: '100%', padding: 24 }}>
           <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>ADMIN ONLY</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>SMS OTP Delivery Reports</div>
-          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>2Factor.in delivery status callbacks recorded in real time.</div>
-          <Field label="Admin PIN">
-            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
-          </Field>
-          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock'}</Btn>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+            2Factor.in delivery status callbacks recorded in real time. PIN + two-factor required.
+          </div>
+          {authStep === 'pin' && (
+            <>
+              <Field label="Admin PIN">
+                <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Continue'}</Btn>
+            </>
+          )}
+          {authStep === 'totp' && (
+            <>
+              <Field label="Authenticator code (6 digits)">
+                <input inputMode="numeric" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && submitTotp()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              <Btn full onClick={submitTotp} disabled={activeTotp.length !== 6 || loading}>{loading ? 'Verifying…' : 'Unlock reports'}</Btn>
+            </>
+          )}
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#otp-delivery-report</code>
           </div>
@@ -12926,7 +12992,10 @@ function OtpDeliveryReportPage() {
             <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 1 }}>2FACTOR DELIVERY REPORTS</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>SMS OTP Status</div>
           </div>
-          <AdminDeepLinkBtn hash="admin" label="Admin hub →" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <AdminDeepLinkBtn hash="admin" label="Admin hub →" />
+            <Btn v="ghost" sm onClick={lock}>Lock</Btn>
+          </div>
         </div>
       </div>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
