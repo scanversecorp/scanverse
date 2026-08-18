@@ -4078,8 +4078,19 @@ async function getIP() {
   catch(e) { return 'unknown'; }
 }
 
-const SILENT_GEO_CACHE_KEY = 'scanv_silent_geo';
+const SILENT_GEO_CACHE_KEY = 'scanv_silent_geo_v2';
 const SILENT_GEO_CACHE_MS = 60 * 60 * 1000;
+
+/** Verified India Post PINs — OSM suburb names often map to the wrong office */
+const KNOWN_LOCALITY_PINS = {
+  tathawade: '411033',
+  thathawade: '411033',
+};
+
+function knownPinForPlace(name) {
+  const key = String(name || '').trim().toLowerCase().replace(/\s+/g, '');
+  return KNOWN_LOCALITY_PINS[key] || '';
+}
 
 function loadCachedSilentGeo() {
   try {
@@ -4104,33 +4115,60 @@ async function resolveIpGeo(ipAddr) {
     const ipGeo = await fetch(`https://ipapi.co/${ipAddr}/json/`).then((r) => r.json());
     if (ipGeo?.error) return null;
     const city = String(ipGeo.city || '').trim();
-    const pincode = String(ipGeo.postal || '').replace(/\D/g, '').slice(0, 6);
-    if (!city && !pincode) return null;
+    if (!city) return null;
     return {
       city,
       state: ipGeo.region || 'Maharashtra',
-      pincode,
       country: ipGeo.country_name || 'India',
       lat: ipGeo.latitude != null ? Number(ipGeo.latitude) : null,
       lng: ipGeo.longitude != null ? Number(ipGeo.longitude) : null,
       source: 'ip',
+      coarse: true,
     };
   } catch { return null; }
 }
 
-/** Header pill: city + PIN, then village, then coarse GPS, else locating */
+/** Header pill: GPS locality + PIN; IP estimate is city-only (PIN from IP is unreliable in India) */
 function formatGeoBadge(geo) {
   if (!geo) return 'Locating…';
+  if (geo.village && geo.pincode) return `${geo.village} ${geo.pincode}`;
+  if (geo.village) return geo.village;
+  if (geo.coarse || geo.source === 'ip') return geo.city ? `${geo.city} area` : 'Locating…';
   const line = [geo.city, geo.pincode].filter(Boolean).join(' ');
   if (line) return line;
-  if (geo.village) return geo.village;
   if (geo.lat != null) return 'Near you';
   return 'Locating…';
 }
 
 function mergeSilentGeo(setSilentGeo, patch) {
   setSilentGeo((prev) => {
-    const next = { ...(prev || {}), ...patch };
+    let next;
+    if (patch.source === 'gps') {
+      next = {
+        ...(prev || {}),
+        device: patch.device ?? prev?.device,
+        ip: patch.ip ?? prev?.ip,
+        source: 'gps',
+        coarse: false,
+        lat: patch.lat ?? prev?.lat,
+        lng: patch.lng ?? prev?.lng,
+      };
+      if (patch.lat != null && patch.lng != null && !patch.pincode && !patch.village && !patch.city) {
+        next.pincode = '';
+      }
+      for (const k of ['address', 'village', 'city', 'state', 'pincode', 'country']) {
+        if (patch[k] != null && patch[k] !== '') next[k] = patch[k];
+      }
+    } else if (patch.source === 'ip') {
+      next = {
+        ...(prev || {}),
+        ...patch,
+        pincode: '',
+        coarse: true,
+      };
+    } else {
+      next = { ...(prev || {}), ...patch };
+    }
     cacheSilentGeo(next);
     return next;
   });
@@ -4171,6 +4209,8 @@ function pickIndiaPostPincode(offices, query, stateHint = 'Maharashtra') {
 }
 
 async function lookupPinByPlaceName(name, stateHint='Maharashtra') {
+  const known = knownPinForPlace(name);
+  if (/^\d{6}$/.test(known)) return known;
   for (const q of pinLookupQueries(name)) {
     try {
       const r=await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(q)}`);
@@ -4195,19 +4235,28 @@ async function reverseGeo(lat,lng) {
 
     let pincode='';
     if (isIndia) {
-      // Village/neighbourhood before suburb — suburbs like Hinjawadi can share wrong PIN vs village (Tathawade 411033 vs 411057)
-      const placeTiers = [
-        [a.village, a.hamlet].filter(Boolean),
-        [a.neighbourhood].filter(Boolean),
-        [a.suburb, a.town, a.city_district].filter(Boolean),
-      ];
-      for (const tier of placeTiers) {
-        const names = [...new Set(tier.map((v) => String(v).trim()).filter((v) => v.length >= 3))];
-        for (const place of names) {
-          pincode = await lookupPinByPlaceName(place, state);
+      // Village/hamlet first — suburb Wakad (411057) must not override village Tathawade (411033)
+      const villageNames = [...new Set([a.village, a.hamlet].filter(Boolean).map((v) => String(v).trim()).filter((v) => v.length >= 3))];
+      for (const place of villageNames) {
+        pincode = knownPinForPlace(place) || await lookupPinByPlaceName(place, state);
+        if (/^\d{6}$/.test(pincode)) break;
+      }
+      if (!/^\d{6}$/.test(pincode) && villageNames.some((v) => /tathawade|thathawade/i.test(v))) {
+        pincode = await lookupPinByPlaceName('Thathawade', state);
+      }
+      if (!/^\d{6}$/.test(pincode)) {
+        const placeTiers = [
+          [a.neighbourhood].filter(Boolean),
+          [a.suburb, a.town, a.city_district].filter(Boolean),
+        ];
+        for (const tier of placeTiers) {
+          const names = [...new Set(tier.map((v) => String(v).trim()).filter((v) => v.length >= 3))];
+          for (const place of names) {
+            pincode = knownPinForPlace(place) || await lookupPinByPlaceName(place, state);
+            if (/^\d{6}$/.test(pincode)) break;
+          }
           if (/^\d{6}$/.test(pincode)) break;
         }
-        if (/^\d{6}$/.test(pincode)) break;
       }
     }
     // OSM postcode last resort only — often wrong (e.g. 411057 for Tathawade; correct is 411033)
@@ -4221,7 +4270,7 @@ async function reverseGeo(lat,lng) {
 
     return {
       address,
-      village: a.village||a.suburb||a.neighbourhood||a.town||'',
+      village: a.village||a.neighbourhood||a.suburb||a.town||'',
       city: a.city||a.state_district||a.town||a.county?.replace(/\s*Subdistrict$/i,'')||'',
       state,
       pincode,
@@ -6152,8 +6201,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
         <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
-          {silentGeo?.city && (
-            <div style={{fontSize:11,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {silentGeo.village || silentGeo.city}{silentGeo.pincode ? ` · ${silentGeo.pincode}` : ''} detected</div>
+          {(silentGeo?.village || silentGeo?.city) && (
+            <div style={{fontSize:11,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {formatGeoBadge(silentGeo)} detected</div>
           )}
           <Field label="Mobile" req note="10-digit Indian mobile">
             <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
