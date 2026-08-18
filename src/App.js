@@ -13154,6 +13154,7 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
   const [apiFilter, setApiFilter] = useState('all');
   const [checksOpen, setChecksOpen] = useState(true);
   const [apiOpen, setApiOpen] = useState(true);
+  const [apiSort, setApiSort] = useState({ key: 'latency_ms', dir: 'desc' });
   const [activeReport, setActiveReport] = useState(null);
   const [payLimit, setPayLimit] = useState(12);
   const reportRefs = useRef({});
@@ -13289,6 +13290,61 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
     if (apiFilter === 'fail') return !p.ok;
     if (apiFilter === 'slow') return p.warn;
     return p.vendor === apiFilter;
+  });
+
+  const toggleApiSort = useCallback((key) => {
+    setApiSort((prev) => ({
+      key,
+      dir: prev.key === key && prev.dir === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
+
+  const sortedProbes = useMemo(() => {
+    const items = [...visibleProbes];
+    const { key, dir } = apiSort;
+    const mul = dir === 'asc' ? 1 : -1;
+    const probeStatusRank = (p) => (!p.ok ? 0 : p.warn ? 1 : 2);
+    const cmp = (a, b) => {
+      let av;
+      let bv;
+      switch (key) {
+        case 'status':
+          av = probeStatusRank(a);
+          bv = probeStatusRank(b);
+          break;
+        case 'latency_ms':
+          av = a.latency_ms || 0;
+          bv = b.latency_ms || 0;
+          break;
+        case 'name':
+        case 'vendor':
+        case 'scope':
+        case 'direction':
+        case 'method':
+        case 'request_summary':
+        case 'response_summary':
+          av = String(a[key] || '').toLowerCase();
+          bv = String(b[key] || '').toLowerCase();
+          return av.localeCompare(bv) * mul;
+        default:
+          av = String(a[key] || '').toLowerCase();
+          bv = String(b[key] || '').toLowerCase();
+      }
+      if (av < bv) return -1 * mul;
+      if (av > bv) return 1 * mul;
+      return 0;
+    };
+    items.sort(cmp);
+    return items;
+  }, [visibleProbes, apiSort]);
+
+  const apiSortMark = (key) => (apiSort.key === key ? (apiSort.dir === 'asc' ? ' ↑' : ' ↓') : '');
+  const sortThBtn = (label, key) => ({
+    ...th,
+    cursor: 'pointer',
+    userSelect: 'none',
+    background: apiSort.key === key ? `${C.acc}10` : C.surf,
+    color: apiSort.key === key ? C.acc : C.sub,
   });
 
   const apiSummary = apiMon?.summary;
@@ -13526,15 +13582,32 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
                     </div>
                     <div style={{ overflowX: 'auto', maxHeight: 'min(50vh, 480px)', overflowY: 'auto', border: BDR, borderRadius: 10 }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 980, fontSize: 11 }}>
-                        <thead>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: C.surf }}>
                           <tr>
-                            {['Status', 'Vendor', 'Scope', 'Direction', 'API', 'Method', 'Time', 'Request', 'Response'].map((h) => (
-                              <th key={h} style={th}>{h}</th>
+                            {[
+                              ['Status', 'status'],
+                              ['Vendor', 'vendor'],
+                              ['Scope', 'scope'],
+                              ['Direction', 'direction'],
+                              ['API', 'name'],
+                              ['Method', 'method'],
+                              ['Time', 'latency_ms'],
+                              ['Request', 'request_summary'],
+                              ['Response', 'response_summary'],
+                            ].map(([label, key]) => (
+                              <th
+                                key={key}
+                                style={sortThBtn(label, key)}
+                                onClick={() => toggleApiSort(key)}
+                                title={`Sort by ${label}`}
+                              >
+                                {label}{apiSortMark(key)}
+                              </th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {visibleProbes.map((p) => (
+                          {sortedProbes.map((p) => (
                             <tr key={`${p.id}-${p.endpoint}`}>
                               <td style={{ ...td, fontWeight: 700, color: !p.ok ? C.red : p.warn ? C.gold : C.grn, fontSize: 10 }}>
                                 {!p.ok ? 'FAIL' : p.warn ? 'SLOW' : 'OK'}
