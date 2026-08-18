@@ -113,13 +113,32 @@ function catalogCourseFeePaise(courses, courseId, row = null) {
   return p > 0 ? p : null;
 }
 
+function catalogScanvPaise(row, courseId, courses) {
+  const fromApi = Number(row?.catalog_scanv_amount_paise || 0);
+  if (fromApi > 0) return fromApi;
+  const courseFee = catalogCourseFeePaise(courses, courseId, row);
+  if (!courseFee) return 0;
+  return Math.round(courseFee * 0.3);
+}
+
+function catalogPartnerPaise(row, courseId, courses) {
+  const fromApi = Number(row?.catalog_partner_amount_paise || 0);
+  if (fromApi > 0) return fromApi;
+  const courseFee = catalogCourseFeePaise(courses, courseId, row) ?? 0;
+  return Math.max(0, courseFee - catalogScanvPaise(row, courseId, courses));
+}
+
 function displayPendingPaise(row, courses, discountPaise) {
   const sgrDue = isSgrPaidRow(row)
     ? 0
     : Math.max(0, sgrFeePaiseFor(row) - Number(row.sgr_paid_paise || 0));
-  const courseFee = catalogCourseFeePaise(courses, row.course_id, row) ?? Number(row.course_fee_paise || 0);
-  const courseDue = Math.max(0, courseFee - Number(discountPaise || 0) - Number(row.course_paid_paise || 0));
-  return sgrDue + courseDue;
+  const courseId = row.course_id;
+  const courseFee = catalogCourseFeePaise(courses, courseId, row) ?? Number(row.course_fee_paise || 0);
+  const scanvFee = catalogScanvPaise(row, courseId, courses);
+  const discount = Number(discountPaise || 0);
+  const scanvDiscount = courseFee > 0 ? Math.round(discount * scanvFee / courseFee) : 0;
+  const scanvDue = Math.max(0, scanvFee - scanvDiscount - Number(row.course_paid_paise || 0));
+  return sgrDue + scanvDue;
 }
 
 function digits10(raw) {
@@ -554,6 +573,89 @@ function formatWhen(iso) {
   }
 }
 
+function localDatetimeInputValue(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day}T${hh}:${mm}`;
+  } catch { return ''; }
+}
+
+const PAYMENT_APPS = ['GPay', 'PhonePe', 'Paytm', 'BHIM', 'Bank transfer', 'Cash', 'Razorpay', 'Other'];
+
+function PaymentCaptureModal({ open, onClose, onSubmit, C, S, Btn, defaultAmount = '' }) {
+  const [form, setForm] = useState({
+    amount_rs: defaultAmount,
+    payment_by: '',
+    payment_app: 'GPay',
+    payment_at: localDatetimeInputValue(new Date().toISOString()),
+    txn_id: '',
+    upi_id: '',
+    note: '',
+  });
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        amount_rs: defaultAmount,
+        payment_by: '',
+        payment_app: 'GPay',
+        payment_at: localDatetimeInputValue(new Date().toISOString()),
+        txn_id: '',
+        upi_id: '',
+        note: '',
+      });
+    }
+  }, [open, defaultAmount]);
+
+  if (!open) return null;
+  const inp = { ...S.inp(), padding: '8px 10px', fontSize: 12, margin: 0 };
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 20 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Record payment</div>
+        <div style={{ fontSize: 11, color: C.sub, marginBottom: 14 }}>Capture payer, app, date/time, transaction ID, and UPI details.</div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <label style={{ fontSize: 11, color: C.dim }}>Amount (₹)
+            <input type="number" step="0.01" value={form.amount_rs} onChange={(e) => set('amount_rs', e.target.value)} style={inp} placeholder="0.00" />
+          </label>
+          <label style={{ fontSize: 11, color: C.dim }}>Payment by
+            <input value={form.payment_by} onChange={(e) => set('payment_by', e.target.value)} style={inp} placeholder="Student / parent name" />
+          </label>
+          <label style={{ fontSize: 11, color: C.dim }}>Payment app
+            <select value={form.payment_app} onChange={(e) => set('payment_app', e.target.value)} style={inp}>
+              {PAYMENT_APPS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </label>
+          <label style={{ fontSize: 11, color: C.dim }}>Payment date & time
+            <input type="datetime-local" value={form.payment_at} onChange={(e) => set('payment_at', e.target.value)} style={inp} />
+          </label>
+          <label style={{ fontSize: 11, color: C.dim }}>Transaction ID
+            <input value={form.txn_id} onChange={(e) => set('txn_id', e.target.value)} style={inp} placeholder="UPI ref / bank txn" />
+          </label>
+          <label style={{ fontSize: 11, color: C.dim }}>UPI ID
+            <input value={form.upi_id} onChange={(e) => set('upi_id', e.target.value)} style={inp} placeholder="name@upi" />
+          </label>
+          <label style={{ fontSize: 11, color: C.dim }}>Note
+            <input value={form.note} onChange={(e) => set('note', e.target.value)} style={inp} placeholder="Optional note" />
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <Btn v="ghost" sm onClick={onClose}>Cancel</Btn>
+          <Btn sm onClick={() => onSubmit(form)}>Save payment</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Btn }) {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -561,7 +663,7 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [edit, setEdit] = useState({});
-  const [payAmt, setPayAmt] = useState({});
+  const [payModal, setPayModal] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr('');
@@ -584,7 +686,9 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
         student_id: id,
         course_fee_paise: catalogFee ?? (patch.course_fee_rs != null ? Math.round(Number(patch.course_fee_rs) * 100) : undefined),
         discount_paise: patch.discount_rs != null ? Math.round(Number(patch.discount_rs) * 100) : undefined,
-        notes: patch.notes,
+        admin_comment: patch.admin_comment,
+        installment_1_date: patch.installment_1_date,
+        installment_2_date: patch.installment_2_date,
         course_id: patch.course_id,
         course_name: patch.course_id ? (courses || []).find((c) => c.id === patch.course_id)?.name : undefined,
       }, { pin, apikey });
@@ -593,12 +697,22 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
     } catch (e) { setErr(e.message); }
   };
 
-  const recordPay = async (id) => {
-    const rs = Number(payAmt[id] || 0);
+  const submitPayment = async (studentId, form) => {
+    const rs = Number(form.amount_rs || 0);
     if (rs <= 0) return setErr('Enter payment amount in rupees');
     try {
-      await studentCloudFetch('record_payment', { student_id: id, kind: 'course', amount_paise: Math.round(rs * 100), note: 'Partial / course fee' }, { pin, apikey });
-      setPayAmt((p) => ({ ...p, [id]: '' }));
+      await studentCloudFetch('record_payment', {
+        student_id: studentId,
+        kind: 'course',
+        amount_paise: Math.round(rs * 100),
+        note: form.note || 'Course fee payment',
+        payment_by: form.payment_by || undefined,
+        payment_app: form.payment_app || undefined,
+        payment_at: form.payment_at ? new Date(form.payment_at).toISOString() : undefined,
+        txn_id: form.txn_id || undefined,
+        upi_id: form.upi_id || undefined,
+      }, { pin, apikey });
+      setPayModal(null);
       setMsg('Payment recorded');
       load();
     } catch (e) { setErr(e.message); }
@@ -614,13 +728,19 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
   };
 
   const csv = () => {
-    const headers = ['Name', 'Mobile', 'DOB', 'Experience', 'Address', 'Village', 'City', 'State', 'PIN', 'Course', 'Schedule', 'Joined', 'SGR paid at', 'SGR fee', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Status'];
+    const headers = ['Name', 'Mobile', 'Course', 'SGR paid', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Course paid', 'Pending (ScanV)', 'Inst 1', 'Inst 2', 'Comment', 'Last payment'];
     const lines = [headers.join(',')];
     for (const r of rows) {
+      const scanv = catalogScanvPaise(r, r.course_id, courses);
+      const partner = catalogPartnerPaise(r, r.course_id, courses);
+      const pending = displayPendingPaise(r, courses, r.discount_paise);
+      const lastPay = (r.student_cloud_payments || []).slice().sort((a, b) => new Date(b.payment_at || b.created_at) - new Date(a.payment_at || a.created_at))[0];
       const vals = [
-        `${r.first_name} ${r.last_name}`, r.mobile, r.dob, r.experience, r.address, r.village, r.city, r.state, r.pincode,
-        r.course_name, `${r.schedule_date || ''} ${r.schedule_time || ''}`, r.created_at, r.sgr_paid_at,
-        fmtRs(r.sgr_fee_paise), fmtRs(r.sgr_paid_paise), fmtRs(r.course_fee_paise), fmtRs(r.discount_paise), fmtRs(r.course_paid_paise), fmtRs(r.pending_paise), r.status,
+        `${r.first_name} ${r.last_name}`, r.mobile, r.course_name,
+        fmtRs(r.sgr_paid_paise), fmtRs(r.effective_course_fee_paise || r.course_fee_paise),
+        fmtRs(scanv), fmtRs(partner), fmtRs(r.discount_paise), fmtRs(r.course_paid_paise), fmtRs(pending),
+        r.installment_1_date || '', r.installment_2_date || '', r.admin_comment || '',
+        lastPay ? `${fmtRs(lastPay.amount_paise)} · ${lastPay.payment_app || ''} · ${lastPay.txn_id || ''}` : '',
       ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`);
       lines.push(vals.join(','));
     }
@@ -637,10 +757,19 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
 
   return (
     <div>
+      <PaymentCaptureModal
+        open={!!payModal}
+        defaultAmount={payModal?.defaultAmount || ''}
+        onClose={() => setPayModal(null)}
+        onSubmit={(form) => submitPayment(payModal?.id, form)}
+        C={C}
+        S={S}
+        Btn={Btn}
+      />
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Student Cloud</div>
-          <div style={{ fontSize: 12, color: C.sub }}>AI, Cloud & Data Center · SGR ₹500 + course fees · partial pay · reminders</div>
+          <div style={{ fontSize: 12, color: C.sub }}>ScanV ₹ & Partner ₹ from Pricing Input · Pending uses ScanV share · 2 installments · payment capture</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn v="outline" sm onClick={csv}>Export CSV</Btn>
@@ -652,10 +781,10 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
       {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
       {loading && !rows.length ? <div style={{ padding: 24, display: 'flex', gap: 8, alignItems: 'center' }}><Spin size={16} /> Loading…</div> : (
         <div style={{ overflow: 'auto', border: `1px solid ${C.bdr}`, borderRadius: 12, maxHeight: '70vh' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 1280 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 1680 }}>
             <thead>
               <tr>
-                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
+                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Paid', 'Pending', 'Inst 1', 'Inst 2', 'Comment', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -663,10 +792,14 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                 const e = edit[r.id] || {};
                 const courseId = e.course_id ?? r.course_id;
                 const catalogFee = catalogCourseFeePaise(courses, courseId, r);
+                const scanvAmt = catalogScanvPaise(r, courseId, courses);
+                const partnerAmt = catalogPartnerPaise(r, courseId, courses);
                 const discountPaise = e.discount_rs != null ? Math.round(Number(e.discount_rs) * 100) : Number(r.discount_paise || 0);
                 const pending = displayPendingPaise({ ...r, course_id: courseId }, courses, discountPaise);
                 const sgrPaid = isSgrPaidRow(r);
                 const addr = [r.address, r.village, r.city, r.state, r.pincode].filter(Boolean).join(', ');
+                const payments = (r.student_cloud_payments || []).slice().sort((a, b) => new Date(b.payment_at || b.created_at) - new Date(a.payment_at || a.created_at));
+                const lastPay = payments[0];
                 return (
                   <tr key={r.id}>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 180, maxWidth: 240 }}>
@@ -677,6 +810,12 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                       </div>
                       <div style={{ color: C.sub, fontSize: 10, marginTop: 4, lineHeight: 1.45 }}>{addr || '—'}</div>
                       <div style={{ color: C.dim, fontSize: 9, marginTop: 4 }}>Joined {formatWhen(r.created_at)}</div>
+                      {lastPay && (
+                        <div style={{ color: C.dim, fontSize: 9, marginTop: 6, lineHeight: 1.4 }}>
+                          Last: ₹{fmtRs(lastPay.amount_paise)} · {lastPay.payment_app || '—'} · {formatWhen(lastPay.payment_at || lastPay.created_at)}
+                          {lastPay.txn_id ? ` · ${lastPay.txn_id}` : ''}
+                        </div>
+                      )}
                     </td>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 150 }}>
                       <select value={courseId ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_id: ev.target.value } }))} style={{ ...inp, minWidth: 140, marginBottom: 6 }}>
@@ -688,12 +827,11 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                           SGR paid{r.sgr_paid_at ? ` · ${formatWhen(r.sgr_paid_at)}` : ''}
                         </div>
                       ) : (
-                        <div style={{ fontSize: 10, color: C.gold, marginTop: 4, fontWeight: 700 }}>SGR pending</div>
+                        <div style={{ fontSize: 10, color: C.gold, marginTop: 4, fontWeight: 700 }}>SGR pending · ₹{fmtRs(r.sgr_fee_paise)}</div>
                       )}
                     </td>
                     <td style={td}>{r.schedule_date || '—'} {r.schedule_time || ''}</td>
-                    <td style={td}>₹{fmtRs(r.sgr_fee_paise)}</td>
-                    <td style={{ ...td, color: sgrPaid ? C.grn : C.gold, fontWeight: 700 }}>₹{fmtRs(r.sgr_paid_paise)}</td>
+                    <td style={td}>₹{fmtRs(r.sgr_paid_paise)}</td>
                     <td style={td}>
                       {sgrPaid ? (
                         <span style={{ fontWeight: 700, color: C.txt }}>
@@ -704,13 +842,23 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                         <span style={{ color: C.dim, fontSize: 11 }}>—</span>
                       )}
                     </td>
-                    <td style={td}><input value={e.discount_rs ?? (Number(r.discount_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], discount_rs: ev.target.value } }))} style={{ ...inp, width: 80 }} /></td>
+                    <td style={{ ...td, fontWeight: 700, color: C.acc }}>{sgrPaid ? `₹${fmtRs(scanvAmt)}` : '—'}</td>
+                    <td style={{ ...td, color: C.cyan }}>{sgrPaid ? `₹${fmtRs(partnerAmt)}` : '—'}</td>
+                    <td style={td}><input value={e.discount_rs ?? (Number(r.discount_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], discount_rs: ev.target.value } }))} style={{ ...inp, width: 72 }} /></td>
                     <td style={td}>₹{fmtRs(r.course_paid_paise)}</td>
-                    <td style={{ ...td, fontWeight: 800, color: pending > 0 ? C.acc : C.grn }}>₹{fmtRs(pending)}</td>
+                    <td style={{ ...td, fontWeight: 800, color: pending > 0 ? C.acc : C.grn }} title="ScanV share pending">₹{fmtRs(pending)}</td>
                     <td style={td}>
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <input value={payAmt[r.id] || ''} onChange={(ev) => setPayAmt((p) => ({ ...p, [r.id]: ev.target.value }))} placeholder="₹ partial" style={{ ...inp, width: 72 }} />
-                        <button type="button" onClick={() => recordPay(r.id)} style={{ ...inp, width: 'auto', cursor: 'pointer', fontWeight: 700 }}>+Pay</button>
+                      <input type="date" value={e.installment_1_date ?? r.installment_1_date ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], installment_1_date: ev.target.value || null } }))} style={{ ...inp, width: 118 }} />
+                    </td>
+                    <td style={td}>
+                      <input type="date" value={e.installment_2_date ?? r.installment_2_date ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], installment_2_date: ev.target.value || null } }))} style={{ ...inp, width: 118 }} />
+                    </td>
+                    <td style={{ ...td, whiteSpace: 'normal', minWidth: 120, maxWidth: 160 }}>
+                      <input value={e.admin_comment ?? r.admin_comment ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], admin_comment: ev.target.value } }))} style={{ ...inp, width: '100%', minWidth: 100 }} placeholder="Notes…" />
+                    </td>
+                    <td style={td}>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button type="button" onClick={() => setPayModal({ id: r.id, defaultAmount: pending > 0 ? String((pending / 100).toFixed(2)) : '' })} style={{ ...inp, width: 'auto', cursor: 'pointer', fontWeight: 700 }}>+Pay</button>
                         <button type="button" onClick={() => save(r.id)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}>Save</button>
                         <button type="button" onClick={() => remind(r.id, 'sms')} disabled={pending <= 0} style={{ ...inp, width: 'auto', cursor: 'pointer' }}>SMS</button>
                         <button type="button" onClick={() => remind(r.id, 'call')} disabled={pending <= 0} style={{ ...inp, width: 'auto', cursor: 'pointer' }}>Call</button>
@@ -719,7 +867,7 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                   </tr>
                 );
               })}
-              {!rows.length && <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: C.dim, padding: 24 }}>No student admissions yet</td></tr>}
+              {!rows.length && <tr><td colSpan={14} style={{ ...td, textAlign: 'center', color: C.dim, padding: 24 }}>No student admissions yet</td></tr>}
             </tbody>
           </table>
         </div>
@@ -799,6 +947,7 @@ export function StudentCloudPage({ apikey, courses, kit }) {
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1 }}>STUDENT CLOUD · HARDPIN</div>
+          <div style={{ fontSize: 11, color: C.sub }}>ScanV ₹ & Partner ₹ from Pricing Input (#pricing-admin)</div>
           <Btn v="outline" sm onClick={lock}>Lock</Btn>
         </div>
         <StudentCloudDashboard pin={pin} apikey={apikey} courses={courses} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />

@@ -114,35 +114,98 @@ function isSgrPaid(row: Record<string, unknown>): boolean {
   return ["sgr_paid", "enrolled", "fee_due", "completed"].includes(String(row.status || ""));
 }
 
-function pendingOf(row: Record<string, unknown>, catalogCourseFee?: number | null): number {
+type CatalogPricing = {
+  course_fee_paise: number;
+  scanv_amount_paise: number;
+  partner_amount_paise: number;
+  scanv_pct: number;
+  partner_pct: number;
+};
+
+function effectiveCourseFee(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
+  const storedCourse = Number(row.course_fee_paise || 0);
+  if (storedCourse > 0) return storedCourse;
+  return catalog?.course_fee_paise ?? 0;
+}
+
+function scanvSharePaise(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
+  if (catalog?.scanv_amount_paise != null && catalog.scanv_amount_paise > 0) {
+    return catalog.scanv_amount_paise;
+  }
+  const courseFee = effectiveCourseFee(row, catalog);
+  const pct = catalog?.scanv_pct ?? 30;
+  return courseFee > 0 ? Math.round(courseFee * pct / 100) : 0;
+}
+
+function partnerSharePaise(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
+  if (catalog?.partner_amount_paise != null && catalog.partner_amount_paise > 0) {
+    return catalog.partner_amount_paise;
+  }
+  const courseFee = effectiveCourseFee(row, catalog);
+  return Math.max(0, courseFee - scanvSharePaise(row, catalog));
+}
+
+function pendingOf(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
   const fee = Number(row.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
   const sgrDue = isSgrPaid(row) ? 0 : Math.max(0, fee - Number(row.sgr_paid_paise || 0));
-  const storedCourse = Number(row.course_fee_paise || 0);
-  const courseFee = storedCourse > 0 ? storedCourse : (catalogCourseFee ?? 0);
-  const courseDue = Math.max(
-    0,
-    courseFee - Number(row.discount_paise || 0) - Number(row.course_paid_paise || 0),
-  );
-  return sgrDue + courseDue;
+  const courseFee = effectiveCourseFee(row, catalog);
+  const scanvFee = scanvSharePaise(row, catalog);
+  const discount = Number(row.discount_paise || 0);
+  const scanvDiscount = courseFee > 0 ? Math.round(discount * scanvFee / courseFee) : 0;
+  const scanvDue = Math.max(0, scanvFee - scanvDiscount - Number(row.course_paid_paise || 0));
+  return sgrDue + scanvDue;
 }
 
-function withPending(row: Record<string, unknown>, catalogCourseFee?: number | null) {
-  const pending_paise = pendingOf(row, catalogCourseFee);
+function withPending(row: Record<string, unknown>, catalog?: CatalogPricing | null) {
+  const pending_paise = pendingOf(row, catalog);
   const storedCourse = Number(row.course_fee_paise || 0);
-  const catalog = catalogCourseFee ?? null;
-  const effective_course_fee_paise = storedCourse > 0 ? storedCourse : (catalog ?? 0);
-  return { ...row, pending_paise, pending_rs: pending_paise / 100, catalog_course_fee_paise: catalog, effective_course_fee_paise };
+  const catalogFee = catalog?.course_fee_paise ?? null;
+  const effective_course_fee_paise = storedCourse > 0 ? storedCourse : (catalogFee ?? 0);
+  const scanv_amount_paise = scanvSharePaise(row, catalog);
+  const partner_amount_paise = partnerSharePaise(row, catalog);
+  return {
+    ...row,
+    pending_paise,
+    pending_rs: pending_paise / 100,
+    catalog_course_fee_paise: catalogFee,
+    effective_course_fee_paise,
+    catalog_scanv_amount_paise: scanv_amount_paise,
+    catalog_partner_amount_paise: partner_amount_paise,
+    catalog_scanv_pct: catalog?.scanv_pct ?? null,
+    catalog_partner_pct: catalog?.partner_pct ?? null,
+  };
 }
 
-async function catalogCourseFeesById(sb: ReturnType<typeof adminSb>, courseIds: string[]): Promise<Record<string, number>> {
+async function catalogPricingById(
+  sb: ReturnType<typeof adminSb>,
+  courseIds: string[],
+): Promise<Record<string, CatalogPricing>> {
   const ids = [...new Set(courseIds.map((id) => String(id || "").trim()).filter(Boolean))];
   if (!ids.length) return {};
-  const { data } = await sb.from("service_prices_public").select("service_id, price_paise").in("service_id", ids);
-  const out: Record<string, number> = {};
+  const { data } = await sb
+    .from("service_pricing")
+    .select("service_id, new_amount_paise, scanv_amount_paise, partner_amount_paise, scanv_pct, partner_pct")
+    .in("service_id", ids);
+  const out: Record<string, CatalogPricing> = {};
   for (const row of data || []) {
-    const p = Number(row.price_paise);
-    if (p > 0) out[String(row.service_id)] = p;
+    const courseFee = Number(row.new_amount_paise);
+    if (courseFee <= 0) continue;
+    out[String(row.service_id)] = {
+      course_fee_paise: courseFee,
+      scanv_amount_paise: Number(row.scanv_amount_paise) || Math.round(courseFee * Number(row.scanv_pct || 30) / 100),
+      partner_amount_paise: Number(row.partner_amount_paise) || Math.round(courseFee * Number(row.partner_pct || 70) / 100),
+      scanv_pct: Number(row.scanv_pct) || 30,
+      partner_pct: Number(row.partner_pct) || 70,
+    };
   }
+  return out;
+}
+
+/** @deprecated use catalogPricingById */
+async function catalogCourseFeesById(sb: ReturnType<typeof adminSb>, courseIds: string[]): Promise<Record<string, number>> {
+  const pricing = await catalogPricingById(sb, courseIds);
+  const out: Record<string, number> = {};
+  for (const [id, p] of Object.entries(pricing)) out[id] = p.course_fee_paise;
   return out;
 }
 
@@ -409,8 +472,8 @@ Deno.serve(async (req) => {
       const { data, error } = await sb.from("student_cloud").select("*, student_cloud_payments(*)").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       const raw = (data || []) as Record<string, unknown>[];
-      const catalogFees = await catalogCourseFeesById(sb, raw.map((r) => String(r.course_id || "")));
-      let rows = raw.map((r) => withPending(r, catalogFees[String(r.course_id || "")] ?? null));
+      const catalogPricing = await catalogPricingById(sb, raw.map((r) => String(r.course_id || "")));
+      let rows = raw.map((r) => withPending(r, catalogPricing[String(r.course_id || "")] ?? null));
       if (q) {
         rows = rows.filter((r) => {
           const hay = [r.first_name, r.last_name, r.mobile, r.course_name, r.city, r.status].join(" ").toLowerCase();
@@ -424,20 +487,23 @@ Deno.serve(async (req) => {
       const id = String(body.student_id || "");
       if (!id) return json({ error: "student_id required" }, 400);
       const patch: Record<string, unknown> = {};
-      for (const k of ["course_id", "course_name", "course_fee_paise", "discount_paise", "status", "notes", "schedule_date", "schedule_time"]) {
+      for (const k of [
+        "course_id", "course_name", "course_fee_paise", "discount_paise", "status", "notes",
+        "schedule_date", "schedule_time", "installment_1_date", "installment_2_date", "admin_comment",
+      ]) {
         if (body[k] !== undefined) patch[k] = body[k];
       }
       if (patch.course_id && patch.course_fee_paise == null) {
-        const catalogFees = await catalogCourseFeesById(sb, [String(patch.course_id)]);
-        const catalogFee = catalogFees[String(patch.course_id)] ?? null;
+        const catalogPricing = await catalogPricingById(sb, [String(patch.course_id)]);
+        const catalogFee = catalogPricing[String(patch.course_id)]?.course_fee_paise ?? null;
         if (catalogFee != null) patch.course_fee_paise = catalogFee;
       }
       if (patch.course_fee_paise != null) patch.course_fee_paise = Math.max(0, Math.round(Number(patch.course_fee_paise) || 0));
       if (patch.discount_paise != null) patch.discount_paise = Math.max(0, Math.round(Number(patch.discount_paise) || 0));
       const { data, error } = await sb.from("student_cloud").update(patch).eq("id", id).select("*").single();
       if (error) throw error;
-      const catalogFees = await catalogCourseFeesById(sb, [String(data.course_id || "")]);
-      return json({ success: true, student: withPending(data, catalogFees[String(data.course_id || "")] ?? null) });
+      const catalogPricing = await catalogPricingById(sb, [String(data.course_id || "")]);
+      return json({ success: true, student: withPending(data, catalogPricing[String(data.course_id || "")] ?? null) });
     }
 
     if (action === "record_payment") {
@@ -448,6 +514,9 @@ Deno.serve(async (req) => {
       const { data: student, error: se } = await sb.from("student_cloud").select("*").eq("id", id).maybeSingle();
       if (se || !student) return json({ error: "Student not found" }, 404);
 
+      const paymentAtRaw = String(body.payment_at || "").trim();
+      const paymentAt = paymentAtRaw ? new Date(paymentAtRaw).toISOString() : new Date().toISOString();
+
       await sb.from("student_cloud_payments").insert({
         student_id: id,
         kind,
@@ -456,6 +525,10 @@ Deno.serve(async (req) => {
         status: "captured",
         note: String(body.note || "Partial payment") || "Partial payment",
         created_by: "admin",
+        payment_by: String(body.payment_by || "") || null,
+        payment_app: String(body.payment_app || "") || null,
+        payment_at: paymentAt,
+        upi_id: String(body.upi_id || "") || null,
       });
 
       const patch: Record<string, unknown> = {};
@@ -463,17 +536,19 @@ Deno.serve(async (req) => {
         patch.sgr_paid_paise = Number(student.sgr_paid_paise || 0) + amount;
         if (Number(patch.sgr_paid_paise) >= Number(student.sgr_fee_paise || SGR_FEE_FALLBACK_PAISE) && student.status === "sgr_pending") {
           patch.status = "sgr_paid";
-          patch.sgr_paid_at = new Date().toISOString();
+          patch.sgr_paid_at = paymentAt;
         }
       } else {
         patch.course_paid_paise = Number(student.course_paid_paise || 0) + amount;
-        const due = pendingOf({ ...student, ...patch });
+        const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
+        const due = pendingOf({ ...student, ...patch }, catalogPricing[String(student.course_id || "")] ?? null);
         if (due <= 0) patch.status = "enrolled";
         else if (student.status === "sgr_paid") patch.status = "fee_due";
       }
       const { data, error } = await sb.from("student_cloud").update(patch).eq("id", id).select("*").single();
       if (error) throw error;
-      return json({ success: true, student: withPending(data) });
+      const catalogPricing = await catalogPricingById(sb, [String(data.course_id || "")]);
+      return json({ success: true, student: withPending(data, catalogPricing[String(data.course_id || "")] ?? null) });
     }
 
     if (action === "remind") {
@@ -482,7 +557,8 @@ Deno.serve(async (req) => {
       if (!id) return json({ error: "student_id required" }, 400);
       const { data: student, error: se } = await sb.from("student_cloud").select("*").eq("id", id).maybeSingle();
       if (se || !student) return json({ error: "Student not found" }, 404);
-      const pending = pendingOf(student);
+      const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
+      const pending = pendingOf(student, catalogPricing[String(student.course_id || "")] ?? null);
       if (pending <= 0) return json({ error: "No pending payment" }, 400);
       const rs = (pending / 100).toLocaleString("en-IN");
       const name = student.first_name || "Student";

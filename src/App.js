@@ -2637,13 +2637,15 @@ function adminAuthOk() {
   try {
     const raw = sessionStorage.getItem(ADMIN_AUTH_KEY);
     if (!raw) return false;
-    const { pin, exp } = JSON.parse(raw);
-    return !!pin && Date.now() < exp;
+    const { pin, totpOk, sessionToken, exp } = JSON.parse(raw);
+    return !!pin && totpOk === true && !!sessionToken && Date.now() < exp;
   } catch { return false; }
 }
 
-function setAdminAuth(pin, iam = null) {
-  sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify({ pin, iam, exp: Date.now() + 86400000 }));
+function setAdminAuth(pin, iam = null, totpOk = false, sessionToken = null) {
+  sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify({
+    pin, iam, totpOk: !!totpOk, sessionToken: sessionToken || null, exp: Date.now() + 28800000,
+  }));
 }
 
 function getAdminIam() {
@@ -2666,9 +2668,34 @@ function getAdminAuth() {
   } catch { return null; }
 }
 
-async function adminHubFetch(action, payload = {}, pin) {
+function adminHubHeaders(pin, { totp } = {}) {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
   if (pin) headers['x-admin-pin'] = pin;
+  if (totp) {
+    headers['x-admin-totp'] = String(totp).replace(/\D/g, '');
+    return headers;
+  }
+  const auth = getAdminAuth();
+  if (auth?.sessionToken && auth.pin === pin) {
+    headers['x-admin-session'] = auth.sessionToken;
+  }
+  return headers;
+}
+
+async function adminHubTotp(pin, action, extra = {}, totp) {
+  const res = await fetch(ADMIN_FN, {
+    method: 'POST',
+    headers: adminHubHeaders(pin, { totp }),
+    body: JSON.stringify({ action, code: totp ? String(totp).replace(/\D/g, '') : undefined, ...extra }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function adminHubFetch(action, payload = {}, pin) {
+  const usePin = pin || getAdminAuth()?.pin;
+  const headers = adminHubHeaders(usePin);
   const staffToken = getAdminAuth()?.staff_token;
   if (staffToken) headers['Authorization'] = `Bearer ${staffToken}`;
   const res = await fetch(ADMIN_FN, {
@@ -2677,7 +2704,11 @@ async function adminHubFetch(action, payload = {}, pin) {
     body: JSON.stringify({ action, ...payload }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) {
+    const err = new Error(data.error || 'Request failed');
+    err.totpRequired = data.totp_required;
+    throw err;
+  }
   return data;
 }
 
@@ -12436,28 +12467,70 @@ function ExecDonutChart({ segments, size = 120 }) {
 }
 
 function ExecDashboardPage() {
-  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
+  const savedAuth = getAdminAuth();
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin || '');
+  const [totpCode, setTotpCode] = useState('');
+  const [authStep, setAuthStep] = useState('pin');
   const [authed, setAuthed] = useState(adminAuthOk());
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [data, setData] = useState(null);
 
   const usePin = pin || getAdminAuth()?.pin;
+  const activeTotp = totpCode.replace(/\D/g, '').slice(0, 6);
+
+  useEffect(() => {
+    if (adminAuthOk()) {
+      setPin(getAdminAuth().pin);
+      setAuthed(true);
+      setAuthStep('done');
+      return;
+    }
+    const savedPin = sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin;
+    if (!savedPin) return;
+    (async () => {
+      try {
+        const status = await adminHubTotp(savedPin, 'totp_status');
+        setPin(savedPin);
+        if (status.enrolled) setAuthStep('totp');
+      } catch { /* stay on pin */ }
+    })();
+  }, []);
 
   const login = async () => {
     if (!pin) { setErr('Enter owner PIN'); return; }
     setLoading(true); setErr('');
     try {
-      await adminHubFetch('exec_stats', {}, pin);
+      await adminHubFetch('whoami', {}, pin);
       sessionStorage.setItem(ADMIN_PIN_KEY, pin);
-      setAdminAuth(pin);
-      setAuthed(true);
+      const status = await adminHubTotp(pin, 'totp_status');
+      if (!status.enrolled) {
+        setErr('Admin hub 2FA must be set up first at /#admin');
+        return;
+      }
+      setAuthStep('totp');
     } catch (e) {
       setErr(e.message?.includes('Executive') || e.message?.includes('403')
         ? 'Executive dashboard requires ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN'
         : 'Incorrect PIN — set ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN in Supabase secrets');
       setAuthed(false);
       sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    } finally { setLoading(false); }
+  };
+
+  const submitTotp = async () => {
+    if (activeTotp.length !== 6) { setErr('Enter 6-digit code'); return; }
+    setLoading(true); setErr('');
+    try {
+      const verified = await adminHubTotp(pin, 'totp_verify', {}, activeTotp);
+      setAdminAuth(pin, null, true, verified.session_token);
+      await adminHubFetch('exec_stats', {}, pin);
+      setAuthed(true);
+      setAuthStep('done');
+      setTotpCode('');
+    } catch (e) {
+      setErr(e.message || 'Invalid code');
+      setAuthed(false);
     } finally { setLoading(false); }
   };
 
@@ -12490,13 +12563,26 @@ function ExecDashboardPage() {
           <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>BUSINESS OWNER · CONFIDENTIAL</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Executive Dashboard</div>
           <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
-            Read-only metrics for revenue, payments, users, bookings, support, and platform health. Requires owner PIN.
+            Read-only metrics for revenue, payments, users, bookings, support, and platform health. PIN + two-factor required.
           </div>
-          <Field label="Owner PIN (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN)">
-            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
-          </Field>
-          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock dashboard'}</Btn>
+          {authStep === 'pin' && (
+            <>
+              <Field label="Owner PIN (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN)">
+                <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Continue'}</Btn>
+            </>
+          )}
+          {authStep === 'totp' && (
+            <>
+              <Field label="Authenticator code (6 digits)">
+                <input inputMode="numeric" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && submitTotp()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              <Btn full onClick={submitTotp} disabled={activeTotp.length !== 6 || loading}>{loading ? 'Verifying…' : 'Unlock dashboard'}</Btn>
+            </>
+          )}
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#exec</code>
           </div>
@@ -14768,8 +14854,14 @@ function AdminBookingsTab({ pin }) {
 }
 
 function AdminControlCenter({ onPricesUpdated }) {
-  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || '');
+  const savedAuth = getAdminAuth();
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin || '');
+  const [totpCode, setTotpCode] = useState('');
+  const [authStep, setAuthStep] = useState('pin');
   const [authed, setAuthed] = useState(adminAuthOk());
+  const [totpEnrolled, setTotpEnrolled] = useState(null);
+  const [enrollQr, setEnrollQr] = useState('');
+  const [enrollSecret, setEnrollSecret] = useState('');
   const [iam, setIam] = useState(() => getAdminIam());
   const [tab, setTab] = useState(() => adminTabFromHash() || 'overview');
   const [loading, setLoading] = useState(false);
@@ -14778,6 +14870,7 @@ function AdminControlCenter({ onPricesUpdated }) {
   const [stats, setStats] = useState(null);
 
   const usePin = pin || getAdminAuth()?.pin;
+  const activeTotp = totpCode.replace(/\D/g, '').slice(0, 6);
 
   const navigateAdminTab = useCallback((id) => {
     setTab(id);
@@ -14786,6 +14879,31 @@ function AdminControlCenter({ onPricesUpdated }) {
     if (ADMIN_TABS.some((t) => t.id === id)) {
       window.history.replaceState({}, '', adminTabUrl(id));
     }
+  }, []);
+
+  useEffect(() => {
+    if (adminAuthOk()) {
+      const auth = getAdminAuth();
+      setPin(auth.pin);
+      setAuthed(true);
+      setTotpEnrolled(true);
+      setAuthStep('done');
+      setTotpCode('');
+      return;
+    }
+    const savedPin = sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin;
+    if (!savedPin) return;
+    (async () => {
+      try {
+        const status = await adminHubTotp(savedPin, 'totp_status');
+        setPin(savedPin);
+        setTotpEnrolled(!!status.enrolled);
+        if (status.enrolled) {
+          setAuthStep('totp');
+          setMsg('Enter your authenticator code to continue');
+        }
+      } catch { /* invalid pin */ }
+    })();
   }, []);
 
   useEffect(() => {
@@ -14804,14 +14922,23 @@ function AdminControlCenter({ onPricesUpdated }) {
     let cancelled = false;
     (async () => {
       try {
+        const auth = getAdminAuth();
         const who = await adminHubFetch('whoami', {}, usePin);
         if (cancelled) return;
-        setAdminAuth(usePin, who);
+        setAdminAuth(usePin, who, auth?.totpOk, auth?.sessionToken);
         setIam(who);
       } catch { /* stale PIN handled on next action */ }
     })();
     return () => { cancelled = true; };
   }, [authed, usePin]);
+
+  const startEnroll = async (usePin) => {
+    const data = await adminHubTotp(usePin, 'totp_enroll');
+    setEnrollSecret(data.secret);
+    setEnrollQr(data.otpauth_uri);
+    setAuthStep('enroll');
+    setMsg('Scan QR in Microsoft / Google Authenticator, then enter the 6-digit code');
+  };
 
   const login = async () => {
     if (!pin) { setErr('Enter admin PIN'); return; }
@@ -14819,14 +14946,56 @@ function AdminControlCenter({ onPricesUpdated }) {
     try {
       const who = await adminHubFetch('whoami', {}, pin);
       sessionStorage.setItem(ADMIN_PIN_KEY, pin);
-      setAdminAuth(pin, who);
-      setIam(who);
-      setAuthed(true);
-      setMsg(`Admin hub unlocked · ${who.roles?.join(', ') || who.role || 'staff'}`);
+      const status = await adminHubTotp(pin, 'totp_status');
+      setTotpEnrolled(!!status.enrolled);
+      if (!status.enrolled) {
+        setMsg('Set up two-factor authentication to continue');
+        await startEnroll(pin);
+        return;
+      }
+      setAuthStep('totp');
+      setMsg('Enter your authenticator code');
     } catch {
       setErr('Incorrect PIN — set ADMIN_HUB_PIN, SUPPORT_ADMIN_PIN, PRICING_ADMIN_PIN, or VENDOR_ADMIN_PIN in Supabase secrets');
       setAuthed(false);
       sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    } finally { setLoading(false); }
+  };
+
+  const submitTotp = async () => {
+    if (activeTotp.length !== 6) { setErr('Enter 6-digit code'); return; }
+    setLoading(true); setErr('');
+    try {
+      const verified = await adminHubTotp(pin, 'totp_verify', {}, activeTotp);
+      setAdminAuth(pin, null, true, verified.session_token);
+      const who = await adminHubFetch('whoami', {}, pin);
+      setAdminAuth(pin, who, true, verified.session_token);
+      setIam(who);
+      setAuthed(true);
+      setAuthStep('done');
+      setTotpCode('');
+      setMsg(`Admin hub unlocked · ${who.roles?.join(', ') || who.role || 'staff'}`);
+    } catch (e) {
+      setErr(e.message || 'Invalid code');
+    } finally { setLoading(false); }
+  };
+
+  const confirmEnroll = async () => {
+    if (activeTotp.length !== 6) { setErr('Enter 6-digit code from authenticator'); return; }
+    setLoading(true); setErr('');
+    try {
+      const confirmed = await adminHubTotp(pin, 'totp_confirm', { code: activeTotp }, activeTotp);
+      setAdminAuth(pin, null, true, confirmed.session_token);
+      const who = await adminHubFetch('whoami', {}, pin);
+      setAdminAuth(pin, who, true, confirmed.session_token);
+      setIam(who);
+      setAuthed(true);
+      setAuthStep('done');
+      setTotpEnrolled(true);
+      setTotpCode('');
+      setMsg(`2FA enabled · Admin hub unlocked · ${who.roles?.join(', ') || who.role || 'staff'}`);
+    } catch (e) {
+      setErr(e.message || 'Invalid code — check authenticator and try again');
     } finally { setLoading(false); }
   };
 
@@ -14835,7 +15004,16 @@ function AdminControlCenter({ onPricesUpdated }) {
     try {
       const data = await adminHubFetch('stats', {}, usePin);
       setStats(data);
-    } catch (e) { setErr(e.message); }
+    } catch (e) {
+      if (e.totpRequired) {
+        setAuthed(false);
+        setAuthStep('totp');
+        setErr('Session expired — enter a fresh authenticator code');
+        sessionStorage.removeItem(ADMIN_AUTH_KEY);
+      } else {
+        setErr(e.message);
+      }
+    }
   }, [usePin]);
 
   useEffect(() => {
@@ -14848,6 +15026,8 @@ function AdminControlCenter({ onPricesUpdated }) {
     setAuthed(false);
     setStats(null);
     setIam(null);
+    setAuthStep(totpEnrolled === false ? 'pin' : 'totp');
+    setTotpCode('');
   };
 
   const tabBtn = (t) => ({
@@ -14864,13 +15044,47 @@ function AdminControlCenter({ onPricesUpdated }) {
           <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>LEADER ONLY · CONFIDENTIAL</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Admin Control Center</div>
           <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
-            Unified hub for pricing, support, agents, vendors, bookings, and platform settings. Not linked in public navigation.
+            Unified hub for pricing, support, agents, vendors, bookings, and platform settings. PIN + two-factor required.
           </div>
-          <Field label="Admin PIN">
-            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
-          </Field>
-          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock admin hub'}</Btn>
+          {authStep === 'pin' && (
+            <>
+              <Field label="Admin PIN">
+                <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 12 }}>{msg}</div>}
+              <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Continue'}</Btn>
+            </>
+          )}
+          {authStep === 'totp' && (
+            <>
+              <Field label="Authenticator code (6 digits)">
+                <input inputMode="numeric" pattern="[0-9]*" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && submitTotp()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              {msg && <div style={{ color: C.sub, fontSize: 12, marginBottom: 12 }}>{msg}</div>}
+              <Btn full onClick={submitTotp} disabled={activeTotp.length !== 6 || loading}>{loading ? 'Verifying…' : 'Unlock admin hub'}</Btn>
+              <Btn v="ghost" sm full onClick={() => { setAuthStep('pin'); setTotpCode(''); setErr(''); }} style={{ marginTop: 8 }}>Back to PIN</Btn>
+            </>
+          )}
+          {authStep === 'enroll' && (
+            <>
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>Scan in Microsoft Authenticator, Google Authenticator, or Authy:</div>
+              {enrollQr && (
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(enrollQr)}`} alt="TOTP QR" width={180} height={180} style={{ borderRadius: 8, border: BDR }} />
+                </div>
+              )}
+              {enrollSecret && (
+                <div style={{ fontSize: 10, color: C.dim, wordBreak: 'break-all', marginBottom: 12 }}>Manual key: <code style={{ color: C.acc }}>{enrollSecret}</code></div>
+              )}
+              <Field label="Enter code from app">
+                <input inputMode="numeric" maxLength={6} value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && confirmEnroll()} style={{ ...S.inp(), letterSpacing: 6, fontSize: 18, fontWeight: 800, textAlign: 'center' }} placeholder="000000" autoComplete="one-time-code" />
+              </Field>
+              {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+              <Btn full onClick={confirmEnroll} disabled={activeTotp.length !== 6 || loading}>{loading ? 'Confirming…' : 'Enable 2FA & unlock'}</Btn>
+            </>
+          )}
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#admin</code>
           </div>

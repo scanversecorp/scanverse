@@ -161,11 +161,16 @@ import {
   resolveIamContext,
   type IamContext,
 } from "../_shared/iam.ts";
+import {
+  generateTotpSecret,
+  otpAuthUri,
+  verifyTotp,
+} from "../_shared/totp.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-admin-pin, x-support-pin",
+    "authorization, x-client-info, apikey, content-type, x-admin-pin, x-support-pin, x-admin-totp, x-admin-session",
 };
 
 function json(body: unknown, status = 200): Response {
@@ -1014,6 +1019,179 @@ async function updateRazorpayRouteTicketAction(
   return json({ success: true, ticket: result.ticket });
 }
 
+const ADMIN_HUB_TOTP_SECRET_KEY = "admin_hub_totp_secret";
+const ADMIN_HUB_TOTP_PENDING_KEY = "admin_hub_totp_pending";
+const ADMIN_HUB_TOTP_ISSUER = "ScanV Admin Hub";
+const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+async function adminSessionHmacKey(): Promise<CryptoKey> {
+  const material = Deno.env.get("ADMIN_HUB_PIN") || "scanv-admin-hub-session";
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(material),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+}
+
+function b64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function b64urlDecode(s: string): Uint8Array {
+  const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
+  const bin = atob(b64);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+async function createAdminSession(): Promise<{ token: string; exp: number }> {
+  const exp = Date.now() + ADMIN_SESSION_TTL_MS;
+  const nonce = crypto.randomUUID();
+  const payload = `${exp}.${nonce}`;
+  const key = await adminSessionHmacKey();
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return { token: `${payload}.${b64url(new Uint8Array(sig))}`, exp };
+}
+
+async function verifyAdminSession(token: string): Promise<boolean> {
+  if (!token) return false;
+  const lastDot = token.lastIndexOf(".");
+  if (lastDot <= 0) return false;
+  const payload = token.slice(0, lastDot);
+  const sigPart = token.slice(lastDot + 1);
+  const exp = Number(payload.split(".")[0]);
+  if (!exp || Date.now() > exp) return false;
+  try {
+    const key = await adminSessionHmacKey();
+    const sig = b64urlDecode(sigPart);
+    return await crypto.subtle.verify("HMAC", key, sig, new TextEncoder().encode(payload));
+  } catch {
+    return false;
+  }
+}
+
+async function issueAdminSessionResponse(extra: Record<string, unknown> = {}) {
+  const session = await createAdminSession();
+  return json({ ...extra, session_token: session.token, session_exp: session.exp });
+}
+
+function adminPinPresent(req: Request): boolean {
+  const pin = req.headers.get("x-admin-pin") || req.headers.get("x-support-pin") || "";
+  if (!pin || pin.length < 6) return false;
+  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN", "SUPPORT_AGENT_PIN"]) {
+    const secret = Deno.env.get(k) || "";
+    if (secret.length >= 6 && pin === secret) return true;
+  }
+  return false;
+}
+
+async function getAdminHubSetting(sb: ReturnType<typeof adminSb>, key: string): Promise<string | null> {
+  const { data } = await sb.from("platform_settings").select("value").eq("key", key).maybeSingle();
+  return data?.value ? String(data.value) : null;
+}
+
+async function setAdminHubSetting(sb: ReturnType<typeof adminSb>, key: string, value: string, description?: string) {
+  const { error } = await sb.from("platform_settings").upsert({
+    key,
+    value,
+    description: description || null,
+    updated_by: "admin-hub",
+  }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
+
+async function deleteAdminHubSetting(sb: ReturnType<typeof adminSb>, key: string) {
+  await sb.from("platform_settings").delete().eq("key", key);
+}
+
+async function getAdminHubTotpSecret(sb: ReturnType<typeof adminSb>): Promise<string | null> {
+  const dbSecret = await getAdminHubSetting(sb, ADMIN_HUB_TOTP_SECRET_KEY);
+  if (dbSecret?.trim()) return dbSecret.trim();
+  const envSecret = Deno.env.get("ADMIN_HUB_TOTP_SECRET")?.trim();
+  return envSecret || null;
+}
+
+function adminTotpCodeFrom(req: Request, body: Record<string, unknown>): string {
+  return String(body.code || req.headers.get("x-admin-totp") || "").replace(/\D/g, "");
+}
+
+async function checkAdminHubTotpCode(secret: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  if (!code || code.length !== 6) return { ok: false, error: "Authenticator code required" };
+  const valid = await verifyTotp(secret.trim(), code, 2);
+  if (!valid) return { ok: false, error: "Invalid authenticator code — try the next code" };
+  return { ok: true };
+}
+
+async function handleAdminHubTotpAction(
+  sb: ReturnType<typeof adminSb>,
+  action: string,
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<Response | null> {
+  if (!adminPinPresent(req)) return json({ error: "Unauthorized" }, 401);
+
+  if (action === "totp_status") {
+    const secret = await getAdminHubTotpSecret(sb);
+    const pending = await getAdminHubSetting(sb, ADMIN_HUB_TOTP_PENDING_KEY);
+    return json({ enrolled: !!secret, pending: !!pending });
+  }
+
+  if (action === "totp_enroll") {
+    const existing = await getAdminHubTotpSecret(sb);
+    if (existing) return json({ error: "Two-factor already enrolled" }, 400);
+    const secret = generateTotpSecret();
+    await setAdminHubSetting(sb, ADMIN_HUB_TOTP_PENDING_KEY, secret, "Pending TOTP enrollment for admin hub");
+    const uri = otpAuthUri(secret, ADMIN_HUB_TOTP_ISSUER, "admin-hub");
+    return json({ secret, otpauth_uri: uri, issuer: ADMIN_HUB_TOTP_ISSUER });
+  }
+
+  if (action === "totp_confirm") {
+    const pending = await getAdminHubSetting(sb, ADMIN_HUB_TOTP_PENDING_KEY);
+    if (!pending) return json({ error: "No pending enrollment — start again" }, 400);
+    const code = adminTotpCodeFrom(req, body);
+    const result = await checkAdminHubTotpCode(pending, code);
+    if (!result.ok) return json({ error: result.error || "Invalid code" }, 401);
+    await setAdminHubSetting(sb, ADMIN_HUB_TOTP_SECRET_KEY, pending, "TOTP secret for admin hub 2FA");
+    await deleteAdminHubSetting(sb, ADMIN_HUB_TOTP_PENDING_KEY);
+    return issueAdminSessionResponse({ success: true, enrolled: true });
+  }
+
+  if (action === "totp_verify") {
+    const enrolledSecret = await getAdminHubTotpSecret(sb);
+    if (!enrolledSecret) return json({ success: true, enrolled: false });
+    const code = adminTotpCodeFrom(req, body);
+    const result = await checkAdminHubTotpCode(enrolledSecret, code);
+    if (!result.ok) return json({ error: result.error }, 401);
+    return issueAdminSessionResponse({ success: true, enrolled: true });
+  }
+
+  return null;
+}
+
+async function checkAdminHubTotp(
+  req: Request,
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+  action: string,
+): Promise<Response | null> {
+  if (action.startsWith("totp_") || action === "whoami") return null;
+  const secret = await getAdminHubTotpSecret(sb);
+  if (!secret) return null;
+
+  const session = req.headers.get("x-admin-session") || "";
+  if (await verifyAdminSession(session)) return null;
+
+  const code = adminTotpCodeFrom(req, body);
+  const result = await checkAdminHubTotpCode(secret, code);
+  if (!result.ok) return json({ error: result.error, totp_required: true }, 401);
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -1033,10 +1211,18 @@ Deno.serve(async (req) => {
   const action = String(body.action || "");
   const sb = adminSb();
 
+  if (action.startsWith("totp_")) {
+    const totpRes = await handleAdminHubTotpAction(sb, action, body, req);
+    if (totpRes) return totpRes;
+  }
+
   const ctx = await resolveIamContext(req, sb);
   if (!ctx) {
     return json({ error: "Unauthorized" }, 401);
   }
+
+  const totpErr = await checkAdminHubTotp(req, sb, body, action);
+  if (totpErr) return totpErr;
 
   if (action !== "whoami") {
     const missingPerm = requireHubPermission(ctx, action);
