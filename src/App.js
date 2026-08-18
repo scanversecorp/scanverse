@@ -8143,41 +8143,45 @@ function gpsDistanceM(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/** Cached position first (triggers native permission popup), then high-accuracy refresh in background */
+/** Cached position + high-accuracy in parallel — permission prompt fires immediately on app open */
 function requestNativeGps({ onFast, onAccurate, onError } = {}) {
   if (!navigator.geolocation) {
     onError?.({ code: 0, message: 'GPS not supported' });
     return;
   }
+  let fastDone = false;
+  const emitFast = (payload) => {
+    if (fastDone) return;
+    fastDone = true;
+    onFast?.(payload);
+  };
+
+  // Stale-while-revalidate: return last fix instantly if browser has one (< 5 min)
+  navigator.geolocation.getCurrentPosition(
+    (pos) => emitFast({
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      pos,
+    }),
+    () => {},
+    { enableHighAccuracy: false, maximumAge: 300000, timeout: 3000 },
+  );
+
+  // High accuracy — fired immediately in parallel (not after cached returns)
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      onFast?.({ lat, lng, accuracy: pos.coords.accuracy, pos });
-      navigator.geolocation.getCurrentPosition(
-        (pos2) => onAccurate?.({
-          lat: pos2.coords.latitude,
-          lng: pos2.coords.longitude,
-          accuracy: pos2.coords.accuracy,
-          pos: pos2,
-        }),
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 },
-      );
+      const payload = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        pos,
+      };
+      emitFast(payload);
+      onAccurate?.(payload);
     },
-    () => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          onFast?.({ lat, lng, accuracy: pos.coords.accuracy, pos });
-          onAccurate?.({ lat, lng, accuracy: pos.coords.accuracy, pos });
-        },
-        (err) => onError?.(err),
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 },
-      );
-    },
-    { enableHighAccuracy: false, maximumAge: 600000, timeout: 8000 },
+    (err) => { if (!fastDone) onError?.(err); },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
   );
 }
 
@@ -15278,46 +15282,49 @@ export default function App() {
     setUser(null); setState('browse'); setScreen('services');
   },[]);
 
-  // Native GPS on app open — IP estimate first, then GPS refine (cached for repeat visits)
+  // GPS immediately on app open; IP estimate runs in parallel as fallback only
   useEffect(() => {
     if (isGpsPortalRoute()) return undefined;
     let cancelled = false;
+    const device = detectDevice();
 
     const cached = loadCachedSilentGeo();
     if (cached) setSilentGeo(cached);
 
+    requestNativeGps({
+      onFast: ({ lat, lng }) => {
+        if (cancelled) return;
+        mergeSilentGeo(setSilentGeo, { lat, lng, device, source: 'gps' });
+        reverseGeo(lat, lng).then((geo) => {
+          if (cancelled) return;
+          mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, source: 'gps' });
+        }).catch(() => {});
+      },
+      onAccurate: ({ lat, lng }) => {
+        if (cancelled) return;
+        reverseGeo(lat, lng).then((geo) => {
+          if (cancelled) return;
+          mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, source: 'gps' });
+        }).catch(() => {
+          if (!cancelled) mergeSilentGeo(setSilentGeo, { lat, lng, device, source: 'gps' });
+        });
+      },
+      onError: () => { /* IP fallback below if GPS denied */ },
+    });
+
     (async () => {
-      const device = detectDevice();
-      let ipAddr = '';
-      try { ipAddr = await getIP(); } catch (_) { /* non-blocking */ }
-
-      if (!cancelled && ipAddr) {
+      try {
+        const ipAddr = await getIP();
+        if (cancelled || !ipAddr) return;
         const ipGeo = await resolveIpGeo(ipAddr);
-        if (ipGeo && !cancelled) {
-          mergeSilentGeo(setSilentGeo, { ...ipGeo, device, ip: ipAddr });
-        }
-      }
-
-      requestNativeGps({
-        onFast: ({ lat, lng }) => {
-          if (cancelled) return;
-          mergeSilentGeo(setSilentGeo, { lat, lng, device, ip: ipAddr, source: 'gps' });
-          reverseGeo(lat, lng).then((geo) => {
-            if (cancelled) return;
-            mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, ip: ipAddr, source: 'gps' });
-          }).catch(() => {});
-        },
-        onAccurate: ({ lat, lng }) => {
-          if (cancelled) return;
-          reverseGeo(lat, lng).then((geo) => {
-            if (cancelled) return;
-            mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, ip: ipAddr, source: 'gps' });
-          }).catch(() => {
-            if (!cancelled) mergeSilentGeo(setSilentGeo, { lat, lng, device, ip: ipAddr, source: 'gps' });
-          });
-        },
-        onError: () => { /* IP estimate or session cache already shown */ },
-      });
+        if (cancelled || !ipGeo) return;
+        setSilentGeo((prev) => {
+          if (prev?.source === 'gps' || prev?.lat != null) return prev;
+          const next = { ...(prev || {}), ...ipGeo, device, ip: ipAddr, coarse: true, pincode: '' };
+          cacheSilentGeo(next);
+          return next;
+        });
+      } catch (_) { /* non-blocking */ }
     })();
 
     return () => { cancelled = true; };
