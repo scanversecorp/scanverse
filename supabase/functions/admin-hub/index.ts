@@ -51,6 +51,7 @@
  *   run_infra_health_check — DB, deploy bundle, go-live, catalog checks
  *   run_security_health_check — RLS, auth gates, exposure & production safety
  *   run_smoke_test — application + infra + security + UI fetch smoke
+ *   run_api_monitoring — API latency probes + flow transactions (Ops Dashboard)
  *
  * Auth: Authorization Bearer (staff JWT) OR x-admin-pin
  *   PIN secrets: ADMIN_HUB_PIN | EXEC_DASHBOARD_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
@@ -178,6 +179,7 @@ import {
   runSecurityHealthChecks,
   runSmokeTest,
 } from "../_shared/health-checks.ts";
+import { runApiMonitoring } from "../_shared/api-monitoring.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -1786,6 +1788,16 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Smoke test failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "run_api_monitoring") {
+    try {
+      const result = await runApiMonitoring(sb);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "API monitoring failed";
       return json({ error: msg }, 500);
     }
   }

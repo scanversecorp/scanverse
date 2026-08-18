@@ -13125,16 +13125,35 @@ function payStatusColor(st) {
   return C.sub;
 }
 
+function latencyMsColor(ms, ok) {
+  if (!ok) return C.red;
+  if (ms >= 3000) return C.red;
+  if (ms >= 1500) return C.gold;
+  return C.grn;
+}
+
+function vendorAccent(v) {
+  const map = {
+    scanv: C.acc, supabase: C.cyan, vercel: C.txt, cloudflare: C.gold,
+    resend: C.vio, razorpay: C.acc, twofactor: C.grn, msg91: C.cyan, twilio: C.red,
+  };
+  return map[v] || C.sub;
+}
+
 function AdminHealthCheckTab({ pin }) {
   const [stats, setStats] = useState(null);
   const [recentPay, setRecentPay] = useState([]);
   const [result, setResult] = useState(null);
+  const [apiMon, setApiMon] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingHealth, setLoadingHealth] = useState(false);
+  const [loadingApiMon, setLoadingApiMon] = useState(false);
   const [phase, setPhase] = useState('');
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState('all');
+  const [apiFilter, setApiFilter] = useState('all');
   const [checksOpen, setChecksOpen] = useState(true);
+  const [apiOpen, setApiOpen] = useState(true);
 
   const loadStats = useCallback(async () => {
     if (!pin) return;
@@ -13171,18 +13190,40 @@ function AdminHealthCheckTab({ pin }) {
     }
   }, [pin]);
 
+  const loadApiMon = useCallback(async () => {
+    if (!pin) return;
+    setLoadingApiMon(true);
+    try {
+      const data = await adminHubFetch('run_api_monitoring', {}, pin);
+      setApiMon(data);
+      setApiOpen(true);
+    } catch (e) {
+      setErr((prev) => prev || e.message);
+    } finally {
+      setLoadingApiMon(false);
+    }
+  }, [pin]);
+
   useEffect(() => { loadStats(); }, [loadStats]);
 
   const healthBoot = useRef(false);
+  const apiBoot = useRef(false);
   useEffect(() => {
     if (!pin || healthBoot.current || result) return;
     healthBoot.current = true;
     run('run_smoke_test', 'Loading platform health checks…');
   }, [pin, result, run]);
 
+  useEffect(() => {
+    if (!pin || apiBoot.current || apiMon) return;
+    apiBoot.current = true;
+    loadApiMon();
+  }, [pin, apiMon, loadApiMon]);
+
   const refreshAll = () => {
     loadStats();
     run('run_smoke_test', 'Refreshing health checks…');
+    loadApiMon();
   };
 
   const exportCsv = useCallback(() => {
@@ -13221,6 +13262,19 @@ function AdminHealthCheckTab({ pin }) {
     if (filter === 'warn') return c.status === 'warn';
     return c.category === filter;
   });
+
+  const visibleProbes = (apiMon?.probes || []).filter((p) => {
+    if (apiFilter === 'all') return true;
+    if (apiFilter === 'internal') return p.scope === 'internal';
+    if (apiFilter === 'external') return p.scope === 'external';
+    if (apiFilter === 'incoming') return p.direction === 'incoming';
+    if (apiFilter === 'outgoing') return p.direction === 'outgoing';
+    if (apiFilter === 'fail') return !p.ok;
+    if (apiFilter === 'slow') return p.warn;
+    return p.vendor === apiFilter;
+  });
+
+  const apiSummary = apiMon?.summary;
 
   const suiteLabel = {
     application: 'Application',
@@ -13271,7 +13325,7 @@ function AdminHealthCheckTab({ pin }) {
           <div>
             <div style={{ fontSize: 18, fontWeight: 900, color: C.txt, letterSpacing: -0.3 }}>ScanV Ops Dashboard</div>
             <div style={{ fontSize: 12, color: C.sub, marginTop: 6, lineHeight: 1.55, maxWidth: 480 }}>
-              Live revenue, payments, bookings, support — plus automated health checks.
+              Live revenue, payments, bookings, support — health checks plus API latency & flow monitoring.
               Scheduled reports email <strong style={{ color: C.txt }}>sam@</strong> & <strong style={{ color: C.txt }}>jas@getscanv.com</strong> at 6 AM & 5 PM IST.
             </div>
             {result && (
@@ -13284,12 +13338,13 @@ function AdminHealthCheckTab({ pin }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Btn v="primary" sm onClick={refreshAll} disabled={loadingStats || loadingHealth}>
-            {loadingStats || loadingHealth ? 'Refreshing…' : '↻ Refresh all'}
+          <Btn v="primary" sm onClick={refreshAll} disabled={loadingStats || loadingHealth || loadingApiMon}>
+            {loadingStats || loadingHealth || loadingApiMon ? 'Refreshing…' : '↻ Refresh all'}
           </Btn>
           <Btn v="outline" sm onClick={() => run('run_security_health_check', 'Security…')} disabled={loadingHealth}>Security</Btn>
           <Btn v="outline" sm onClick={() => run('run_app_health_check', 'Application…')} disabled={loadingHealth}>App</Btn>
           <Btn v="outline" sm onClick={() => run('run_infra_health_check', 'Infra…')} disabled={loadingHealth}>Infra</Btn>
+          <Btn v="outline" sm onClick={loadApiMon} disabled={loadingApiMon}>{loadingApiMon ? 'API…' : 'API monitor'}</Btn>
           <AdminDeepLinkBtn hash="exec" label="Executive →" />
         </div>
       </div>
@@ -13380,6 +13435,110 @@ function AdminHealthCheckTab({ pin }) {
               )}
             </ExecSection>
           </div>
+
+          {/* API & flow monitoring */}
+          <ExecSection title="API & flow monitoring" sub={apiMon ? `Probes · flows · avg latency · ${new Date(apiMon.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` : 'Run API monitor to probe internal/external vendors'}>
+            {loadingApiMon && !apiMon ? (
+              <div style={{ textAlign: 'center', padding: 24 }}><Spin size={28} /><div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>Probing APIs & flow transactions…</div></div>
+            ) : apiMon ? (
+              <>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                  <AdminStatCard label="Avg latency" value={`${apiSummary?.avg_latency_ms ?? '—'}ms`} color={latencyMsColor(apiSummary?.avg_latency_ms, true)} sub={`Internal ${apiSummary?.internal_avg_ms ?? '—'}ms · External ${apiSummary?.external_avg_ms ?? '—'}ms`} />
+                  <AdminStatCard label="Incoming APIs" value={`${apiSummary?.incoming_avg_ms ?? '—'}ms`} color={C.cyan} sub="Customer → ScanV" />
+                  <AdminStatCard label="Outgoing APIs" value={`${apiSummary?.outgoing_avg_ms ?? '—'}ms`} color={C.vio} sub="ScanV → vendors" />
+                  <AdminStatCard label="Probes OK" value={apiSummary?.passed ?? '—'} color={C.grn} sub={`Failed ${apiSummary?.failed ?? 0} · Slow ${apiSummary?.warned ?? 0}`} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Avg latency by vendor</div>
+                    <ExecBarChart items={Object.entries(apiSummary?.by_vendor || {}).map(([label, v]) => ({
+                      label, value: v.avg_ms, color: vendorAccent(label),
+                    }))} height={120} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Flow transactions (end-to-end)</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {(apiMon.flows || []).map((f) => (
+                        <div key={f.id} style={{ padding: '10px 12px', background: C.deep, borderRadius: 10, border: `1px solid ${f.ok ? C.bdr : C.red}44` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>{f.name}</div>
+                              <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{f.description}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: 14, fontWeight: 800, color: latencyMsColor(f.total_ms, f.ok) }}>{f.total_ms}ms</div>
+                              <div style={{ fontSize: 10, color: C.sub }}>avg {f.avg_step_ms}ms · {f.steps.length} steps</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" onClick={() => setApiOpen((o) => !o)} style={{
+                  width: '100%', textAlign: 'left', background: C.deep, border: BDR, borderRadius: 10,
+                  padding: '10px 14px', cursor: 'pointer', fontFamily: FF, marginBottom: apiOpen ? 10 : 0,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: C.txt }}>{apiOpen ? '▼' : '▶'} API probe details</span>
+                  <span style={{ fontSize: 11, color: C.sub, marginLeft: 10 }}>{visibleProbes.length} endpoints · request/response · timing</span>
+                </button>
+
+                {apiOpen && (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                      {[['all', 'All'], ['internal', 'Internal'], ['external', 'External'], ['incoming', 'Incoming'], ['outgoing', 'Outgoing'], ['fail', 'Failed'], ['slow', 'Slow']].map(([id, label]) => (
+                        <button key={id} type="button" onClick={() => setApiFilter(id)} style={filterPill(apiFilter === id)}>{label}</button>
+                      ))}
+                      {['scanv', 'supabase', 'vercel', 'cloudflare', 'resend', 'razorpay', 'twofactor', 'msg91', 'twilio'].map((v) => (
+                        apiSummary?.by_vendor?.[v] ? (
+                          <button key={v} type="button" onClick={() => setApiFilter(v)} style={filterPill(apiFilter === v)}>{v}</button>
+                        ) : null
+                      ))}
+                    </div>
+                    <div style={{ overflowX: 'auto', maxHeight: 'min(50vh, 480px)', overflowY: 'auto', border: BDR, borderRadius: 10 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 980, fontSize: 11 }}>
+                        <thead>
+                          <tr>
+                            {['Status', 'Vendor', 'Scope', 'Direction', 'API', 'Method', 'Time', 'Request', 'Response'].map((h) => (
+                              <th key={h} style={th}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleProbes.map((p) => (
+                            <tr key={`${p.id}-${p.endpoint}`}>
+                              <td style={{ ...td, fontWeight: 700, color: !p.ok ? C.red : p.warn ? C.gold : C.grn, fontSize: 10 }}>
+                                {!p.ok ? 'FAIL' : p.warn ? 'SLOW' : 'OK'}
+                              </td>
+                              <td style={{ ...td, color: vendorAccent(p.vendor), fontWeight: 600, textTransform: 'capitalize' }}>{p.vendor}</td>
+                              <td style={{ ...td, color: C.sub, textTransform: 'capitalize' }}>{p.scope}</td>
+                              <td style={{ ...td, color: C.sub, textTransform: 'capitalize' }}>{p.direction}</td>
+                              <td style={{ ...td, fontWeight: 600, maxWidth: 180 }}>
+                                {p.name}
+                                {p.flow && <div style={{ fontSize: 9, color: C.dim, marginTop: 2 }}>{p.flow}</div>}
+                              </td>
+                              <td style={{ ...td, fontFamily: 'monospace', fontSize: 10, color: C.acc }}>{p.method}</td>
+                              <td style={{ ...td, fontWeight: 800, color: latencyMsColor(p.latency_ms, p.ok) }}>{p.latency_ms}ms</td>
+                              <td style={{ ...td, color: C.dim, fontSize: 10, maxWidth: 200, lineHeight: 1.4 }}>{p.request_summary}</td>
+                              <td style={{ ...td, color: C.sub, fontSize: 10, maxWidth: 240, lineHeight: 1.4, whiteSpace: 'normal' }}>
+                                {p.status != null && <span style={{ color: C.dim }}>{p.status} · </span>}{p.response_summary}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div style={{ color: C.dim, fontSize: 12, padding: 12, textAlign: 'center' }}>
+                Click <strong style={{ color: C.txt }}>API monitor</strong> or Refresh all
+              </div>
+            )}
+          </ExecSection>
 
           <ExecSection title="Recent incoming payments" sub="Latest payment_intents · UPI & Razorpay">
             <div style={{ overflowX: 'auto' }}>
