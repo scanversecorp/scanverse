@@ -1,6 +1,23 @@
 # ScanV Supabase project (edge functions + migrations)
 project_id = "rwlwrmmqtedugcreweut"
 
+[auth]
+site_url = "https://getscanv.com"
+additional_redirect_urls = [
+  "https://getscanv.com",
+  "https://www.getscanv.com",
+  "https://scanv-tau.vercel.app",
+]
+
+[auth.email]
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [functions.whatsapp-verify]
 verify_jwt = false
 
