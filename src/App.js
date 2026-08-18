@@ -18,7 +18,7 @@ import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
-import { StudentCloudAdmitScreen, useStudentCloudFeeView, StudentCloudPage } from './student-cloud';
+import { StudentCloudAdmitScreen, useStudentCloudFeeView, StudentCloudPage, resolveUserMobile10 } from './student-cloud';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -3442,9 +3442,16 @@ function PriceTag({ svc, sm }) {
   );
 }
 
+function cloudCourseMatchesEnrollment(svc, feeView) {
+  if (!feeView?.sgr_paid) return false;
+  if (feeView.course_id && feeView.course_id === svc.id) return true;
+  const enrolled = String(feeView.course_name || '').trim().toLowerCase();
+  const name = String(svc.name || '').trim().toLowerCase();
+  return enrolled && name && enrolled === name;
+}
+
 function CloudCoursePriceTag({ svc, sm, feeView }) {
-  const sgrPaid = !!feeView?.sgr_paid;
-  const isEnrolledCourse = sgrPaid && feeView?.course_id === svc.id;
+  const isEnrolledCourse = cloudCourseMatchesEnrollment(svc, feeView);
   if (!isEnrolledCourse) {
     return (
       <span style={{ color: C.gold, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em' }}>Awaiting SGR</span>
@@ -4868,7 +4875,6 @@ async function recordQrScan({ onGeo } = {}) {
    User browses → picks service → books → THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick = 0 }) {
-  const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY);
   const [screen, setScreen] = useState('services'); // services | top-rated | detail | verify | payment | schedule | login
   const [navTab, setNavTab] = useState('home');
   const [loginIntent, setLoginIntent] = useState(null); // 'home' | 'bookings' | 'profile'
@@ -4897,6 +4903,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     city: silentGeo?.city,
     pincode: silentGeo?.pincode,
   }));
+  const browseCloudMobile = useMemo(() => {
+    const fromMob = String(mobile || '').replace(/\D/g, '').slice(-10);
+    if (fromMob.length === 10) return fromMob;
+    const uid = userId || (typeof localStorage !== 'undefined' ? localStorage.getItem('scanv_uid') : null);
+    return resolveUserMobile10({ id: uid, phone: pendingProfile?.phone });
+  }, [mobile, userId, pendingProfile?.phone]);
+  const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY, browseCloudMobile);
   const { markAuto, inpStyle, bind: browseBind } = browseAuto;
   const [otpSent, setOtpSent]     = useState(false);
   const [otpChannel, setOtpChannel] = useState('sms');
@@ -7075,8 +7088,9 @@ function TopRatedScreen() {
 }
 
 function ServicesScreen() {
-  const {setActiveSvc,setScreen,activeSvc,addToast,silentGeo,catalogTick}=useApp();
-  const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY);
+  const { setActiveSvc, setScreen, activeSvc, addToast, silentGeo, catalogTick, user } = useApp();
+  const cloudMobile = useMemo(() => resolveUserMobile10(user), [user]);
+  const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY, cloudMobile);
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [subListCat,setSubListCat]=useState(null);

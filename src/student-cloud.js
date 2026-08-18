@@ -21,13 +21,33 @@ export function setStoredStudentCloudId(id) {
   } catch { /* ignore */ }
 }
 
-export async function fetchStudentCloudFeeView(studentId, apikey) {
-  if (!studentId || !apikey) return { sgr_paid: false, course_id: null, course_fee_paise: null };
-  const data = await studentCloudFetch('fee_view', { student_id: studentId }, { apikey });
+export function resolveUserMobile10(user) {
+  if (!user) return null;
+  const fromPhone = digits10(user.phone || user.mobile || '');
+  if (fromPhone.length === 10) return fromPhone;
+  const id = String(user.id || '');
+  const m10 = /^cust_(\d{10})$/.exec(id);
+  if (m10) return m10[1];
+  const mLegacy = /^cust_(\d+)$/.exec(id);
+  if (mLegacy) {
+    const d = mLegacy[1].slice(-10);
+    if (d.length === 10) return d;
+  }
+  return null;
+}
+
+export async function fetchStudentCloudFeeView({ studentId, mobile, apikey } = {}) {
+  if (!apikey) return { sgr_paid: false, course_id: null, course_fee_paise: null };
+  const payload = {};
+  if (studentId) payload.student_id = studentId;
+  else if (mobile) payload.mobile = mobile;
+  else return { sgr_paid: false, course_id: null, course_fee_paise: null };
+  const data = await studentCloudFetch('fee_view', payload, { apikey });
+  if (data?.student_id) setStoredStudentCloudId(data.student_id);
   return data;
 }
 
-export function useStudentCloudFeeView(apikey) {
+export function useStudentCloudFeeView(apikey, mobile10 = null) {
   const [feeView, setFeeView] = useState(null);
   const [loading, setLoading] = useState(!!apikey);
 
@@ -38,21 +58,25 @@ export function useStudentCloudFeeView(apikey) {
       return;
     }
     const id = getStoredStudentCloudId();
-    if (!id) {
-      setFeeView({ sgr_paid: false, course_id: null, course_fee_paise: null });
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const data = await fetchStudentCloudFeeView(id, apikey);
+      let data;
+      if (mobile10) {
+        data = await fetchStudentCloudFeeView({ mobile: mobile10, apikey });
+      } else if (id) {
+        data = await fetchStudentCloudFeeView({ studentId: id, apikey });
+      } else {
+        setFeeView({ sgr_paid: false, course_id: null, course_fee_paise: null });
+        setLoading(false);
+        return;
+      }
       setFeeView(data);
     } catch {
       setFeeView({ sgr_paid: false, course_id: null, course_fee_paise: null });
     } finally {
       setLoading(false);
     }
-  }, [apikey]);
+  }, [apikey, mobile10]);
 
   useEffect(() => {
     refresh();

@@ -337,26 +337,46 @@ Deno.serve(async (req) => {
 
     if (action === "fee_view") {
       const studentId = String(body.student_id || "").trim();
-      if (!studentId) return json({ error: "student_id required" }, 400);
-      const { data: student, error: se } = await sb
-        .from("student_cloud")
-        .select("id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, discount_paise, status")
-        .eq("id", studentId)
-        .maybeSingle();
-      if (se) throw se;
-      if (!student) {
-        return json({ sgr_paid: false, course_id: null, course_fee_paise: null, course_name: null, status: null });
+      const mobileRaw = String(body.mobile || body.mobile_e164 || "").trim();
+      if (!studentId && !mobileRaw) return json({ error: "student_id or mobile required" }, 400);
+
+      const selectCols =
+        "id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, discount_paise, status";
+      let student: Record<string, unknown> | null = null;
+
+      if (studentId) {
+        const { data, error: se } = await sb.from("student_cloud").select(selectCols).eq("id", studentId).maybeSingle();
+        if (se) throw se;
+        student = data as Record<string, unknown> | null;
+      } else {
+        const d10 = digits10(mobileRaw);
+        const e164 = normalizeMobile(mobileRaw) || (d10.length === 10 ? `+91${d10}` : null);
+        if (e164) {
+          const { data, error: se } = await sb.from("student_cloud").select(selectCols).eq("mobile_e164", e164).maybeSingle();
+          if (se) throw se;
+          student = data as Record<string, unknown> | null;
+        }
+        if (!student && d10.length === 10) {
+          const { data, error: se } = await sb.from("student_cloud").select(selectCols).eq("mobile", d10).maybeSingle();
+          if (se) throw se;
+          student = data as Record<string, unknown> | null;
+        }
       }
-      const sgrPaid = isSgrPaid(student as Record<string, unknown>);
+
+      if (!student) {
+        return json({ sgr_paid: false, course_id: null, course_fee_paise: null, course_name: null, status: null, student_id: null });
+      }
+      const sgrPaid = isSgrPaid(student);
       const netCourse = Math.max(
         0,
         Number(student.course_fee_paise || 0) - Number(student.discount_paise || 0),
       );
       return json({
+        student_id: student.id || null,
         sgr_paid: sgrPaid,
         course_id: student.course_id || null,
         course_name: student.course_name || null,
-        course_fee_paise: sgrPaid && netCourse > 0 ? netCourse : null,
+        course_fee_paise: sgrPaid ? (netCourse > 0 ? netCourse : null) : null,
         status: student.status || null,
       });
     }
