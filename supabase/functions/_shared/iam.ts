@@ -94,6 +94,7 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   get_social_dashboard: "hub.stats",
   run_app_health_check: "hub.stats",
   run_infra_health_check: "hub.stats",
+  run_security_health_check: "hub.stats",
   run_smoke_test: "hub.stats",
   update_social_content: "hub.settings",
   add_social_content: "hub.settings",

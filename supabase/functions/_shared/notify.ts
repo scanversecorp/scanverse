@@ -535,13 +535,28 @@ export async function sendEmail(
   subject: string,
   body: string,
 ): Promise<{ ok: boolean; provider?: string; error?: string }> {
-  const email = (to || "").trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, error: "Invalid email address" };
+  return sendEmailMany([to], subject, body);
+}
+
+/** Send one email to multiple recipients via Resend. */
+export async function sendEmailMany(
+  recipients: string[],
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; provider?: string; error?: string; sent?: number }> {
+  const emails = [...new Set(
+    (recipients || [])
+      .map((r) => (r || "").trim())
+      .filter((email) => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+  )];
+  if (!emails.length) {
+    return { ok: false, error: "No valid email recipients" };
   }
 
   const resendKey = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("SUPPORT_EMAIL_FROM") || "support@dcoreglobal.com";
+  const from = Deno.env.get("HEALTH_REPORT_FROM")
+    || Deno.env.get("SUPPORT_EMAIL_FROM")
+    || "support@dcoreglobal.com";
 
   if (resendKey) {
     const res = await fetch("https://api.resend.com/emails", {
@@ -550,10 +565,10 @@ export async function sendEmail(
         Authorization: `Bearer ${resendKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [email], subject, text: body }),
+      body: JSON.stringify({ from, to: emails, subject, text: body }),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return { ok: true, provider: "resend" };
+    if (res.ok) return { ok: true, provider: "resend", sent: emails.length };
     return {
       ok: false,
       error: typeof data === "object" && data !== null && "message" in data
@@ -562,7 +577,7 @@ export async function sendEmail(
     };
   }
 
-  console.log(`[ScanV email] To: ${email} | ${subject}\n${body.slice(0, 500)}`);
+  console.log(`[ScanV email] To: ${emails.join(", ")} | ${subject}\n${body.slice(0, 500)}`);
   return { ok: false, error: "Email not configured — set RESEND_API_KEY and SUPPORT_EMAIL_FROM" };
 }
 

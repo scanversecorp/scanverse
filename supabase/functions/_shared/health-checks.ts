@@ -12,17 +12,35 @@ export type HealthCheckStatus = "pass" | "fail" | "warn";
 export type HealthCheck = {
   id: string;
   name: string;
-  category: "application" | "infra" | "ui";
+  category: "application" | "infra" | "ui" | "security";
   status: HealthCheckStatus;
   detail: string;
   manual?: string;
 };
 
 export type HealthRunResult = {
-  suite: "application" | "infra" | "smoke";
+  suite: "application" | "infra" | "smoke" | "security";
   generated_at: string;
   app_url: string;
   checks: HealthCheck[];
+  passed: number;
+  failed: number;
+  warned: number;
+  total: number;
+};
+
+export type HealthCheckOptions = {
+  /** Skip auth signup probe (scheduled reports — avoids test users). */
+  skipAuthProbe?: boolean;
+};
+
+export type DailyHealthReport = {
+  generated_at: string;
+  app_url: string;
+  slot: "morning" | "evening";
+  application: HealthRunResult;
+  infra: HealthRunResult;
+  security: HealthRunResult;
   passed: number;
   failed: number;
   warned: number;
@@ -62,6 +80,15 @@ function summarize(suite: HealthRunResult["suite"], checks: HealthCheck[]): Heal
     failed: checks.filter((c) => c.status === "fail").length,
     warned: checks.filter((c) => c.status === "warn").length,
     total: checks.length,
+  };
+}
+
+function tally(results: HealthRunResult[]): Pick<DailyHealthReport, "passed" | "failed" | "warned" | "total"> {
+  return {
+    passed: results.reduce((n, r) => n + r.passed, 0),
+    failed: results.reduce((n, r) => n + r.failed, 0),
+    warned: results.reduce((n, r) => n + r.warned, 0),
+    total: results.reduce((n, r) => n + r.total, 0),
   };
 }
 
@@ -107,8 +134,118 @@ function push(
   });
 }
 
-/** API security + public endpoint checks (mirrors scripts/smoke-test.mjs runApiTests). */
-export async function runApplicationHealthChecks(): Promise<HealthRunResult> {
+/** RLS, auth gates, production safety switches, and public exposure checks. */
+export async function runSecurityHealthChecks(sb: SupabaseClient): Promise<HealthRunResult> {
+  const checks: HealthCheck[] = [];
+  const url = sbUrl();
+  const key = anonKey();
+  const base = appUrl();
+
+  if (!url || !key) {
+    push(checks, "security", "env", "Supabase env", false, "SUPABASE_URL or anon key missing on edge function");
+    return summarize("security", checks);
+  }
+
+  let r = await anonFetch("/rest/v1/profiles?select=id&limit=1");
+  push(checks, "security", "profiles-anon", "Profiles anon read blocked",
+    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
+
+  r = await anonFetch("/rest/v1/bookings?select=id&limit=1");
+  push(checks, "security", "bookings-anon", "Bookings anon read blocked",
+    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
+
+  r = await anonFetch("/rest/v1/support_tickets?select=id&limit=1");
+  push(checks, "security", "tickets-anon", "Support tickets anon read blocked",
+    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
+
+  r = await anonFetch("/rest/v1/payment_intents?select=txn_id&limit=1");
+  const payRows = Array.isArray(r.body) ? r.body : [];
+  push(checks, "security", "pay-intents-read", "Payment intents anon read blocked",
+    payRows.length === 0, `HTTP ${r.status}, rows=${payRows.length}`);
+
+  r = await anonFetch("/rest/v1/payment_intents", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ txn_id: `TXN-SEC-${Date.now()}`, amount_paise: 1, status: "paid" }),
+  });
+  push(checks, "security", "pay-intents-insert", "Payment intents anon insert blocked",
+    r.status >= 400, `HTTP ${r.status}`);
+
+  r = await anonFetch("/functions/v1/admin-hub", {
+    method: "POST",
+    body: JSON.stringify({ action: "ping" }),
+  });
+  push(checks, "security", "admin-no-pin", "Admin hub without PIN blocked",
+    r.status === 401, `HTTP ${r.status}`);
+
+  r = await anonFetch("/functions/v1/booking-dispatch", {
+    method: "POST",
+    body: JSON.stringify({ action: "tick" }),
+  });
+  push(checks, "security", "dispatch-no-secret", "Dispatch tick without secret blocked",
+    r.status === 401, `HTTP ${r.status}`);
+
+  r = await anonFetch("/functions/v1/admin-hub", {
+    method: "POST",
+    body: JSON.stringify({ action: "get_admin_url_index" }),
+  });
+  const unauthBody = r.body as { error?: string };
+  push(checks, "security", "url-index-no-pin", "URL index without PIN blocked",
+    r.status === 401 || unauthBody?.error === "Unauthorized", `HTTP ${r.status}`);
+
+  r = await anonFetch("/functions/v1/health-report", {
+    method: "POST",
+    body: JSON.stringify({ slot: "morning" }),
+  });
+  push(checks, "security", "health-report-no-secret", "Health report cron endpoint protected",
+    r.status === 401, `HTTP ${r.status}`);
+
+  const otpReportSecret = Deno.env.get("OTP_REPORT_SECRET") || "";
+  push(checks, "security", "otp-report-secret", "OTP_REPORT_SECRET configured",
+    otpReportSecret.length >= 8, otpReportSecret ? "set" : "missing — delivery report webhook may fail-open", undefined, !otpReportSecret);
+
+  try {
+    const docsRes = await fetch(`${base}/docs/architecture.html`);
+    const docsBody = await docsRes.text();
+    const docsBlocked = docsBody.includes("Page not found") || docsBody.includes("not publicly available") || docsRes.status === 404;
+    push(checks, "security", "docs-blocked", "/docs/architecture.html blocked",
+      docsBlocked, `HTTP ${docsRes.status}`);
+
+    const html = await (await fetch(base)).text();
+    const mainMatch = html.match(/main\.([a-f0-9]+)\.js/);
+    if (mainMatch) {
+      const mainSrc = await (await fetch(`${base}/static/js/${mainMatch[0]}`)).text();
+      push(checks, "security", "bundle-no-url-index", "Main bundle has no admin URL catalog",
+        !mainSrc.includes("github.com/scanversecorp/scanverse"), "confidential catalog not in bundle");
+      push(checks, "security", "bundle-no-mermaid", "Main bundle has no embedded Mermaid data",
+        !mainSrc.includes("flowchart TB") && !mainSrc.includes("sequenceDiagram"), "diagram source not inlined");
+    }
+  } catch (e) {
+    push(checks, "security", "frontend-security", "Frontend security fetch", false,
+      e instanceof Error ? e.message : String(e));
+  }
+
+  try {
+    const cfg = await buildGoLiveConfig(sb) as {
+      sections?: Array<{ id?: string; items?: Array<{ setting?: string; enabled?: boolean }> }>;
+    };
+    const runtime = (cfg.sections || []).find((s) => s.id === "switches")?.items || [];
+    const otpDev = runtime.find((s) => s.setting === "otp_dev_mode");
+    const dispatch = runtime.find((s) => s.setting === "dispatch_open");
+    push(checks, "security", "otp-dev-mode", "otp_dev_mode OFF (production)",
+      !otpDev?.enabled, otpDev?.enabled ? "ON — must be OFF" : "OFF");
+    push(checks, "security", "dispatch-open", "dispatch_open OFF (production)",
+      !dispatch?.enabled, dispatch?.enabled ? "ON — must be OFF" : "OFF");
+  } catch (e) {
+    push(checks, "security", "go-live-security", "Go-Live security switches", false,
+      e instanceof Error ? e.message : String(e));
+  }
+
+  return summarize("security", checks);
+}
+
+/** Functional API + platform checks (mirrors scripts/smoke-test.mjs runApiTests). */
+export async function runApplicationHealthChecks(opts: HealthCheckOptions = {}): Promise<HealthRunResult> {
   const checks: HealthCheck[] = [];
   const url = sbUrl();
   const key = anonKey();
@@ -118,52 +255,9 @@ export async function runApplicationHealthChecks(): Promise<HealthRunResult> {
     return summarize("application", checks);
   }
 
-  let r = await anonFetch("/rest/v1/profiles?select=id&limit=1");
-  push(checks, "application", "profiles-anon", "Profiles anon read blocked",
-    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
-
-  r = await anonFetch("/rest/v1/bookings?select=id&limit=1");
-  push(checks, "application", "bookings-anon", "Bookings anon read blocked",
-    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
-
-  r = await anonFetch("/rest/v1/payment_intents?select=txn_id&limit=1");
-  const payRows = Array.isArray(r.body) ? r.body : [];
-  push(checks, "application", "pay-intents-read", "Payment intents anon read blocked",
-    payRows.length === 0, `HTTP ${r.status}, rows=${payRows.length}`);
-
-  r = await anonFetch("/rest/v1/payment_intents", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ txn_id: `TXN-HEALTH-${Date.now()}`, amount_paise: 1, status: "paid" }),
-  });
-  push(checks, "application", "pay-intents-insert", "Payment intents anon insert blocked",
-    r.status >= 400, `HTTP ${r.status}`);
-
-  r = await anonFetch("/rest/v1/service_prices_public?select=service_id&limit=3");
+  let r = await anonFetch("/rest/v1/service_prices_public?select=service_id&limit=3");
   push(checks, "application", "pricing-public", "Public pricing readable",
     r.status === 200, `HTTP ${r.status}, rows=${Array.isArray(r.body) ? r.body.length : "?"}`);
-
-  r = await anonFetch("/functions/v1/admin-hub", {
-    method: "POST",
-    body: JSON.stringify({ action: "ping" }),
-  });
-  push(checks, "application", "admin-no-pin", "Admin hub without PIN blocked",
-    r.status === 401, `HTTP ${r.status}`);
-
-  r = await anonFetch("/functions/v1/booking-dispatch", {
-    method: "POST",
-    body: JSON.stringify({ action: "tick" }),
-  });
-  push(checks, "application", "dispatch-no-secret", "Dispatch tick without secret blocked",
-    r.status === 401, `HTTP ${r.status}`);
-
-  r = await anonFetch("/functions/v1/admin-hub", {
-    method: "POST",
-    body: JSON.stringify({ action: "get_admin_url_index" }),
-  });
-  const unauthBody = r.body as { error?: string };
-  push(checks, "application", "url-index-no-pin", "URL index without PIN blocked",
-    r.status === 401 || unauthBody?.error === "Unauthorized", `HTTP ${r.status}`);
 
   r = await anonFetch("/functions/v1/razorpay-payment", {
     method: "POST",
@@ -181,23 +275,27 @@ export async function runApplicationHealthChecks(): Promise<HealthRunResult> {
   push(checks, "application", "send-otp", "Send OTP edge function reachable",
     Boolean(otpBody?.success), `HTTP ${r.status} provider=${otpBody?.provider || "?"}`);
 
-  const email = `health${Date.now()}@scanv.app`;
-  const password = "ScanVHealthCheck1!";
-  const signupRes = await fetch(`${url}/auth/v1/signup`, {
-    method: "POST",
-    headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  const signup = await signupRes.json() as { access_token?: string; msg?: string };
-  const signinRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  const signin = await signinRes.json() as { access_token?: string; error_description?: string };
-  push(checks, "application", "auth-signup", "Auth signup/signin",
-    Boolean(signup.access_token || signin.access_token),
-    signup.access_token ? "signup session ok" : (signin.access_token ? "signin ok" : signin.error_description || signup.msg || "no session"));
+  if (!opts.skipAuthProbe) {
+    const email = `health${Date.now()}@scanv.app`;
+    const password = "ScanVHealthCheck1!";
+    const signupRes = await fetch(`${url}/auth/v1/signup`, {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const signup = await signupRes.json() as { access_token?: string; msg?: string };
+    const signinRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const signin = await signinRes.json() as { access_token?: string; error_description?: string };
+    push(checks, "application", "auth-signup", "Auth signup/signin",
+      Boolean(signup.access_token || signin.access_token),
+      signup.access_token ? "signup session ok" : (signin.access_token ? "signin ok" : signin.error_description || signup.msg || "no session"));
+  } else {
+    push(checks, "application", "auth-signup", "Auth signup/signin", true, "skipped on scheduled report");
+  }
 
   const pcRes = await anonFetch("/functions/v1/platform-config");
   const pc = pcRes.body as { vendors?: Record<string, unknown> };
@@ -242,20 +340,10 @@ export async function runInfraHealthChecks(sb: SupabaseClient): Promise<HealthRu
       const mainSrc = await (await fetch(`${base}/static/js/${mainMatch[0]}`)).text();
       push(checks, "infra", "bundle-diagrams-ref", "Main bundle references AdminDiagramsTab",
         mainSrc.includes("AdminDiagramsTab"), "AdminDiagramsTab string present");
-      push(checks, "infra", "bundle-no-mermaid", "Main bundle has no embedded Mermaid data",
-        !mainSrc.includes("flowchart TB") && !mainSrc.includes("sequenceDiagram"), "diagram source not inlined");
-      push(checks, "infra", "bundle-no-url-index", "Main bundle has no admin URL catalog",
-        !mainSrc.includes("github.com/scanversecorp/scanverse"), "confidential catalog not in bundle");
       push(checks, "infra", "bundle-schedule-ui", "Main bundle includes service schedule UI",
         mainSrc.includes("list_service_schedules") && mainSrc.includes("AdminServiceSchedule"),
         "schedule booking UI symbols present");
     }
-
-    const docsRes = await fetch(`${base}/docs/architecture.html`);
-    const docsBody = await docsRes.text();
-    const docsBlocked = docsBody.includes("Page not found") || docsBody.includes("not publicly available") || docsRes.status === 404;
-    push(checks, "infra", "docs-blocked", "/docs/architecture.html blocked",
-      docsBlocked, `HTTP ${docsRes.status}`);
   } catch (e) {
     push(checks, "infra", "frontend-fetch", "Frontend fetch", false, e instanceof Error ? e.message : String(e));
   }
@@ -296,14 +384,6 @@ export async function runInfraHealthChecks(sb: SupabaseClient): Promise<HealthRu
       push(checks, "infra", `switch-${key}`, `${key} ON`,
         Boolean(row?.enabled), row ? (row.enabled ? "ON" : "OFF") : "missing", undefined, true);
     }
-
-    const runtime = (cfg.sections || []).find((s) => s.id === "switches")?.items || [];
-    const otpDev = runtime.find((s) => s.setting === "otp_dev_mode");
-    const dispatch = runtime.find((s) => s.setting === "dispatch_open");
-    push(checks, "infra", "otp-dev-mode", "otp_dev_mode OFF (production)",
-      !otpDev?.enabled, otpDev?.enabled ? "ON — must be OFF" : "OFF");
-    push(checks, "infra", "dispatch-open", "dispatch_open OFF (production)",
-      !dispatch?.enabled, dispatch?.enabled ? "ON — must be OFF" : "OFF");
   } catch (e) {
     push(checks, "infra", "go-live-config", "Go-Live config load", false, e instanceof Error ? e.message : String(e));
   }
@@ -401,13 +481,38 @@ export async function runUiSmokeChecks(): Promise<HealthCheck[]> {
   return checks;
 }
 
-/** Combined application + infra + UI fetch smoke test. */
-export async function runSmokeTest(sb: SupabaseClient): Promise<HealthRunResult> {
-  const [app, infra, ui] = await Promise.all([
-    runApplicationHealthChecks(),
+/** Combined application + infra + security + UI fetch smoke test. */
+export async function runSmokeTest(sb: SupabaseClient, opts: HealthCheckOptions = {}): Promise<HealthRunResult> {
+  const [app, infra, security, ui] = await Promise.all([
+    runApplicationHealthChecks(opts),
     runInfraHealthChecks(sb),
+    runSecurityHealthChecks(sb),
     runUiSmokeChecks(),
   ]);
-  const checks = [...app.checks, ...infra.checks, ...ui];
+  const checks = [...app.checks, ...infra.checks, ...security.checks, ...ui];
   return summarize("smoke", checks);
+}
+
+/** Daily report payload for scheduled email (Application + Infra + Security). */
+export async function runDailyHealthReport(
+  sb: SupabaseClient,
+  slot: "morning" | "evening",
+  opts: HealthCheckOptions = { skipAuthProbe: true },
+): Promise<DailyHealthReport> {
+  const scheduledOpts = { skipAuthProbe: true, ...opts };
+  const [application, infra, security] = await Promise.all([
+    runApplicationHealthChecks(scheduledOpts),
+    runInfraHealthChecks(sb),
+    runSecurityHealthChecks(sb),
+  ]);
+  const totals = tally([application, infra, security]);
+  return {
+    generated_at: new Date().toISOString(),
+    app_url: appUrl(),
+    slot,
+    application,
+    infra,
+    security,
+    ...totals,
+  };
 }

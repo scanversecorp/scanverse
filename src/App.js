@@ -13135,6 +13135,7 @@ function AdminHealthCheckTab({ pin }) {
   const suiteLabel = {
     application: 'Application Health Check',
     infra: 'Infra Health Check',
+    security: 'Security Health Check',
     smoke: 'Full Smoke Test',
   };
 
@@ -13144,11 +13145,13 @@ function AdminHealthCheckTab({ pin }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>Health Check Portal</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.6, maxWidth: 640 }}>
-            Run production application security checks, infrastructure validation, or the combined smoke test suite.
-            Full Playwright UI flows (booking, OTP, PIN gates) still run via <code style={{ color: C.acc }}>node scripts/smoke-test.mjs</code> locally.
+            Run production security, application, and infrastructure checks — or the combined smoke test suite.
+            Scheduled email reports go to ops at <strong style={{ color: C.txt }}>6:00 AM</strong> and <strong style={{ color: C.txt }}>5:00 PM IST</strong> daily.
+            Full Playwright UI flows still run via <code style={{ color: C.acc }}>node scripts/smoke-test.mjs</code> locally.
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn v="outline" sm onClick={() => run('run_security_health_check', 'Running security health checks…')} disabled={loading}>Security</Btn>
           <Btn v="outline" sm onClick={() => run('run_app_health_check', 'Running application health checks…')} disabled={loading}>Application</Btn>
           <Btn v="outline" sm onClick={() => run('run_infra_health_check', 'Running infra health checks…')} disabled={loading}>Infra</Btn>
           <Btn v="primary" sm onClick={() => run('run_smoke_test', 'Running full smoke test…')} disabled={loading}>{loading ? 'Running…' : 'Smoke test'}</Btn>
@@ -13180,7 +13183,7 @@ function AdminHealthCheckTab({ pin }) {
             <AdminStatCard label="Total" value={result.total ?? 0} />
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {[['all', 'All'], ['application', 'Application'], ['infra', 'Infra'], ['ui', 'UI'], ['fail', 'Failures'], ['warn', 'Warnings']].map(([id, label]) => (
+            {[['all', 'All'], ['security', 'Security'], ['application', 'Application'], ['infra', 'Infra'], ['ui', 'UI'], ['fail', 'Failures'], ['warn', 'Warnings']].map(([id, label]) => (
               <button key={id} type="button" onClick={() => setFilter(id)} style={filterPill(filter === id)}>{label}</button>
             ))}
           </div>
@@ -13223,9 +13226,10 @@ function AdminHealthCheckTab({ pin }) {
         <div style={{ ...S.card(), padding: 16, fontSize: 12, color: C.sub, lineHeight: 1.7 }}>
           <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>What each suite covers</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            <li><strong style={{ color: C.txt }}>Application</strong> — RLS/security (profiles, bookings, payment_intents), public pricing, edge function auth gates, Razorpay register, send-otp, auth signup, platform-config vendors.</li>
-            <li><strong style={{ color: C.txt }}>Infra</strong> — Frontend bundle deploy, DB table counts, go-live switches, diagram/URL catalogs, Business HQ, service schedule routes.</li>
-            <li><strong style={{ color: C.txt }}>Smoke test</strong> — All of the above plus UI fetch checks (homepage, privacy, terms). Playwright booking/OTP flows are documented for local CLI.</li>
+            <li><strong style={{ color: C.txt }}>Security</strong> — RLS on profiles/bookings/tickets/payment_intents, edge auth gates, docs blocked, bundle exposure, production switches.</li>
+            <li><strong style={{ color: C.txt }}>Application</strong> — Public pricing, Razorpay register, send-otp, auth signup, platform-config vendors.</li>
+            <li><strong style={{ color: C.txt }}>Infra</strong> — Frontend bundle deploy, DB table counts, go-live vendor switches, diagram/URL catalogs, Business HQ, service schedules.</li>
+            <li><strong style={{ color: C.txt }}>Smoke test</strong> — All suites above plus UI fetch checks. Daily emails at 6 AM & 5 PM IST to samir.workmail@gmail.com and jasmeen.workmail@gmail.com.</li>
           </ul>
         </div>
       )}

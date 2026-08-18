@@ -47,7 +47,8 @@
  *   purge_test_data      — { dry_run?, confirm_execute?, confirm? } pre-launch wipe (owner only)
  *   run_app_health_check — API security + public endpoint checks
  *   run_infra_health_check — DB, deploy bundle, go-live, catalog checks
- *   run_smoke_test — application + infra + UI fetch smoke (Playwright UI is local CLI)
+ *   run_security_health_check — RLS, auth gates, exposure & production safety
+ *   run_smoke_test — application + infra + security + UI fetch smoke
  *
  * Auth: Authorization Bearer (staff JWT) OR x-admin-pin
  *   PIN secrets: ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
@@ -172,6 +173,7 @@ import {
 import {
   runApplicationHealthChecks,
   runInfraHealthChecks,
+  runSecurityHealthChecks,
   runSmokeTest,
 } from "../_shared/health-checks.ts";
 
@@ -1758,6 +1760,16 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Infra health check failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "run_security_health_check") {
+    try {
+      const result = await runSecurityHealthChecks(sb);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Security health check failed";
       return json({ error: msg }, 500);
     }
   }
