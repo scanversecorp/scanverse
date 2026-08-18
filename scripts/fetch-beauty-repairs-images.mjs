@@ -7,7 +7,7 @@ import sharp from 'sharp';
 const PUBLIC = path.resolve(process.cwd(), 'public');
 
 const UNSPLASH = {
-  'home-models/beauty.png': 'photo-1675034741621-79a7d07c1369',
+  'home-models/beauty.png': 'photo-1731355771304-bc2f23167bea',
   'home-models/repairs.png': 'photo-1621905252507-b35492cc74b4',
   'services/beauty/haircut-women.png': 'photo-1734111719430-fe4a3973f8af',
   'services/beauty/haircut-men.png': 'photo-1507003211169-0a1dd7228f2d',

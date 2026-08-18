@@ -1337,7 +1337,7 @@ const SUB_CATEGORIES = {
   food:      { title:'Food', subtitle:'Tiffin · restaurants · bars · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
   'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · polish · 8 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
   'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 8 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
-  beauty: { title:'Beauty & Personal Care', subtitle:'Makeup · Salon · Grooming services · 25% off', cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','men','occasion'] },
+  beauty: { title:'Beauty & Personal Care', subtitle:'Beauty · Makeup · Salon · Services · 25% off', cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','men','occasion'] },
   repairs: { title:'Repairs & Handyman', subtitle:'Electric · plumbing · AC · appliances · 25% off', cat:'Repairs & Handyman', themes:RP_THEME, svcs:REPAIRS_SVCS, themeOrder:['fix','appliances'] },
 };
 
@@ -3014,7 +3014,7 @@ const SVCS = [
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 8 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 6 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
-  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:'Makeup · Salon · Grooming services', cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
+  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:'Beauty · Makeup · Salon · Services · 25% off', cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurants · bars · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
   { id:'repairs',  icon:'🔧', name:'Repairs & Handyman', sub:'Electric · plumbing · AC · 8 services', cat:'Repairs & Handyman', cash:false, ...svcDisc(299), repairs:true },
@@ -3057,7 +3057,7 @@ const HOME_CARD_META = {
   health:   { commitment:'Care that starts with a smile.',  face:'Dr. Ananya · home visits' },
   property: { commitment:'Find home. Find peace.',          face:'Verified listings · local' },
   household:{ commitment:'A lighter home. A lighter heart.',face:'Deep clean & home help · 12 services' },
-  beauty:   { commitment:'Look good. Feel confident.',     face:'Makeup · Salon · Grooming services' },
+  beauty:   { commitment:'Look good. Feel confident.' },
   delivery: { commitment:'On time. With a smile.',          face:'Vikram · local delivery' },
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
   repairs:  { commitment:'Fixed right. Stress gone.',       face:'Electric · plumbing · AC · 8 services' },
@@ -3302,7 +3302,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             {badgeRow(false)}
             <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>&ldquo;{meta.commitment}&rdquo;</div>
             <div style={{ color:C.txt, fontWeight:800, fontSize:16, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
-            <div style={{ color:C.sub, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>
+            {meta.face && svc.id !== 'beauty' && <div style={{ color:C.sub, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'nowrap', marginTop:2, minWidth:0 }}>
               <span style={{ color:C.acc, fontSize:13, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
               <span style={{ color:C.dim, fontSize:10, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
@@ -3342,10 +3342,10 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
         </div>
       </div>
       <div style={{ padding:'11px 12px 13px', background:C.card, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
-        {meta.face && <div style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{meta.face}</div>}
+        {meta.face && svc.id !== 'beauty' && <div style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{meta.face}</div>}
         <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
         <div style={{ color:C.txt, fontWeight:800, fontSize:14, lineHeight:1.2 }}>{title}</div>
-        <div style={{ color:C.sub, fontSize:10, fontWeight:600, lineHeight:1.3 }}>{svc.sub}</div>
+        {svc.id !== 'beauty' && svc.sub && <div style={{ color:C.sub, fontSize:10, fontWeight:600, lineHeight:1.3 }}>{svc.sub}</div>}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginTop:'auto' }}>
           <span style={{ color:C.acc, fontSize:12, fontWeight:800 }}>₹{fmtRs(svc.price)} →</span>
           <span style={{ color:C.dim, fontSize:9, fontWeight:600 }}>{d.rating||'4.8 ⭐'}</span>
