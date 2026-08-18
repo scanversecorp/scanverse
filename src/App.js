@@ -18,7 +18,7 @@ import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
-import { StudentCloudAdmitScreen } from './student-cloud';
+import { StudentCloudAdmitScreen, useStudentCloudFeeView } from './student-cloud';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -3433,6 +3433,26 @@ function PriceTag({ svc, sm }) {
   );
 }
 
+function CloudCoursePriceTag({ svc, sm, feeView }) {
+  const sgrPaid = !!feeView?.sgr_paid;
+  const isEnrolledCourse = sgrPaid && feeView?.course_id === svc.id;
+  if (!isEnrolledCourse) {
+    return (
+      <span style={{ color: C.gold, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em' }}>Awaiting SGR</span>
+    );
+  }
+  const feePaise = Number(feeView.course_fee_paise) > 0 ? Number(feeView.course_fee_paise) : svc.price;
+  const priced = { ...svc, price: feePaise, mrp: Math.max(Number(svc.mrp) || feePaise, feePaise) };
+  return <PriceTag svc={priced} sm={sm} />;
+}
+
+function ServicePriceTag({ svc, sm, categoryId, cloudFeeView }) {
+  if (categoryId === 'cloud' && svc?.parent === 'cloud' && svc.id !== SGR_SERVICE_ID) {
+    return <CloudCoursePriceTag svc={svc} sm={sm} feeView={cloudFeeView} />;
+  }
+  return <PriceTag svc={svc} sm={sm} />;
+}
+
 function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
   const src = resolveSvcImage(svc);
   if (src) {
@@ -3447,7 +3467,7 @@ function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
   return <IconThumb svc={svc} categoryId={categoryId} height={height} fullBleed={fullBleed} />;
 }
 
-function CategorySvcCard({ categoryId, svc, onClick, compact }) {
+function CategorySvcCard({ categoryId, svc, onClick, compact, cloudFeeView }) {
   const imgH = compact ? 104 : 120;
   return (
     <div onClick={onClick} style={{ ...S.card(), padding: 0, overflow: 'hidden', cursor: 'pointer', border: IG_TILE.border, boxShadow: IG_TILE.shadow, minWidth: 0, height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -3458,7 +3478,7 @@ function CategorySvcCard({ categoryId, svc, onClick, compact }) {
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
         <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
         <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8, flex: 1 }}>{svc.sub}</div>
-        <PriceTag svc={svc} sm={compact} />
+        <ServicePriceTag svc={svc} sm={compact} categoryId={categoryId} cloudFeeView={cloudFeeView} />
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
           <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
@@ -3470,8 +3490,12 @@ function CategorySvcCard({ categoryId, svc, onClick, compact }) {
 function HouseholdSvcCard(props) { return <CategorySvcCard categoryId="household" {...props} />; }
 function CloudSvcCard(props) { return <CategorySvcCard categoryId="cloud" {...props} />; }
 
-function CategoryListBody({ categoryId, onSelect, onAdmit }) {
+function CategoryListBody({ categoryId, onSelect, onAdmit, apikey, cloudFeeView: cloudFeeViewProp }) {
   const cfg = SUB_CATEGORIES[categoryId];
+  const { feeView: fetchedCloudFeeView } = useStudentCloudFeeView(
+    categoryId === 'cloud' && cloudFeeViewProp == null ? apikey : null,
+  );
+  const cloudFeeView = cloudFeeViewProp ?? fetchedCloudFeeView;
   const [filter, setFilter] = useState('all');
   if (!cfg) return null;
   const list = visibleSvcs(cfg.svcs).filter(s => filter === 'all' || s.theme === filter);
@@ -3516,7 +3540,7 @@ function CategoryListBody({ categoryId, onSelect, onAdmit }) {
             </div>
             <SvcGrid2
               items={items}
-              renderItem={(svc) => <CategorySvcCard categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact />}
+              renderItem={(svc) => <CategorySvcCard categoryId={categoryId} svc={svc} onClick={() => onSelect(svc)} compact cloudFeeView={cloudFeeView} />}
             />
           </div>
         );
@@ -4835,6 +4859,7 @@ async function recordQrScan({ onGeo } = {}) {
    User browses → picks service → books → THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
+  const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY);
   const [screen, setScreen] = useState('services'); // services | top-rated | detail | verify | payment | schedule | login
   const [navTab, setNavTab] = useState('home');
   const [loginIntent, setLoginIntent] = useState(null); // 'home' | 'bookings' | 'profile'
@@ -5755,6 +5780,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
           categoryId={listCatId}
           onSelect={(svc) => openSubSvc(listCatId, svc)}
           onAdmit={listCatId === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setScreen('cloud-admit'); } : undefined}
+          apikey={SB_KEY}
+          cloudFeeView={cloudFeeView}
         />
       </BrowseCategoryShell>
     );
@@ -5903,7 +5930,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
             {!isSubSvc && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
             <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
-            {isSubSvc && <div style={{ marginBottom: 12 }}><PriceTag svc={activeSvc} /></div>}
+            {isSubSvc && (
+              <div style={{ marginBottom: 12 }}>
+                <ServicePriceTag svc={activeSvc} categoryId={parentCat} cloudFeeView={cloudFeeView} />
+              </div>
+            )}
             <div style={{display:'flex',justifyContent:'center',gap:22}}>
               <div><div style={{color:C.acc,fontSize:14,fontWeight:800}}>{d.rating||activeSvc.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Rating</div></div>
               <div><div style={{color:C.grn,fontSize:14,fontWeight:800}}>{d.bookings||activeSvc.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Bookings</div></div>
@@ -7036,6 +7067,7 @@ function TopRatedScreen() {
 
 function ServicesScreen() {
   const {setActiveSvc,setScreen,activeSvc,addToast,silentGeo}=useApp();
+  const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY);
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [subListCat,setSubListCat]=useState(null);
@@ -7100,6 +7132,8 @@ function ServicesScreen() {
           categoryId={subListCat}
           onSelect={(svc) => openSubSvc(subListCat, svc)}
           onAdmit={subListCat === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setCloudAdmit(true); } : undefined}
+          apikey={SB_KEY}
+          cloudFeeView={cloudFeeView}
         />
       </BrowseCategoryShell>
     );
@@ -7123,7 +7157,11 @@ function ServicesScreen() {
             {!isSubSvc && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
             <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
-            {isSubSvc ? <div style={{ marginBottom: 12 }}><PriceTag svc={detail} /></div> : (
+            {isSubSvc ? (
+              <div style={{ marginBottom: 12 }}>
+                <ServicePriceTag svc={detail} categoryId={parentCat} cloudFeeView={cloudFeeView} />
+              </div>
+            ) : (
               <div style={{ marginBottom: 12 }}><PriceTag svc={detail} sm /></div>
             )}
             <div style={{display:'flex',justifyContent:'center',gap:20,flexWrap:'wrap'}}>

@@ -4,7 +4,64 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 export const SGR_FEE_FALLBACK_PAISE = 50000;
 /** @deprecated use sgrFeePaise prop / pricing catalog */
 export const CLOUD_SGR_FEE_PAISE = SGR_FEE_FALLBACK_PAISE;
+export const STUDENT_CLOUD_ID_KEY = 'scanv_student_cloud_id';
+export const STUDENT_CLOUD_FEE_EVENT = 'scanv-student-cloud-fee-updated';
 const STUDENT_CLOUD_FN = 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/student-cloud';
+
+export function getStoredStudentCloudId() {
+  try { return sessionStorage.getItem(STUDENT_CLOUD_ID_KEY); } catch { return null; }
+}
+
+export function setStoredStudentCloudId(id) {
+  try {
+    if (id) sessionStorage.setItem(STUDENT_CLOUD_ID_KEY, id);
+    else sessionStorage.removeItem(STUDENT_CLOUD_ID_KEY);
+    window.dispatchEvent(new CustomEvent(STUDENT_CLOUD_FEE_EVENT));
+  } catch { /* ignore */ }
+}
+
+export async function fetchStudentCloudFeeView(studentId, apikey) {
+  if (!studentId || !apikey) return { sgr_paid: false, course_id: null, course_fee_paise: null };
+  const data = await studentCloudFetch('fee_view', { student_id: studentId }, { apikey });
+  return data;
+}
+
+export function useStudentCloudFeeView(apikey) {
+  const [feeView, setFeeView] = useState(null);
+  const [loading, setLoading] = useState(!!apikey);
+
+  const refresh = useCallback(async () => {
+    if (!apikey) {
+      setFeeView({ sgr_paid: false, course_id: null, course_fee_paise: null });
+      setLoading(false);
+      return;
+    }
+    const id = getStoredStudentCloudId();
+    if (!id) {
+      setFeeView({ sgr_paid: false, course_id: null, course_fee_paise: null });
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await fetchStudentCloudFeeView(id, apikey);
+      setFeeView(data);
+    } catch {
+      setFeeView({ sgr_paid: false, course_id: null, course_fee_paise: null });
+    } finally {
+      setLoading(false);
+    }
+  }, [apikey]);
+
+  useEffect(() => {
+    refresh();
+    const onUpdate = () => { refresh(); };
+    window.addEventListener(STUDENT_CLOUD_FEE_EVENT, onUpdate);
+    return () => window.removeEventListener(STUDENT_CLOUD_FEE_EVENT, onUpdate);
+  }, [refresh]);
+
+  return { feeView, loading, refresh };
+}
 
 function fmtRs(paise) {
   return ((Number(paise) || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -282,6 +339,7 @@ export function StudentCloudAdmitScreen({
       }, { apikey: SB_KEY });
       setOtpVerified(true);
       setStudent(r.student);
+      if (r.student?.id) setStoredStudentCloudId(r.student.id);
       const lockedFee = Number(r.sgr_fee_paise) >= 100 ? Number(r.sgr_fee_paise) : sgrFeePaise;
       setSgrFeeLocked(lockedFee);
       const tid = `TXN-SGR-${Date.now()}`;
@@ -309,6 +367,7 @@ export function StudentCloudAdmitScreen({
       setPaid(true);
       try {
         const r = await studentCloudFetch('confirm_sgr', { student_id: student.id, txn_id: txnId }, { apikey: SB_KEY });
+        setStoredStudentCloudId(student.id);
         setDone(true);
         setDoneMsg(r.message || 'Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours');
         addToast?.('SGR payment confirmed', 'success');
@@ -550,7 +609,13 @@ export function AdminStudentCloudTab({ pin, apikey, courses, C, S, FF, Spin, Btn
                     <td style={td}>{r.schedule_date || '—'} {r.schedule_time || ''}</td>
                     <td style={td}>₹{fmtRs(r.sgr_fee_paise)}</td>
                     <td style={{ ...td, color: Number(r.sgr_paid_paise) >= Number(r.sgr_fee_paise) ? C.grn : C.gold, fontWeight: 700 }}>₹{fmtRs(r.sgr_paid_paise)}</td>
-                    <td style={td}><input value={e.course_fee_rs ?? (Number(r.course_fee_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_fee_rs: ev.target.value } }))} style={{ ...inp, width: 90 }} /></td>
+                    <td style={td}>
+                      {Number(r.sgr_paid_paise) >= Number(r.sgr_fee_paise) ? (
+                        <input value={e.course_fee_rs ?? (Number(r.course_fee_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_fee_rs: ev.target.value } }))} style={{ ...inp, width: 90 }} />
+                      ) : (
+                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 11 }}>Awaiting SGR</span>
+                      )}
+                    </td>
                     <td style={td}><input value={e.discount_rs ?? (Number(r.discount_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], discount_rs: ev.target.value } }))} style={{ ...inp, width: 80 }} /></td>
                     <td style={td}>₹{fmtRs(r.course_paid_paise)}</td>
                     <td style={{ ...td, fontWeight: 800, color: pending > 0 ? C.acc : C.grn }}>₹{fmtRs(pending)}</td>

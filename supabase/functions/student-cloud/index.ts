@@ -4,6 +4,7 @@
  * Public (OTP required):
  *   submit   — create/update admission after OTP
  *   confirm_sgr — mark ₹500 Skill Gap Review paid after Razorpay
+ *   fee_view — course fee visibility for a student (by student_id)
  *
  * Admin PIN:
  *   list, update, record_payment, remind
@@ -104,6 +105,11 @@ function validateScheduleInput(dateStr: string, timeStr: string): string | null 
     if (slot <= new Date()) return "Schedule time must be later today";
   }
   return null;
+}
+
+function isSgrPaid(row: Record<string, unknown>): boolean {
+  const fee = Number(row.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
+  return Number(row.sgr_paid_paise || 0) >= fee;
 }
 
 function pendingOf(row: Record<string, unknown>): number {
@@ -413,6 +419,32 @@ Deno.serve(async (req) => {
 
       if (!ok) return json({ error: err || "Reminder failed" }, 502);
       return json({ success: true, channel, pending_paise: pending, tel: `tel:+91${digits10(student.mobile)}` });
+    }
+
+    if (action === "fee_view") {
+      const studentId = String(body.student_id || "").trim();
+      if (!studentId) return json({ error: "student_id required" }, 400);
+      const { data: student, error: se } = await sb
+        .from("student_cloud")
+        .select("id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, discount_paise, status")
+        .eq("id", studentId)
+        .maybeSingle();
+      if (se) throw se;
+      if (!student) {
+        return json({ sgr_paid: false, course_id: null, course_fee_paise: null, course_name: null, status: null });
+      }
+      const sgrPaid = isSgrPaid(student as Record<string, unknown>);
+      const netCourse = Math.max(
+        0,
+        Number(student.course_fee_paise || 0) - Number(student.discount_paise || 0),
+      );
+      return json({
+        sgr_paid: sgrPaid,
+        course_id: student.course_id || null,
+        course_name: student.course_name || null,
+        course_fee_paise: sgrPaid && netCourse > 0 ? netCourse : null,
+        status: student.status || null,
+      });
     }
 
     return json({ error: `Unknown action ${action}` }, 400);
