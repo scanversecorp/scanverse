@@ -5810,7 +5810,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         sgrFeePaise={getSgrFeePaise()}
         onBack={() => setScreen('cloud-list')}
         addToast={addToast}
-        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
+        showCopyright
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
       />
     );
   }
@@ -6327,6 +6328,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendLoginOTP();}}/>
           )}
+          <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} />
         </div>
       </>
     );
@@ -7169,7 +7171,8 @@ function ServicesScreen() {
         sgrFeePaise={getSgrFeePaise()}
         onBack={() => setCloudAdmit(false)}
         addToast={addToast}
-        kit={{ C, S, FF, Field, Btn, Spin, BDR, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
+        showCopyright={false}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
       />
     );
   }
@@ -8893,7 +8896,7 @@ function BookingsScreen() {
   };
 
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
+    <div style={{ fontFamily: FF }}>
       <TopBar title="Bookings"/>
       {user.role==='partner'&&(
         <>
@@ -8957,6 +8960,7 @@ function BookingsScreen() {
           <div style={{fontWeight:600,marginBottom:4}}>No bookings yet</div>
           <div style={{fontSize:12}}>Book a service to see your orders here</div>
         </div>}
+        <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} />
       </div>
       {cancelModalBooking && (
         <CancelBookingModal
@@ -15763,7 +15767,7 @@ export default function App() {
         <div className="scanv-shell" style={APP_SHELL}>
           <div className="scanv-mobile-zoom" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
             <Boundary>{renderScreen()}</Boundary>
-            <CopyrightLine style={{ padding: '6px 16px 16px' }} />
+            {screen !== 'bookings' && <CopyrightLine style={{ padding: '6px 16px 16px' }} />}
           </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>

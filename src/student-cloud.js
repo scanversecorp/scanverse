@@ -217,10 +217,10 @@ function otpChange(i, raw, digits, setDigits, prefix) {
 }
 
 export function StudentCloudAdmitScreen({
-  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, kit,
+  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, showCopyright = true, kit,
 }) {
   const {
-    C, S, FF, Field, Btn, Spin, BDR,
+    C, S, FF, Field, Btn, Spin, BDR, CopyrightLine,
     invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified,
     minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY,
   } = kit;
@@ -447,6 +447,7 @@ export function StudentCloudAdmitScreen({
           <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>₹{sgrFeeLabel} paid · {courseName} · {scheduleDate} {scheduleTime}</div>
           <Btn full onClick={onBack} style={{ marginTop: 18 }}>Back to Cloud courses</Btn>
         </div>
+        {showCopyright && CopyrightLine ? <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} /> : null}
       </div>
     );
   }
@@ -538,6 +539,7 @@ export function StudentCloudAdmitScreen({
             {paid && <div style={{ fontSize: 12, color: C.grn, marginTop: 8, fontWeight: 700 }}>Payment seen — confirming…</div>}
           </div>
         )}
+        {showCopyright && CopyrightLine ? <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} /> : null}
       </div>
     </>
   );
