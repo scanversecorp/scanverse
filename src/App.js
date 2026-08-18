@@ -18,7 +18,7 @@ import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
-import { StudentCloudAdmitScreen, useStudentCloudFeeView, StudentCloudPage, resolveUserMobile10 } from './student-cloud';
+import { StudentCloudAdmitScreen, useStudentCloudFeeView, resolveUserMobile10 } from './student-cloud';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -3503,6 +3503,13 @@ function CloudCoursePriceTag({ svc, sm, feeView, onFillSgr }) {
       >
         Fill SGR
       </button>
+    );
+  }
+  if (!feeView?.course_fee_paise) {
+    return (
+      <span style={{ color: C.gold, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em', fontFamily: FF }}>
+        Awaiting payment
+      </span>
     );
   }
   const feePaise = Number(feeView.course_fee_paise) > 0 ? Number(feeView.course_fee_paise) : svc.price;
@@ -15883,14 +15890,13 @@ export default function App() {
   }
 
   if (isStudentCloudRoute()) {
+    window.location.replace(adminTabUrl('student-cloud'));
     return (
       <Boundary>
         <style>{APP_CSS}</style>
-        <StudentCloudPage
-          apikey={SB_KEY}
-          courses={CLOUD_SVCS}
-          kit={{ C, S, FF, Field, Btn, Spin, BDR }}
-        />
+        <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Spin size={32} />
+        </div>
       </Boundary>
     );
   }

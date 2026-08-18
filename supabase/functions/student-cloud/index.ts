@@ -52,7 +52,7 @@ async function getSgrFeePaise(sb: ReturnType<typeof adminSb>): Promise<number> {
 function adminPinOk(req: Request): boolean {
   const pin = req.headers.get("x-admin-pin") || "";
   if (!pin || pin.length < 6) return false;
-  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN", "STUDENT_CLOUD_PIN"]) {
+  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN"]) {
     const secret = Deno.env.get(k) || "";
     if (secret.length >= 6 && pin === secret) return true;
   }
@@ -274,6 +274,33 @@ async function voiceCallRupees(mobile: string, rupees: number): Promise<{ ok: bo
   return { ok: false, error: text.slice(0, 120) || "Voice call failed" };
 }
 
+function paymentDateOnly(iso: string): string {
+  try {
+    return new Date(iso).toISOString().slice(0, 10);
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function applyInstallmentFromPayment(
+  student: Record<string, unknown>,
+  amount: number,
+  paymentAt: string,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  const payDate = paymentDateOnly(paymentAt);
+  if (!student.installment_1_date) {
+    patch.installment_1_date = payDate;
+    patch.installment_1_paise = amount;
+  } else if (!student.installment_2_date) {
+    patch.installment_2_date = payDate;
+    patch.installment_2_paise = amount;
+  } else {
+    patch.installment_2_paise = Number(student.installment_2_paise || 0) + amount;
+  }
+  return patch;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -424,7 +451,7 @@ Deno.serve(async (req) => {
       if (!studentId && !mobileRaw) return json({ error: "student_id or mobile required" }, 400);
 
       const selectCols =
-        "id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, discount_paise, status";
+        "id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, course_paid_paise, discount_paise, status";
       let student: Record<string, unknown> | null = null;
 
       if (studentId) {
@@ -455,12 +482,16 @@ Deno.serve(async (req) => {
       const storedCourse = Number(student.course_fee_paise || 0);
       const effectiveCourse = storedCourse > 0 ? storedCourse : (catalogCourse ?? 0);
       const netCourse = Math.max(0, effectiveCourse - Number(student.discount_paise || 0));
+      const coursePaid = Number(student.course_paid_paise || 0) > 0;
+      const status = String(student.status || "");
+      const mayShowCourseFee = sgrPaid && (coursePaid || status === "enrolled" || status === "fee_due" || status === "completed");
       return json({
         student_id: student.id || null,
         sgr_paid: sgrPaid,
         course_id: student.course_id || null,
         course_name: student.course_name || null,
-        course_fee_paise: sgrPaid && netCourse > 0 ? netCourse : null,
+        course_fee_paise: mayShowCourseFee && netCourse > 0 ? netCourse : null,
+        course_paid_paise: coursePaid ? Number(student.course_paid_paise) : 0,
         status: student.status || null,
       });
     }
@@ -540,6 +571,7 @@ Deno.serve(async (req) => {
         }
       } else {
         patch.course_paid_paise = Number(student.course_paid_paise || 0) + amount;
+        Object.assign(patch, applyInstallmentFromPayment(student, amount, paymentAt));
         const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
         const due = pendingOf({ ...student, ...patch }, catalogPricing[String(student.course_id || "")] ?? null);
         if (due <= 0) patch.status = "enrolled";

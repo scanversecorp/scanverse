@@ -6,7 +6,6 @@ export const SGR_FEE_FALLBACK_PAISE = 50000;
 export const CLOUD_SGR_FEE_PAISE = SGR_FEE_FALLBACK_PAISE;
 export const STUDENT_CLOUD_ID_KEY = 'scanv_student_cloud_id';
 export const STUDENT_CLOUD_FEE_EVENT = 'scanv-student-cloud-fee-updated';
-export const STUDENT_CLOUD_PIN_KEY = 'scanv_student_cloud_pin';
 const STUDENT_CLOUD_FN = 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/student-cloud';
 
 export function getStoredStudentCloudId() {
@@ -588,6 +587,43 @@ function localDatetimeInputValue(iso) {
 
 const PAYMENT_APPS = ['GPay', 'PhonePe', 'Paytm', 'BHIM', 'Bank transfer', 'Cash', 'Razorpay', 'Other'];
 
+function coursePayments(row) {
+  return (row?.student_cloud_payments || [])
+    .filter((p) => p.kind === 'course')
+    .slice()
+    .sort((a, b) => new Date(a.payment_at || a.created_at) - new Date(b.payment_at || b.created_at));
+}
+
+function InstallmentBox({ label, date, amountPaise, C, bdr }) {
+  return (
+    <div style={{ border: `1px solid ${bdr}`, borderRadius: 8, padding: '6px 8px', minWidth: 108, background: '#fafbfc' }}>
+      <div style={{ fontSize: 9, fontWeight: 800, color: C.dim, letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: amountPaise > 0 ? C.grn : C.dim }}>
+        {amountPaise > 0 ? `₹${fmtRs(amountPaise)}` : '—'}
+      </div>
+      <div style={{ fontSize: 10, color: C.sub, marginTop: 4 }}>{date || 'Not paid yet'}</div>
+    </div>
+  );
+}
+
+function PaymentHistoryPanel({ payments, C, bdr }) {
+  if (!payments.length) {
+    return <div style={{ fontSize: 10, color: C.dim }}>No course payments yet</div>;
+  }
+  return (
+    <div style={{ display: 'grid', gap: 6 }}>
+      {payments.map((p) => (
+        <div key={p.id} style={{ border: `1px solid ${bdr}`, borderRadius: 8, padding: '6px 8px', fontSize: 10, lineHeight: 1.45, background: '#fff' }}>
+          <div style={{ fontWeight: 800, color: C.txt }}>₹{fmtRs(p.amount_paise)} · {p.payment_app || '—'}</div>
+          <div style={{ color: C.sub }}>{formatWhen(p.payment_at || p.created_at)}</div>
+          <div style={{ color: C.dim }}>By: {p.payment_by || '—'} · Txn: {p.txn_id || '—'}</div>
+          <div style={{ color: C.dim }}>UPI: {p.upi_id || '—'}{p.note ? ` · ${p.note}` : ''}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PaymentCaptureModal({ open, onClose, onSubmit, C, S, Btn, defaultAmount = '' }) {
   const [form, setForm] = useState({
     amount_rs: defaultAmount,
@@ -687,8 +723,6 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
         course_fee_paise: catalogFee ?? (patch.course_fee_rs != null ? Math.round(Number(patch.course_fee_rs) * 100) : undefined),
         discount_paise: patch.discount_rs != null ? Math.round(Number(patch.discount_rs) * 100) : undefined,
         admin_comment: patch.admin_comment,
-        installment_1_date: patch.installment_1_date,
-        installment_2_date: patch.installment_2_date,
         course_id: patch.course_id,
         course_name: patch.course_id ? (courses || []).find((c) => c.id === patch.course_id)?.name : undefined,
       }, { pin, apikey });
@@ -728,19 +762,18 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
   };
 
   const csv = () => {
-    const headers = ['Name', 'Mobile', 'Course', 'SGR paid', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Course paid', 'Pending (ScanV)', 'Inst 1', 'Inst 2', 'Comment', 'Last payment'];
+    const headers = ['Name', 'Mobile', 'Course', 'SGR paid', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Course paid', 'Pending (ScanV)', 'Inst 1', 'Inst 2', 'Comment', 'Payments'];
     const lines = [headers.join(',')];
     for (const r of rows) {
       const scanv = catalogScanvPaise(r, r.course_id, courses);
       const partner = catalogPartnerPaise(r, r.course_id, courses);
       const pending = displayPendingPaise(r, courses, r.discount_paise);
-      const lastPay = (r.student_cloud_payments || []).slice().sort((a, b) => new Date(b.payment_at || b.created_at) - new Date(a.payment_at || a.created_at))[0];
       const vals = [
         `${r.first_name} ${r.last_name}`, r.mobile, r.course_name,
         fmtRs(r.sgr_paid_paise), fmtRs(r.effective_course_fee_paise || r.course_fee_paise),
         fmtRs(scanv), fmtRs(partner), fmtRs(r.discount_paise), fmtRs(r.course_paid_paise), fmtRs(pending),
         r.installment_1_date || '', r.installment_2_date || '', r.admin_comment || '',
-        lastPay ? `${fmtRs(lastPay.amount_paise)} · ${lastPay.payment_app || ''} · ${lastPay.txn_id || ''}` : '',
+        coursePayments(r).map((p) => `${fmtRs(p.amount_paise)} ${p.payment_app || ''} ${p.txn_id || ''}`).join('; '),
       ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`);
       lines.push(vals.join(','));
     }
@@ -769,7 +802,7 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Student Cloud</div>
-          <div style={{ fontSize: 12, color: C.sub }}>ScanV ₹ & Partner ₹ from Pricing Input · Pending uses ScanV share · 2 installments · payment capture</div>
+          <div style={{ fontSize: 12, color: C.sub }}>Admin only · ScanV ₹ & Partner ₹ from Pricing Input · installments auto-update on payment</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn v="outline" sm onClick={csv}>Export CSV</Btn>
@@ -781,10 +814,10 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
       {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
       {loading && !rows.length ? <div style={{ padding: 24, display: 'flex', gap: 8, alignItems: 'center' }}><Spin size={16} /> Loading…</div> : (
         <div style={{ overflow: 'auto', border: `1px solid ${C.bdr}`, borderRadius: 12, maxHeight: '70vh' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 1680 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 1900 }}>
             <thead>
               <tr>
-                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Paid', 'Pending', 'Inst 1', 'Inst 2', 'Comment', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
+                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Paid', 'Pending', 'Installments', 'Payments', 'Comment', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -798,8 +831,9 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                 const pending = displayPendingPaise({ ...r, course_id: courseId }, courses, discountPaise);
                 const sgrPaid = isSgrPaidRow(r);
                 const addr = [r.address, r.village, r.city, r.state, r.pincode].filter(Boolean).join(', ');
-                const payments = (r.student_cloud_payments || []).slice().sort((a, b) => new Date(b.payment_at || b.created_at) - new Date(a.payment_at || a.created_at));
-                const lastPay = payments[0];
+                const pays = coursePayments(r);
+                const inst1Amt = Number(r.installment_1_paise || 0);
+                const inst2Amt = Number(r.installment_2_paise || 0);
                 return (
                   <tr key={r.id}>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 180, maxWidth: 240 }}>
@@ -810,12 +844,6 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                       </div>
                       <div style={{ color: C.sub, fontSize: 10, marginTop: 4, lineHeight: 1.45 }}>{addr || '—'}</div>
                       <div style={{ color: C.dim, fontSize: 9, marginTop: 4 }}>Joined {formatWhen(r.created_at)}</div>
-                      {lastPay && (
-                        <div style={{ color: C.dim, fontSize: 9, marginTop: 6, lineHeight: 1.4 }}>
-                          Last: ₹{fmtRs(lastPay.amount_paise)} · {lastPay.payment_app || '—'} · {formatWhen(lastPay.payment_at || lastPay.created_at)}
-                          {lastPay.txn_id ? ` · ${lastPay.txn_id}` : ''}
-                        </div>
-                      )}
                     </td>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 150 }}>
                       <select value={courseId ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_id: ev.target.value } }))} style={{ ...inp, minWidth: 140, marginBottom: 6 }}>
@@ -847,14 +875,24 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                     <td style={td}><input value={e.discount_rs ?? (Number(r.discount_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], discount_rs: ev.target.value } }))} style={{ ...inp, width: 72 }} /></td>
                     <td style={td}>₹{fmtRs(r.course_paid_paise)}</td>
                     <td style={{ ...td, fontWeight: 800, color: pending > 0 ? C.acc : C.grn }} title="ScanV share pending">₹{fmtRs(pending)}</td>
-                    <td style={td}>
-                      <input type="date" value={e.installment_1_date ?? r.installment_1_date ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], installment_1_date: ev.target.value || null } }))} style={{ ...inp, width: 118 }} />
+                    <td style={{ ...td, whiteSpace: 'normal' }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <InstallmentBox label="Inst 1" date={r.installment_1_date} amountPaise={inst1Amt} C={C} bdr={C.bdr} />
+                        <InstallmentBox label="Inst 2" date={r.installment_2_date} amountPaise={inst2Amt} C={C} bdr={C.bdr} />
+                      </div>
                     </td>
-                    <td style={td}>
-                      <input type="date" value={e.installment_2_date ?? r.installment_2_date ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], installment_2_date: ev.target.value || null } }))} style={{ ...inp, width: 118 }} />
+                    <td style={{ ...td, whiteSpace: 'normal', minWidth: 180, maxWidth: 220, verticalAlign: 'top' }}>
+                      <PaymentHistoryPanel payments={pays} C={C} bdr={C.bdr} />
                     </td>
-                    <td style={{ ...td, whiteSpace: 'normal', minWidth: 120, maxWidth: 160 }}>
-                      <input value={e.admin_comment ?? r.admin_comment ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], admin_comment: ev.target.value } }))} style={{ ...inp, width: '100%', minWidth: 100 }} placeholder="Notes…" />
+                    <td style={{ ...td, whiteSpace: 'normal', minWidth: 120, maxWidth: 160, verticalAlign: 'top' }}>
+                      <textarea
+                        rows={4}
+                        cols={4}
+                        value={e.admin_comment ?? r.admin_comment ?? ''}
+                        onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], admin_comment: ev.target.value } }))}
+                        style={{ ...inp, width: '100%', minWidth: 100, minHeight: 72, resize: 'vertical', fontFamily: FF, lineHeight: 1.4 }}
+                        placeholder="Notes…"
+                      />
                     </td>
                     <td style={td}>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -878,80 +916,4 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
 
 export function AdminStudentCloudTab(props) {
   return <StudentCloudDashboard {...props} />;
-}
-
-export function StudentCloudPage({ apikey, courses, kit }) {
-  const { C, S, FF, Field, Btn, Spin } = kit;
-  const [pin, setPin] = useState(() => {
-    try { return sessionStorage.getItem(STUDENT_CLOUD_PIN_KEY) || ''; } catch { return ''; }
-  });
-  const [authed, setAuthed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
-
-  const login = async () => {
-    if (!pin || pin.length < 6) { setErr('Enter your HardPin (6+ characters)'); return; }
-    setLoading(true); setErr('');
-    try {
-      await studentCloudFetch('list', {}, { pin, apikey });
-      try { sessionStorage.setItem(STUDENT_CLOUD_PIN_KEY, pin); } catch { /* ignore */ }
-      setAuthed(true);
-    } catch (e) {
-      setErr(e.message || 'Incorrect HardPin — use STUDENT_CLOUD_PIN or admin hub PIN');
-      setAuthed(false);
-    } finally { setLoading(false); }
-  };
-
-  useEffect(() => {
-    if (!pin || pin.length < 6) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        await studentCloudFetch('list', {}, { pin, apikey });
-        if (!cancelled) setAuthed(true);
-      } catch { /* stay on gate */ }
-    })();
-    return () => { cancelled = true; };
-  }, [pin, apikey]);
-
-  const lock = () => {
-    try { sessionStorage.removeItem(STUDENT_CLOUD_PIN_KEY); } catch { /* ignore */ }
-    setAuthed(false);
-    setPin('');
-  };
-
-  if (!authed) {
-    return (
-      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 24 }}>
-          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>CONFIDENTIAL · STUDENT CLOUD</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Student Cloud</div>
-          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
-            SGR admissions · profile · enrollment · course fees. Protected by HardPin.
-          </div>
-          <Field label="HardPin (STUDENT_CLOUD_PIN or admin hub PIN)">
-            <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
-          </Field>
-          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock Student Cloud'}</Btn>
-          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
-            Bookmark: <code style={{ color: C.acc }}>https://getscanv.com/#student-cloud</code>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, padding: '16px 16px 32px' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1 }}>STUDENT CLOUD · HARDPIN</div>
-          <div style={{ fontSize: 11, color: C.sub }}>ScanV ₹ & Partner ₹ from Pricing Input (#pricing-admin)</div>
-          <Btn v="outline" sm onClick={lock}>Lock</Btn>
-        </div>
-        <StudentCloudDashboard pin={pin} apikey={apikey} courses={courses} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
-      </div>
-    </div>
-  );
 }
