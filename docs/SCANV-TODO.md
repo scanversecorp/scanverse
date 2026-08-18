@@ -73,6 +73,21 @@ curl -X POST 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/health-repor
 
 ---
 
+## Go-live · payments (Vyapar UPI)
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 12 | **HDFC Vyapar / UPI live collections** | ⏳ **Blocked — bank** | Owner reached out to **bank** (19 Aug 2026); still working on merchant KYC / VPA activation / webhook side. Go-Live §B items stay open until bank confirms. |
+| 13 | Vyapar webhook + `VYAPAR_WEBHOOK_SECRET` + ₹1 UPI test | ⏳ After bank | Depends on §12 — auto-confirm booking flow cannot sign off until live UPI works. |
+| 14 | **Razorpay live** backup path | ⏳ Parallel | Can complete while waiting on Vyapar — webhook + phone test does not require HDFC. |
+| 15 | **2Factor / DLT / OTP delivery** | ⏳ Parallel | Independent of Vyapar — fix SMS callbacks + delivery report before real bookings. |
+
+**While bank works on Vyapar:** OTP (§A), Razorpay backup (§C), E2E browse/OTP (partial §H), backup drill (§I), device testing (§F).
+
+**Blocked on Vyapar only:** UPI pay at checkout, Vyapar dashboard reconciliation, full E2E payment (§H payment step via UPI).
+
+---
+
 ## Not blocking (reference)
 
 Full launch checklist items (OTP/DLT, Vyapar live, Razorpay live, backup drill, app stores) remain in [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).

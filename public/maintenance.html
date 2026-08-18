@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ScanV — Planned maintenance</title>
+  <meta name="robots" content="noindex" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 20% 0%, #ffe4ec 0%, #faf7f8 45%, #f0f4ff 100%);
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 380px;
+      width: 100%;
+      background: #fff;
+      border-radius: 20px;
+      border: 1px solid rgba(214, 58, 86, 0.2);
+      box-shadow: 0 20px 60px rgba(214, 58, 86, 0.12);
+      padding: 28px 24px 24px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: #d63a56;
+      background: rgba(214, 58, 86, 0.08);
+      border: 1px solid rgba(214, 58, 86, 0.25);
+      border-radius: 20px;
+      padding: 6px 12px;
+      margin-bottom: 14px;
+    }
+    .emoji { font-size: 48px; line-height: 1; margin-bottom: 12px; animation: wobble 2.4s ease-in-out infinite; }
+    @keyframes wobble { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+    h1 { font-size: 20px; font-weight: 800; margin-bottom: 10px; color: #d63a56; }
+    #msg { font-size: 14px; line-height: 1.5; color: #333; margin-bottom: 20px; font-weight: 500; }
+    .pct { font-size: 12px; color: #888; margin-bottom: 16px; }
+    .hint { font-size: 10px; color: #888; margin-top: 12px; line-height: 1.55; }
+    code { font-size: 10px; color: #d63a56; }
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 11px;
+      background: #d63a56;
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">PLANNED MAINTENANCE</div>
+    <div class="emoji">🛠️</div>
+    <h1>Planned maintenance</h1>
+    <p id="msg">We emailed you. You didn’t read it. Neither did we, apparently.</p>
+    <p class="pct">Back soon · <strong id="pct">67%</strong> done</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+    <p class="hint">Staff: <code>#admin → Go-Live</code> · <code>node scripts/maintenance-mode.mjs off</code></p>
+  </div>
+  <script>
+    const lines = [
+      'We emailed you. You didn’t read it. Neither did we, apparently.',
+      'Planned downtime — read your boring emails next time.',
+      'Not hacked. Not broken. Just upgrading. Check spam.',
+      'Calendar invite: maintenance. You: delete. Us: offline.',
+      'The maintenance email exists. This page is the TL;DR.',
+      'Scheduled upgrade. Your unread inbox sends regrets.',
+    ];
+    document.getElementById('msg').textContent = lines[Math.floor(Math.random() * lines.length)];
+    document.getElementById('pct').textContent = (58 + Math.floor(Math.random() * 35)) + '%';
+  </script>
+</body>
+</html>

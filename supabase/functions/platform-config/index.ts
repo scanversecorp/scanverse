@@ -1,6 +1,7 @@
 /** Public vendor enable flags for customer PWA (payment buttons, OTP paths). */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { loadClientVendorPayload } from "../_shared/vendor-providers.ts";
+import { getPlatformSettingValue, isPlatformFlagOn } from "../_shared/platform-settings.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -24,8 +25,17 @@ Deno.serve(async (req) => {
 
   const sb = createClient(url, key);
   const vendors = await loadClientVendorPayload(sb);
+  const maintenance_mode = await isPlatformFlagOn(sb, "maintenance_mode", {
+    envFallbackKey: "MAINTENANCE_MODE",
+  });
+  const maintenance_message = await getPlatformSettingValue(sb, "maintenance_message");
 
-  return new Response(JSON.stringify({ vendors, app_url: Deno.env.get("APP_URL") || "https://getscanv.com" }), {
+  return new Response(JSON.stringify({
+    vendors,
+    app_url: Deno.env.get("APP_URL") || "https://getscanv.com",
+    maintenance_mode,
+    maintenance_message: maintenance_message || null,
+  }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

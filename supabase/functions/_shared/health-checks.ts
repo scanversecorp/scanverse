@@ -236,10 +236,14 @@ export async function runSecurityHealthChecks(sb: SupabaseClient): Promise<Healt
     const runtime = (cfg.sections || []).find((s) => s.id === "switches")?.items || [];
     const otpDev = runtime.find((s) => s.setting === "otp_dev_mode");
     const dispatch = runtime.find((s) => s.setting === "dispatch_open");
+    const maintenance = runtime.find((s) => s.setting === "maintenance_mode");
     push(checks, "security", "otp-dev-mode", "otp_dev_mode OFF (production)",
       !otpDev?.enabled, otpDev?.enabled ? "ON — must be OFF" : "OFF");
     push(checks, "security", "dispatch-open", "dispatch_open OFF (production)",
       !dispatch?.enabled, dispatch?.enabled ? "ON — must be OFF" : "OFF");
+    push(checks, "security", "maintenance-mode", "maintenance_mode OFF (public site live)",
+      !maintenance?.enabled, maintenance?.enabled ? "ON — customers see maintenance page" : "OFF",
+      undefined, !!maintenance?.enabled);
   } catch (e) {
     push(checks, "security", "go-live-security", "Go-Live security switches", false,
       e instanceof Error ? e.message : String(e));

@@ -240,7 +240,10 @@ export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, 
   const manualMap = await loadManualCheckMap(sb);
   const razorpayRouteTicket = await loadRazorpayRouteTicket(sb);
 
+  const maintenanceOn = await isPlatformFlagOn(sb, "maintenance_mode", { envFallbackKey: "MAINTENANCE_MODE" });
+
   const switches = await Promise.all([
+    buildSwitchRow(sb, "maintenance_mode", "Customer PWA · platform-config", "Funny “we’re upgrading” page for everyone except admin/ops hash routes (#admin, #exec, etc.). CLI: node scripts/maintenance-mode.mjs", "off", false),
     buildSwitchRow(sb, "otp_dev_mode", "send-otp · vendor-onboard · razorpay-payment", "Dev bypass: OTP without SMS; relaxes webhook checks when secrets missing. Same as legacy OTP_DEV_MODE env.", "off", true),
     buildSwitchRow(sb, "voice_otp_fallback", "send-otp · vendor-onboard · admin-hub", "When SMS fails, 2Factor voice call with OTP. Turn OFF for SMS-only.", "on", false),
     buildSwitchRow(sb, "dispatch_open", "booking-dispatch", "Allow dispatch without DISPATCH_SECRET header.", "off", true),
@@ -339,6 +342,16 @@ export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, 
       production_recommendation: "0",
       toggleable: false,
     },
+    {
+      type: "auto",
+      setting: "maintenance_mode",
+      function: "platform-config",
+      description: `Customer maintenance page OFF (current: ${maintenanceOn ? "ON — public site hidden" : "OFF"})`,
+      passed: !maintenanceOn,
+      required: false,
+      production_recommendation: "off",
+      toggleable: false,
+    },
   ];
 
   const references = [
@@ -388,6 +401,30 @@ export async function buildGoLiveConfig(sb: PlatformSb): Promise<Record<string, 
       function: "QR print",
       description: "Printable PNG asset",
       value: `${appUrl}/scanv-qr.png`,
+      toggleable: false,
+    },
+    {
+      type: "reference",
+      setting: "maintenance_cli_on",
+      function: "Emergency CLI",
+      description: "Turn maintenance ON when Go-Live UI is unreachable (needs ADMIN_HUB_PIN in .env)",
+      value: "node scripts/maintenance-mode.mjs on",
+      toggleable: false,
+    },
+    {
+      type: "reference",
+      setting: "maintenance_cli_off",
+      function: "Emergency CLI",
+      description: "Turn maintenance OFF — site live again",
+      value: "node scripts/maintenance-mode.mjs off",
+      toggleable: false,
+    },
+    {
+      type: "reference",
+      setting: "maintenance_sql_off",
+      function: "Emergency SQL",
+      description: "Last resort if admin-hub also down — Supabase SQL Editor or supabase db query --linked",
+      value: "UPDATE platform_settings SET value = '0', updated_by = 'sql' WHERE key = 'maintenance_mode';",
       toggleable: false,
     },
   ];

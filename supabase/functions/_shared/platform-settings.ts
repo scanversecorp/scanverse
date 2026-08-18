@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 export type PlatformSb = ReturnType<typeof createClient>;
 
 export const GO_LIVE_SWITCH_KEYS = new Set([
+  "maintenance_mode",
   "otp_dev_mode",
   "voice_otp_fallback",
   "dispatch_open",

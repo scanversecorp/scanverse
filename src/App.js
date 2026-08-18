@@ -66,12 +66,24 @@ const DEFAULT_PLATFORM_VENDORS = {
 const UPI_LABEL_TO_VENDOR_KEY = { GPay: 'gpay', PhonePe: 'phonepe', Paytm: 'paytm', Navi: 'navi', BHIM: 'bhim', 'Any UPI': 'any' };
 const PLATFORM_CONFIG_FN = `${SB_URL}/functions/v1/platform-config`;
 let platformVendors = null;
-async function loadPlatformVendors() {
+let platformMaintenance = false;
+let platformMaintenanceMessage = null;
+
+async function loadPlatformConfig() {
   try {
     const r = await fetch(PLATFORM_CONFIG_FN, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
     const d = await r.json();
     if (d?.vendors) platformVendors = d.vendors;
+    platformMaintenance = !!d?.maintenance_mode;
+    platformMaintenanceMessage = d?.maintenance_message || null;
+    return d;
   } catch (_) { /* keep defaults */ }
+  return { vendors: getPlatformVendors(), maintenance_mode: platformMaintenance };
+}
+
+/** @deprecated use loadPlatformConfig */
+async function loadPlatformVendors() {
+  await loadPlatformConfig();
   return getPlatformVendors();
 }
 function getPlatformVendors() {
@@ -6921,6 +6933,56 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
 }
 
 /* ================================================================
+   MAINTENANCE PAGE — when Go-Live maintenance_mode switch is ON
+================================================================ */
+const MAINTENANCE_QUIPS = [
+  'We emailed you. You didn’t read it. Neither did we, apparently.',
+  'Planned downtime — read your boring emails next time.',
+  'Not hacked. Not broken. Just upgrading. Check spam.',
+  'Calendar invite: maintenance. You: delete. Us: offline.',
+  'The maintenance email exists. This page is the TL;DR.',
+  'Scheduled upgrade. Your unread inbox sends regrets.',
+];
+
+function MaintenancePage({ message, onRetry }) {
+  const [quipIdx] = useState(() => Math.floor(Math.random() * MAINTENANCE_QUIPS.length));
+  const [pct] = useState(() => 58 + Math.floor(Math.random() * 35));
+  const [busy, setBusy] = useState(false);
+  const quip = message || MAINTENANCE_QUIPS[quipIdx];
+
+  const retry = async () => {
+    setBusy(true);
+    try {
+      await loadPlatformConfig();
+      onRetry?.();
+      if (!platformMaintenance) window.location.reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: `radial-gradient(1200px 600px at 20% 0%, ${C.acc}22 0%, ${C.bg} 55%, #eef2ff 100%)`, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ ...S.card(), maxWidth: 440, width: '100%', padding: '28px 24px', textAlign: 'center', border: `1.5px solid ${C.acc}33`, boxShadow: '0 20px 60px rgba(214,58,86,0.12)' }}>
+        <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: C.acc, background: `${C.acc}14`, border: `1px solid ${C.acc}44`, borderRadius: 20, padding: '6px 12px', marginBottom: 14 }}>
+          PLANNED MAINTENANCE
+        </div>
+        <div style={{ fontSize: 48, marginBottom: 12, animation: 'wobble 2.4s ease-in-out infinite' }}>🛠️</div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: C.acc, marginBottom: 10 }}>Planned maintenance</div>
+        <div style={{ fontSize: 14, color: C.txt, lineHeight: 1.5, marginBottom: 20, fontWeight: 500 }}>{quip}</div>
+        <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>Back soon · {pct}% done</div>
+        <Btn full onClick={retry} disabled={busy}>{busy ? 'Checking…' : 'Try again'}</Btn>
+        <div style={{ fontSize: 10, color: C.dim, marginTop: 16, lineHeight: 1.55 }}>
+          Urgent booking? Call <a href={`tel:${ASSIST.replace(/\D/g, '')}`} style={{ color: C.acc, fontWeight: 700 }}>{ASSIST}</a>
+          <br />Staff: <code style={{ color: C.acc }}>#admin → Go-Live</code> · <code style={{ color: C.acc }}>node scripts/maintenance-mode.mjs off</code>
+        </div>
+      </div>
+      <style>{`@keyframes wobble { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(4deg)} }`}</style>
+    </div>
+  );
+}
+
+/* ================================================================
    QR CODE SCREEN (accessible from admin)
 ================================================================ */
 function QRScreen() {
@@ -8341,6 +8403,13 @@ function requestNativeGps({ onFast, onAccurate, onError } = {}) {
 function isGpsPortalRoute() {
   return isAdminHubRoute() || isVendorAdminRoute() || isCustomerSupportRoute()
     || isPricingAdminRoute() || isExecDashboardRoute() || isVendorOnboardRoute() || isStudentCloudRoute();
+}
+
+/** Admin/ops hash routes stay up when maintenance_mode is ON */
+function isOpsBypassRoute() {
+  return isAdminHubRoute() || isExecDashboardRoute() || isOtpDeliveryReportRoute()
+    || isPricingAdminRoute() || isVendorAdminRoute() || isCustomerSupportRoute()
+    || isStudentCloudRoute();
 }
 
 async function persistCustomerGps(user, lat, lng, geo, setUser, setSilentGeo) {
@@ -14183,6 +14252,12 @@ function AdminGoLiveTab({ pin, onMsg, onErr, onGoVendors }) {
   useEffect(() => { load(); }, [load]);
 
   const toggleSwitch = async (item, next) => {
+    if (item.setting === 'maintenance_mode') {
+      const msg = next
+        ? 'Turn ON maintenance mode?\n\nCustomers see the funny “we’re upgrading” page.\nAdmin routes (#admin, #exec, etc.) still work.'
+        : 'Turn OFF maintenance mode?\n\nPublic site goes live again for everyone.';
+      if (!window.confirm(msg)) return;
+    }
     if (item.dangerous && next) {
       const ok = window.confirm(`Turn ON "${item.setting}"?\n\nDevelopment only — weakens production security.`);
       if (!ok) return;
@@ -16491,6 +16566,11 @@ export default function App() {
   const [qrPrefill,setQrPrefill] = useState(null);
   const [catalogTick, setCatalogTick] = useState(0);
   const [silentGeo, setSilentGeo] = useState(null);
+  const [platformTick, setPlatformTick] = useState(0);
+  const refreshPlatformConfig = useCallback(async () => {
+    await loadPlatformConfig();
+    setPlatformTick((t) => t + 1);
+  }, []);
   const [trackBookingId, setTrackBookingId] = useState(() => trackBookingIdFromHash() || sessionStorage.getItem(TRACK_BOOKING_KEY) || null);
   const refreshPricing = useCallback(() => { setCatalogTick(t => t + 1); }, []);
 
@@ -16559,8 +16639,9 @@ export default function App() {
 
   useEffect(()=>{
     (async()=>{
-      // Load vendor toggles (payment buttons, OTP routes) before customer flows
-      await loadPlatformVendors();
+      // Load vendor toggles + maintenance flag before customer flows
+      await loadPlatformConfig();
+      setPlatformTick((t) => t + 1);
       // Load catalog (prices + names) from Supabase before showing services
       await fetchCatalogFromDb(refreshPricing);
 
@@ -16817,6 +16898,15 @@ export default function App() {
       <Boundary>
         <style>{APP_CSS}</style>
         <CustomerSupportPage/>
+      </Boundary>
+    );
+  }
+
+  if (platformMaintenance && !isOpsBypassRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <MaintenancePage message={platformMaintenanceMessage} onRetry={refreshPlatformConfig} key={platformTick} />
       </Boundary>
     );
   }

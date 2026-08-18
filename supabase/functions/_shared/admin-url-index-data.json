@@ -35,9 +35,9 @@
         "note": "Replace BK-XXXX with booking ID"
       },
       {
-        "label": "Payment return",
-        "url": "https://getscanv.com/?payment=TXN-XXXX",
-        "note": "Razorpay redirect after pay · replace TXN-XXXX"
+        "label": "Maintenance page (static)",
+        "url": "https://getscanv.com/maintenance.html",
+        "note": "Fallback HTML if SPA fails · toggle via Go-Live maintenance_mode"
       },
       {
         "label": "Partner registration",
