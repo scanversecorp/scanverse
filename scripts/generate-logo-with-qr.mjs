@@ -10,8 +10,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
 const DOCS_SOCIAL = join(ROOT, 'docs', 'social');
 const APP_URL = process.env.APP_URL || 'https://getscanv.com';
-/** Direct app open — scan logo from print, screen, or social */
-const QR_URL = `${APP_URL}?utm_source=logo&utm_medium=qr`;
+/** Printable standee PNG — must match SCANV_QR_URL in src/App.js */
+const PRINT_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
+/** Logo badge on brand assets — separate analytics bucket */
+const LOGO_QR_URL = `${APP_URL}?utm_source=logo&utm_medium=qr`;
 
 const BASE = join(PUBLIC, 'scanv-brand-logo-base.png');
 if (!existsSync(BASE)) {
@@ -30,14 +32,14 @@ const TARGETS = [
 ];
 
 const qrPath = join(PUBLIC, '.logo-qr-temp.png');
-await QRCode.toFile(qrPath, QR_URL, {
+await QRCode.toFile(qrPath, LOGO_QR_URL, {
   errorCorrectionLevel: 'H',
   margin: 2,
   width: 640,
   color: { dark: '#121212', light: '#ffffff' },
 });
 
-await QRCode.toFile(join(PUBLIC, 'scanv-qr.png'), QR_URL, {
+await QRCode.toFile(join(PUBLIC, 'scanv-qr.png'), PRINT_QR_URL, {
   errorCorrectionLevel: 'H',
   margin: 2,
   width: 512,
@@ -80,5 +82,6 @@ Image.open('${join(PUBLIC, 'favicon-32.png')}').convert('RGBA').save('${join(PUB
 `], { stdio: 'inherit' });
 
 console.log('ScanV logo + QR ready');
-console.log('  Scan opens →', QR_URL);
+console.log('  Print QR (scanv-qr.png) →', PRINT_QR_URL);
+console.log('  Logo badge QR →', LOGO_QR_URL);
 console.log('  Assets: scanv-brand-logo.png, scanv-logo-sm.png, logo512.png, scanv-qr.png, social profile');
