@@ -861,17 +861,13 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                     <td style={td}>{r.schedule_date || '—'} {r.schedule_time || ''}</td>
                     <td style={td}>₹{fmtRs(r.sgr_paid_paise)}</td>
                     <td style={td}>
-                      {sgrPaid ? (
-                        <span style={{ fontWeight: 700, color: C.txt }}>
-                          ₹{fmtRs(catalogFee ?? 0)}
-                          {!catalogFee && <span style={{ color: C.gold, fontWeight: 600, marginLeft: 4, fontSize: 10 }}>no catalog price</span>}
-                        </span>
-                      ) : (
-                        <span style={{ color: C.dim, fontSize: 11 }}>—</span>
-                      )}
+                      <span style={{ fontWeight: 700, color: C.txt }}>
+                        ₹{fmtRs(catalogFee ?? 0)}
+                        {!catalogFee && <span style={{ color: C.gold, fontWeight: 600, marginLeft: 4, fontSize: 10 }}>no catalog price</span>}
+                      </span>
                     </td>
-                    <td style={{ ...td, fontWeight: 700, color: C.acc }}>{sgrPaid ? `₹${fmtRs(scanvAmt)}` : '—'}</td>
-                    <td style={{ ...td, color: C.cyan }}>{sgrPaid ? `₹${fmtRs(partnerAmt)}` : '—'}</td>
+                    <td style={{ ...td, fontWeight: 700, color: C.acc }}>₹{fmtRs(scanvAmt)}</td>
+                    <td style={{ ...td, color: C.cyan }}>₹{fmtRs(partnerAmt)}</td>
                     <td style={td}><input value={e.discount_rs ?? (Number(r.discount_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], discount_rs: ev.target.value } }))} style={{ ...inp, width: 72 }} /></td>
                     <td style={td}>₹{fmtRs(r.course_paid_paise)}</td>
                     <td style={{ ...td, fontWeight: 800, color: pending > 0 ? C.acc : C.grn }} title="ScanV share pending">₹{fmtRs(pending)}</td>
