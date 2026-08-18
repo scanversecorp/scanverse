@@ -2299,22 +2299,26 @@ function getTopRatedServices() {
   return out.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
-/** Parent cards: DB row wins; else min sub-service price after catalog sync. */
+/** Parent home cards: Pricing Admin category row wins; else min visible sub-service ("From"). */
 function syncParentFromPrices(rows) {
   const dbById = Object.fromEntries((rows || []).map(r => [r.service_id, r]));
   for (const parent of SVCS) {
     const dbRow = dbById[parent.id];
     const cfg = SUB_CATEGORIES[parent.id];
+    const dbPrice = dbRow?.price_paise != null ? Number(dbRow.price_paise) : null;
+    const dbMrp = dbRow?.mrp_paise != null ? Number(dbRow.mrp_paise) : null;
+
+    if (dbPrice != null && dbPrice >= 100) {
+      parent.price = dbPrice;
+      if (dbMrp != null && dbMrp >= dbPrice) parent.mrp = dbMrp;
+      continue;
+    }
+
     const subPrices = cfg?.svcs?.length ? visibleSvcs(cfg.svcs).map(s => s.price).filter(p => p > 0) : [];
     if (subPrices.length) {
       parent.price = Math.min(...subPrices);
       const subMrps = visibleSvcs(cfg.svcs).map(s => s.mrp).filter(p => p > 0);
       if (subMrps.length) parent.mrp = Math.min(...subMrps);
-      continue;
-    }
-    if (dbRow?.price_paise != null && dbRow.price_paise >= 10000) {
-      parent.price = dbRow.price_paise;
-      if (dbRow.mrp_paise != null) parent.mrp = dbRow.mrp_paise;
     }
   }
 }
@@ -4858,7 +4862,7 @@ async function recordQrScan({ onGeo } = {}) {
    BROWSE FLOW -- Services first, no registration wall
    User browses → picks service → books → THEN registers
 ================================================================ */
-function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
+function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick = 0 }) {
   const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY);
   const [screen, setScreen] = useState('services'); // services | top-rated | detail | verify | payment | schedule | login
   const [navTab, setNavTab] = useState('home');
@@ -5697,7 +5701,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast }) {
     </div>
   );
 
-  const searchResult = searchAllServices(search);
+  const searchResult = useMemo(() => searchAllServices(search), [search, catalogTick]);
   const { categories: svcList, ...searchSubs } = searchResult;
   const searching = !!search.trim();
 
@@ -7066,14 +7070,14 @@ function TopRatedScreen() {
 }
 
 function ServicesScreen() {
-  const {setActiveSvc,setScreen,activeSvc,addToast,silentGeo}=useApp();
+  const {setActiveSvc,setScreen,activeSvc,addToast,silentGeo,catalogTick}=useApp();
   const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY);
   const [search,setSearch]=useState('');
   const [detail,setDetail]=useState(null);
   const [subListCat,setSubListCat]=useState(null);
   const [cloudAdmit,setCloudAdmit]=useState(false);
   const scrollRef = useRef(null);
-  const searchResult = searchAllServices(search);
+  const searchResult = useMemo(() => searchAllServices(search), [search, catalogTick]);
   const { categories: list, ...searchSubs } = searchResult;
   const searching = !!search.trim();
 
@@ -15646,6 +15650,7 @@ export default function App() {
     <Boundary><CustomerShell toasts={toasts}>
     <BrowseFlow
       silentGeo={silentGeo}
+      catalogTick={catalogTick}
       onRegistered={(p, bookingId, navIntent)=>{setUser(p);setState('app');if(bookingId)goToTrack(setTrackBookingId,setScreen,bookingId);else if(navIntent==='bookings')setScreen('bookings');else if(navIntent==='profile')setScreen('profile');else if(navIntent==='top-rated')setScreen('top-rated');else setScreen('services');}}
       onSignUp={()=>{ setQrPrefill({ geo: silentGeo, dev: silentGeo?.device }); setState('register'); }}
       addToast={addToast}
