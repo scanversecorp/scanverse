@@ -92,6 +92,36 @@ function fmtRs(paise) {
   return ((Number(paise) || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function sgrFeePaiseFor(row) {
+  return Number(row?.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
+}
+
+export function isSgrPaidRow(row) {
+  if (!row) return false;
+  if (Number(row.sgr_paid_paise || 0) >= sgrFeePaiseFor(row)) return true;
+  if (row.sgr_paid_at) return true;
+  return ['sgr_paid', 'enrolled', 'fee_due', 'completed'].includes(String(row.status || ''));
+}
+
+function catalogCourseFeePaise(courses, courseId, row = null) {
+  const fromApi = Number(row?.catalog_course_fee_paise || row?.effective_course_fee_paise || 0);
+  if (fromApi > 0) return fromApi;
+  const id = String(courseId || '').trim();
+  if (!id) return null;
+  const c = (courses || []).find((x) => x.id === id);
+  const p = Number(c?.price);
+  return p > 0 ? p : null;
+}
+
+function displayPendingPaise(row, courses, discountPaise) {
+  const sgrDue = isSgrPaidRow(row)
+    ? 0
+    : Math.max(0, sgrFeePaiseFor(row) - Number(row.sgr_paid_paise || 0));
+  const courseFee = catalogCourseFeePaise(courses, row.course_id, row) ?? Number(row.course_fee_paise || 0);
+  const courseDue = Math.max(0, courseFee - Number(discountPaise || 0) - Number(row.course_paid_paise || 0));
+  return sgrDue + courseDue;
+}
+
 function digits10(raw) {
   return String(raw || '').replace(/\D/g, '').slice(-10);
 }
@@ -544,12 +574,14 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
 
   const save = async (id) => {
     const patch = edit[id] || {};
+    const row = rows.find((r) => r.id === id);
+    const courseId = patch.course_id ?? row?.course_id;
+    const catalogFee = catalogCourseFeePaise(courses, courseId, row);
     try {
       await studentCloudFetch('update', {
         student_id: id,
-        course_fee_paise: patch.course_fee_rs != null ? Math.round(Number(patch.course_fee_rs) * 100) : undefined,
+        course_fee_paise: catalogFee ?? (patch.course_fee_rs != null ? Math.round(Number(patch.course_fee_rs) * 100) : undefined),
         discount_paise: patch.discount_rs != null ? Math.round(Number(patch.discount_rs) * 100) : undefined,
-        status: patch.status,
         notes: patch.notes,
         course_id: patch.course_id,
         course_name: patch.course_id ? (courses || []).find((c) => c.id === patch.course_id)?.name : undefined,
@@ -621,13 +653,17 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
           <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 1280 }}>
             <thead>
               <tr>
-                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Status', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
+                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
                 const e = edit[r.id] || {};
-                const pending = r.pending_paise || 0;
+                const courseId = e.course_id ?? r.course_id;
+                const catalogFee = catalogCourseFeePaise(courses, courseId, r);
+                const discountPaise = e.discount_rs != null ? Math.round(Number(e.discount_rs) * 100) : Number(r.discount_paise || 0);
+                const pending = displayPendingPaise({ ...r, course_id: courseId }, courses, discountPaise);
+                const sgrPaid = isSgrPaidRow(r);
                 const addr = [r.address, r.village, r.city, r.state, r.pincode].filter(Boolean).join(', ');
                 return (
                   <tr key={r.id}>
@@ -641,32 +677,34 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                       <div style={{ color: C.dim, fontSize: 9, marginTop: 4 }}>Joined {formatWhen(r.created_at)}</div>
                     </td>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 150 }}>
-                      <select value={e.course_id ?? r.course_id ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_id: ev.target.value } }))} style={{ ...inp, minWidth: 140, marginBottom: 6 }}>
+                      <select value={courseId ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_id: ev.target.value } }))} style={{ ...inp, minWidth: 140, marginBottom: 6 }}>
                         {(courses || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
-                      <div style={{ fontSize: 10, color: C.sub }}>{r.course_name || '—'}</div>
-                      <div style={{ fontSize: 10, color: Number(r.sgr_paid_paise) >= Number(r.sgr_fee_paise) ? C.grn : C.gold, marginTop: 4, fontWeight: 700 }}>
-                        SGR paid {r.sgr_paid_at ? formatWhen(r.sgr_paid_at) : '—'}
-                      </div>
+                      <div style={{ fontSize: 10, color: C.sub }}>{(courses || []).find((c) => c.id === courseId)?.name || r.course_name || '—'}</div>
+                      {sgrPaid ? (
+                        <div style={{ fontSize: 10, color: C.grn, marginTop: 4, fontWeight: 700 }}>
+                          SGR paid{r.sgr_paid_at ? ` · ${formatWhen(r.sgr_paid_at)}` : ''}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 10, color: C.gold, marginTop: 4, fontWeight: 700 }}>SGR pending</div>
+                      )}
                     </td>
                     <td style={td}>{r.schedule_date || '—'} {r.schedule_time || ''}</td>
                     <td style={td}>₹{fmtRs(r.sgr_fee_paise)}</td>
-                    <td style={{ ...td, color: Number(r.sgr_paid_paise) >= Number(r.sgr_fee_paise) ? C.grn : C.gold, fontWeight: 700 }}>₹{fmtRs(r.sgr_paid_paise)}</td>
+                    <td style={{ ...td, color: sgrPaid ? C.grn : C.gold, fontWeight: 700 }}>₹{fmtRs(r.sgr_paid_paise)}</td>
                     <td style={td}>
-                      {Number(r.sgr_paid_paise) >= Number(r.sgr_fee_paise) ? (
-                        <input value={e.course_fee_rs ?? (Number(r.course_fee_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_fee_rs: ev.target.value } }))} style={{ ...inp, width: 90 }} />
+                      {sgrPaid ? (
+                        <span style={{ fontWeight: 700, color: C.txt }}>
+                          ₹{fmtRs(catalogFee ?? 0)}
+                          {!catalogFee && <span style={{ color: C.gold, fontWeight: 600, marginLeft: 4, fontSize: 10 }}>no catalog price</span>}
+                        </span>
                       ) : (
-                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 11 }}>Awaiting SGR</span>
+                        <span style={{ color: C.dim, fontSize: 11 }}>—</span>
                       )}
                     </td>
                     <td style={td}><input value={e.discount_rs ?? (Number(r.discount_paise || 0) / 100)} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], discount_rs: ev.target.value } }))} style={{ ...inp, width: 80 }} /></td>
                     <td style={td}>₹{fmtRs(r.course_paid_paise)}</td>
                     <td style={{ ...td, fontWeight: 800, color: pending > 0 ? C.acc : C.grn }}>₹{fmtRs(pending)}</td>
-                    <td style={td}>
-                      <select value={e.status ?? r.status} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], status: ev.target.value } }))} style={inp}>
-                        {['sgr_pending', 'sgr_paid', 'enrolled', 'fee_due', 'completed', 'dropped'].map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </td>
                     <td style={td}>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                         <input value={payAmt[r.id] || ''} onChange={(ev) => setPayAmt((p) => ({ ...p, [r.id]: ev.target.value }))} placeholder="₹ partial" style={{ ...inp, width: 72 }} />
@@ -679,7 +717,7 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                   </tr>
                 );
               })}
-              {!rows.length && <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: C.dim, padding: 24 }}>No student admissions yet</td></tr>}
+              {!rows.length && <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: C.dim, padding: 24 }}>No student admissions yet</td></tr>}
             </tbody>
           </table>
         </div>

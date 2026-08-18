@@ -109,21 +109,41 @@ function validateScheduleInput(dateStr: string, timeStr: string): string | null 
 
 function isSgrPaid(row: Record<string, unknown>): boolean {
   const fee = Number(row.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
-  return Number(row.sgr_paid_paise || 0) >= fee;
+  if (Number(row.sgr_paid_paise || 0) >= fee) return true;
+  if (row.sgr_paid_at) return true;
+  return ["sgr_paid", "enrolled", "fee_due", "completed"].includes(String(row.status || ""));
 }
 
-function pendingOf(row: Record<string, unknown>): number {
-  const sgrDue = Math.max(0, Number(row.sgr_fee_paise || 0) - Number(row.sgr_paid_paise || 0));
+function pendingOf(row: Record<string, unknown>, catalogCourseFee?: number | null): number {
+  const fee = Number(row.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
+  const sgrDue = isSgrPaid(row) ? 0 : Math.max(0, fee - Number(row.sgr_paid_paise || 0));
+  const storedCourse = Number(row.course_fee_paise || 0);
+  const courseFee = storedCourse > 0 ? storedCourse : (catalogCourseFee ?? 0);
   const courseDue = Math.max(
     0,
-    Number(row.course_fee_paise || 0) - Number(row.discount_paise || 0) - Number(row.course_paid_paise || 0),
+    courseFee - Number(row.discount_paise || 0) - Number(row.course_paid_paise || 0),
   );
   return sgrDue + courseDue;
 }
 
-function withPending(row: Record<string, unknown>) {
-  const pending_paise = pendingOf(row);
-  return { ...row, pending_paise, pending_rs: pending_paise / 100 };
+function withPending(row: Record<string, unknown>, catalogCourseFee?: number | null) {
+  const pending_paise = pendingOf(row, catalogCourseFee);
+  const storedCourse = Number(row.course_fee_paise || 0);
+  const catalog = catalogCourseFee ?? null;
+  const effective_course_fee_paise = storedCourse > 0 ? storedCourse : (catalog ?? 0);
+  return { ...row, pending_paise, pending_rs: pending_paise / 100, catalog_course_fee_paise: catalog, effective_course_fee_paise };
+}
+
+async function catalogCourseFeesById(sb: ReturnType<typeof adminSb>, courseIds: string[]): Promise<Record<string, number>> {
+  const ids = [...new Set(courseIds.map((id) => String(id || "").trim()).filter(Boolean))];
+  if (!ids.length) return {};
+  const { data } = await sb.from("service_prices_public").select("service_id, price_paise").in("service_id", ids);
+  const out: Record<string, number> = {};
+  for (const row of data || []) {
+    const p = Number(row.price_paise);
+    if (p > 0) out[String(row.service_id)] = p;
+  }
+  return out;
 }
 
 async function verifyOtp(mobile: string, otp: string): Promise<boolean> {
@@ -367,16 +387,17 @@ Deno.serve(async (req) => {
         return json({ sgr_paid: false, course_id: null, course_fee_paise: null, course_name: null, status: null, student_id: null });
       }
       const sgrPaid = isSgrPaid(student);
-      const netCourse = Math.max(
-        0,
-        Number(student.course_fee_paise || 0) - Number(student.discount_paise || 0),
-      );
+      const catalogFees = await catalogCourseFeesById(sb, [String(student.course_id || "")]);
+      const catalogCourse = catalogFees[String(student.course_id || "")] ?? null;
+      const storedCourse = Number(student.course_fee_paise || 0);
+      const effectiveCourse = storedCourse > 0 ? storedCourse : (catalogCourse ?? 0);
+      const netCourse = Math.max(0, effectiveCourse - Number(student.discount_paise || 0));
       return json({
         student_id: student.id || null,
         sgr_paid: sgrPaid,
         course_id: student.course_id || null,
         course_name: student.course_name || null,
-        course_fee_paise: sgrPaid ? (netCourse > 0 ? netCourse : null) : null,
+        course_fee_paise: sgrPaid && netCourse > 0 ? netCourse : null,
         status: student.status || null,
       });
     }
@@ -387,7 +408,9 @@ Deno.serve(async (req) => {
       const q = String(body.q || "").trim().toLowerCase();
       const { data, error } = await sb.from("student_cloud").select("*, student_cloud_payments(*)").order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
-      let rows = (data || []).map((r) => withPending(r as Record<string, unknown>));
+      const raw = (data || []) as Record<string, unknown>[];
+      const catalogFees = await catalogCourseFeesById(sb, raw.map((r) => String(r.course_id || "")));
+      let rows = raw.map((r) => withPending(r, catalogFees[String(r.course_id || "")] ?? null));
       if (q) {
         rows = rows.filter((r) => {
           const hay = [r.first_name, r.last_name, r.mobile, r.course_name, r.city, r.status].join(" ").toLowerCase();
@@ -404,11 +427,17 @@ Deno.serve(async (req) => {
       for (const k of ["course_id", "course_name", "course_fee_paise", "discount_paise", "status", "notes", "schedule_date", "schedule_time"]) {
         if (body[k] !== undefined) patch[k] = body[k];
       }
+      if (patch.course_id && patch.course_fee_paise == null) {
+        const catalogFees = await catalogCourseFeesById(sb, [String(patch.course_id)]);
+        const catalogFee = catalogFees[String(patch.course_id)] ?? null;
+        if (catalogFee != null) patch.course_fee_paise = catalogFee;
+      }
       if (patch.course_fee_paise != null) patch.course_fee_paise = Math.max(0, Math.round(Number(patch.course_fee_paise) || 0));
       if (patch.discount_paise != null) patch.discount_paise = Math.max(0, Math.round(Number(patch.discount_paise) || 0));
       const { data, error } = await sb.from("student_cloud").update(patch).eq("id", id).select("*").single();
       if (error) throw error;
-      return json({ success: true, student: withPending(data) });
+      const catalogFees = await catalogCourseFeesById(sb, [String(data.course_id || "")]);
+      return json({ success: true, student: withPending(data, catalogFees[String(data.course_id || "")] ?? null) });
     }
 
     if (action === "record_payment") {
