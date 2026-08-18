@@ -12493,21 +12493,26 @@ function ExecDashboardPage() {
   const activeTotp = totpCode.replace(/\D/g, '').slice(0, 6);
 
   useEffect(() => {
-    if (adminAuthOk()) {
-      setPin(getAdminAuth().pin);
-      setAuthed(true);
-      setAuthStep('done');
-      return;
-    }
-    const savedPin = sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin;
-    if (!savedPin) return;
-    (async () => {
+    const bootstrap = async (savedPin) => {
       try {
-        const status = await adminHubTotp(savedPin, 'totp_status');
+        await adminHubFetch('exec_pin_check', {}, savedPin);
         setPin(savedPin);
+        if (adminAuthOk()) {
+          setAuthed(true);
+          setAuthStep('done');
+          return;
+        }
+        const status = await adminHubTotp(savedPin, 'totp_status');
         if (status.enrolled) setAuthStep('totp');
-      } catch { /* stay on pin */ }
-    })();
+      } catch {
+        if (adminAuthOk()) {
+          sessionStorage.removeItem(ADMIN_AUTH_KEY);
+          setAuthed(false);
+        }
+      }
+    };
+    const savedPin = sessionStorage.getItem(ADMIN_PIN_KEY) || savedAuth?.pin;
+    if (savedPin) bootstrap(savedPin);
   }, []);
 
   const login = async () => {

@@ -1095,7 +1095,7 @@ async function issueAdminSessionResponse(extra: Record<string, unknown> = {}) {
 function adminPinPresent(req: Request): boolean {
   const pin = req.headers.get("x-admin-pin") || req.headers.get("x-support-pin") || "";
   if (!pin || pin.length < 6) return false;
-  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN", "SUPPORT_AGENT_PIN"]) {
+  for (const k of ["ADMIN_HUB_PIN", "EXEC_DASHBOARD_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN", "SUPPORT_AGENT_PIN"]) {
     const secret = Deno.env.get(k) || "";
     if (secret.length >= 6 && pin === secret) return true;
   }
@@ -1191,7 +1191,7 @@ async function checkAdminHubTotp(
   body: Record<string, unknown>,
   action: string,
 ): Promise<Response | null> {
-  if (action.startsWith("totp_") || action === "whoami") return null;
+  if (action.startsWith("totp_") || action === "whoami" || action === "exec_pin_check") return null;
   const secret = await getAdminHubTotpSecret(sb);
   if (!secret) return null;
 
