@@ -308,6 +308,32 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "fee_view") {
+      const studentId = String(body.student_id || "").trim();
+      if (!studentId) return json({ error: "student_id required" }, 400);
+      const { data: student, error: se } = await sb
+        .from("student_cloud")
+        .select("id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, discount_paise, status")
+        .eq("id", studentId)
+        .maybeSingle();
+      if (se) throw se;
+      if (!student) {
+        return json({ sgr_paid: false, course_id: null, course_fee_paise: null, course_name: null, status: null });
+      }
+      const sgrPaid = isSgrPaid(student as Record<string, unknown>);
+      const netCourse = Math.max(
+        0,
+        Number(student.course_fee_paise || 0) - Number(student.discount_paise || 0),
+      );
+      return json({
+        sgr_paid: sgrPaid,
+        course_id: student.course_id || null,
+        course_name: student.course_name || null,
+        course_fee_paise: sgrPaid && netCourse > 0 ? netCourse : null,
+        status: student.status || null,
+      });
+    }
+
     if (!adminPinOk(req)) return json({ error: "Admin PIN required" }, 401);
 
     if (action === "list") {
@@ -419,32 +445,6 @@ Deno.serve(async (req) => {
 
       if (!ok) return json({ error: err || "Reminder failed" }, 502);
       return json({ success: true, channel, pending_paise: pending, tel: `tel:+91${digits10(student.mobile)}` });
-    }
-
-    if (action === "fee_view") {
-      const studentId = String(body.student_id || "").trim();
-      if (!studentId) return json({ error: "student_id required" }, 400);
-      const { data: student, error: se } = await sb
-        .from("student_cloud")
-        .select("id, course_id, course_name, sgr_fee_paise, sgr_paid_paise, course_fee_paise, discount_paise, status")
-        .eq("id", studentId)
-        .maybeSingle();
-      if (se) throw se;
-      if (!student) {
-        return json({ sgr_paid: false, course_id: null, course_fee_paise: null, course_name: null, status: null });
-      }
-      const sgrPaid = isSgrPaid(student as Record<string, unknown>);
-      const netCourse = Math.max(
-        0,
-        Number(student.course_fee_paise || 0) - Number(student.discount_paise || 0),
-      );
-      return json({
-        sgr_paid: sgrPaid,
-        course_id: student.course_id || null,
-        course_name: student.course_name || null,
-        course_fee_paise: sgrPaid && netCourse > 0 ? netCourse : null,
-        status: student.status || null,
-      });
     }
 
     return json({ error: `Unknown action ${action}` }, 400);
