@@ -3064,7 +3064,7 @@ const HOME_CARD_META = {
   food:     { commitment:'Happiness, served fresh.',        face:'Chef Kavita · tiffin & more' },
   repairs:  { commitment:'Fixed right. Stress gone.',       face:'Electric · plumbing · AC · 8 services' },
   'two-wheeler': { commitment:'Back on the road. Fast.',    face:'Ravi · bike mechanic · live GPS' },
-  'four-wheeler': { commitment:'Your car. Our care.',       face:'Suresh · car service · live tracking' },
+  'four-wheeler': { commitment:'Your car. Our care.',       face:'Samir · car service · live tracking' },
 };
 
 /** Search categories + all sub-services */
