@@ -217,6 +217,13 @@ function dayKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
+/** Health-check auth probe users — exclude from signup KPIs. */
+function isHealthTestProfile(p: { email?: string | null; id?: string | null }): boolean {
+  const e = (p.email || "").toLowerCase().trim();
+  if (e === "health-check@scanv.app" || /^health\d+@scanv\.app$/.test(e)) return true;
+  return false;
+}
+
 function lastNDays(n: number): string[] {
   const out: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -329,8 +336,8 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
   ] = await Promise.all([
     sb.from("payments").select("amount,status,method,gateway,created_at,paid_at"),
     sb.from("payment_intents").select("amount_paise,status,verified_via,created_at,paid_at"),
-    sb.from("profiles").select("id,mobile_verified,created_at"),
-    sb.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since7),
+    sb.from("profiles").select("id,mobile_verified,created_at,email"),
+    sb.from("profiles").select("id,email,created_at").gte("created_at", since7),
     sb.from("bookings").select("id,status,total,customer_id,created_at"),
     sb.from("bookings").select("id,status,created_at").gte("created_at", since30),
     sb.from("booking_dispatch").select("status"),
@@ -354,10 +361,12 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
   const payAgg = aggregatePayments(paymentRows);
   const todayStart = isoDaysAgo(0);
 
-  const profiles = profilesRes.data || [];
+  const profilesAll = profilesRes.data || [];
+  const profiles = profilesAll.filter((p: { email?: string | null }) => !isHealthTestProfile(p));
   const mobileVerified = profiles.filter((p: { mobile_verified?: boolean }) => p.mobile_verified).length;
   const signupsToday = profiles.filter((p: { created_at?: string }) => p.created_at && p.created_at >= todayStart).length;
-  const signups7d = profilesRecentRes.count ?? profiles.filter((p: { created_at?: string }) => p.created_at && p.created_at >= since7).length;
+  const recentProfiles = (profilesRecentRes.data || []).filter((p: { email?: string | null }) => !isHealthTestProfile(p));
+  const signups7d = recentProfiles.length;
 
   const bookings = bookingsRes.data || [];
   const bookingsByStatus: Record<string, number> = {};
@@ -1784,7 +1793,8 @@ Deno.serve(async (req) => {
 
   if (action === "run_smoke_test") {
     try {
-      const result = await runSmokeTest(sb);
+      const skipAuthProbe = body.skip_auth_probe !== false;
+      const result = await runSmokeTest(sb, { skipAuthProbe });
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Smoke test failed";

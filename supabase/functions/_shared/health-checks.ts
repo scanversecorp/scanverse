@@ -279,25 +279,36 @@ export async function runApplicationHealthChecks(opts: HealthCheckOptions = {}):
     Boolean(otpBody?.success), `HTTP ${r.status} provider=${otpBody?.provider || "?"}`);
 
   if (!opts.skipAuthProbe) {
-    const email = `health${Date.now()}@scanv.app`;
-    const password = "ScanVHealthCheck1!";
-    const signupRes = await fetch(`${url}/auth/v1/signup`, {
-      method: "POST",
-      headers: { apikey: key, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const signup = await signupRes.json() as { access_token?: string; msg?: string };
+    const email = Deno.env.get("HEALTH_CHECK_EMAIL") || "health-check@scanv.app";
+    const password = Deno.env.get("HEALTH_CHECK_PASSWORD") || "ScanVHealthCheck1!";
+    const authHeaders = { apikey: key, "Content-Type": "application/json" };
     const signinRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
       method: "POST",
-      headers: { apikey: key, "Content-Type": "application/json" },
+      headers: authHeaders,
       body: JSON.stringify({ email, password }),
     });
     const signin = await signinRes.json() as { access_token?: string; error_description?: string };
-    push(checks, "application", "auth-signup", "Auth signup/signin",
-      Boolean(signup.access_token || signin.access_token),
-      signup.access_token ? "signup session ok" : (signin.access_token ? "signin ok" : signin.error_description || signup.msg || "no session"));
+    if (signin.access_token) {
+      push(checks, "application", "auth-signup", "Auth signup/signin", true, "signin ok (health-check user)");
+    } else {
+      const signupRes = await fetch(`${url}/auth/v1/signup`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ email, password }),
+      });
+      const signup = await signupRes.json() as { access_token?: string; msg?: string };
+      const retrySignin = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ email, password }),
+      });
+      const retry = await retrySignin.json() as { access_token?: string; error_description?: string };
+      push(checks, "application", "auth-signup", "Auth signup/signin",
+        Boolean(signup.access_token || retry.access_token),
+        signup.access_token ? "signup session ok" : (retry.access_token ? "signin ok" : retry.error_description || signup.msg || "no session"));
+    }
   } else {
-    push(checks, "application", "auth-signup", "Auth signup/signin", true, "skipped on scheduled report");
+    push(checks, "application", "auth-signup", "Auth signup/signin", true, "skipped (avoids test signups on refresh)");
   }
 
   const pcRes = await anonFetch("/functions/v1/platform-config");
