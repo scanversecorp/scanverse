@@ -1326,6 +1326,8 @@ const REPAIRS_SVCS = [
     features:['TV wall mount install','Stud finder & levelling','Microwave & shelf fit','Cable tidy basic','Hardware guidance'], turnaround:'Same day', rating:'4.6 ⭐', bookings:'1,600+' },
 ];
 
+const BEAUTY_HOME_CARD_SUB = 'Beauty · Grooming · Makeup · Salon · Services · 25% off';
+
 const SUB_CATEGORIES = {
   household: { title:'Household services', subtitle:'Deep cleaning & home help · 25% off · verified partners', cat:'Household Services', themes:HH_THEME, svcs:HOUSEHOLD_SVCS, themeOrder:['pink','green'] },
   cloud:     { title:'Cloud services', subtitle:'AI · cloud · data center · packages · 25% off', cat:'Cloud Services', themes:CL_THEME, svcs:CLOUD_SVCS, themeOrder:['host','build','care','pack'] },
@@ -1337,7 +1339,7 @@ const SUB_CATEGORIES = {
   food:      { title:'Food', subtitle:'Tiffin · restaurants · bars · 25% off', cat:'Food', themes:FD_THEME, svcs:FOOD_SVCS, themeOrder:['daily','events'] },
   'two-wheeler': { title:'Two Wheeler Support', subtitle:'Mechanic · pick-up · wash · polish · 8 services', cat:'Two Wheeler Support', themes:TW_THEME, svcs:TWO_WHEELER_SVCS, themeOrder:['roadside','care'] },
   'four-wheeler': { title:'Four Wheeler Support', subtitle:'Car mechanic · pick-up · wash · sanitization · 8 services', cat:'Four Wheeler Support', themes:FW_THEME, svcs:FOUR_WHEELER_SVCS, themeOrder:['service','care'] },
-  beauty: { title:'Beauty & Personal Care', subtitle:'Beauty · Makeup · Salon · Services · 25% off', cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','men','occasion'] },
+  beauty: { title:'Beauty & Personal Care', subtitle:BEAUTY_HOME_CARD_SUB, cat:'Beauty & Personal Care', themes:BT_THEME, svcs:BEAUTY_SVCS, themeOrder:['salon','men','occasion'] },
   repairs: { title:'Repairs & Handyman', subtitle:'Electric · plumbing · AC · appliances · 25% off', cat:'Repairs & Handyman', themes:RP_THEME, svcs:REPAIRS_SVCS, themeOrder:['fix','appliances'] },
 };
 
@@ -3014,7 +3016,7 @@ const SVCS = [
   { id:'health',   icon:'🏥', name:'Health care',        sub:'Doctors · tests · pharmacy · 8 services',  cat:'Health Care',        cash:false, ...svcDisc(499), health:true },
   { id:'property', icon:'🏡', name:'Property & rentals', sub:'Buy · rent · verify · 6 services',         cat:'Property & Rentals', cash:false, ...svcDisc(1999), property:true },
   { id:'household',icon:'🧹', name:'Household services', sub:'Deep clean · home help · 14 services', cat:'Household Services', cash:false, ...svcDisc(149), household:true },
-  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:'Beauty · Makeup · Salon · Services · 25% off', cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
+  { id:'beauty', icon:'💄', name:'Beauty & Personal Care', sub:BEAUTY_HOME_CARD_SUB, cat:'Beauty & Personal Care', cash:false, ...svcDisc(199), beauty:true },
   { id:'delivery', icon:'📦', name:'Deliveries',         sub:'Courier · parcels · express · 6 services', cat:'Deliveries',         cash:false, ...svcDisc(99), delivery:true },
   { id:'food',     icon:'🍱', name:'Food',               sub:'Tiffin · restaurants · bars · 6 services', cat:'Food',               cash:false, ...svcDisc(199), food:true },
   { id:'repairs',  icon:'🔧', name:'Repairs & Handyman', sub:'Electric · plumbing · AC · 8 services', cat:'Repairs & Handyman', cash:false, ...svcDisc(299), repairs:true },
@@ -3276,6 +3278,11 @@ function Badge({label,color}) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,borderRadius:99,fontSize:11,fontWeight:600,padding:'2px 10px',display:'inline-block'}}>{label}</span>;
 }
 
+const HOME_CARD_SUB_STYLE = {
+  default: { color: C.sub, fontSize: 10, fontWeight: 600, lineHeight: 1.3 },
+  beauty: { color: C.dim, fontSize: 8, fontWeight: 600, lineHeight: 1.25, letterSpacing: '-0.01em' },
+};
+
 function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   const theme = SVC_CARD_THEME[svc.id] || SVC_CARD_THEME.legal;
   const meta = HOME_CARD_META[svc.id] || {};
@@ -3302,6 +3309,7 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
             {badgeRow(false)}
             <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>&ldquo;{meta.commitment}&rdquo;</div>
             <div style={{ color:C.txt, fontWeight:800, fontSize:16, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
+            {svc.sub && svc.id === 'beauty' && <div style={{ ...HOME_CARD_SUB_STYLE.beauty, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{svc.sub}</div>}
             {meta.face && svc.id !== 'beauty' && <div style={{ color:C.sub, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'nowrap', marginTop:2, minWidth:0 }}>
               <span style={{ color:C.acc, fontSize:13, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
@@ -3345,7 +3353,9 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
         {meta.face && svc.id !== 'beauty' && <div style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{meta.face}</div>}
         <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
         <div style={{ color:C.txt, fontWeight:800, fontSize:14, lineHeight:1.2 }}>{title}</div>
-        {svc.id !== 'beauty' && svc.sub && <div style={{ color:C.sub, fontSize:10, fontWeight:600, lineHeight:1.3 }}>{svc.sub}</div>}
+        {svc.sub && (
+          <div style={svc.id === 'beauty' ? HOME_CARD_SUB_STYLE.beauty : HOME_CARD_SUB_STYLE.default}>{svc.sub}</div>
+        )}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginTop:'auto' }}>
           <span style={{ color:C.acc, fontSize:12, fontWeight:800 }}>₹{fmtRs(svc.price)} →</span>
           <span style={{ color:C.dim, fontSize:9, fontWeight:600 }}>{d.rating||'4.8 ⭐'}</span>
