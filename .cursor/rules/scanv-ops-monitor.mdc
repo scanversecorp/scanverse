@@ -1,0 +1,15 @@
+---
+description: ScanV production ops — review health reports and fix failures
+alwaysApply: true
+---
+
+# ScanV ops monitoring
+
+When working on ScanV (`getscanv.com`) or when the user mentions health reports, monitoring, or production status:
+
+1. **Review health** — run `node scripts/ops-health-review.mjs` or inspect the latest scheduled report (6 AM / 5 PM IST emails to `sam@` + `jas@getscanv.com`).
+2. **Act on failures** — do not only summarize. For each `FAIL`, diagnose, fix (code/secrets/deploy), re-run checks until green or document blocker in `docs/SCANV-TODO.md`.
+3. **Keep todos current** — update `docs/SCANV-TODO.md` when items are fixed or new issues found.
+4. **Follow runbook** — `docs/SCANV-OPS-MONITOR.md` for playbooks and commands.
+
+Scheduled cron already emails reports; the agent's job is **review + remediate**, not replace cron.

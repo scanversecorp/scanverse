@@ -12963,7 +12963,7 @@ const ADMIN_TABS = [
   { id: 'social', label: 'Social Media', icon: '📱' },
   { id: 'iam', label: 'Roles & IAM', icon: '🛡️' },
   { id: 'diagrams', label: 'Architecture', icon: '📐' },
-  { id: 'health', label: 'Health Check', icon: '🩺' },
+  { id: 'health', label: 'Ops Dashboard', icon: '📊' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -13070,30 +13070,115 @@ function istDateYmd(d = new Date()) {
   }).format(d);
 }
 
+function HealthScoreRing({ passed, total, size = 96 }) {
+  const t = Math.max(1, total || 1);
+  const pct = Math.round(((passed || 0) / t) * 100);
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - pct / 100);
+  const color = pct >= 100 ? C.grn : pct >= 90 ? C.gold : C.red;
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg viewBox="0 0 100 100" style={{ width: size, height: size, transform: 'rotate(-90deg)' }}>
+        <circle cx="50" cy="50" r={r} fill="none" stroke={C.bdr} strokeWidth="8" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1 }}>{pct}%</div>
+        <div style={{ fontSize: 9, color: C.dim, fontWeight: 700, marginTop: 2 }}>HEALTH</div>
+      </div>
+    </div>
+  );
+}
+
+function HealthCategoryBar({ label, passed, failed, warned, total, accent }) {
+  const t = Math.max(1, total || 1);
+  const pPct = ((passed || 0) / t) * 100;
+  const wPct = ((warned || 0) / t) * 100;
+  const fPct = ((failed || 0) / t) * 100;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+        <span style={{ fontWeight: 700, color: C.txt }}>{label}</span>
+        <span style={{ color: C.sub }}>{passed}/{total}</span>
+      </div>
+      <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', background: C.deep }}>
+        {pPct > 0 && <div style={{ width: `${pPct}%`, background: C.grn }} title={`${passed} passed`} />}
+        {wPct > 0 && <div style={{ width: `${wPct}%`, background: C.gold }} title={`${warned} warnings`} />}
+        {fPct > 0 && <div style={{ width: `${fPct}%`, background: C.red }} title={`${failed} failed`} />}
+        {pPct + wPct + fPct < 100 && <div style={{ flex: 1, background: accent || C.bdr, opacity: 0.25 }} />}
+      </div>
+    </div>
+  );
+}
+
+function payStatusColor(st) {
+  if (st === 'paid' || st === 'success') return C.grn;
+  if (st === 'failed' || st === 'cancelled') return C.red;
+  if (st === 'pending') return C.gold;
+  return C.sub;
+}
+
 function AdminHealthCheckTab({ pin }) {
+  const [stats, setStats] = useState(null);
+  const [recentPay, setRecentPay] = useState([]);
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingHealth, setLoadingHealth] = useState(false);
   const [phase, setPhase] = useState('');
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState('all');
+  const [checksOpen, setChecksOpen] = useState(true);
+
+  const loadStats = useCallback(async () => {
+    if (!pin) return;
+    setLoadingStats(true);
+    setErr('');
+    try {
+      const [s, pay] = await Promise.all([
+        adminHubFetch('exec_stats', {}, pin),
+        adminHubFetch('list_payments', { limit: 12 }, pin),
+      ]);
+      setStats(s);
+      setRecentPay(pay?.payment_intents || []);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [pin]);
 
   const run = useCallback(async (action, label) => {
     if (!pin) return;
-    setLoading(true);
+    setLoadingHealth(true);
     setErr('');
     setPhase(label);
-    setResult(null);
     try {
       const data = await adminHubFetch(action, {}, pin);
       setResult(data);
+      setChecksOpen(true);
     } catch (e) {
       setErr(e.message);
-      setResult(null);
     } finally {
-      setLoading(false);
+      setLoadingHealth(false);
       setPhase('');
     }
   }, [pin]);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  const healthBoot = useRef(false);
+  useEffect(() => {
+    if (!pin || healthBoot.current || result) return;
+    healthBoot.current = true;
+    run('run_smoke_test', 'Loading platform health checks…');
+  }, [pin, result, run]);
+
+  const refreshAll = () => {
+    loadStats();
+    run('run_smoke_test', 'Refreshing health checks…');
+  };
 
   const exportCsv = useCallback(() => {
     if (!result?.checks?.length) return;
@@ -13133,28 +13218,74 @@ function AdminHealthCheckTab({ pin }) {
   });
 
   const suiteLabel = {
-    application: 'Application Health Check',
-    infra: 'Infra Health Check',
-    security: 'Security Health Check',
-    smoke: 'Full Smoke Test',
+    application: 'Application',
+    infra: 'Infrastructure',
+    security: 'Security',
+    smoke: 'Full smoke test',
   };
+
+  const k = stats?.kpis || {};
+  const payTrend = (stats?.payments?.daily_trend || []).map((d) => ({ date: d.date, value: d.success }));
+  const signupTrend = (stats?.users?.signup_trend || []).map((d) => ({ date: d.date, value: d.count }));
+
+  const catStats = (cat) => {
+    const checks = (result?.checks || []).filter((c) => c.category === cat);
+    return {
+      passed: checks.filter((c) => c.status === 'pass').length,
+      failed: checks.filter((c) => c.status === 'fail').length,
+      warned: checks.filter((c) => c.status === 'warn').length,
+      total: checks.length,
+    };
+  };
+
+  const heroGrad = `linear-gradient(135deg, ${C.acc}22 0%, ${C.cyan}18 45%, ${C.vio}14 100%)`;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>Health Check Portal</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.6, maxWidth: 640 }}>
-            Run production security, application, and infrastructure checks — or the combined smoke test suite.
-            Scheduled email reports go to ops at <strong style={{ color: C.txt }}>6:00 AM</strong> and <strong style={{ color: C.txt }}>5:00 PM IST</strong> daily.
-            Full Playwright UI flows still run via <code style={{ color: C.acc }}>node scripts/smoke-test.mjs</code> locally.
+      {/* Hero */}
+      <div style={{
+        ...S.card(),
+        padding: '18px 20px',
+        marginBottom: 16,
+        background: heroGrad,
+        border: `1px solid ${C.acc}33`,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 16,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flex: '1 1 280px' }}>
+          {result ? (
+            <HealthScoreRing passed={result.passed} total={result.total} />
+          ) : (
+            <div style={{ width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {loadingHealth ? <Spin size={36} /> : <span style={{ fontSize: 36 }}>📊</span>}
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.txt, letterSpacing: -0.3 }}>ScanV Ops Dashboard</div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 6, lineHeight: 1.55, maxWidth: 480 }}>
+              Live revenue, payments, bookings, support — plus automated health checks.
+              Scheduled reports email <strong style={{ color: C.txt }}>sam@</strong> & <strong style={{ color: C.txt }}>jas@getscanv.com</strong> at 6 AM & 5 PM IST.
+            </div>
+            {result && (
+              <div style={{ marginTop: 8, fontSize: 11, color: C.dim }}>
+                Health run · {new Date(result.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
+                {' · '}{result.passed}/{result.total} passed
+                {result.failed > 0 && <span style={{ color: C.red, fontWeight: 700 }}> · {result.failed} need attention</span>}
+              </div>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Btn v="outline" sm onClick={() => run('run_security_health_check', 'Running security health checks…')} disabled={loading}>Security</Btn>
-          <Btn v="outline" sm onClick={() => run('run_app_health_check', 'Running application health checks…')} disabled={loading}>Application</Btn>
-          <Btn v="outline" sm onClick={() => run('run_infra_health_check', 'Running infra health checks…')} disabled={loading}>Infra</Btn>
-          <Btn v="primary" sm onClick={() => run('run_smoke_test', 'Running full smoke test…')} disabled={loading}>{loading ? 'Running…' : 'Smoke test'}</Btn>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Btn v="primary" sm onClick={refreshAll} disabled={loadingStats || loadingHealth}>
+            {loadingStats || loadingHealth ? 'Refreshing…' : '↻ Refresh all'}
+          </Btn>
+          <Btn v="outline" sm onClick={() => run('run_security_health_check', 'Security…')} disabled={loadingHealth}>Security</Btn>
+          <Btn v="outline" sm onClick={() => run('run_app_health_check', 'Application…')} disabled={loadingHealth}>App</Btn>
+          <Btn v="outline" sm onClick={() => run('run_infra_health_check', 'Infra…')} disabled={loadingHealth}>Infra</Btn>
+          <AdminDeepLinkBtn hash="exec" label="Executive →" />
         </div>
       </div>
 
@@ -13163,74 +13294,190 @@ function AdminHealthCheckTab({ pin }) {
           <Spin size={16} /> {phase}
         </div>
       )}
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12, padding: '10px 14px', background: `${C.red}12`, borderRadius: 10, border: `1px solid ${C.red}33` }}>{err}</div>}
 
-      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-
-      {result && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: C.sub }}>
-              <strong style={{ color: C.txt }}>{suiteLabel[result.suite] || result.suite}</strong>
-              {' · '}{result.app_url}
-              {' · '}{new Date(result.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
-            </div>
-            <Btn v="ghost" sm onClick={exportCsv} disabled={!result.checks?.length}>Export CSV</Btn>
-          </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-            <AdminStatCard label="Passed" value={result.passed ?? 0} color={C.grn} />
-            <AdminStatCard label="Failed" value={result.failed ?? 0} color={C.red} />
-            <AdminStatCard label="Warnings" value={result.warned ?? 0} color={C.gold} />
-            <AdminStatCard label="Total" value={result.total ?? 0} />
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {[['all', 'All'], ['security', 'Security'], ['application', 'Application'], ['infra', 'Infra'], ['ui', 'UI'], ['fail', 'Failures'], ['warn', 'Warnings']].map(([id, label]) => (
-              <button key={id} type="button" onClick={() => setFilter(id)} style={filterPill(filter === id)}>{label}</button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {result?.checks?.length > 0 && (
-        <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto', maxHeight: 'min(70vh, 720px)', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-              <thead>
-                <tr>
-                  <th style={th}>Status</th>
-                  <th style={th}>Category</th>
-                  <th style={th}>Check</th>
-                  <th style={th}>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleChecks.map((c) => (
-                  <tr key={c.id}>
-                    <td style={{ ...td, color: statusColor(c.status), fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{c.status}</td>
-                    <td style={{ ...td, color: C.sub, textTransform: 'capitalize' }}>{c.category}</td>
-                    <td style={{ ...td, fontWeight: 600 }}>{c.name}</td>
-                    <td style={{ ...td, color: C.sub, lineHeight: 1.5, whiteSpace: 'normal', maxWidth: 420 }}>
-                      {c.detail}
-                      {c.manual && (
-                        <div style={{ marginTop: 4, fontSize: 10, color: C.dim }}>Manual: {c.manual}</div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* KPI row */}
+      {stats && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <AdminStatCard label="Revenue (30d)" value={`₹${fmtRs(k.revenue_30d_paise)}`} color={C.grn} sub={`Today ₹${fmtRs(k.revenue_today_paise)} · 7d ₹${fmtRs(k.revenue_7d_paise)}`} />
+          <AdminStatCard label="Incoming payments" value={k.payments_success ?? '—'} color={C.grn} sub={`Failed ${k.payments_failed ?? 0} · Pending ${k.payments_pending ?? 0}`} />
+          <AdminStatCard label="Avg transaction" value={`₹${fmtRs(k.avg_txn_paise)}`} color={C.acc} />
+          <AdminStatCard label="Bookings today" value={k.bookings_today ?? '—'} color={C.cyan} sub={`Pending dispatch ${k.pending_dispatch ?? 0}`} />
+          <AdminStatCard label="Active users (30d)" value={k.active_users_30d ?? '—'} color={C.vio} sub={`${k.profiles_total ?? 0} profiles · ${k.mobile_verified ?? 0} verified`} />
+          <AdminStatCard label="Open tickets" value={k.open_tickets ?? '—'} color={C.gold} sub={stats?.support?.open_queue != null ? `Queue ${stats.support.open_queue}` : ''} />
+          <AdminStatCard label="Signups (7d)" value={k.signups_7d ?? '—'} sub={`Today ${k.signups_today ?? 0}`} />
+          <AdminStatCard label="Load index (24h)" value={k.activity_index_24h ?? '—'} color={C.cyan} sub="Bookings + tickets + payments" />
         </div>
       )}
 
-      {!result && !loading && !err && (
+      {loadingStats && !stats && (
+        <div style={{ textAlign: 'center', padding: 32 }}><Spin size={32} /><div style={{ fontSize: 12, color: C.sub, marginTop: 10 }}>Loading business metrics…</div></div>
+      )}
+
+      {stats && (
+        <>
+          <ExecSection title="Payments & revenue" sub="Success vs failed · method mix · 14-day incoming trend">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Payment outcomes</div>
+                <ExecBarChart items={[
+                  { label: 'Success', value: stats.payments?.success || 0, color: C.grn },
+                  { label: 'Failed', value: stats.payments?.failed || 0, color: C.red },
+                  { label: 'Pending', value: stats.payments?.pending || 0, color: C.gold },
+                ]} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Method breakdown</div>
+                <ExecBarChart items={[
+                  { label: 'UPI', value: stats.payments?.methods?.upi || 0, color: C.cyan },
+                  { label: 'Razorpay', value: stats.payments?.methods?.razorpay || 0, color: C.acc },
+                  { label: 'Other', value: stats.payments?.methods?.other || 0, color: C.dim },
+                ]} height={120} />
+              </div>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Daily successful payments (14 days)</div>
+              <ExecLineChart points={payTrend} color={C.grn} />
+            </div>
+          </ExecSection>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+            <ExecSection title="Bookings & dispatch" sub="Status mix · pipeline">
+              <ExecDonutChart segments={Object.entries(stats.bookings?.by_status || {}).map(([label, value], i) => ({
+                label, value, color: [C.acc, C.cyan, C.grn, C.gold, C.red][i % 5],
+              }))} />
+              <div style={{ marginTop: 12 }}>
+                <ExecBarChart items={[
+                  { label: 'Pending', value: stats.dispatch?.pending || 0, color: C.gold },
+                  { label: 'Dispatching', value: stats.dispatch?.by_status?.dispatching || 0, color: C.cyan },
+                  { label: 'Assigned', value: stats.dispatch?.assigned || 0, color: C.grn },
+                ]} height={100} />
+              </div>
+            </ExecSection>
+
+            <ExecSection title="Platform health" sub={result ? `${suiteLabel[result.suite] || result.suite} · ${result.app_url}` : 'Run checks to populate'}>
+              {result ? (
+                <>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                    <AdminStatCard label="Passed" value={result.passed} color={C.grn} />
+                    <AdminStatCard label="Failed" value={result.failed} color={C.red} />
+                    <AdminStatCard label="Warnings" value={result.warned} color={C.gold} />
+                  </div>
+                  <HealthCategoryBar label="Security" accent={C.red} {...catStats('security')} />
+                  <HealthCategoryBar label="Application" accent={C.acc} {...catStats('application')} />
+                  <HealthCategoryBar label="Infrastructure" accent={C.cyan} {...catStats('infra')} />
+                  <HealthCategoryBar label="UI / Smoke" accent={C.vio} {...catStats('ui')} />
+                </>
+              ) : (
+                <div style={{ color: C.dim, fontSize: 12, padding: 16, textAlign: 'center' }}>
+                  {loadingHealth ? 'Running health checks…' : 'Click Refresh all to run checks'}
+                </div>
+              )}
+            </ExecSection>
+          </div>
+
+          <ExecSection title="Recent incoming payments" sub="Latest payment_intents · UPI & Razorpay">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640, fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    {['Txn', 'Amount', 'Status', 'Via', 'Paid', 'Created'].map((h) => (
+                      <th key={h} style={th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentPay.length ? recentPay.map((p) => (
+                    <tr key={p.id || p.txn_id}>
+                      <td style={{ ...td, fontFamily: 'monospace', fontSize: 10, color: C.acc }}>{p.txn_id || p.id?.slice(0, 8)}</td>
+                      <td style={{ ...td, fontWeight: 700, color: C.grn }}>₹{fmtRs(p.amount_paise)}</td>
+                      <td style={{ ...td }}>
+                        <Badge label={p.status || '?'} color={payStatusColor(p.status)} />
+                      </td>
+                      <td style={{ ...td, color: C.sub, fontSize: 10 }}>{p.verified_via || '—'}</td>
+                      <td style={{ ...td, color: C.dim, fontSize: 10 }}>{p.paid_at ? fmtDt(p.paid_at) : '—'}</td>
+                      <td style={{ ...td, color: C.dim, fontSize: 10 }}>{p.created_at ? fmtDt(p.created_at) : '—'}</td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim }}>No payment intents yet</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </ExecSection>
+
+          <ExecSection title="Support & growth" sub="Tickets · signups">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Tickets by category</div>
+                <ExecBarChart items={Object.entries(stats.support?.by_category || {}).map(([label, value]) => ({
+                  label, value, color: label === 'payment' ? C.acc : label === 'booking' ? C.cyan : C.grn,
+                }))} height={110} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>User signups (14d)</div>
+                <ExecLineChart points={signupTrend} color={C.cyan} height={110} />
+              </div>
+            </div>
+          </ExecSection>
+        </>
+      )}
+
+      {/* Health check detail table */}
+      {result?.checks?.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button type="button" onClick={() => setChecksOpen((o) => !o)} style={{
+            width: '100%', textAlign: 'left', background: C.surf, border: BDR, borderRadius: 12,
+            padding: '12px 16px', cursor: 'pointer', fontFamily: FF, marginBottom: checksOpen ? 12 : 0,
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: C.txt }}>{checksOpen ? '▼' : '▶'} Health check details</span>
+            <span style={{ fontSize: 11, color: C.sub, marginLeft: 10 }}>{visibleChecks.length} checks shown</span>
+          </button>
+          {checksOpen && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[['all', 'All'], ['security', 'Security'], ['application', 'Application'], ['infra', 'Infra'], ['ui', 'UI'], ['fail', 'Failures'], ['warn', 'Warnings']].map(([id, label]) => (
+                    <button key={id} type="button" onClick={() => setFilter(id)} style={filterPill(filter === id)}>{label}</button>
+                  ))}
+                </div>
+                <Btn v="ghost" sm onClick={exportCsv}>Export CSV</Btn>
+              </div>
+              <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto', maxHeight: 'min(50vh, 520px)', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Status</th>
+                        <th style={th}>Category</th>
+                        <th style={th}>Check</th>
+                        <th style={th}>Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleChecks.map((c) => (
+                        <tr key={c.id}>
+                          <td style={{ ...td, color: statusColor(c.status), fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{c.status}</td>
+                          <td style={{ ...td, color: C.sub, textTransform: 'capitalize' }}>{c.category}</td>
+                          <td style={{ ...td, fontWeight: 600 }}>{c.name}</td>
+                          <td style={{ ...td, color: C.sub, lineHeight: 1.5, whiteSpace: 'normal', maxWidth: 420 }}>
+                            {c.detail}
+                            {c.manual && <div style={{ marginTop: 4, fontSize: 10, color: C.dim }}>Manual: {c.manual}</div>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!result && !loadingHealth && !stats && !loadingStats && !err && (
         <div style={{ ...S.card(), padding: 16, fontSize: 12, color: C.sub, lineHeight: 1.7 }}>
-          <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>What each suite covers</div>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            <li><strong style={{ color: C.txt }}>Security</strong> — RLS on profiles/bookings/tickets/payment_intents, edge auth gates, docs blocked, bundle exposure, production switches.</li>
-            <li><strong style={{ color: C.txt }}>Application</strong> — Public pricing, Razorpay register, send-otp, auth signup, platform-config vendors.</li>
-            <li><strong style={{ color: C.txt }}>Infra</strong> — Frontend bundle deploy, DB table counts, go-live vendor switches, diagram/URL catalogs, Business HQ, service schedules.</li>
-            <li><strong style={{ color: C.txt }}>Smoke test</strong> — All suites above plus UI fetch checks. Daily emails at 6 AM & 5 PM IST to sam@getscanv.com and jas@getscanv.com.</li>
-          </ul>
+          Enter your admin PIN to load the ops dashboard.
         </div>
       )}
     </div>
@@ -15340,7 +15587,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
                 <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />
-                <button type="button" onClick={() => navigateAdminTab('health')} style={{ ...tabBtn({ id: 'health' }), border: `1.5px solid ${C.grn}44` }}>🩺 Health Check →</button>
+                <button type="button" onClick={() => navigateAdminTab('health')} style={{ ...tabBtn({ id: 'health' }), border: `1.5px solid ${C.grn}44` }}>📊 Ops Dashboard →</button>
                 <button type="button" onClick={() => navigateAdminTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
               </div>
             </div>

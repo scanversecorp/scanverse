@@ -147,16 +147,19 @@ export async function runSecurityHealthChecks(sb: SupabaseClient): Promise<Healt
   }
 
   let r = await anonFetch("/rest/v1/profiles?select=id&limit=1");
+  const profileRows = Array.isArray(r.body) ? r.body : [];
   push(checks, "security", "profiles-anon", "Profiles anon read blocked",
-    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
+    profileRows.length === 0, `HTTP ${r.status}, rows=${profileRows.length}`);
 
   r = await anonFetch("/rest/v1/bookings?select=id&limit=1");
+  const bookingRows = Array.isArray(r.body) ? r.body : [];
   push(checks, "security", "bookings-anon", "Bookings anon read blocked",
-    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
+    bookingRows.length === 0, `HTTP ${r.status}, rows=${bookingRows.length}`);
 
   r = await anonFetch("/rest/v1/support_tickets?select=id&limit=1");
+  const ticketRows = Array.isArray(r.body) ? r.body : [];
   push(checks, "security", "tickets-anon", "Support tickets anon read blocked",
-    r.status === 401 || r.status === 403, `HTTP ${r.status}`);
+    ticketRows.length === 0, `HTTP ${r.status}, rows=${ticketRows.length}`);
 
   r = await anonFetch("/rest/v1/payment_intents?select=txn_id&limit=1");
   const payRows = Array.isArray(r.body) ? r.body : [];

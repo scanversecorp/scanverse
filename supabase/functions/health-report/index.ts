@@ -139,6 +139,18 @@ Deno.serve(async (req) => {
     const text = formatEmailBody(report);
     const mail = await sendEmailMany(recipients, subject, text);
 
+    const allChecks = [
+      ...report.application.checks,
+      ...report.infra.checks,
+      ...report.security.checks,
+    ];
+    const failures = allChecks
+      .filter((c) => c.status === "fail")
+      .map((c) => ({ id: c.id, name: c.name, category: c.category, detail: c.detail }));
+    const warnings = allChecks
+      .filter((c) => c.status === "warn")
+      .map((c) => ({ id: c.id, name: c.name, category: c.category, detail: c.detail }));
+
     return json({
       success: true,
       slot,
@@ -147,6 +159,8 @@ Deno.serve(async (req) => {
       failed: report.failed,
       warned: report.warned,
       total: report.total,
+      failures,
+      warnings,
       recipients,
       email: mail,
     });

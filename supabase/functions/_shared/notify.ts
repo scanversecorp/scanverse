@@ -529,7 +529,7 @@ export function callFailedStatuses(): Set<string> {
   ]);
 }
 
-/** Optional email — set RESEND_API_KEY + SUPPORT_EMAIL_FROM in Supabase secrets */
+/** Optional email — Resend or Cloudflare Email Sending + SUPPORT_EMAIL_FROM in Supabase secrets */
 export async function sendEmail(
   to: string,
   subject: string,
@@ -554,9 +554,11 @@ export async function sendEmailMany(
   }
 
   const resendKey = Deno.env.get("RESEND_API_KEY");
+  const cfToken = Deno.env.get("CLOUDFLARE_API_TOKEN") || Deno.env.get("CF_API_TOKEN") || "";
+  const cfAccount = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") || "7f8fbca1a540bef510c9c39cf15aa0a8";
   const from = Deno.env.get("HEALTH_REPORT_FROM")
     || Deno.env.get("SUPPORT_EMAIL_FROM")
-    || "support@dcoreglobal.com";
+    || "reports@getscanv.com";
 
   if (resendKey) {
     const res = await fetch("https://api.resend.com/emails", {
@@ -577,8 +579,39 @@ export async function sendEmailMany(
     };
   }
 
+  if (cfToken) {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccount}/email/sending/send`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cfToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: emails.length === 1 ? emails[0] : emails,
+          from: { address: from, name: "ScanV Health" },
+          subject,
+          text: body,
+        }),
+      },
+    );
+    const data = await res.json().catch(() => ({})) as {
+      success?: boolean;
+      errors?: Array<{ message?: string }>;
+      result?: { delivered?: string[]; permanent_bounces?: string[]; queued?: string[] };
+    };
+    if (res.ok && data.success) {
+      const delivered = data.result?.delivered?.length || 0;
+      const queued = data.result?.queued?.length || 0;
+      if (delivered + queued > 0) return { ok: true, provider: "cloudflare-email", sent: emails.length };
+    }
+    const err = data.errors?.[0]?.message || res.statusText;
+    return { ok: false, error: err || "Cloudflare Email Sending failed" };
+  }
+
   console.log(`[ScanV email] To: ${emails.join(", ")} | ${subject}\n${body.slice(0, 500)}`);
-  return { ok: false, error: "Email not configured — set RESEND_API_KEY and SUPPORT_EMAIL_FROM" };
+  return { ok: false, error: "Email not configured — set RESEND_API_KEY or CLOUDFLARE_API_TOKEN + SUPPORT_EMAIL_FROM" };
 }
 
 export function ticketClosureMessage(

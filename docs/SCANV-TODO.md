@@ -1,0 +1,78 @@
+# ScanV Todo List
+
+**Updated:** 19 Aug 2026  
+**Owners:** Samir + Jasmeen
+
+Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).
+
+---
+
+## Email & Cloudflare
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | **Cloudflare Email Sending via CLI** — run `wrangler login` locally *or* set `CLOUDFLARE_API_TOKEN` with Email Sending permissions | ⏳ Pending | Wrangler is not authenticated in CI/automation. Optional upgrade path; **Resend is live today**. Requires **Workers Paid** on the Cloudflare account. |
+| 2 | Enable Cloudflare Email Sending in dashboard (if moving off Resend) | ⏳ Pending | Blocked on Workers Paid plan on account `7f8fbca1…`. |
+| 3 | Gmail **Send mail as** for `support@` / `reports@` (manual replies) | ⏳ Optional | [GETSCANV-EMAIL.md](./GETSCANV-EMAIL.md) — use Resend SMTP or “Treat as alias”. |
+| 4 | Merge SPF on root `@` if both Resend + Cloudflare sending coexist | ⏳ When needed | Keep Cloudflare MX for inbound routing; combine `include:amazonses.com` + Cloudflare send SPF in one TXT. |
+
+### Done (email)
+
+- [x] Resend account + `getscanv.com` domain verified (DKIM/SPF via Cloudflare Domain Connect)
+- [x] Supabase secrets: `RESEND_API_KEY`, `SUPPORT_EMAIL_FROM=reports@getscanv.com`, `HEALTH_REPORT_*`
+- [x] `health-report` + `support-tickets` deployed; test email + cron path confirmed (Resend)
+
+---
+
+## Code & deploy
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 5 | Commit & push `notify.ts` (Cloudflare send fallback + `reports@getscanv.com` default) | ⏳ Pending | Deployed to Supabase; local git diff not committed. |
+| 6 | Update [GETSCANV-EMAIL.md](./GETSCANV-EMAIL.md) — mark Resend setup complete | ⏳ Pending | Doc still shows generic “add Resend” steps. |
+| 7 | Mark Resend item done in [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md) §J | ⏳ Pending | Section J still lists Resend as optional unchecked. |
+| 8 | Push **v5.5.3** frontend if not on production yet | ⏳ Check | [VERSION.md](./VERSION.md) — local tag may still need Vercel deploy. |
+
+---
+
+## Health checks & monitoring
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 9 | Investigate **1 failing check** in daily health report (69/70 pass) | ✅ Done | False positive: RLS returned HTTP 200 + 0 rows; fixed check to count rows. **70/70** now. |
+| 10 | Confirm morning/evening cron emails arrive at `sam@` + `jas@` Gmail | ⏳ Watch | Schedule: 6:00 AM & 5:00 PM IST (`scanv-health-report-am` / `-pm`). |
+| 11 | **Agent ops monitor** — review health reports & fix failures | ✅ Active | Runbook: [SCANV-OPS-MONITOR.md](./SCANV-OPS-MONITOR.md). Rule: `.cursor/rules/scanv-ops-monitor.mdc`. Script: `scripts/ops-health-review.mjs`. |
+
+---
+
+## Quick commands
+
+```bash
+# Cloudflare CLI auth (local machine)
+npx wrangler login
+# or
+export CLOUDFLARE_API_TOKEN=...   # Email Sending + Zone DNS read
+
+# Check Cloudflare Email Sending DNS (after auth + Workers Paid)
+npx wrangler email sending dns get getscanv.com
+
+# Resend secrets (already set — re-run only if rotating key)
+npx supabase secrets set \
+  RESEND_API_KEY=re_xxxx \
+  SUPPORT_EMAIL_FROM=reports@getscanv.com
+
+# Manual health report test
+HEALTH_REPORT_SECRET=<secret> node scripts/ops-health-review.mjs
+
+# Or curl directly
+curl -X POST 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/health-report' \
+  -H 'Content-Type: application/json' \
+  -H 'x-health-report-secret: <HEALTH_REPORT_SECRET>' \
+  -d '{"slot":"morning"}'
+```
+
+---
+
+## Not blocking (reference)
+
+Full launch checklist items (OTP/DLT, Vyapar live, Razorpay live, backup drill, app stores) remain in [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).
