@@ -13140,7 +13140,7 @@ function vendorAccent(v) {
   return map[v] || C.sub;
 }
 
-function AdminHealthCheckTab({ pin }) {
+function AdminHealthCheckTab({ pin, onNavigateTab }) {
   const [stats, setStats] = useState(null);
   const [recentPay, setRecentPay] = useState([]);
   const [result, setResult] = useState(null);
@@ -13154,6 +13154,9 @@ function AdminHealthCheckTab({ pin }) {
   const [apiFilter, setApiFilter] = useState('all');
   const [checksOpen, setChecksOpen] = useState(true);
   const [apiOpen, setApiOpen] = useState(true);
+  const [activeReport, setActiveReport] = useState(null);
+  const [payLimit, setPayLimit] = useState(12);
+  const reportRefs = useRef({});
 
   const loadStats = useCallback(async () => {
     if (!pin) return;
@@ -13162,7 +13165,7 @@ function AdminHealthCheckTab({ pin }) {
     try {
       const [s, pay] = await Promise.all([
         adminHubFetch('ops_dashboard_stats', {}, pin),
-        adminHubFetch('list_payments', { limit: 12 }, pin),
+        adminHubFetch('list_payments', { limit: payLimit }, pin),
       ]);
       setStats(s);
       setRecentPay(pay?.payment_intents || []);
@@ -13171,7 +13174,21 @@ function AdminHealthCheckTab({ pin }) {
     } finally {
       setLoadingStats(false);
     }
-  }, [pin]);
+  }, [pin, payLimit]);
+
+  const scrollToReport = useCallback((id, { adminTab, expandPay } = {}) => {
+    if (adminTab && onNavigateTab) {
+      onNavigateTab(adminTab);
+      return;
+    }
+    setActiveReport(id);
+    if (id === 'api') setApiOpen(true);
+    if (id === 'health') setChecksOpen(true);
+    if (expandPay) setPayLimit(50);
+    requestAnimationFrame(() => {
+      reportRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [onNavigateTab]);
 
   const run = useCallback(async (action, label) => {
     if (!pin) return;
@@ -13356,17 +13373,17 @@ function AdminHealthCheckTab({ pin }) {
       )}
       {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12, padding: '10px 14px', background: `${C.red}12`, borderRadius: 10, border: `1px solid ${C.red}33` }}>{err}</div>}
 
-      {/* KPI row */}
+      {/* KPI row — click any card for detailed report */}
       {stats && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-          <AdminStatCard label="Revenue (30d)" value={`₹${fmtRs(k.revenue_30d_paise)}`} color={C.grn} sub={`Today ₹${fmtRs(k.revenue_today_paise)} · 7d ₹${fmtRs(k.revenue_7d_paise)}`} />
-          <AdminStatCard label="Incoming payments" value={k.payments_success ?? '—'} color={C.grn} sub={`Failed ${k.payments_failed ?? 0} · Pending ${k.payments_pending ?? 0}`} />
-          <AdminStatCard label="Avg transaction" value={`₹${fmtRs(k.avg_txn_paise)}`} color={C.acc} />
-          <AdminStatCard label="Bookings today" value={k.bookings_today ?? '—'} color={C.cyan} sub={`Pending dispatch ${k.pending_dispatch ?? 0}`} />
-          <AdminStatCard label="Active users (30d)" value={k.active_users_30d ?? '—'} color={C.vio} sub={`${k.profiles_total ?? 0} profiles · ${k.mobile_verified ?? 0} verified`} />
-          <AdminStatCard label="Open tickets" value={k.open_tickets ?? '—'} color={C.gold} sub={stats?.support?.open_queue != null ? `Queue ${stats.support.open_queue}` : ''} />
-          <AdminStatCard label="Signups (7d)" value={k.signups_7d ?? '—'} sub={`Today ${k.signups_today ?? 0}`} />
-          <AdminStatCard label="Load index (24h)" value={k.activity_index_24h ?? '—'} color={C.cyan} sub="Bookings + tickets + payments" />
+          <AdminStatCard label="Revenue (30d)" value={`₹${fmtRs(k.revenue_30d_paise)}`} color={C.grn} sub={`Today ₹${fmtRs(k.revenue_today_paise)} · 7d ₹${fmtRs(k.revenue_7d_paise)}`} onClick={() => scrollToReport('payments')} active={activeReport === 'payments'} />
+          <AdminStatCard label="Incoming payments" value={k.payments_success ?? '—'} color={C.grn} sub={`Failed ${k.payments_failed ?? 0} · Pending ${k.payments_pending ?? 0}`} onClick={() => scrollToReport('payments-list', { expandPay: true })} active={activeReport === 'payments-list'} />
+          <AdminStatCard label="Avg transaction" value={`₹${fmtRs(k.avg_txn_paise)}`} color={C.acc} onClick={() => scrollToReport('payments')} active={activeReport === 'payments'} />
+          <AdminStatCard label="Bookings today" value={k.bookings_today ?? '—'} color={C.cyan} sub={`Pending dispatch ${k.pending_dispatch ?? 0}`} onClick={() => scrollToReport('bookings')} active={activeReport === 'bookings'} />
+          <AdminStatCard label="Active users (30d)" value={k.active_users_30d ?? '—'} color={C.vio} sub={`${k.profiles_total ?? 0} profiles · ${k.mobile_verified ?? 0} verified`} onClick={() => scrollToReport('users')} active={activeReport === 'users'} />
+          <AdminStatCard label="Open tickets" value={k.open_tickets ?? '—'} color={C.gold} sub={stats?.support?.open_queue != null ? `Queue ${stats.support.open_queue}` : ''} onClick={() => scrollToReport('tickets', { adminTab: 'tickets' })} active={activeReport === 'tickets'} />
+          <AdminStatCard label="Signups (7d)" value={k.signups_7d ?? '—'} sub={`Today ${k.signups_today ?? 0}`} onClick={() => scrollToReport('users')} active={activeReport === 'users'} />
+          <AdminStatCard label="Load index (24h)" value={k.activity_index_24h ?? '—'} color={C.cyan} sub="Bookings + tickets + payments" onClick={() => scrollToReport('api')} active={activeReport === 'api'} />
         </div>
       )}
 
@@ -13376,6 +13393,7 @@ function AdminHealthCheckTab({ pin }) {
 
       {stats && (
         <>
+          <div ref={(el) => { reportRefs.current.payments = el; }}>
           <ExecSection title="Payments & revenue" sub="Success vs failed · method mix · 14-day incoming trend">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
               <div>
@@ -13400,9 +13418,16 @@ function AdminHealthCheckTab({ pin }) {
               <ExecLineChart points={payTrend} color={C.grn} />
             </div>
           </ExecSection>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
-            <ExecSection title="Bookings & dispatch" sub="Status mix · pipeline">
+            <div ref={(el) => { reportRefs.current.bookings = el; }}>
+            <ExecSection title="Bookings & dispatch" sub="Status mix · pipeline · full desk in Bookings tab">
+              {onNavigateTab && (
+                <div style={{ marginBottom: 10 }}>
+                  <Btn v="outline" sm onClick={() => onNavigateTab('bookings')}>Open bookings desk →</Btn>
+                </div>
+              )}
               <ExecDonutChart segments={Object.entries(stats.bookings?.by_status || {}).map(([label, value], i) => ({
                 label, value, color: [C.acc, C.cyan, C.grn, C.gold, C.red][i % 5],
               }))} />
@@ -13414,6 +13439,7 @@ function AdminHealthCheckTab({ pin }) {
                 ]} height={100} />
               </div>
             </ExecSection>
+            </div>
 
             <ExecSection title="Platform health" sub={result ? `${suiteLabel[result.suite] || result.suite} · ${result.app_url}` : 'Run checks to populate'}>
               {result ? (
@@ -13437,6 +13463,7 @@ function AdminHealthCheckTab({ pin }) {
           </div>
 
           {/* API & flow monitoring */}
+          <div ref={(el) => { reportRefs.current.api = el; }}>
           <ExecSection title="API & flow monitoring" sub={apiMon ? `Probes · flows · avg latency · ${new Date(apiMon.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` : 'Run API monitor to probe internal/external vendors'}>
             {loadingApiMon && !apiMon ? (
               <div style={{ textAlign: 'center', padding: 24 }}><Spin size={28} /><div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>Probing APIs & flow transactions…</div></div>
@@ -13539,8 +13566,10 @@ function AdminHealthCheckTab({ pin }) {
               </div>
             )}
           </ExecSection>
+          </div>
 
-          <ExecSection title="Recent incoming payments" sub="Latest payment_intents · UPI & Razorpay">
+          <div ref={(el) => { reportRefs.current['payments-list'] = el; }}>
+          <ExecSection title="Recent incoming payments" sub={`Latest payment_intents · showing ${recentPay.length}${payLimit > 12 ? ` of ${payLimit}` : ''}`}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640, fontSize: 12 }}>
                 <thead>
@@ -13569,8 +13598,16 @@ function AdminHealthCheckTab({ pin }) {
               </table>
             </div>
           </ExecSection>
+          </div>
 
-          <ExecSection title="Support & growth" sub="Tickets · signups">
+          <div ref={(el) => { reportRefs.current.users = el; }}>
+          <ExecSection title="Support & growth" sub="Tickets by category · 14-day signup trend · users directory in Users tab">
+            {onNavigateTab && (
+              <div style={{ marginBottom: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Btn v="outline" sm onClick={() => onNavigateTab('users')}>Users directory →</Btn>
+                <Btn v="outline" sm onClick={() => onNavigateTab('tickets')}>Support tickets →</Btn>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Tickets by category</div>
@@ -13584,12 +13621,13 @@ function AdminHealthCheckTab({ pin }) {
               </div>
             </div>
           </ExecSection>
+          </div>
         </>
       )}
 
       {/* Health check detail table */}
       {result?.checks?.length > 0 && (
-        <div style={{ marginTop: 8 }}>
+        <div ref={(el) => { reportRefs.current.health = el; }} style={{ marginTop: 8 }}>
           <button type="button" onClick={() => setChecksOpen((o) => !o)} style={{
             width: '100%', textAlign: 'left', background: C.surf, border: BDR, borderRadius: 12,
             padding: '12px 16px', cursor: 'pointer', fontFamily: FF, marginBottom: checksOpen ? 12 : 0,
@@ -13820,12 +13858,33 @@ function AdminDeepLinkBtn({ hash, label }) {
   );
 }
 
-function AdminStatCard({ label, value, sub, color }) {
+function AdminStatCard({ label, value, sub, color, onClick, active }) {
+  const clickable = typeof onClick === 'function';
   return (
-    <div style={{ ...S.card(), padding: 16, flex: '1 1 140px', minWidth: 140 }}>
+    <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+      } : undefined}
+      style={{
+        ...S.card(),
+        padding: 16,
+        flex: '1 1 140px',
+        minWidth: 140,
+        cursor: clickable ? 'pointer' : 'default',
+        border: active ? `2px solid ${color || C.acc}` : undefined,
+        boxShadow: active ? `0 0 0 3px ${(color || C.acc)}22` : undefined,
+        transition: 'box-shadow 0.2s, border-color 0.2s',
+      }}
+    >
       <div style={{ fontSize: 10, color: C.sub, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color: color || C.acc, marginTop: 6 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{sub}</div>}
+      {clickable && (
+        <div style={{ fontSize: 10, color: C.acc, marginTop: 8, fontWeight: 700 }}>View report →</div>
+      )}
     </div>
   );
 }
@@ -15851,7 +15910,7 @@ function AdminControlCenter({ onPricesUpdated }) {
           </div>
         )}
 
-        {tab === 'health' && <AdminHealthCheckTab pin={usePin} />}
+        {tab === 'health' && <AdminHealthCheckTab pin={usePin} onNavigateTab={navigateAdminTab} />}
 
         {tab === 'gps' && <AdminGpsStatusTab pin={usePin} />}
 
