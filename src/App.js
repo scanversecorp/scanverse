@@ -13140,6 +13140,33 @@ function vendorAccent(v) {
   return map[v] || C.sub;
 }
 
+function nextSortState(prev, key) {
+  return { key, dir: prev.key === key && prev.dir === 'asc' ? 'desc' : 'asc' };
+}
+
+function sortIndicator(sort, key) {
+  if (sort.key !== key) return ' ⇅';
+  return sort.dir === 'asc' ? ' ↑' : ' ↓';
+}
+
+function sortableThStyle(baseTh, sort, key, accent) {
+  const active = sort.key === key;
+  return {
+    ...baseTh,
+    cursor: 'pointer',
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+    background: active ? `${accent}12` : C.surf,
+    color: active ? accent : C.sub,
+  };
+}
+
+function healthStatusRank(status) {
+  if (status === 'fail') return 0;
+  if (status === 'warn') return 1;
+  return 2;
+}
+
 function AdminHealthCheckTab({ pin, onNavigateTab }) {
   const [stats, setStats] = useState(null);
   const [recentPay, setRecentPay] = useState([]);
@@ -13155,6 +13182,8 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
   const [checksOpen, setChecksOpen] = useState(true);
   const [apiOpen, setApiOpen] = useState(true);
   const [apiSort, setApiSort] = useState({ key: 'latency_ms', dir: 'desc' });
+  const [healthSort, setHealthSort] = useState({ key: 'status', dir: 'asc' });
+  const [paySort, setPaySort] = useState({ key: 'created_at', dir: 'desc' });
   const [activeReport, setActiveReport] = useState(null);
   const [payLimit, setPayLimit] = useState(12);
   const reportRefs = useRef({});
@@ -13293,10 +13322,15 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
   });
 
   const toggleApiSort = useCallback((key) => {
-    setApiSort((prev) => ({
-      key,
-      dir: prev.key === key && prev.dir === 'asc' ? 'desc' : 'asc',
-    }));
+    setApiSort((prev) => nextSortState(prev, key));
+  }, []);
+
+  const toggleHealthSort = useCallback((key) => {
+    setHealthSort((prev) => nextSortState(prev, key));
+  }, []);
+
+  const togglePaySort = useCallback((key) => {
+    setPaySort((prev) => nextSortState(prev, key));
   }, []);
 
   const sortedProbes = useMemo(() => {
@@ -13304,48 +13338,42 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
     const { key, dir } = apiSort;
     const mul = dir === 'asc' ? 1 : -1;
     const probeStatusRank = (p) => (!p.ok ? 0 : p.warn ? 1 : 2);
-    const cmp = (a, b) => {
-      let av;
-      let bv;
-      switch (key) {
-        case 'status':
-          av = probeStatusRank(a);
-          bv = probeStatusRank(b);
-          break;
-        case 'latency_ms':
-          av = a.latency_ms || 0;
-          bv = b.latency_ms || 0;
-          break;
-        case 'name':
-        case 'vendor':
-        case 'scope':
-        case 'direction':
-        case 'method':
-        case 'request_summary':
-        case 'response_summary':
-          av = String(a[key] || '').toLowerCase();
-          bv = String(b[key] || '').toLowerCase();
-          return av.localeCompare(bv) * mul;
-        default:
-          av = String(a[key] || '').toLowerCase();
-          bv = String(b[key] || '').toLowerCase();
-      }
-      if (av < bv) return -1 * mul;
-      if (av > bv) return 1 * mul;
-      return 0;
-    };
-    items.sort(cmp);
+    items.sort((a, b) => {
+      if (key === 'status') return (probeStatusRank(a) - probeStatusRank(b)) * mul;
+      if (key === 'latency_ms') return ((a.latency_ms || 0) - (b.latency_ms || 0)) * mul;
+      return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * mul;
+    });
     return items;
   }, [visibleProbes, apiSort]);
 
-  const apiSortMark = (key) => (apiSort.key === key ? (apiSort.dir === 'asc' ? ' ↑' : ' ↓') : '');
-  const sortThBtn = (label, key) => ({
-    ...th,
-    cursor: 'pointer',
-    userSelect: 'none',
-    background: apiSort.key === key ? `${C.acc}10` : C.surf,
-    color: apiSort.key === key ? C.acc : C.sub,
-  });
+  const sortedChecks = useMemo(() => {
+    const items = [...visibleChecks];
+    const { key, dir } = healthSort;
+    const mul = dir === 'asc' ? 1 : -1;
+    items.sort((a, b) => {
+      if (key === 'status') return (healthStatusRank(a.status) - healthStatusRank(b.status)) * mul;
+      const av = String(a[key] || '');
+      const bv = String(b[key] || '');
+      return av.localeCompare(bv, undefined, { sensitivity: 'base' }) * mul;
+    });
+    return items;
+  }, [visibleChecks, healthSort]);
+
+  const sortedPayments = useMemo(() => {
+    const items = [...recentPay];
+    const { key, dir } = paySort;
+    const mul = dir === 'asc' ? 1 : -1;
+    items.sort((a, b) => {
+      if (key === 'amount_paise') return ((Number(a.amount_paise) || 0) - (Number(b.amount_paise) || 0)) * mul;
+      if (key === 'paid_at' || key === 'created_at') {
+        const av = a[key] ? new Date(a[key]).getTime() : 0;
+        const bv = b[key] ? new Date(b[key]).getTime() : 0;
+        return (av - bv) * mul;
+      }
+      return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * mul;
+    });
+    return items;
+  }, [recentPay, paySort]);
 
   const apiSummary = apiMon?.summary;
 
@@ -13597,11 +13625,11 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
                             ].map(([label, key]) => (
                               <th
                                 key={key}
-                                style={sortThBtn(label, key)}
+                                style={sortableThStyle(th, apiSort, key, C.acc)}
                                 onClick={() => toggleApiSort(key)}
                                 title={`Sort by ${label}`}
                               >
-                                {label}{apiSortMark(key)}
+                                {label}{sortIndicator(apiSort, key)}
                               </th>
                             ))}
                           </tr>
@@ -13645,15 +13673,29 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
           <ExecSection title="Recent incoming payments" sub={`Latest payment_intents · showing ${recentPay.length}${payLimit > 12 ? ` of ${payLimit}` : ''}`}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640, fontSize: 12 }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: C.surf }}>
                   <tr>
-                    {['Txn', 'Amount', 'Status', 'Via', 'Paid', 'Created'].map((h) => (
-                      <th key={h} style={th}>{h}</th>
+                    {[
+                      ['Txn', 'txn_id'],
+                      ['Amount', 'amount_paise'],
+                      ['Status', 'status'],
+                      ['Via', 'verified_via'],
+                      ['Paid', 'paid_at'],
+                      ['Created', 'created_at'],
+                    ].map(([label, key]) => (
+                      <th
+                        key={key}
+                        style={sortableThStyle(th, paySort, key, C.acc)}
+                        onClick={() => togglePaySort(key)}
+                        title={`Sort by ${label}`}
+                      >
+                        {label}{sortIndicator(paySort, key)}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {recentPay.length ? recentPay.map((p) => (
+                  {sortedPayments.length ? sortedPayments.map((p) => (
                     <tr key={p.id || p.txn_id}>
                       <td style={{ ...td, fontFamily: 'monospace', fontSize: 10, color: C.acc }}>{p.txn_id || p.id?.slice(0, 8)}</td>
                       <td style={{ ...td, fontWeight: 700, color: C.grn }}>₹{fmtRs(p.amount_paise)}</td>
@@ -13721,16 +13763,27 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
               <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
                 <div style={{ overflowX: 'auto', maxHeight: 'min(50vh, 520px)', overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-                    <thead>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: C.surf }}>
                       <tr>
-                        <th style={th}>Status</th>
-                        <th style={th}>Category</th>
-                        <th style={th}>Check</th>
-                        <th style={th}>Detail</th>
+                        {[
+                          ['Status', 'status'],
+                          ['Category', 'category'],
+                          ['Check', 'name'],
+                          ['Detail', 'detail'],
+                        ].map(([label, key]) => (
+                          <th
+                            key={key}
+                            style={sortableThStyle(th, healthSort, key, C.acc)}
+                            onClick={() => toggleHealthSort(key)}
+                            title={`Sort by ${label}`}
+                          >
+                            {label}{sortIndicator(healthSort, key)}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleChecks.map((c) => (
+                      {sortedChecks.map((c) => (
                         <tr key={c.id}>
                           <td style={{ ...td, color: statusColor(c.status), fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{c.status}</td>
                           <td style={{ ...td, color: C.sub, textTransform: 'capitalize' }}>{c.category}</td>
