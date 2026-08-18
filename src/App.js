@@ -4014,7 +4014,7 @@ function BrowseFixedHeader({ children, padX = 16 }) {
 }
 
 /** Category panel — header pinned in flex column; body scrolls internally (Safari-safe vs position:fixed). */
-function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children }) {
+function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children, showCopyright = true }) {
   return (
     <div style={{
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: C.bg,
@@ -4040,7 +4040,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
         {children}
-        <CopyrightLine style={{ padding: '12px 16px 24px' }} />
+        {showCopyright ? <CopyrightLine style={{ padding: '12px 16px 24px' }} /> : null}
       </div>
     </div>
   );
@@ -7149,6 +7149,7 @@ function ServicesScreen() {
         padX={20}
         title={cfg.title}
         subtitle={cfg.subtitle}
+        showCopyright={false}
         onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
       >
         <CategoryListBody
@@ -7171,6 +7172,7 @@ function ServicesScreen() {
         scrollRef={scrollRef}
         padX={20}
         title={detail.name}
+        showCopyright={false}
         onBack={() => { setDetail(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
       >
         <div style={{ padding: 16 }}>
