@@ -6,6 +6,7 @@ export const SGR_FEE_FALLBACK_PAISE = 50000;
 export const CLOUD_SGR_FEE_PAISE = SGR_FEE_FALLBACK_PAISE;
 export const STUDENT_CLOUD_ID_KEY = 'scanv_student_cloud_id';
 export const STUDENT_CLOUD_FEE_EVENT = 'scanv-student-cloud-fee-updated';
+export const STUDENT_CLOUD_PIN_KEY = 'scanv_student_cloud_pin';
 const STUDENT_CLOUD_FN = 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/student-cloud';
 
 export function getStoredStudentCloudId() {
@@ -488,7 +489,16 @@ export function StudentCloudAdmitScreen({
   );
 }
 
-export function AdminStudentCloudTab({ pin, apikey, courses, C, S, FF, Spin, Btn }) {
+function formatWhen(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
+  } catch {
+    return String(iso).slice(0, 16);
+  }
+}
+
+export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Btn }) {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
@@ -546,12 +556,12 @@ export function AdminStudentCloudTab({ pin, apikey, courses, C, S, FF, Spin, Btn
   };
 
   const csv = () => {
-    const headers = ['Name', 'Mobile', 'Course', 'Schedule', 'Experience', 'DOB', 'Village', 'City', 'State', 'SGR fee', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Status'];
+    const headers = ['Name', 'Mobile', 'DOB', 'Experience', 'Address', 'Village', 'City', 'State', 'PIN', 'Course', 'Schedule', 'Joined', 'SGR paid at', 'SGR fee', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Status'];
     const lines = [headers.join(',')];
     for (const r of rows) {
       const vals = [
-        `${r.first_name} ${r.last_name}`, r.mobile, r.course_name, `${r.schedule_date || ''} ${r.schedule_time || ''}`,
-        r.experience, r.dob, r.village, r.city, r.state,
+        `${r.first_name} ${r.last_name}`, r.mobile, r.dob, r.experience, r.address, r.village, r.city, r.state, r.pincode,
+        r.course_name, `${r.schedule_date || ''} ${r.schedule_time || ''}`, r.created_at, r.sgr_paid_at,
         fmtRs(r.sgr_fee_paise), fmtRs(r.sgr_paid_paise), fmtRs(r.course_fee_paise), fmtRs(r.discount_paise), fmtRs(r.course_paid_paise), fmtRs(r.pending_paise), r.status,
       ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`);
       lines.push(vals.join(','));
@@ -587,24 +597,33 @@ export function AdminStudentCloudTab({ pin, apikey, courses, C, S, FF, Spin, Btn
           <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 1280 }}>
             <thead>
               <tr>
-                {['Student', 'Mobile', 'Course', 'Schedule', 'SGR', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Status', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
+                {['Profile', 'Enrollment', 'Schedule', 'SGR', 'SGR paid', 'Course fee', 'Discount', 'Course paid', 'Pending', 'Status', 'Pay / remind'].map((h) => <th key={h} style={th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
                 const e = edit[r.id] || {};
                 const pending = r.pending_paise || 0;
+                const addr = [r.address, r.village, r.city, r.state, r.pincode].filter(Boolean).join(', ');
                 return (
                   <tr key={r.id}>
-                    <td style={td}>
-                      <div style={{ fontWeight: 700 }}>{r.first_name} {r.last_name}</div>
-                      <div style={{ color: C.dim, fontSize: 10 }}>{r.city}{r.state ? `, ${r.state}` : ''} · {r.experience}</div>
+                    <td style={{ ...td, whiteSpace: 'normal', minWidth: 180, maxWidth: 240 }}>
+                      <div style={{ fontWeight: 800 }}>{r.first_name} {r.last_name}</div>
+                      <div style={{ marginTop: 4 }}><a href={`tel:+91${r.mobile}`} style={{ color: C.cyan, fontWeight: 700 }}>+91 {r.mobile}</a></div>
+                      <div style={{ color: C.dim, fontSize: 10, marginTop: 4, lineHeight: 1.45 }}>
+                        DOB: {r.dob || '—'} · {r.experience || '—'}
+                      </div>
+                      <div style={{ color: C.sub, fontSize: 10, marginTop: 4, lineHeight: 1.45 }}>{addr || '—'}</div>
+                      <div style={{ color: C.dim, fontSize: 9, marginTop: 4 }}>Joined {formatWhen(r.created_at)}</div>
                     </td>
-                    <td style={td}><a href={`tel:+91${r.mobile}`} style={{ color: C.cyan, fontWeight: 700 }}>{r.mobile}</a></td>
-                    <td style={td}>
-                      <select value={e.course_id ?? r.course_id ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_id: ev.target.value } }))} style={{ ...inp, minWidth: 140 }}>
+                    <td style={{ ...td, whiteSpace: 'normal', minWidth: 150 }}>
+                      <select value={e.course_id ?? r.course_id ?? ''} onChange={(ev) => setEdit((p) => ({ ...p, [r.id]: { ...p[r.id], course_id: ev.target.value } }))} style={{ ...inp, minWidth: 140, marginBottom: 6 }}>
                         {(courses || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
+                      <div style={{ fontSize: 10, color: C.sub }}>{r.course_name || '—'}</div>
+                      <div style={{ fontSize: 10, color: Number(r.sgr_paid_paise) >= Number(r.sgr_fee_paise) ? C.grn : C.gold, marginTop: 4, fontWeight: 700 }}>
+                        SGR paid {r.sgr_paid_at ? formatWhen(r.sgr_paid_at) : '—'}
+                      </div>
                     </td>
                     <td style={td}>{r.schedule_date || '—'} {r.schedule_time || ''}</td>
                     <td style={td}>₹{fmtRs(r.sgr_fee_paise)}</td>
@@ -636,11 +655,90 @@ export function AdminStudentCloudTab({ pin, apikey, courses, C, S, FF, Spin, Btn
                   </tr>
                 );
               })}
-              {!rows.length && <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: C.dim, padding: 24 }}>No student admissions yet</td></tr>}
+              {!rows.length && <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: C.dim, padding: 24 }}>No student admissions yet</td></tr>}
             </tbody>
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+export function AdminStudentCloudTab(props) {
+  return <StudentCloudDashboard {...props} />;
+}
+
+export function StudentCloudPage({ apikey, courses, kit }) {
+  const { C, S, FF, Field, Btn, Spin } = kit;
+  const [pin, setPin] = useState(() => {
+    try { return sessionStorage.getItem(STUDENT_CLOUD_PIN_KEY) || ''; } catch { return ''; }
+  });
+  const [authed, setAuthed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const login = async () => {
+    if (!pin || pin.length < 6) { setErr('Enter your HardPin (6+ characters)'); return; }
+    setLoading(true); setErr('');
+    try {
+      await studentCloudFetch('list', {}, { pin, apikey });
+      try { sessionStorage.setItem(STUDENT_CLOUD_PIN_KEY, pin); } catch { /* ignore */ }
+      setAuthed(true);
+    } catch (e) {
+      setErr(e.message || 'Incorrect HardPin — use STUDENT_CLOUD_PIN or admin hub PIN');
+      setAuthed(false);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    if (!pin || pin.length < 6) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await studentCloudFetch('list', {}, { pin, apikey });
+        if (!cancelled) setAuthed(true);
+      } catch { /* stay on gate */ }
+    })();
+    return () => { cancelled = true; };
+  }, [pin, apikey]);
+
+  const lock = () => {
+    try { sessionStorage.removeItem(STUDENT_CLOUD_PIN_KEY); } catch { /* ignore */ }
+    setAuthed(false);
+    setPin('');
+  };
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 24 }}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>CONFIDENTIAL · STUDENT CLOUD</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Student Cloud</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 20, lineHeight: 1.5 }}>
+            SGR admissions · profile · enrollment · course fees. Protected by HardPin.
+          </div>
+          <Field label="HardPin (STUDENT_CLOUD_PIN or admin hub PIN)">
+            <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
+          </Field>
+          {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <Btn full onClick={login} disabled={!pin || loading}>{loading ? 'Checking…' : 'Unlock Student Cloud'}</Btn>
+          <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
+            Bookmark: <code style={{ color: C.acc }}>https://getscanv.com/#student-cloud</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, padding: '16px 16px 32px' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ fontSize: 11, color: C.red, fontWeight: 700, letterSpacing: 1 }}>STUDENT CLOUD · HARDPIN</div>
+          <Btn v="outline" sm onClick={lock}>Lock</Btn>
+        </div>
+        <StudentCloudDashboard pin={pin} apikey={apikey} courses={courses} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
+      </div>
     </div>
   );
 }

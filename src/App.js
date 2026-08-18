@@ -18,7 +18,7 @@ import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
-import { StudentCloudAdmitScreen, useStudentCloudFeeView } from './student-cloud';
+import { StudentCloudAdmitScreen, useStudentCloudFeeView, StudentCloudPage } from './student-cloud';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -2528,6 +2528,7 @@ function canonicalizeHashRoute() {
   window.history.replaceState({}, '', next);
 }
 const OTP_DELIVERY_REPORT_HASH = 'otp-delivery-report';
+const STUDENT_CLOUD_HASH = 'student-cloud';
 const OTP_DELIVERY_CALLBACK_URL = process.env.REACT_APP_OTP_DELIVERY_CALLBACK_URL
   || `${SB_URL}/functions/v1/otp-delivery-report`;
 
@@ -2537,6 +2538,10 @@ function isExecDashboardRoute() {
 
 function isOtpDeliveryReportRoute() {
   return hashBase() === OTP_DELIVERY_REPORT_HASH;
+}
+
+function isStudentCloudRoute() {
+  return hashBase() === STUDENT_CLOUD_HASH;
 }
 
 function isCustomerSupportRoute() {
@@ -8235,7 +8240,7 @@ function requestNativeGps({ onFast, onAccurate, onError } = {}) {
 
 function isGpsPortalRoute() {
   return isAdminHubRoute() || isVendorAdminRoute() || isCustomerSupportRoute()
-    || isPricingAdminRoute() || isExecDashboardRoute() || isVendorOnboardRoute();
+    || isPricingAdminRoute() || isExecDashboardRoute() || isVendorOnboardRoute() || isStudentCloudRoute();
 }
 
 async function persistCustomerGps(user, lat, lng, geo, setUser, setSilentGeo) {
@@ -15603,6 +15608,19 @@ export default function App() {
       <Boundary>
         <style>{APP_CSS}</style>
         <PricingAdminPage onPricesUpdated={refreshPricing}/>
+      </Boundary>
+    );
+  }
+
+  if (isStudentCloudRoute()) {
+    return (
+      <Boundary>
+        <style>{APP_CSS}</style>
+        <StudentCloudPage
+          apikey={SB_KEY}
+          courses={CLOUD_SVCS}
+          kit={{ C, S, FF, Field, Btn, Spin, BDR }}
+        />
       </Boundary>
     );
   }

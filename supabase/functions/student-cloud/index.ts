@@ -52,7 +52,7 @@ async function getSgrFeePaise(sb: ReturnType<typeof adminSb>): Promise<number> {
 function adminPinOk(req: Request): boolean {
   const pin = req.headers.get("x-admin-pin") || "";
   if (!pin || pin.length < 6) return false;
-  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN"]) {
+  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN", "STUDENT_CLOUD_PIN"]) {
     const secret = Deno.env.get(k) || "";
     if (secret.length >= 6 && pin === secret) return true;
   }
@@ -152,6 +152,31 @@ async function paymentCaptured(sb: ReturnType<typeof adminSb>, txnId: string, mi
   const via = String(data.verified_via || "").toLowerCase();
   if (!["webhook", "api", "vyapar_webhook"].includes(via)) return false;
   return Number(data.amount_paise || 0) >= minPaise;
+}
+
+function sgrAlertMobile(): string {
+  return (
+    Deno.env.get("STUDENT_CLOUD_ALERT_MOBILE") ||
+    Deno.env.get("ADMIN_OWNER_MOBILE") ||
+    Deno.env.get("REFUND_APPROVAL_MOBILE") ||
+    "8484850288"
+  );
+}
+
+async function notifyOwnerSgrPaid(student: Record<string, unknown>, feePaise: number): Promise<void> {
+  const to = normalizeMobile(sgrAlertMobile());
+  if (!to) return;
+  const name = `${String(student.first_name || "").trim()} ${String(student.last_name || "").trim()}`.trim() || "Student";
+  const course = String(student.course_name || student.course_id || "Cloud course");
+  const mobile = digits10(String(student.mobile || ""));
+  const rs = fmtRsPaise(feePaise);
+  const when = [student.schedule_date, student.schedule_time].filter(Boolean).join(" ");
+  const msg = `ScanV SGR paid: ${name} · ${course} · ₹${rs} · +91${mobile}${when ? ` · ${when}` : ""}`;
+  try {
+    await sendSms(to, msg);
+  } catch {
+    /* non-blocking */
+  }
 }
 
 async function voiceCallRupees(mobile: string, rupees: number): Promise<{ ok: boolean; error?: string }> {
@@ -300,6 +325,8 @@ Deno.serve(async (req) => {
         status: student.status === "sgr_pending" ? "sgr_paid" : nextStatus,
       }).eq("id", studentId).select("*").single();
       if (error) throw error;
+
+      await notifyOwnerSgrPaid(updated as Record<string, unknown>, expectedFee);
 
       return json({
         success: true,
