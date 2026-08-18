@@ -45,6 +45,9 @@
  *   upsert_staff_user — { email, display_name, role_ids?, support_agent_id?, notes? }
  *   mark_social_everywhere — mark daily post platform done
  *   purge_test_data      — { dry_run?, confirm_execute?, confirm? } pre-launch wipe (owner only)
+ *   run_app_health_check — API security + public endpoint checks
+ *   run_infra_health_check — DB, deploy bundle, go-live, catalog checks
+ *   run_smoke_test — application + infra + UI fetch smoke (Playwright UI is local CLI)
  *
  * Auth: Authorization Bearer (staff JWT) OR x-admin-pin
  *   PIN secrets: ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
@@ -166,6 +169,11 @@ import {
   otpAuthUri,
   verifyTotp,
 } from "../_shared/totp.ts";
+import {
+  runApplicationHealthChecks,
+  runInfraHealthChecks,
+  runSmokeTest,
+} from "../_shared/health-checks.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -1730,6 +1738,36 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Purge failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "run_app_health_check") {
+    try {
+      const result = await runApplicationHealthChecks();
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Application health check failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "run_infra_health_check") {
+    try {
+      const result = await runInfraHealthChecks(sb);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Infra health check failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "run_smoke_test") {
+    try {
+      const result = await runSmokeTest(sb);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Smoke test failed";
       return json({ error: msg }, 500);
     }
   }

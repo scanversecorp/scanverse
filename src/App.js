@@ -12963,6 +12963,7 @@ const ADMIN_TABS = [
   { id: 'social', label: 'Social Media', icon: '📱' },
   { id: 'iam', label: 'Roles & IAM', icon: '🛡️' },
   { id: 'diagrams', label: 'Architecture', icon: '📐' },
+  { id: 'health', label: 'Health Check', icon: '🩺' },
   { id: 'database', label: 'Database / App', icon: '🗄️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -13067,6 +13068,169 @@ function istDateYmd(d = new Date()) {
     month: '2-digit',
     day: '2-digit',
   }).format(d);
+}
+
+function AdminHealthCheckTab({ pin }) {
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState('');
+  const [err, setErr] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const run = useCallback(async (action, label) => {
+    if (!pin) return;
+    setLoading(true);
+    setErr('');
+    setPhase(label);
+    setResult(null);
+    try {
+      const data = await adminHubFetch(action, {}, pin);
+      setResult(data);
+    } catch (e) {
+      setErr(e.message);
+      setResult(null);
+    } finally {
+      setLoading(false);
+      setPhase('');
+    }
+  }, [pin]);
+
+  const exportCsv = useCallback(() => {
+    if (!result?.checks?.length) return;
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = 'Category,Check,Status,Detail,Manual\n';
+    const rows = result.checks.map((c) =>
+      [c.category, c.name, c.status, c.detail, c.manual || ''].map(esc).join(','),
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `scanv-health-${result.suite || 'run'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [result]);
+
+  const statusColor = (s) => (s === 'pass' ? C.grn : s === 'warn' ? C.gold : C.red);
+  const filterPill = (active) => ({
+    padding: '6px 12px',
+    borderRadius: 20,
+    border: `1.5px solid ${active ? C.acc : C.bdr}`,
+    background: active ? `${C.acc}18` : C.surf,
+    color: active ? C.acc : C.sub,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: FF,
+  });
+  const th = { padding: '8px 10px', fontSize: 10, fontWeight: 700, color: C.sub, textAlign: 'left', borderBottom: BDR, whiteSpace: 'nowrap' };
+  const td = { padding: '8px 10px', fontSize: 11, color: C.txt, borderBottom: `1px solid ${C.bdr}`, verticalAlign: 'top' };
+
+  const visibleChecks = (result?.checks || []).filter((c) => {
+    if (filter === 'all') return true;
+    if (filter === 'fail') return c.status === 'fail';
+    if (filter === 'warn') return c.status === 'warn';
+    return c.category === filter;
+  });
+
+  const suiteLabel = {
+    application: 'Application Health Check',
+    infra: 'Infra Health Check',
+    smoke: 'Full Smoke Test',
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>Health Check Portal</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.6, maxWidth: 640 }}>
+            Run production application security checks, infrastructure validation, or the combined smoke test suite.
+            Full Playwright UI flows (booking, OTP, PIN gates) still run via <code style={{ color: C.acc }}>node scripts/smoke-test.mjs</code> locally.
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn v="outline" sm onClick={() => run('run_app_health_check', 'Running application health checks…')} disabled={loading}>Application</Btn>
+          <Btn v="outline" sm onClick={() => run('run_infra_health_check', 'Running infra health checks…')} disabled={loading}>Infra</Btn>
+          <Btn v="primary" sm onClick={() => run('run_smoke_test', 'Running full smoke test…')} disabled={loading}>{loading ? 'Running…' : 'Smoke test'}</Btn>
+        </div>
+      </div>
+
+      {phase && (
+        <div style={{ ...S.card(), padding: 12, marginBottom: 14, fontSize: 12, color: C.cyan, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Spin size={16} /> {phase}
+        </div>
+      )}
+
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+
+      {result && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: C.sub }}>
+              <strong style={{ color: C.txt }}>{suiteLabel[result.suite] || result.suite}</strong>
+              {' · '}{result.app_url}
+              {' · '}{new Date(result.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
+            </div>
+            <Btn v="ghost" sm onClick={exportCsv} disabled={!result.checks?.length}>Export CSV</Btn>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+            <AdminStatCard label="Passed" value={result.passed ?? 0} color={C.grn} />
+            <AdminStatCard label="Failed" value={result.failed ?? 0} color={C.red} />
+            <AdminStatCard label="Warnings" value={result.warned ?? 0} color={C.gold} />
+            <AdminStatCard label="Total" value={result.total ?? 0} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            {[['all', 'All'], ['application', 'Application'], ['infra', 'Infra'], ['ui', 'UI'], ['fail', 'Failures'], ['warn', 'Warnings']].map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setFilter(id)} style={filterPill(filter === id)}>{label}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {result?.checks?.length > 0 && (
+        <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto', maxHeight: 'min(70vh, 720px)', overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th style={th}>Status</th>
+                  <th style={th}>Category</th>
+                  <th style={th}>Check</th>
+                  <th style={th}>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleChecks.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ ...td, color: statusColor(c.status), fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{c.status}</td>
+                    <td style={{ ...td, color: C.sub, textTransform: 'capitalize' }}>{c.category}</td>
+                    <td style={{ ...td, fontWeight: 600 }}>{c.name}</td>
+                    <td style={{ ...td, color: C.sub, lineHeight: 1.5, whiteSpace: 'normal', maxWidth: 420 }}>
+                      {c.detail}
+                      {c.manual && (
+                        <div style={{ marginTop: 4, fontSize: 10, color: C.dim }}>Manual: {c.manual}</div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!result && !loading && !err && (
+        <div style={{ ...S.card(), padding: 16, fontSize: 12, color: C.sub, lineHeight: 1.7 }}>
+          <div style={{ fontWeight: 700, color: C.txt, marginBottom: 8 }}>What each suite covers</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <li><strong style={{ color: C.txt }}>Application</strong> — RLS/security (profiles, bookings, payment_intents), public pricing, edge function auth gates, Razorpay register, send-otp, auth signup, platform-config vendors.</li>
+            <li><strong style={{ color: C.txt }}>Infra</strong> — Frontend bundle deploy, DB table counts, go-live switches, diagram/URL catalogs, Business HQ, service schedule routes.</li>
+            <li><strong style={{ color: C.txt }}>Smoke test</strong> — All of the above plus UI fetch checks (homepage, privacy, terms). Playwright booking/OTP flows are documented for local CLI.</li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AdminGpsStatusTab({ pin }) {
@@ -15172,6 +15336,7 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
                 <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />
+                <button type="button" onClick={() => navigateAdminTab('health')} style={{ ...tabBtn({ id: 'health' }), border: `1.5px solid ${C.grn}44` }}>🩺 Health Check →</button>
                 <button type="button" onClick={() => navigateAdminTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
               </div>
             </div>
@@ -15270,6 +15435,8 @@ function AdminControlCenter({ onPricesUpdated }) {
             </div>
           </div>
         )}
+
+        {tab === 'health' && <AdminHealthCheckTab pin={usePin} />}
 
         {tab === 'gps' && <AdminGpsStatusTab pin={usePin} />}
 
