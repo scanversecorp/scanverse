@@ -6,6 +6,7 @@ import { getBusinessCommand } from "./business-command-admin.ts";
 import { listServiceSchedulesAdmin } from "./service-schedule-admin.ts";
 import adminDiagramSections from "./admin-diagrams-data.json" with { type: "json" };
 import adminUrlIndex from "./admin-url-index-data.json" with { type: "json" };
+import { validateUrlIndexSections } from "./url-index-validate.ts";
 
 export type HealthCheckStatus = "pass" | "fail" | "warn";
 
@@ -407,6 +408,36 @@ export async function runInfraHealthChecks(sb: SupabaseClient): Promise<HealthRu
   );
   push(checks, "infra", "url-index-count", "Admin URL index catalog",
     urlIndexTotal >= 40, `${urlIndexTotal} links (PIN-gated at runtime)`);
+
+  const urlIndexValidation = validateUrlIndexSections(
+    Array.isArray(adminUrlIndex) ? adminUrlIndex : [],
+  );
+  push(checks, "infra", "url-index-routes", "URL index covers all app routes",
+    urlIndexValidation.ok,
+    urlIndexValidation.ok ? "manifest complete" : urlIndexValidation.missing.slice(0, 8).join(", ") + (urlIndexValidation.missing.length > 8 ? "…" : ""),
+    undefined, !urlIndexValidation.ok);
+
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const isoStart = todayStart.toISOString();
+    const [{ count: failedToday }, { count: deliveredToday }] = await Promise.all([
+      sb.from("otp_delivery_reports").select("id", { count: "exact", head: true })
+        .eq("status", "failed").gte("created_at", isoStart),
+      sb.from("otp_delivery_reports").select("id", { count: "exact", head: true })
+        .eq("status", "delivered").gte("created_at", isoStart),
+    ]);
+    const failed = failedToday ?? 0;
+    const delivered = deliveredToday ?? 0;
+    push(checks, "application", "otp-delivery-failed-today", "2Factor OTP SMS failures today",
+      failed === 0,
+      `failed=${failed} delivered=${delivered} (2Factor delivery callbacks)`,
+      undefined,
+      failed > 0);
+  } catch (e) {
+    push(checks, "application", "otp-delivery-stats", "2Factor OTP delivery stats", false,
+      e instanceof Error ? e.message : String(e));
+  }
 
   const diagramSections = Array.isArray(adminDiagramSections) ? adminDiagramSections : [];
   const diagramTotal = diagramSections.reduce(

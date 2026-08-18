@@ -1456,6 +1456,7 @@ const PRICING_ADMIN_HASH = 'pricing-admin';
 const VENDOR_ONBOARD_HASH = 'vendor-onboard';
 const VENDOR_ADMIN_HASH = 'vendor-admin';
 const TRACK_HASH = 'track';
+/* New hash routes: also update url-route-manifest.json + admin-url-index-data.json, then npm run validate:url-index */
 const TRACK_BOOKING_KEY = 'scanv_track_booking';
 const BOOKING_DRAFT_KEY = 'scanv_booking_draft';
 const BOOKING_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -13501,8 +13502,11 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
             {result && (
               <div style={{ marginTop: 8, fontSize: 11, color: C.dim }}>
                 Health run · {new Date(result.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
-                {' · '}{result.passed}/{result.total} passed
-                {result.failed > 0 && <span style={{ color: C.red, fontWeight: 700 }}> · {result.failed} need attention</span>}
+                {' · '}{result.passed}/{result.total} health checks passed
+                {result.failed > 0 && <span style={{ color: C.red, fontWeight: 700 }}> · {result.failed} health fail{result.failed !== 1 ? 's' : ''}</span>}
+                {(k.otp_failed_today ?? 0) > 0 && (
+                  <span style={{ color: C.red, fontWeight: 700 }}> · {k.otp_failed_today} 2Factor OTP SMS fail{k.otp_failed_today !== 1 ? 's' : ''} today</span>
+                )}
               </div>
             )}
           </div>
@@ -13537,6 +13541,14 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
           <AdminStatCard label="Open tickets" value={k.open_tickets ?? '—'} color={C.gold} sub={stats?.support?.open_queue != null ? `Queue ${stats.support.open_queue}` : ''} onClick={() => scrollToReport('tickets', { adminTab: 'tickets' })} active={activeReport === 'tickets'} />
           <AdminStatCard label="Signups (7d)" value={k.signups_7d ?? '—'} sub={`Today ${k.signups_today ?? 0}`} onClick={() => scrollToReport('users')} active={activeReport === 'users'} />
           <AdminStatCard label="Load index (24h)" value={k.activity_index_24h ?? '—'} color={C.cyan} sub="Bookings + tickets + payments" onClick={() => scrollToReport('api')} active={activeReport === 'api'} />
+          <AdminStatCard
+            label="2Factor OTP failed"
+            value={k.otp_failed_today ?? 0}
+            color={(k.otp_failed_today ?? 0) > 0 ? C.red : C.grn}
+            sub={`Delivered ${k.otp_delivered_today ?? 0} today · SMS callbacks`}
+            onClick={() => scrollToReport('otp-delivery', { adminTab: 'otp' })}
+            active={activeReport === 'otp-delivery'}
+          />
         </div>
       )}
 
@@ -13594,13 +13606,13 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
             </ExecSection>
             </div>
 
-            <ExecSection title="Platform health" sub={result ? `${suiteLabel[result.suite] || result.suite} · ${result.app_url}` : 'Run checks to populate'}>
+            <ExecSection title="Platform health" sub={result ? `${suiteLabel[result.suite] || result.suite} · smoke/infra/security checks (not OTP SMS)` : 'Run checks to populate'}>
               {result ? (
                 <>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-                    <AdminStatCard label="Passed" value={result.passed} color={C.grn} />
-                    <AdminStatCard label="Failed" value={result.failed} color={C.red} />
-                    <AdminStatCard label="Warnings" value={result.warned} color={C.gold} />
+                    <AdminStatCard label="Health passed" value={result.passed} color={C.grn} />
+                    <AdminStatCard label="Health fails" value={result.failed} color={C.red} sub="Infra · security · app smoke" />
+                    <AdminStatCard label="Health warnings" value={result.warned} color={C.gold} />
                   </div>
                   <HealthCategoryBar label="Security" accent={C.red} {...catStats('security')} />
                   <HealthCategoryBar label="Application" accent={C.acc} {...catStats('application')} />
@@ -13613,6 +13625,45 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
                 </div>
               )}
             </ExecSection>
+          </div>
+
+          <div ref={(el) => { reportRefs.current['otp-delivery'] = el; }}>
+          <ExecSection
+            title="2Factor OTP delivery (today)"
+            sub="SMS delivery callbacks from 2Factor.in — separate from platform health checks"
+          >
+            {stats.otp_delivery?.today ? (
+              <>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                  <AdminStatCard label="Delivered" value={stats.otp_delivery.today.delivered ?? 0} color={C.grn} />
+                  <AdminStatCard label="Failed" value={stats.otp_delivery.today.failed ?? 0} color={C.red} sub="2Factor SMS REJECTED/failed" />
+                  <AdminStatCard label="Pending" value={stats.otp_delivery.today.pending ?? 0} color={C.gold} />
+                  <AdminStatCard label="Unknown" value={stats.otp_delivery.today.unknown ?? 0} />
+                </div>
+                {(stats.otp_delivery.recent_failed || []).length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: 'uppercase' }}>Recent failed deliveries</div>
+                    {(stats.otp_delivery.recent_failed || []).map((r) => (
+                      <div key={r.id} style={{ ...S.card(), marginBottom: 8, padding: 12, border: `1px solid ${C.red}33` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontWeight: 700, color: C.txt }}>{r.mobile || '—'}</div>
+                            <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{fmtDt(r.created_at)} · {r.otp_context || 'general'}</div>
+                          </div>
+                          <Badge label={r.raw_status || r.status} color={C.red} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {onNavigateTab && (
+                  <Btn v="outline" sm onClick={() => onNavigateTab('otp')}>Full OTP delivery report →</Btn>
+                )}
+              </>
+            ) : (
+              <div style={{ color: C.dim, fontSize: 12, padding: 12 }}>No OTP delivery callbacks recorded today</div>
+            )}
+          </ExecSection>
           </div>
 
           {/* API & flow monitoring */}

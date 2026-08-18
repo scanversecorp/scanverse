@@ -1,0 +1,52 @@
+{
+  "hashRoutes": [
+    "admin",
+    "customer-support",
+    "exec",
+    "faq",
+    "otp-delivery-report",
+    "pricing-admin",
+    "report",
+    "student-cloud",
+    "track",
+    "track-ticket",
+    "vendor-admin",
+    "vendor-onboard"
+  ],
+  "hashAliases": {
+    "admin-hub": "admin",
+    "exec-dashboard": "exec"
+  },
+  "adminTabs": [
+    "overview",
+    "business",
+    "index",
+    "schedule",
+    "pricing",
+    "support",
+    "refunds",
+    "investments",
+    "tickets",
+    "agents",
+    "users",
+    "dispatch",
+    "directory",
+    "vendors",
+    "gps",
+    "bookings",
+    "student-cloud",
+    "otp",
+    "go-live",
+    "vendor-leads",
+    "logistics",
+    "social",
+    "iam",
+    "health",
+    "diagrams",
+    "database",
+    "settings"
+  ],
+  "legalPaths": ["privacy", "terms", "refund", "payment"],
+  "staticPaths": ["/scanv-qr.png"],
+  "publicPaths": ["/", "/?qr=1"]
+}

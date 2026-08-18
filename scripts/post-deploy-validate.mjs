@@ -167,6 +167,11 @@ async function checkAdminUrlIndex() {
   const total = (data.sections || []).reduce((n, s) => n + (s.items?.length || 0), 0);
   if (total >= 40) pass(`Admin URL index: ${total} links (PIN-gated)`);
   else fail(`Admin URL index: ${total} links (expected ~45)`);
+
+  const { spawnSync } = await import('child_process');
+  const v = spawnSync('node', ['scripts/validate-url-index.mjs'], { cwd: new URL('..', import.meta.url).pathname, encoding: 'utf8' });
+  if (v.status === 0) pass('URL index covers all App.js routes');
+  else fail(`URL index route coverage: ${(v.stderr || v.stdout || '').trim().split('\n').slice(-3).join(' ')}`);
 }
 
 async function checkDiagrams() {

@@ -35,6 +35,11 @@
         "note": "Replace BK-XXXX with booking ID"
       },
       {
+        "label": "Payment return",
+        "url": "https://getscanv.com/?payment=TXN-XXXX",
+        "note": "Razorpay redirect after pay · replace TXN-XXXX"
+      },
+      {
         "label": "Partner registration",
         "url": "https://getscanv.com/#vendor-onboard",
         "note": "Vendor self-signup"
@@ -54,7 +59,12 @@
       {
         "label": "Executive dashboard",
         "url": "https://getscanv.com/#exec",
-        "note": "Owner PIN · KPIs & charts"
+        "note": "EXEC_DASHBOARD_PIN or owner PIN · 2FA · KPIs & charts"
+      },
+      {
+        "label": "Executive dashboard (alias)",
+        "url": "https://getscanv.com/#exec-dashboard",
+        "note": "Same as #exec · legacy bookmark"
       },
       {
         "label": "Pricing admin",
@@ -74,7 +84,17 @@
       {
         "label": "OTP delivery reports",
         "url": "https://getscanv.com/#otp-delivery-report",
-        "note": "2Factor callback stats"
+        "note": "Admin PIN + 2FA · 2Factor callback stats"
+      },
+      {
+        "label": "Student Cloud (standalone)",
+        "url": "https://getscanv.com/#student-cloud",
+        "note": "Student payment portal · admin PIN"
+      },
+      {
+        "label": "Admin hub alias",
+        "url": "https://getscanv.com/#admin-hub",
+        "note": "Same as #admin"
       }
     ]
   },
@@ -94,6 +114,18 @@
         "adminTab": "business",
         "url": "https://getscanv.com/#admin?tab=business",
         "note": "All 10 cards · vendor gaps · revenue pipeline · action queue"
+      },
+      {
+        "label": "URL Index",
+        "adminTab": "index",
+        "url": "https://getscanv.com/#admin?tab=index",
+        "note": "This page — all bookmarks"
+      },
+      {
+        "label": "Service Schedule",
+        "adminTab": "schedule",
+        "url": "https://getscanv.com/#admin?tab=schedule",
+        "note": "Per-service hours · blackout dates"
       },
       {
         "label": "Pricing",
@@ -132,6 +164,12 @@
         "note": "agents"
       },
       {
+        "label": "Staff users (IAM)",
+        "adminTab": "users",
+        "url": "https://getscanv.com/#admin?tab=users",
+        "note": "Staff accounts · role assignments"
+      },
+      {
         "label": "Dispatch Desk",
         "adminTab": "dispatch",
         "url": "https://getscanv.com/#admin?tab=dispatch",
@@ -162,6 +200,12 @@
         "note": "bookings"
       },
       {
+        "label": "Student Cloud",
+        "adminTab": "student-cloud",
+        "url": "https://getscanv.com/#admin?tab=student-cloud",
+        "note": "Installments · splits · pending payments"
+      },
+      {
         "label": "OTP Delivery",
         "adminTab": "otp",
         "url": "https://getscanv.com/#admin?tab=otp",
@@ -190,6 +234,18 @@
         "adminTab": "social",
         "url": "https://getscanv.com/#admin?tab=social",
         "note": "Daily posts · videos · stories · emotional tracker"
+      },
+      {
+        "label": "Roles & IAM",
+        "adminTab": "iam",
+        "url": "https://getscanv.com/#admin?tab=iam",
+        "note": "PIN→role map · permission matrix · staff roles"
+      },
+      {
+        "label": "Ops Dashboard",
+        "adminTab": "health",
+        "url": "https://getscanv.com/#admin?tab=health",
+        "note": "Live KPIs · health checks · API latency · flow monitoring"
       },
       {
         "label": "Architecture",
@@ -254,6 +310,7 @@
       {
         "label": "Social dashboard (admin)",
         "adminTab": "social",
+        "url": "https://getscanv.com/#admin?tab=social",
         "note": "Daily posts · videos · stories · emotional tracker"
       }
     ]
@@ -324,6 +381,11 @@
         "label": "Vercel dashboard",
         "url": "https://vercel.com/dashboard",
         "note": "scanv-tau deployments"
+      },
+      {
+        "label": "Vercel production alias",
+        "url": "https://scanverse-tau.vercel.app",
+        "note": "Same build as getscanv.com"
       },
       {
         "label": "GitHub repository",

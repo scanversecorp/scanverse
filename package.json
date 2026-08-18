@@ -19,7 +19,8 @@
     "logo:original": "node scripts/generate-logo-original.mjs",
     "logo:qr": "node scripts/generate-logo-with-qr.mjs",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "validate:url-index": "node scripts/validate-url-index.mjs"
   },
   "eslintConfig": {
     "extends": [

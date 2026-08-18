@@ -314,12 +314,47 @@ function dailyPaymentTrend(rows: PayRow[], days = 14) {
   return keys.map((date) => ({ date, ...trend[date] }));
 }
 
+function isoTodayStart(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+const OTP_DELIVERY_STATUSES = ["delivered", "failed", "pending", "unknown"] as const;
+
+/** Full-table counts — not limited to the report list page size. */
+async function otpDeliveryStats(
+  sb: ReturnType<typeof adminSb>,
+  opts: { todayOnly?: boolean } = {},
+) {
+  const todayStart = isoTodayStart();
+  const counts = await Promise.all(
+    OTP_DELIVERY_STATUSES.map(async (status) => {
+      let q = sb
+        .from("otp_delivery_reports")
+        .select("id", { count: "exact", head: true })
+        .eq("status", status);
+      if (opts.todayOnly) q = q.gte("created_at", todayStart);
+      const { count, error } = await q;
+      return { status, count: error ? 0 : (count ?? 0) };
+    }),
+  );
+  const stats = { delivered: 0, failed: 0, pending: 0, unknown: 0, total: 0 };
+  for (const { status, count } of counts) {
+    stats[status] = count;
+    stats.total += count;
+  }
+  return stats;
+}
+
 async function fetchExecData(sb: ReturnType<typeof adminSb>) {
   const since30 = isoDaysAgo(30);
   const since14 = isoDaysAgo(14);
   const since7 = isoDaysAgo(7);
   const since1 = isoDaysAgo(1);
   const since24h = new Date(Date.now() - 86400000).toISOString();
+
+  const todayStart = isoDaysAgo(0);
 
   const [
     paymentsRes,
@@ -333,6 +368,8 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
     agentsRes,
     vendorsRes,
     tableCounts,
+    otpTodayStats,
+    otpFailedRecentRes,
   ] = await Promise.all([
     sb.from("payments").select("amount,status,method,gateway,created_at,paid_at"),
     sb.from("payment_intents").select("amount_paise,status,verified_via,created_at,paid_at"),
@@ -351,6 +388,13 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
       sb.from("support_tickets").select("id", { count: "exact", head: true }),
       sb.from("vendor_partners").select("id", { count: "exact", head: true }),
     ]),
+    otpDeliveryStats(sb, { todayOnly: true }),
+    sb.from("otp_delivery_reports")
+      .select("id,mobile,status,raw_status,otp_context,created_at")
+      .eq("status", "failed")
+      .gte("created_at", todayStart)
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   const paymentRows: PayRow[] = [
@@ -359,7 +403,6 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
   ];
 
   const payAgg = aggregatePayments(paymentRows);
-  const todayStart = isoDaysAgo(0);
 
   const profilesAll = profilesRes.data || [];
   const profiles = profilesAll.filter((p: { email?: string | null }) => !isHealthTestProfile(p));
@@ -477,6 +520,12 @@ async function fetchExecData(sb: ReturnType<typeof adminSb>) {
       pending_dispatch: (dispatchByStatus.pending || 0) + (dispatchByStatus.dispatching || 0),
       bookings_today: bookingsToday,
       activity_index_24h: activity24h,
+      otp_failed_today: otpTodayStats.failed,
+      otp_delivered_today: otpTodayStats.delivered,
+    },
+    otp_delivery: {
+      today: otpTodayStats,
+      recent_failed: otpFailedRecentRes.data || [],
     },
     payments: {
       ...payAgg,
@@ -792,12 +841,6 @@ async function listPayments(sb: ReturnType<typeof adminSb>, body: Record<string,
   return json({ payment_intents: data || [] });
 }
 
-function isoTodayStart(): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
 async function otpDeliveryReports(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
   const todayOnly = !!body.today_only;
   const failedOnly = !!body.failed_only;
@@ -812,17 +855,13 @@ async function otpDeliveryReports(sb: ReturnType<typeof adminSb>, body: Record<s
   if (todayOnly) query = query.gte("created_at", isoTodayStart());
   if (failedOnly) query = query.eq("status", "failed");
 
-  const { data, error } = await query;
+  const [{ data, error }, stats] = await Promise.all([
+    query,
+    otpDeliveryStats(sb, { todayOnly }),
+  ]);
   if (error) return json({ error: error.message }, 500);
 
-  const rows = data || [];
-  const stats = { delivered: 0, failed: 0, pending: 0, unknown: 0, total: rows.length };
-  for (const r of rows) {
-    const s = (r as { status?: string }).status || "unknown";
-    if (s in stats && s !== "total") (stats as Record<string, number>)[s]++;
-  }
-
-  return json({ reports: rows, stats });
+  return json({ reports: data || [], stats });
 }
 
 const DISPATCH_MODES = new Set(["both", "in_app", "external", "disabled"]);
