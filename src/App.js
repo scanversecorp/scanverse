@@ -13137,7 +13137,7 @@ function AdminHealthCheckTab({ pin }) {
     setErr('');
     try {
       const [s, pay] = await Promise.all([
-        adminHubFetch('exec_stats', {}, pin),
+        adminHubFetch('ops_dashboard_stats', {}, pin),
         adminHubFetch('list_payments', { limit: 12 }, pin),
       ]);
       setStats(s);

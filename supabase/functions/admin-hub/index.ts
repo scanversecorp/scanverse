@@ -15,6 +15,7 @@
  *   list_payments    — { q?, limit? }
  *   otp_delivery_reports — { today_only?, failed_only?, limit? }
  *   exec_stats       — executive dashboard KPIs + chart data (owner PIN only)
+ *   ops_dashboard_stats — same KPI/chart payload as exec_stats; hub.stats (Admin Ops tab)
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
  *   get_platform_settings — { keys? } dispatch_mode etc.
  *   get_go_live_config — switches + secret status (no values)
@@ -1382,6 +1383,8 @@ Deno.serve(async (req) => {
   }
 
   if (action === "exec_stats") return execStats(sb);
+
+  if (action === "ops_dashboard_stats") return execStats(sb);
   if (action === "exec_charts") return execCharts(sb);
 
   if (action === "get_admin_diagrams") {
