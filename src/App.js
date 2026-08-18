@@ -13229,7 +13229,7 @@ function AdminHealthCheckTab({ pin }) {
             <li><strong style={{ color: C.txt }}>Security</strong> — RLS on profiles/bookings/tickets/payment_intents, edge auth gates, docs blocked, bundle exposure, production switches.</li>
             <li><strong style={{ color: C.txt }}>Application</strong> — Public pricing, Razorpay register, send-otp, auth signup, platform-config vendors.</li>
             <li><strong style={{ color: C.txt }}>Infra</strong> — Frontend bundle deploy, DB table counts, go-live vendor switches, diagram/URL catalogs, Business HQ, service schedules.</li>
-            <li><strong style={{ color: C.txt }}>Smoke test</strong> — All suites above plus UI fetch checks. Daily emails at 6 AM & 5 PM IST to samir.workmail@gmail.com and jasmeen.workmail@gmail.com.</li>
+            <li><strong style={{ color: C.txt }}>Smoke test</strong> — All suites above plus UI fetch checks. Daily emails at 6 AM & 5 PM IST to sam@getscanv.com and jas@getscanv.com.</li>
           </ul>
         </div>
       )}

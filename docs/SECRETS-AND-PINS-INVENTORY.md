@@ -74,8 +74,11 @@
 
 | Secret Name | Where Set | Purpose | Notes |
 |-------------|-----------|---------|-------|
-| `RESEND_API_KEY` | Supabase secrets | Ticket closure emails | |
-| `SUPPORT_EMAIL_FROM` | Supabase secrets | From address | Default: `support@dcoreglobal.com` |
+| `RESEND_API_KEY` | Supabase secrets | Ticket closure + health report emails | Required for outbound @getscanv.com |
+| `SUPPORT_EMAIL_FROM` | Supabase secrets | From address | Prefer `support@getscanv.com` (see `docs/GETSCANV-EMAIL.md`) |
+| `HEALTH_REPORT_FROM` | Supabase secrets | Health report sender | Default: same as `SUPPORT_EMAIL_FROM` |
+| `HEALTH_REPORT_TO` | Supabase secrets | Health report recipients | Default: `sam@getscanv.com,jas@getscanv.com` |
+| `HEALTH_REPORT_SECRET` | Supabase secrets + Vault | Cron auth for health-report edge fn | See `scripts/setup-health-report-cron.sql` |
 
 ---
 

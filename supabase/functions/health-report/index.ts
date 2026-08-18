@@ -18,8 +18,8 @@ const corsHeaders: Record<string, string> = {
 };
 
 const DEFAULT_RECIPIENTS = [
-  "samir.workmail@gmail.com",
-  "jasmeen.workmail@gmail.com",
+  "sam@getscanv.com",
+  "jas@getscanv.com",
 ];
 
 function json(body: unknown, status = 200): Response {
