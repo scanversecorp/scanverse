@@ -12,7 +12,8 @@
 | `npm audit` | **ACCEPTED RISK** | 28 vulns in dev/build toolchain (react-scripts/jest); no safe fix without breaking change |
 | Hardcoded API keys in client | **FIXED** | Removed unused `TWOFACTOR_KEY` and `FAST2SMS_KEY` from `App.js` |
 | `.env` in git | **FIXED** | Removed from index (`git rm --cached .env`); remains in `.gitignore` |
-| Payment amount validation | **PASS** | Server-side `amount_ok` check in `razorpay-payment` edge function |
+| Payment amount validation | **PASS** | Server-side catalog price + `amount_ok` in `razorpay-payment` |
+| Payment intents RLS | **PASS** | No anon/authenticated policies; DB trigger enforces trusted `verified_via` on paid |
 | Razorpay webhook signature | **PASS** | HMAC-SHA256 verification when `RAZORPAY_WEBHOOK_SECRET` set |
 | Edge function auth (PINs) | **PASS** | Admin/support/pricing/vendor routes require PIN headers |
 | RLS on sensitive tables | **PASS** | Enabled on pricing, vendors, dispatch, live locations |
@@ -93,6 +94,10 @@ Client                    Edge Function              Razorpay
 ```
 
 - Client **never** sets `paymentVerified` without server `check` returning `verified: true` AND `amount_ok: true`
+- `handleCheck` only trusts `status: paid` when `verified_via` is `webhook`, `api`, or `vyapar_webhook`
+- Anon/authenticated clients **cannot** read or write `payment_intents` (edge function uses service role)
+- DB trigger blocks insert with `status != pending` or update to `paid` without trusted `verified_via`
+- Client direct `payment_intents` SELECT/UPSERT fallbacks removed from `App.js`
 - Underpaid payments (e.g. ₹1 test) rejected server-side
 - Webhook signature verified via `RAZORPAY_WEBHOOK_SECRET`
 
@@ -110,8 +115,17 @@ Client                    Edge Function              Razorpay
 | `booking_dispatch` | Yes | Dispatch state |
 | `booking_dispatch_attempts` | Yes | Audit log |
 | `vendor_live_locations` | Yes | Live tracking |
-| `payment_intents` | Via service role | Edge function only |
+| `payment_intents` | Yes | No client policies; service role + edge function only; trigger guards paid status |
 | `support_tickets` | Via service role | Edge function only |
+
+---
+
+## Fixes Applied (18 Aug 2026 — Payment security)
+
+1. Migration `20260818000007_payment_intents_rls_harden.sql` — dropped permissive anon INSERT/SELECT policies; added trigger guarding paid transitions
+2. `razorpay-payment` — `handleCheck` requires trusted `verified_via`; `handleRegister` validates against `service_prices_public`; added `list_paid_for_user` action
+3. `src/App.js` — removed client-side `payment_intents` read/upsert bypasses; orphan recovery via edge function
+4. `student-cloud` — `paymentCaptured` requires trusted `verified_via`
 
 ---
 

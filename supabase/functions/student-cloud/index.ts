@@ -139,10 +139,12 @@ async function verifyOtp(mobile: string, otp: string): Promise<boolean> {
 
 async function paymentCaptured(sb: ReturnType<typeof adminSb>, txnId: string, minPaise: number) {
   if (!txnId) return false;
-  const { data } = await sb.from("payment_intents").select("status, amount_paise").eq("txn_id", txnId).maybeSingle();
+  const { data } = await sb.from("payment_intents").select("status, amount_paise, verified_via").eq("txn_id", txnId).maybeSingle();
   if (!data) return false;
   const st = String(data.status || "").toLowerCase();
-  if (st !== "paid" && st !== "captured" && st !== "success") return false;
+  if (st !== "paid") return false;
+  const via = String(data.verified_via || "").toLowerCase();
+  if (!["webhook", "api", "vyapar_webhook"].includes(via)) return false;
   return Number(data.amount_paise || 0) >= minPaise;
 }
 

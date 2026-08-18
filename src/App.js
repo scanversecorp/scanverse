@@ -477,16 +477,6 @@ async function registerPaymentIntent(txnId, amountPaise, userId, meta = {}) {
       if (data?.success) return data;
       return { error: data.error || e.message || 'Payment registration failed' };
     } catch (e2) {
-      try {
-        await sb().from('payment_intents').upsert({
-          txn_id: txnId,
-          amount_paise: amountPaise,
-          user_id: userId || null,
-          status: 'pending',
-          ...(meta.serviceId ? { service_id: meta.serviceId } : {}),
-          ...(meta.serviceName ? { service_name: meta.serviceName } : {}),
-        }, { onConflict: 'txn_id', ignoreDuplicates: true });
-      } catch (_2) {}
       return { error: e2.message || e.message || 'Payment registration failed' };
     }
   }
@@ -509,11 +499,21 @@ async function fetchPaymentVerification(txnId, expectedAmountPaise) {
     }
   } catch (_) {}
   try {
-    const { data } = await sb().from('payment_intents').select('status, amount_paise, payer_vpa').eq('txn_id', txnId).maybeSingle();
-    if (data?.status !== 'paid') return { verified: false, payer_vpa: null };
-    if (expectedAmountPaise && data.amount_paise !== expectedAmountPaise) return { verified: false, payer_vpa: null };
-    return { verified: true, payer_vpa: data.payer_vpa || null };
-  } catch (_) { return { verified: false, payer_vpa: null }; }
+    const res = await fetch(RAZORPAY_FN, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'check',
+        txn_id: txnId,
+        amount_paise: expectedAmountPaise || undefined,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data?.verified && data?.amount_ok !== false) {
+      return { verified: true, payer_vpa: data.payer_vpa || null };
+    }
+  } catch (_) {}
+  return { verified: false, payer_vpa: null };
 }
 async function checkPaymentVerified(txnId, expectedAmountPaise) {
   const r = await fetchPaymentVerification(txnId, expectedAmountPaise);
@@ -2019,13 +2019,22 @@ async function findOrphanPaidIntents(userId) {
   if (!userId) return [];
   try {
     const returnTxn = parsePaymentReturnTxn();
-    const { data: intents } = await sb().from('payment_intents')
-      .select('txn_id, amount_paise, paid_at, service_id, service_name')
-      .eq('user_id', userId)
-      .eq('status', 'paid')
-      .order('paid_at', { ascending: false })
-      .limit(10);
-    if (!intents?.length) return [];
+    let intents = [];
+    try {
+      const r = await sb().functions.invoke('razorpay-payment', {
+        body: { action: 'list_paid_for_user', user_id: userId },
+      });
+      intents = r.data?.intents || [];
+    } catch (_) {
+      const res = await fetch(RAZORPAY_FN, {
+        method: 'POST',
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_paid_for_user', user_id: userId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      intents = data?.intents || [];
+    }
+    if (!intents.length) return [];
     const pending = [];
     for (const intent of intents) {
       if (returnTxn && intent.txn_id === returnTxn) {

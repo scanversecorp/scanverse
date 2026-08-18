@@ -27,3 +27,4 @@ yarn-error.log*
 
 # local database dumps (scripts/backup-db.sh)
 /backups/
+.vercel

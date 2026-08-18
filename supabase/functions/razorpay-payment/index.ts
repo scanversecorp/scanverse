@@ -29,6 +29,25 @@ const corsHeaders: Record<string, string> = {
 
 const INTENT_TTL_MS = 30 * 60 * 1000;
 const APP_URL = Deno.env.get("APP_URL") || "https://getscanv.com";
+const TRUSTED_VERIFIED_VIA = new Set(["webhook", "api", "vyapar_webhook"]);
+
+function isTrustedVerifiedVia(via: unknown): boolean {
+  return TRUSTED_VERIFIED_VIA.has(String(via || "").toLowerCase());
+}
+
+async function resolveCatalogPricePaise(
+  supabase: ReturnType<typeof createClient>,
+  serviceId: string | null,
+): Promise<number | null> {
+  if (!serviceId) return null;
+  const { data } = await supabase
+    .from("service_prices_public")
+    .select("price_paise")
+    .eq("service_id", serviceId)
+    .maybeSingle();
+  const price = data?.price_paise;
+  return price != null && Number.isFinite(Number(price)) ? Number(price) : null;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -435,14 +454,24 @@ async function handleRegister(
   const userId = body.user_id ? String(body.user_id).trim() || null : null;
   const serviceId = body.service_id ? String(body.service_id).trim() || null : null;
   const serviceName = body.service_name ? String(body.service_name).trim() || null : null;
-  const servicePricePaise = body.service_price_paise != null
-    ? Math.round(Number(body.service_price_paise))
-    : inferServicePriceFromTotal(amountPaise);
-  const split = calcRouteSplit(servicePricePaise);
-
   if (!isValidTxnId(txnId) || !Number.isFinite(amountPaise) || amountPaise <= 0) {
     return json({ error: "Invalid txn_id or amount_paise" }, 400);
   }
+
+  const catalogPricePaise = await resolveCatalogPricePaise(supabase, serviceId);
+  if (catalogPricePaise != null && amountPaise < catalogPricePaise) {
+    return json({
+      error: "Amount below catalog price",
+      expected_paise: catalogPricePaise,
+    }, 400);
+  }
+
+  const servicePricePaise = catalogPricePaise != null
+    ? catalogPricePaise
+    : body.service_price_paise != null
+      ? Math.round(Number(body.service_price_paise))
+      : inferServicePriceFromTotal(amountPaise);
+  const split = calcRouteSplit(servicePricePaise);
 
   const razorpayEnabled = await isVendorEnabled(supabase, "vendor_enable_razorpay");
 
@@ -450,11 +479,11 @@ async function handleRegister(
 
   const { data: existing } = await supabase
     .from("payment_intents")
-    .select("status, amount_paise, razorpay_payment_link_id")
+    .select("status, amount_paise, razorpay_payment_link_id, verified_via")
     .eq("txn_id", txnId)
     .maybeSingle();
 
-  if (existing?.status === "paid") {
+  if (existing?.status === "paid" && isTrustedVerifiedVia(existing.verified_via)) {
     return json({ success: true, txn_id: txnId, already_paid: true });
   }
 
@@ -550,13 +579,21 @@ async function handleCheck(
   }
 
   if (row.status === "paid") {
+    if (!isTrustedVerifiedVia(row.verified_via)) {
+      return json({
+        verified: false,
+        status: "pending",
+        amount_ok: false,
+        error: "Payment not verified by gateway",
+      });
+    }
     return json({
       verified: true,
       status: "paid",
       amount_ok: true,
       amount_paise: expectedPaise,
       paid_at: row.paid_at,
-      mode: row.verified_via || "webhook",
+      mode: row.verified_via,
       payer_vpa: row.payer_vpa || null,
     });
   }
@@ -608,6 +645,30 @@ async function handleCheck(
     amount_ok: false,
     amount_paise: expectedPaise,
   });
+}
+
+async function handleListPaidForUser(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const userId = String(body.user_id || "").trim();
+  if (!userId) return json({ error: "user_id required" }, 400);
+
+  const { data, error } = await supabase
+    .from("payment_intents")
+    .select("txn_id, amount_paise, paid_at, service_id, service_name, verified_via")
+    .eq("user_id", userId)
+    .eq("status", "paid")
+    .order("paid_at", { ascending: false })
+    .limit(10);
+
+  if (error) return json({ error: error.message }, 500);
+
+  const intents = (data || []).filter((row) =>
+    isTrustedVerifiedVia(row.verified_via)
+  ).map(({ verified_via: _via, ...rest }) => rest);
+
+  return json({ intents });
 }
 
 async function resolveCustomerProfileId(
@@ -903,6 +964,9 @@ Deno.serve(async (req) => {
 
   if (action === "register") return handleRegister(supabase, body);
   if (action === "check") return handleCheck(supabase, body);
+  if (action === "list_paid_for_user") {
+    return handleListPaidForUser(supabase, body);
+  }
   if (action === "cancel") {
     return handleCancel(supabase, supabaseUrl, req, body);
   }

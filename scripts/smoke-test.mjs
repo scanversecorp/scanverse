@@ -47,6 +47,21 @@ async function runApiTests() {
   let r = await api('profiles', `${SB_URL}/rest/v1/profiles?select=id&limit=1`);
   r.status === 401 || r.status === 403 ? pass('Security: profiles anon read', `HTTP ${r.status}`) : fail('Security: profiles anon read', `HTTP ${r.status}`);
 
+  r = await api('pay-intents-read', `${SB_URL}/rest/v1/payment_intents?select=txn_id&limit=1`);
+  const payRows = Array.isArray(r.body) ? r.body : [];
+  payRows.length === 0
+    ? pass('Security: payment_intents anon read blocked', `HTTP ${r.status}, rows=${payRows.length}`)
+    : fail('Security: payment_intents anon read blocked', `HTTP ${r.status}, leaked ${payRows.length} row(s)`);
+
+  r = await api('pay-intents-insert', `${SB_URL}/rest/v1/payment_intents`, {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ txn_id: `TXN-EVIL-${Date.now()}`, amount_paise: 1, status: 'paid' }),
+  });
+  r.status >= 400
+    ? pass('Security: payment_intents anon insert blocked', `HTTP ${r.status}`)
+    : fail('Security: payment_intents anon insert blocked', `HTTP ${r.status}`);
+
   r = await api('pricing', `${SB_URL}/rest/v1/service_prices_public?select=service_id&limit=3`);
   r.status === 200 ? pass('API: public pricing readable', `HTTP 200, rows: ${Array.isArray(r.body) ? r.body.length : '?'}`) : fail('API: public pricing readable', `HTTP ${r.status}`);
 
