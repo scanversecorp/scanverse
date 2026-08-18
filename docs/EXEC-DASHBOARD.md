@@ -8,10 +8,10 @@ Read-only business owner dashboard with KPIs, charts, and platform health metric
 |------|-------|
 | **URL** | `https://getscanv.com/#exec` |
 | **Alias** | `https://getscanv.com/#exec-dashboard` |
-| **PIN** | `ADMIN_HUB_PIN` or `SUPPORT_ADMIN_PIN` (Supabase secrets) |
+| **PIN** | `EXEC_DASHBOARD_PIN` (Supabase secret) — dedicated exec PIN. Owner PINs (`ADMIN_HUB_PIN`, `SUPPORT_ADMIN_PIN`) also work. |
 | **From admin hub** | `#admin` → Overview → **Executive Dashboard →** |
 
-Other admin PINs (`PRICING_ADMIN_PIN`, `VENDOR_ADMIN_PIN`) do **not** unlock the exec dashboard.
+Other admin PINs (`PRICING_ADMIN_PIN`, `VENDOR_ADMIN_PIN`, `SUPPORT_AGENT_PIN`) do **not** unlock the exec dashboard.
 
 ## Sections
 
@@ -46,13 +46,12 @@ npx supabase functions deploy admin-hub --no-verify-jwt
 npm run build
 ```
 
-Set via Supabase secrets — owner/admin use `ScanV2026`, agents use `ScanV2026Agent`. Do not commit PIN values to git.
-
 ```bash
 npx supabase secrets set \
-  ADMIN_HUB_PIN=<admin-pin> \
-  SUPPORT_ADMIN_PIN=<admin-pin>
+  EXEC_DASHBOARD_PIN=<exec-pin>
 ```
+
+Owner PINs (`ADMIN_HUB_PIN`, `SUPPORT_ADMIN_PIN`) also unlock `#exec` but do not share the same secret.
 
 ## Notes
 

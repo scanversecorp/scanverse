@@ -12514,7 +12514,7 @@ function ExecDashboardPage() {
     if (!pin) { setErr('Enter owner PIN'); return; }
     setLoading(true); setErr('');
     try {
-      await adminHubFetch('whoami', {}, pin);
+      await adminHubFetch('exec_pin_check', {}, pin);
       sessionStorage.setItem(ADMIN_PIN_KEY, pin);
       const status = await adminHubTotp(pin, 'totp_status');
       if (!status.enrolled) {
@@ -12523,9 +12523,9 @@ function ExecDashboardPage() {
       }
       setAuthStep('totp');
     } catch (e) {
-      setErr(e.message?.includes('Executive') || e.message?.includes('403')
-        ? 'Executive dashboard requires ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN'
-        : 'Incorrect PIN — set ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN in Supabase secrets');
+      setErr(e.message?.includes('Executive') || e.message?.includes('403') || e.message?.includes('hub.exec')
+        ? 'Executive dashboard requires EXEC_DASHBOARD_PIN (or owner ADMIN_HUB_PIN / SUPPORT_ADMIN_PIN)'
+        : 'Incorrect PIN — set EXEC_DASHBOARD_PIN in Supabase secrets');
       setAuthed(false);
       sessionStorage.removeItem(ADMIN_AUTH_KEY);
     } finally { setLoading(false); }
@@ -12580,7 +12580,7 @@ function ExecDashboardPage() {
           </div>
           {authStep === 'pin' && (
             <>
-              <Field label="Owner PIN (ADMIN_HUB_PIN or SUPPORT_ADMIN_PIN)">
+              <Field label="Executive PIN (EXEC_DASHBOARD_PIN)">
                 <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} style={S.inp()} placeholder="••••••••" autoComplete="off" />
               </Field>
               {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}

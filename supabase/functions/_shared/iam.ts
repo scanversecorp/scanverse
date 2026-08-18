@@ -21,6 +21,7 @@ type PinMatch = { pin_key: string; env_name: string };
 
 const PIN_ENV_NAMES: Array<{ env_name: string; pin_key: string }> = [
   { env_name: "ADMIN_HUB_PIN", pin_key: "ADMIN_HUB_PIN" },
+  { env_name: "EXEC_DASHBOARD_PIN", pin_key: "EXEC_DASHBOARD_PIN" },
   { env_name: "SUPPORT_ADMIN_PIN", pin_key: "SUPPORT_ADMIN_PIN" },
   { env_name: "PRICING_ADMIN_PIN", pin_key: "PRICING_ADMIN_PIN" },
   { env_name: "VENDOR_ADMIN_PIN", pin_key: "VENDOR_ADMIN_PIN" },
@@ -59,6 +60,7 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   run_daily_gps_check: "hub.gps",
   exec_stats: "hub.exec",
   exec_charts: "hub.exec",
+  exec_pin_check: "hub.exec",
   pricing_2fa_status: "hub.pricing_2fa",
   pricing_2fa_reset_send: "hub.pricing_2fa",
   pricing_2fa_reset_confirm: "hub.pricing_2fa",
@@ -153,6 +155,7 @@ async function loadPinRoleMap(sb: SupabaseClient): Promise<Map<string, string[]>
 function fallbackPinRoleMap(): Map<string, string[]> {
   return new Map([
     ["ADMIN_HUB_PIN", ["scanv_owner", "hub_operator"]],
+    ["EXEC_DASHBOARD_PIN", ["exec_viewer"]],
     ["SUPPORT_ADMIN_PIN", ["scanv_owner", "hub_operator", "support_admin"]],
     ["PRICING_ADMIN_PIN", ["hub_operator", "pricing_admin"]],
     ["VENDOR_ADMIN_PIN", ["hub_operator", "vendor_admin"]],

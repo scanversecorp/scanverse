@@ -11,6 +11,7 @@
 | Secret Name | Where Set | Purpose | Notes |
 |-------------|-----------|---------|-------|
 | `ADMIN_HUB_PIN` | Supabase secrets | Admin Control Center (`#admin`) | Owner/leader access |
+| `EXEC_DASHBOARD_PIN` | Supabase secrets | Executive Dashboard (`#exec`) | Exec metrics only; does not unlock `#admin` |
 | `SUPPORT_ADMIN_PIN` | Supabase secrets | Support admin + hub + exec dashboard | Full update access |
 | `SUPPORT_AGENT_PIN` | Supabase secrets | Customer support desk (`#customer-support`) | Read-only customer search + ticket desk |
 | `PRICING_ADMIN_PIN` | Supabase secrets | Pricing admin (`#pricing-admin`) | Also grants hub access |

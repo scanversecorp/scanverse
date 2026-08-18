@@ -15,6 +15,7 @@
  *   list_payments    — { q?, limit? }
  *   otp_delivery_reports — { today_only?, failed_only?, limit? }
  *   exec_stats       — executive dashboard KPIs + chart data (owner PIN only)
+ *   exec_pin_check   — validate exec PIN before 2FA (#exec gate)
  *   ops_dashboard_stats — same KPI/chart payload as exec_stats; hub.stats (Admin Ops tab)
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
  *   get_platform_settings — { keys? } dispatch_mode etc.
@@ -52,7 +53,7 @@
  *   run_smoke_test — application + infra + security + UI fetch smoke
  *
  * Auth: Authorization Bearer (staff JWT) OR x-admin-pin
- *   PIN secrets: ADMIN_HUB_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
+ *   PIN secrets: ADMIN_HUB_PIN | EXEC_DASHBOARD_PIN | SUPPORT_ADMIN_PIN | PRICING_ADMIN_PIN | VENDOR_ADMIN_PIN | SUPPORT_AGENT_PIN
  *   Permissions enforced via iam_roles / iam_permissions (see get_iam_catalog)
  */
 
@@ -1383,6 +1384,8 @@ Deno.serve(async (req) => {
   }
 
   if (action === "exec_stats") return execStats(sb);
+
+  if (action === "exec_pin_check") return json({ ok: true, exec: true });
 
   if (action === "ops_dashboard_stats") return execStats(sb);
   if (action === "exec_charts") return execCharts(sb);
