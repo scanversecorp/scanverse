@@ -4014,12 +4014,15 @@ function BrowseFixedHeader({ children, padX = 16 }) {
 }
 
 /** Category panel — header pinned in flex column; body scrolls internally (Safari-safe vs position:fixed). */
-function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children, showCopyright = true }) {
+function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children, showCopyright = true, fillViewport = true }) {
+  const rootStyle = fillViewport
+    ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: C.bg, fontFamily: FF, overflow: 'hidden' }
+    : { display: 'flex', flexDirection: 'column', background: C.bg, fontFamily: FF };
+  const bodyStyle = fillViewport
+    ? { flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }
+    : {};
   return (
-    <div style={{
-      flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: C.bg,
-      fontFamily: FF, overflow: 'hidden',
-    }}>
+    <div style={rootStyle}>
       <div style={{
         flexShrink: 0, background: C.surf, borderBottom: BDR,
         padding: `12px ${padX}px`, paddingTop: BROWSE_HDR_PAD,
@@ -4037,7 +4040,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
       </div>
       <div
         ref={scrollRef}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+        style={bodyStyle}
       >
         {children}
         {showCopyright ? <CopyrightLine style={{ padding: '12px 16px 24px' }} /> : null}
@@ -7150,6 +7153,7 @@ function ServicesScreen() {
         title={cfg.title}
         subtitle={cfg.subtitle}
         showCopyright={false}
+        fillViewport={false}
         onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
       >
         <CategoryListBody
@@ -7173,6 +7177,7 @@ function ServicesScreen() {
         padX={20}
         title={detail.name}
         showCopyright={false}
+        fillViewport={false}
         onBack={() => { setDetail(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
       >
         <div style={{ padding: 16 }}>
@@ -9716,8 +9721,8 @@ function PricingAdminPage({ onPricesUpdated, hubPin, embedded }) {
         <div style={{ marginTop:14, fontSize:11, color:C.dim, lineHeight:1.6 }}>
           <strong>Status:</strong> Active = visible on home, sub-cards & booking. Inactive = removed (soft delete). Paused = temporarily hidden. Use <strong>+ Add card / service</strong> for new home category cards or sub-services. <strong>Remove</strong> sets Inactive for that card or sub-service — reactivate from Status. Change <strong>New ₹</strong> for live prices. Set <strong>Top Rated</strong> for the Top Rated tab. Click <strong>Save all & go live</strong> after bulk edits.
         </div>
+        {!embedded && <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} />}
       </div>
-      {!embedded && <CopyrightLine style={{ flexShrink: 0, padding: '12px 16px' }} />}
     </div>
   );
 }
@@ -10976,7 +10981,7 @@ function VendorAdminPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
@@ -10993,7 +10998,7 @@ function VendorAdminPage() {
         {msg && <div style={{ color: C.grn, fontSize: 12, marginTop: 8 }}>{msg}</div>}
         {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8 }}>{err}</div>}
       </div>
-      <div style={{ padding: '0 16px 16px', flex: 1, minHeight: 0 }}>
+      <div style={{ padding: '0 16px 16px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           {['all', 'pending', 'active', 'paused', 'offboarded'].map((f) => (
             <button key={f} type="button" onClick={() => setStatusFilter(f)} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${statusFilter === f ? C.acc : C.bdr}`, background: statusFilter === f ? `${C.acc}18` : C.surf, color: statusFilter === f ? C.acc : C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
@@ -11069,8 +11074,8 @@ function VendorAdminPage() {
         {!statusFiltered.length && !loading && (
           <div style={{ textAlign: 'center', color: C.dim, padding: 40 }}>No partners — share {APP_URL}/#vendor-onboard</div>
         )}
+        <CopyrightLine style={{ padding: '16px 0 24px', marginTop: 16 }} />
       </div>
-      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>
   );
 }
@@ -12089,7 +12094,7 @@ function CustomerSupportPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1100, margin: '0 auto' }}>
           <div>
@@ -12275,8 +12280,8 @@ function CustomerSupportPage() {
             )}
           </>
         )}
+        <CopyrightLine style={{ padding: '16px 0 24px', marginTop: 16 }} />
       </div>
-      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>
   );
 }
@@ -12471,7 +12476,7 @@ function ExecDashboardPage() {
   const signupTrend = (data?.users?.signup_trend || []).map((d) => ({ date: d.date, value: d.count }));
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 2px 12px rgba(18,18,18,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1200, margin: '0 auto' }}>
           <div>
@@ -12650,8 +12655,8 @@ function ExecDashboardPage() {
             </ExecSection>
           </>
         )}
+        <CopyrightLine style={{ padding: '16px 0 24px', marginTop: 16 }} />
       </div>
-      <CopyrightLine style={{ padding: '16px', marginTop: 'auto' }} />
     </div>
   );
 }
@@ -15674,7 +15679,7 @@ export default function App() {
     <div className="scanv-shell" style={{...APP_SHELL, justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '16px 16px 48px' }}>
       <ScanVLogoMark size={LOGO_SIZE.lg} center />
       <div style={{ marginTop: 16 }}><Spin size={32}/></div>
-      <CopyrightLine style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
+      <CopyrightLine style={{ marginTop: 24 }} />
     </div>
     </div></>
   );
@@ -15725,7 +15730,7 @@ export default function App() {
         <PartnerGpsTracker />
         <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>
-          <div className="scanv-mobile-zoom" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div className="scanv-mobile-zoom" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
             <Boundary>{renderScreen()}</Boundary>
             <CopyrightLine style={{ padding: '6px 16px 16px' }} />
           </div>
