@@ -3389,16 +3389,12 @@ function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
 
   return (
     <div
-      style={{ marginBottom: 14, width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
+      style={{ marginBottom: 10, width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
       onMouseEnter={() => { pauseRef.current = true; }}
       onMouseLeave={() => { pauseRef.current = false; }}
       onTouchStart={() => { pauseRef.current = true; }}
       onTouchEnd={() => { setTimeout(() => { pauseRef.current = false; }, 2800); }}
     >
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-        <div style={{ color:C.dim, fontSize:10, fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase' }}>Featured · swipe of care</div>
-        <div style={{ color:C.dim, fontSize:10, fontWeight:700 }}>{idx + 1} / {n}</div>
-      </div>
       <div
         ref={viewRef}
         style={{ overflow:'hidden', borderRadius:16, height:168, width:'100%', maxWidth:'100%', position:'relative', isolation:'isolate', clipPath:'inset(0 round 16px)' }}
@@ -3420,7 +3416,7 @@ function HomeHeroCarousel({ services, onSelect, intervalMs = 4500 }) {
           ))}
         </div>
       </div>
-      <div style={{ display:'flex', justifyContent:'center', flexWrap:'wrap', gap:5, marginTop:10, width:'100%' }}>
+      <div style={{ display:'flex', justifyContent:'center', flexWrap:'wrap', gap:5, marginTop:8, width:'100%' }}>
         {services.map((svc, i) => (
           <button
             key={svc.id}
@@ -3713,13 +3709,13 @@ function captureFreshGps(fallbackGeo = null) {
 }
 
 /** Fixed browse header — shell margin handles safe-area; keep header padding modest */
-const BROWSE_HDR_PAD = '10px';
+const BROWSE_HDR_PAD = '6px';
 const BROWSE_HOME_INSET = 12;
 const BROWSE_HOME_STACK = {
   display: 'grid',
   gridTemplateColumns: '1fr',
-  padding: `8px ${BROWSE_HOME_INSET}px 0`,
-  gap: 10,
+  padding: `6px ${BROWSE_HOME_INSET}px 0`,
+  gap: 8,
   boxSizing: 'border-box',
   width: '100%',
 };
@@ -4028,7 +4024,7 @@ function TrustCommitmentScreen({ pageKey }) {
 }
 const BROWSE_INLINE_HDR = {
   flexShrink: 0,
-  background: C.surf, borderBottom: BDR, padding: '10px 16px', paddingTop: BROWSE_HDR_PAD,
+  background: C.surf, borderBottom: BDR, padding: '6px 16px', paddingTop: BROWSE_HDR_PAD,
   display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 3px 14px rgba(18,18,18,0.08)',
 };
 
@@ -5878,7 +5874,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:`10px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
+      <div style={{background:C.surf,borderBottom:BDR,padding:`6px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
         <ScanVLogoMark size={LOGO_SIZE.md} />
         <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {formatGeoBadge(silentGeo)}
@@ -5898,7 +5894,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
       </div>
-      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`12px ${BROWSE_HOME_INSET}px 24px`,overflowX:'hidden'}}>
+      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`8px ${BROWSE_HOME_INSET}px 24px`,overflowX:'hidden'}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -7004,7 +7000,7 @@ function BottomNav() {
 function TopBar({title,back}) {
   const {setScreen,logout}=useApp();
   return (
-    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'10px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'6px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
       {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
            :<ScanVLogoMark size={LOGO_SIZE.sm} />}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
@@ -7298,7 +7294,7 @@ function ServicesScreen() {
   return (
     <div ref={scrollRef} style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar />
-      <div style={{padding:16}}>
+      <div style={{padding:'12px 16px 16px'}}>
         <div style={{ ...BROWSE_PROMO_BANNER, marginBottom: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
           <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
