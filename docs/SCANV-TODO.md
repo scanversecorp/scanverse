@@ -1,6 +1,6 @@
 # ScanV Todo List
 
-**Updated:** 19 Aug 2026, 8:27 PM IST  
+**Updated:** 19 Aug 2026, 9:05 PM IST  
 **Owners:** Samir + Jasmeen
 
 Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).
@@ -28,12 +28,12 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | GSC verified; **sitemap submit blocked** — no GSC session in CDP Chrome profile (19 Aug agent run) |
+| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ✅ Verified | Domain verified · homepage indexed · `robots.txt` declares sitemap |
 | 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Needs verified phone + address when available |
 | 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
 | 4 | Deploy official-app SEO + static files | ✅ Live | title "ScanV — Official App \| getscanv.com" · GSC meta tag present |
 | 5 | **GSC domain verified** for `getscanv.com` | ✅ Done | DNS TXT via Cloudflare · account jasmeen.workmail@gmail.com |
-| 6 | Submit sitemap + request indexing | ⏳ Manual | GSC → Sitemaps → `sitemap.xml` — agent could not reach GSC (login required in browser) |
+| 6 | Submit sitemap + request indexing | ⚠️ UI quirk | GSC form rejects `sitemap.xml` though prod serves valid XML — discovery via `robots.txt` OK |
 | 7 | **Fix "ScanV coming to?" snippet** | ✅ Deployed | Prod meta live · **IG/FB bio** still needs "Coming soon" removed (see Social) |
 
 ---
@@ -42,10 +42,10 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Twilio account (ScanV) | ⏳ Login required | CDP Chrome profile hit login page (19 Aug) — session not in copied profile |
-| 2 | **Start SMS trial** → free virtual number | ⏳ Blocked | Console login required · [TWILIO-SETUP.md](./TWILIO-SETUP.md) |
-| 3 | Supabase `TWILIO_*` secrets | ⏳ After trial | No `TWILIO_*` in Supabase secrets list (19 Aug) |
-| 4 | Webhooks on trial number | ⏳ After #2 | booking-dispatch + whatsapp-verify URLs in doc |
+| 1 | Twilio account (ScanV) | ✅ Done | User logged in manually (19 Aug) |
+| 2 | **Start SMS trial** → free virtual number | ✅ Done | Test SMS sent 19 Aug · trial number in Console → Phone Numbers → Active numbers |
+| 3 | Supabase `TWILIO_*` secrets | ⏳ **Next** | Copy Account SID + Auth Token + trial number from Console → run commands below |
+| 4 | Webhooks on trial number | ⏳ After #3 | booking-dispatch + whatsapp-verify URLs in [TWILIO-SETUP.md](./TWILIO-SETUP.md) |
 
 ---
 

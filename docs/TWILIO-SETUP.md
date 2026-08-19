@@ -10,12 +10,12 @@
 
 | Item | Status |
 |------|--------|
-| Twilio account | **✅ Exists** — logged in as **ScanV** · "My First Twilio Account" |
-| Account SID | Set in Supabase secrets — copy from Console (starts with `AC…`) |
-| Auth token in repo | **Not found** — copy from Console → API keys and Auth tokens |
-| Supabase secrets (`TWILIO_*`) | **Unknown** — set after SMS trial completes |
-| Free trial virtual number | **⏳ Pending** — click **Start SMS trial** on account home |
-| Onboarding questionnaire | **⏳ 16%** — select Business → Next on dashboard |
+| Twilio account | **✅ Done** — ScanV trial account · user logged in 19 Aug 2026 |
+| SMS trial + test SMS | **✅ Done** — test SMS sent 19 Aug to verified number (+91-9270194842) |
+| Free trial virtual number | **✅ Assigned** — see Console → Phone Numbers → Active numbers |
+| Account SID + Auth Token | **⏳ Next** — copy from Console → Account → API keys → set Supabase secrets |
+| Supabase secrets (`TWILIO_*`) | **⏳ Pending** — not set yet (19 Aug) |
+| Onboarding questionnaire | **⏳ Optional** — finish Business profile if prompted |
 | India production SMS | **Blocked without TRAI DLT** — use 2Factor/MSG91 as primary for IN OTP |
 
 ---
@@ -48,15 +48,28 @@ See also: `docs/DEPLOY-VENDOR-DISPATCH.md`, `docs/DEPLOY-WHATSAPP-VERIFY.md`, `d
 
 ---
 
-## What's pending right now (2026-08-19 audit)
+## What's pending right now (2026-08-19)
 
 Console: https://console.twilio.com/ → Account home (ScanV trial account)
 
-1. **Start SMS trial** (account home → button) — assigns the free trial virtual number
-2. **Send test SMS to 9270194842** — completes Messaging trial walkthrough
-3. **Finish onboarding** — "Personalize your onboarding" → select **Business** → Next
-4. **Copy credentials** → Account SID + Auth Token → Supabase secrets (below)
-5. **Optional upgrade** — only needed for non-trial limits / dedicated number ownership
+**Completed 19 Aug:** SMS trial started · test SMS sent to +91-9270194842.
+
+**Next (Supabase wiring only):**
+1. Console → **Account → API keys and Auth tokens** — copy Account SID (`AC…`) + Auth Token
+2. Console → **Phone Numbers → Manage → Active numbers** — copy trial number (`+1…`)
+3. Run Supabase secrets (replace placeholders; never commit):
+   ```bash
+   npx supabase secrets set \
+     TWILIO_ACCOUNT_SID=ACxxxxxxxx \
+     TWILIO_AUTH_TOKEN=xxxxxxxx \
+     TWILIO_SMS_FROM=+1xxxxxxxxxx \
+     TWILIO_VOICE_FROM=+1xxxxxxxxxx \
+     TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
+   ```
+4. Configure webhooks on the trial number (URLs in [How ScanV uses Twilio](#how-scanv-uses-twilio-code) above)
+5. Verify: Admin Hub → Ops Dashboard → `ext-twilio-account` probe green
+
+Optional later: finish onboarding questionnaire · upgrade before trial expiry (30 days)
 
 Trial limits until upgrade: SMS/voice only to **verified numbers** (max 5; signup phone counts).
 
@@ -140,10 +153,10 @@ Free disk space (~4.6 GB / 98% used) prevented Supabase CLI secrets list and doc
 
 ## Checklist (copy when account is live)
 
-- [ ] Twilio account created / logged in
-- [ ] Email verified
-- [ ] Phone 9270194842 verified
-- [ ] Messaging trial completed — trial number noted: `____________`
+- [x] Twilio account created / logged in (19 Aug 2026)
+- [x] Phone 9270194842 verified
+- [x] Messaging trial completed — test SMS sent 19 Aug
+- [ ] Trial number copied to Supabase secrets: `____________`
 - [ ] `TWILIO_*` secrets set in Supabase
 - [ ] Webhooks configured on number
 - [ ] Ops Dashboard `ext-twilio-account` probe green
