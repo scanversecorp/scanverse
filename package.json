@@ -16,6 +16,7 @@
     "start": "react-scripts start",
     "prebuild": "node scripts/prepare-deploy.mjs",
     "build": "react-scripts build",
+    "build:major": "SCANV_MAJOR_DEPLOY=1 npm run build",
     "optimize-images": "node scripts/optimize-images.mjs",
     "logo:original": "node scripts/generate-logo-original.mjs",
     "logo:qr": "node scripts/generate-logo-with-qr.mjs",

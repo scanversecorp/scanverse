@@ -13,3 +13,10 @@ When working on ScanV (`getscanv.com`) or when the user mentions health reports,
 4. **Follow runbook** — `docs/SCANV-OPS-MONITOR.md` for playbooks and commands.
 
 Scheduled cron already emails reports; the agent's job is **review + remediate**, not replace cron.
+
+## Production deploys (getscanv.com)
+
+- **Routine deploys** — push anytime; open tabs auto-refresh silently within ~3 min.
+- **Major deploys** (auth, payments, booking flow, breaking UI) between **7:00 AM – 11:59 PM IST**: **ask the user before pushing** unless they explicitly requested deploy now.
+- Mark a major deploy: commit message contains `[major]`, or set `SCANV_MAJOR_DEPLOY=1` for the build.
+- Major + daytime: users with the app **already open** see **“ScanV updated — refreshing…”** then reload. New visit / reopen always gets latest with no banner.

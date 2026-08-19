@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 const VERSION_URL = '/version.json';
 const POLL_MS = 3 * 60 * 1000; // 3 minutes
 const RELOAD_DELAY_MS = 2500;
+const BANNER_RELOAD_DELAY_MS = 3500;
 
 async function fetchDeployedVersion() {
   const r = await fetch(`${VERSION_URL}?t=${Date.now()}`, {
@@ -11,16 +12,61 @@ async function fetchDeployedVersion() {
   });
   if (!r.ok) return null;
   const data = await r.json();
-  return data?.version ? String(data.version) : null;
+  if (!data?.version) return null;
+  return {
+    version: String(data.version),
+    major: data.major === true,
+  };
 }
 
-function scheduleReload(reason) {
+/** 7:00 AM – 11:59 PM IST (inclusive) */
+export function isScanvDaytimeIST(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(date);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
+  const total = hour * 60 + minute;
+  return total >= 7 * 60 && total <= 23 * 60 + 59;
+}
+
+function showUpdateBanner() {
+  if (document.getElementById('scanv-update-banner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'scanv-update-banner';
+  bar.setAttribute('role', 'status');
+  bar.textContent = 'ScanV updated — refreshing…';
+  Object.assign(bar.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    right: '0',
+    zIndex: '99999',
+    padding: '12px 16px',
+    background: 'linear-gradient(135deg, #007a4d 0%, #00a86b 100%)',
+    color: '#fff',
+    fontFamily: "'DM Sans', system-ui, sans-serif",
+    fontSize: '14px',
+    fontWeight: '700',
+    textAlign: 'center',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+    letterSpacing: '0.02em',
+  });
+  document.body.prepend(bar);
+}
+
+function scheduleReload(reason, { showBanner = false } = {}) {
   if (sessionStorage.getItem('scanv_reload_pending') === '1') return;
   sessionStorage.setItem('scanv_reload_pending', '1');
-  console.log('[ScanV] App update detected — reloading:', reason);
+  if (showBanner) showUpdateBanner();
+  const delay = showBanner ? BANNER_RELOAD_DELAY_MS : RELOAD_DELAY_MS;
+  console.log('[ScanV] App update detected — reloading:', reason, showBanner ? '(banner)' : '(silent)');
   setTimeout(() => {
     window.location.reload();
-  }, RELOAD_DELAY_MS);
+  }, delay);
 }
 
 function listenForServiceWorkerUpdates() {
@@ -51,7 +97,7 @@ function listenForServiceWorkerUpdates() {
   };
 }
 
-/** Poll version.json and reload when a new build is deployed. */
+/** Poll version.json; reload when a new build is deployed. Major + daytime IST → banner. */
 export function useAppUpdateCheck() {
   useEffect(() => {
     let cancelled = false;
@@ -62,10 +108,13 @@ export function useAppUpdateCheck() {
         const remote = await fetchDeployedVersion();
         if (cancelled || !remote) return;
         if (knownVersion == null) {
-          knownVersion = remote;
+          knownVersion = remote.version;
           return;
         }
-        if (remote !== knownVersion) scheduleReload(remote);
+        if (remote.version !== knownVersion) {
+          const showBanner = remote.major && isScanvDaytimeIST();
+          scheduleReload(remote.version, { showBanner });
+        }
       } catch (_) { /* offline / transient */ }
     };
 

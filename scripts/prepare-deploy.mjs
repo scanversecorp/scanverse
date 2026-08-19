@@ -19,6 +19,9 @@ const baseMatch = String(pkg.version || '0.0.0').match(/^(\d+\.\d+\.\d+)/);
 const base = baseMatch ? baseMatch[1] : '0.0.0';
 const deployVersion = `${base}.${buildTs}`;
 const isDeploy = process.env.VERCEL === '1' || process.env.CI === 'true';
+const isMajor =
+  process.env.SCANV_MAJOR_DEPLOY === '1'
+  || /\[major\]/i.test(process.env.VERCEL_GIT_COMMIT_MESSAGE || '');
 
 const deployPkg = {
   ...pkg,
@@ -41,7 +44,13 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(publicDir, 'version.json'),
   JSON.stringify(
-    { name: deployPkg.name, version: deployVersion, builtAt: now, deployedAt: deployPkg._deployed },
+    {
+      name: deployPkg.name,
+      version: deployVersion,
+      builtAt: now,
+      deployedAt: deployPkg._deployed,
+      major: isMajor,
+    },
     null,
     2,
   ) + '\n',
@@ -52,4 +61,4 @@ fs.writeFileSync(
   `REACT_APP_TS=${buildTs}\nREACT_APP_VERSION=${deployVersion}\n`,
 );
 
-console.log('[prepare-deploy]', deployPkg.name, deployVersion, now, isDeploy ? '(deploy)' : '(local build)');
+console.log('[prepare-deploy]', deployPkg.name, deployVersion, now, isDeploy ? '(deploy)' : '(local build)', isMajor ? '[MAJOR]' : '');
