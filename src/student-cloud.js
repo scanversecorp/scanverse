@@ -185,11 +185,35 @@ function defaultSgrScheduleDate() {
 }
 
 const DEFAULT_SGR_SCHEDULE_TIME = '14:30';
+const SGR_MIN_AGE = 18;
+const SGR_MAX_AGE = 120;
 
-function validateSgrDob(dateStr, ageFromDob) {
+function sgrAgeFromDob(dobStr) {
+  const dt = parseIsoDate(dobStr);
+  if (!dt) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dt.getFullYear();
+  const md = today.getMonth() - dt.getMonth();
+  if (md < 0 || (md === 0 && today.getDate() < dt.getDate())) age -= 1;
+  return age >= SGR_MIN_AGE && age <= SGR_MAX_AGE ? age : null;
+}
+
+function sgrMaxDobInput() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - SGR_MIN_AGE);
+  return localIsoDate(d);
+}
+
+function sgrMinDobInput() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - SGR_MAX_AGE);
+  return localIsoDate(d);
+}
+
+function validateSgrDob(dateStr) {
   if (!dateStr) return 'Enter date of birth';
   if (!parseIsoDate(dateStr)) return 'Enter a valid date of birth';
-  if (!ageFromDob?.(dateStr)) return 'Enter a valid date of birth (age 5–120)';
+  if (!sgrAgeFromDob(dateStr)) return `Enter a valid date of birth (age ${SGR_MIN_AGE}–${SGR_MAX_AGE})`;
   return '';
 }
 
@@ -241,7 +265,7 @@ export function StudentCloudAdmitScreen({
   const {
     C, S, FF, Field, Btn, Spin, BDR, CopyrightLine,
     invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified,
-    minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY,
+    captureFreshGps, SB_KEY,
   } = kit;
 
   const courseList = courses || [];
@@ -341,7 +365,7 @@ export function StudentCloudAdmitScreen({
     if (!firstName.trim()) return 'Enter first name';
     if (!lastName.trim()) return 'Enter last name';
     if (!experience.trim()) return 'Enter your experience';
-    const dobErr = validateSgrDob(dob, ageFromDob);
+    const dobErr = validateSgrDob(dob);
     if (dobErr) return dobErr;
     if (digits10(mobile).length !== 10) return 'Enter valid 10-digit mobile';
     const emailTrim = email.trim();
@@ -500,8 +524,8 @@ export function StudentCloudAdmitScreen({
         <Field label="Experience" req note="Years / domain — e.g. 2 yrs networking">
           <input value={experience} onChange={(e) => setExperience(e.target.value)} placeholder="Fresher / 3 years IT support" style={S.inp()} disabled={otpVerified} />
         </Field>
-        <Field label="Date of birth" req note="Age 5–120">
-          <input type="date" min={minDobInput()} max={maxDobInput()} value={dob} onChange={(e) => setDob(e.target.value)} style={S.inp()} disabled={otpVerified} />
+        <Field label="Date of birth" req note={`Age ${SGR_MIN_AGE}–${SGR_MAX_AGE}`}>
+          <input type="date" min={sgrMinDobInput()} max={sgrMaxDobInput()} value={dob} onChange={(e) => setDob(e.target.value)} style={S.inp()} disabled={otpVerified} />
         </Field>
         <Field label="Mobile" req note="Verified by OTP">
           <div style={{ display: 'flex', alignItems: 'center', background: C.surf, border: BDR, borderRadius: 10, overflow: 'hidden' }}>

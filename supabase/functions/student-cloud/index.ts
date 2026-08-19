@@ -89,7 +89,7 @@ function ageFromDob(dobStr: string): number | null {
   let age = today.getFullYear() - dt.getFullYear();
   const md = today.getMonth() - dt.getMonth();
   if (md < 0 || (md === 0 && today.getDate() < dt.getDate())) age -= 1;
-  return age >= 5 && age <= 120 ? age : null;
+  return age >= 18 && age <= 120 ? age : null;
 }
 
 function validateScheduleInput(dateStr: string, timeStr: string): string | null {
@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
       if (!experience) return json({ error: "Experience required" }, 400);
       if (!dob) return json({ error: "Date of birth required" }, 400);
       if (!parseIsoDate(dob) || ageFromDob(dob) == null) {
-        return json({ error: "Enter a valid date of birth (age 5–120)" }, 400);
+        return json({ error: "Enter a valid date of birth (age 18–120)" }, 400);
       }
       const email = String(body.email || "").trim();
       const emailErr = validateEmail(email);
