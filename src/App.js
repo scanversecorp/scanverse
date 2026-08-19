@@ -16704,6 +16704,18 @@ npx supabase db push`}</pre>
 ================================================================ */
 function LegalPage({page}) {
   const joinerTypeSections = SCANV_JOINER_TYPES.map(([title, body]) => [title, body]);
+  const termsLiabilityDisclaimer = SCANV_LIABILITY_DISCLAIMER.replace(
+    'Cloud candidates,',
+    'Candidates, any human, any business or anything,'
+  );
+  const termsJoinerTypeSections = SCANV_JOINER_TYPES.map(([title, body], i) =>
+    i === 0
+      ? [
+          'Candidates, Any Human, Any Business or Anything',
+          'Any individual, human, business, entity, organisation, or thing applying for or using ScanV — including Skill Gap Review (SGR), cloud, data-centre, or IT training programmes, or any other ScanV offering. Candidates and joiners are not employees of DCore; outcomes, placement, certification, and fees are governed by programme terms and independent instructors/partners where applicable.',
+        ]
+      : [title, body]
+  );
   const pages = {
     privacy:  {
       title:'Privacy Policy',
@@ -16745,10 +16757,10 @@ function LegalPage({page}) {
             <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By ticking the acceptance checkbox before OTP, you confirm you have read and agree to these Terms, our Privacy Policy, and DPDP Act 2023 in full (100%) — including GPS tracking consent described below.</p>
           </div>
           {[
-            ['Who May Use ScanV & Mandatory Acceptance',`${SCANV_JOINER_TYPES_INTRO} (1) Cloud & IT candidates, (2) service providers, (3) vendors, (4) client users (end users), and (5) any related or unrelated consumer or third party. ${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} Acceptance is recorded with date and time (IST) and forms a legally binding electronic record under the IT Act, 2000.`],
-            ...joinerTypeSections,
-            ['Your Agreement (100%)',`By accepting, you confirm you have read and agree in full (100%) to these Terms & Conditions, Privacy Policy, and DPDP Act 2023 — regardless of which joiner category applies to you. ${SCANV_LIABILITY_DISCLAIMER}`],
-            ['No Liability — ScanV / DCore Global Corporation',`${SCANV_LIABILITY_DISCLAIMER} This includes (without limitation) liability for misuse of the platform, acts or omissions of partners, vendors, or service providers, service outcomes, personal injury, property damage, emotional or mental impact, financial loss, data loss, candidate or recruitment outcomes, food or health incidents, transport incidents, and disputes between any parties — to the maximum extent permitted by Indian law.`],
+            ['Who May Use ScanV & Mandatory Acceptance',`${SCANV_JOINER_TYPES_INTRO} (1) Candidates, any human, any business or anything, (2) service providers, (3) vendors, (4) client users (end users), and (5) any related or unrelated consumer or third party. ${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} Acceptance is recorded with date and time (IST) and forms a legally binding electronic record under the IT Act, 2000.`],
+            ...termsJoinerTypeSections,
+            ['Your Agreement (100%)',`By accepting, you confirm you have read and agree in full (100%) to these Terms & Conditions, Privacy Policy, and DPDP Act 2023 — regardless of which joiner category applies to you. ${termsLiabilityDisclaimer}`],
+            ['No Liability — ScanV / DCore Global Corporation',`${termsLiabilityDisclaimer} This includes (without limitation) liability for misuse of the platform, acts or omissions of partners, vendors, or service providers, service outcomes, personal injury, property damage, emotional or mental impact, financial loss, data loss, candidate or recruitment outcomes, food or health incidents, transport incidents, and disputes between any parties — to the maximum extent permitted by Indian law.`],
             ['ScanV as Marketplace Intermediary',`${SCANV_LEGAL_ENTITY} operates ScanV as an IT Intermediary under the Information Technology Act, 2000 and applicable intermediary guidelines. We provide a technology platform connecting Users with independent Partners and service providers. We do not employ Partners, do not perform services ourselves, and are not responsible or liable for Partner, vendor, or service-provider conduct except as expressly stated here or required by non-waivable law.`],
             ['Acceptance at Sign-Up & Booking','You must tick the checkbox for Terms & Conditions, Privacy Policy & DPDP Act 2023 before OTP verification on every service sub-card, booking flow, and onboarding path. Accepting includes GPS location tracking as set out in these Terms. If you do not agree, do not use ScanV.'],
             ['GPS Location & Tracking Consent','You consent to ScanV accessing device GPS (and IP-based fallback) to: show nearby services; auto-fill address and PIN; match you with Partners; route deliveries; record sign-in location; and enable live job tracking on supported categories (e.g. delivery, bike/car mechanic, towing). Partners receive your service location only to fulfil the booking. Denying GPS may block booking or dispatch. Consent is recorded with your OTP acceptance timestamp.'],
