@@ -1,6 +1,6 @@
 # ScanV Todo List
 
-**Updated:** 19 Aug 2026  
+**Updated:** 19 Aug 2026, 8:27 PM IST  
 **Owners:** Samir + Jasmeen
 
 Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).
@@ -13,7 +13,7 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 |---|------|--------|-------|
 | 1 | **Cloudflare Email Sending via CLI** — run `wrangler login` locally *or* set `CLOUDFLARE_API_TOKEN` with Email Sending permissions | ⏳ Pending | Wrangler is not authenticated in CI/automation. Optional upgrade path; **Resend is live today**. Requires **Workers Paid** on the Cloudflare account. |
 | 2 | Enable Cloudflare Email Sending in dashboard (if moving off Resend) | ⏳ Pending | Blocked on Workers Paid plan on account `7f8fbca1…`. |
-| 3 | Gmail **Send mail as** for `support@` / `reports@` (manual replies) | ⏳ Optional | [GETSCANV-EMAIL.md](./GETSCANV-EMAIL.md) — use Resend SMTP or “Treat as alias”. |
+| 3 | Gmail **Send mail as** for `support@` / `reports@` (manual replies) | ⏳ Optional | [GETSCANV-EMAIL.md](./GETSCANV-EMAIL.md) — use Resend SMTP or "Treat as alias". |
 | 4 | Merge SPF on root `@` if both Resend + Cloudflare sending coexist | ⏳ When needed | Keep Cloudflare MX for inbound routing; combine `include:amazonses.com` + Cloudflare send SPF in one TXT. |
 
 ### Done (email)
@@ -28,13 +28,13 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | GSC verified; **retry sitemap submit** → `sitemap.xml` |
+| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | GSC verified; **sitemap submit blocked** — no GSC session in CDP Chrome profile (19 Aug agent run) |
 | 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Needs verified phone + address when available |
 | 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
-| 4 | Deploy official-app SEO + static files | ✅ Live | `4bf9f8c` · title "ScanV — Official App \| getscanv.com" |
+| 4 | Deploy official-app SEO + static files | ✅ Live | title "ScanV — Official App \| getscanv.com" · GSC meta tag present |
 | 5 | **GSC domain verified** for `getscanv.com` | ✅ Done | DNS TXT via Cloudflare · account jasmeen.workmail@gmail.com |
-| 6 | Submit sitemap + request indexing | ⏳ Manual | GSC → Sitemaps → `sitemap.xml`; URL Inspection → `/` + `/scanv-brand.html` — **retry after deploy** |
-| 7 | **Fix “ScanV coming to?” snippet** | ✅ Deployed | Update live IG/FB bio — remove "Coming soon" |
+| 6 | Submit sitemap + request indexing | ⏳ Manual | GSC → Sitemaps → `sitemap.xml` — agent could not reach GSC (login required in browser) |
+| 7 | **Fix "ScanV coming to?" snippet** | ✅ Deployed | Prod meta live · **IG/FB bio** still needs "Coming soon" removed (see Social) |
 
 ---
 
@@ -42,24 +42,26 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Twilio account (ScanV) | ✅ Live | Trial · 20 days left · see console |
-| 2 | **Start SMS trial** → free virtual number | ⏳ 1 click | Console home → **Start SMS trial** |
-| 3 | Supabase `TWILIO_*` secrets | ⏳ Manual | After trial — [TWILIO-SETUP.md](./TWILIO-SETUP.md) |
+| 1 | Twilio account (ScanV) | ⏳ Login required | CDP Chrome profile hit login page (19 Aug) — session not in copied profile |
+| 2 | **Start SMS trial** → free virtual number | ⏳ Blocked | Console login required · [TWILIO-SETUP.md](./TWILIO-SETUP.md) |
+| 3 | Supabase `TWILIO_*` secrets | ⏳ After trial | No `TWILIO_*` in Supabase secrets list (19 Aug) |
 | 4 | Webhooks on trial number | ⏳ After #2 | booking-dispatch + whatsapp-verify URLs in doc |
 
 ---
 
+## Social (@scanvapp)
+
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 1 | Daily Instagram Graph API post | ✅ Wired | `scripts/instagram_daily_post.mjs` · cron 10:00 AM IST |
-| 2 | GitHub Action cron | ⏳ Push blocked | Commit `8439e37` local — PAT needs **`workflow` scope** to push `.github/workflows/` |
-| 2b | **Vercel Cron fallback** | ✅ Added | `api/cron/instagram-daily.js` + `vercel.json` — deploy + set `CRON_SECRET` + Meta env on Vercel |
-| 3 | **Meta secrets** | ⏳ OTP-only | No `META_PAGE_ACCESS_TOKEN` locally or in GitHub — one-time Meta Developer setup · [AUTOMATION.md](./social/AUTOMATION.md) |
-| 4 | Deploy `public/social/` images | ⏳ Push | `/social/*.png` serves SPA HTML until push + Vercel deploy (verified 19 Aug) |
-| 5 | **Post today @scanvapp** | ⏳ Blocked | Meta API: no token · Cursor browser MCP: tab unavailable · manual: Meta Business Suite or `credentials.env` + `node scripts/instagram_daily_post.mjs` |
-| 6 | **IG bio update** | ⏳ Manual | Copy from [instagram-profile.txt](./social/instagram-profile.txt) — remove any "Coming soon" |
-| 7 | User login outreach (social CTAs) | ✅ Content ready | `node scripts/social_services_campaign.mjs` · register URL `?utm_source=social&utm_medium=user_register` |
-| 8 | Vendor WhatsApp outreach | ⏳ OTP-only | Needs `ADMIN_HUB_PIN` in env + daytime window (9:30–19:00 IST) · `node scripts/send_vendor_outreach.mjs` |
+| 2 | GitHub Action cron | ⏳ Push blocked | `.github/workflows/instagram-daily-post.yml` — PAT lacks **`workflow` scope** |
+| 2b | **Vercel Cron fallback** | ✅ **Live** | `api/cron/instagram-daily.js` + `vercel.json` · dry-run OK 19 Aug · `GET /api/cron/instagram-daily?dry_run=true` |
+| 3 | **Meta secrets on Vercel** | ⏳ Blocked | `META_PAGE_ACCESS_TOKEN` not set — live cron will fail until added in Vercel env |
+| 4 | Deploy `public/social/` images | ✅ Live | `https://getscanv.com/social/coming-hot-post.png` serves PNG (deploy `fe9d1ad`) |
+| 5 | **Post today @scanvapp** | ⏳ Blocked | No Meta token · IG/MBS not logged in CDP profile · CDP upload UI timeout |
+| 6 | **IG bio update** | ⏳ Blocked | Remove "Coming soon" — needs IG/MBS login · copy in [instagram-profile.txt](./social/instagram-profile.txt) |
+| 7 | User login outreach (social CTAs) | ✅ Ran | `node scripts/social_services_campaign.mjs` · 19 Aug 8:19 PM IST |
+| 8 | Vendor WhatsApp outreach | ⏳ Queued | Outside hours (9:30–19:00 IST) · re-run `node scripts/send_vendor_outreach.mjs` |
 
 ---
 
@@ -67,10 +69,10 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 5 | Commit & push `notify.ts` (Cloudflare send fallback + `reports@getscanv.com` default) | ⏳ Pending | Deployed to Supabase; local git diff not committed. |
-| 6 | Update [GETSCANV-EMAIL.md](./GETSCANV-EMAIL.md) — mark Resend setup complete | ⏳ Pending | Doc still shows generic “add Resend” steps. |
+| 5 | Commit & push Instagram automation + Twilio docs | ✅ Pushed | `fe9d1ad` on `origin/main` (workflow file excluded — PAT scope) |
+| 6 | Update [GETSCANV-EMAIL.md](./GETSCANV-EMAIL.md) — mark Resend setup complete | ⏳ Pending | Doc still shows generic "add Resend" steps. |
 | 7 | Mark Resend item done in [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md) §J | ⏳ Pending | Section J still lists Resend as optional unchecked. |
-| 8 | Push **v5.5.3** frontend if not on production yet | ⏳ Check | [VERSION.md](./VERSION.md) — local tag may still need Vercel deploy. |
+| 8 | Push **v5.5.3** frontend if not on production yet | ✅ Deployed | Vercel auto-deploy from `fe9d1ad` confirmed |
 
 ---
 
@@ -100,14 +102,21 @@ npx supabase secrets set \
   RESEND_API_KEY=re_xxxx \
   SUPPORT_EMAIL_FROM=reports@getscanv.com
 
+# Instagram daily (dry run)
+node scripts/instagram_daily_post.mjs --dry-run
+
+# Vercel cron dry run (production)
+curl -s "https://getscanv.com/api/cron/instagram-daily?dry_run=true"
+
+# Twilio secrets (after SMS trial)
+npx supabase secrets set \
+  TWILIO_ACCOUNT_SID=ACxxxx \
+  TWILIO_AUTH_TOKEN=xxxx \
+  TWILIO_SMS_FROM=+1xxxxxxxxxx \
+  TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
+
 # Manual health report test
 HEALTH_REPORT_SECRET=<secret> node scripts/ops-health-review.mjs
-
-# Or curl directly
-curl -X POST 'https://rwlwrmmqtedugcreweut.supabase.co/functions/v1/health-report' \
-  -H 'Content-Type: application/json' \
-  -H 'x-health-report-secret: <HEALTH_REPORT_SECRET>' \
-  -d '{"slot":"morning"}'
 ```
 
 ---
