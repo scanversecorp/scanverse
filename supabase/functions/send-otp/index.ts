@@ -63,10 +63,11 @@ async function findProfileByMobile(
   supabase: SupabaseClient,
   mobile: string,
 ) {
+  const cols = "id,first_name,last_name,name,phone,email,status,contact_email,password_set_at,mobile_verified,mobile_verified_at";
   for (const ph of phoneLookupVariants(mobile)) {
     const { data } = await supabase
       .from("profiles")
-      .select("id,first_name,last_name,name,phone,email,status")
+      .select(cols)
       .eq("phone", ph)
       .maybeSingle();
     if (data?.id) return data;
@@ -74,12 +75,39 @@ async function findProfileByMobile(
   for (const email of profileAuthEmails(mobile)) {
     const { data } = await supabase
       .from("profiles")
-      .select("id,first_name,last_name,name,phone,email,status")
+      .select(cols)
       .eq("email", email)
       .maybeSingle();
     if (data?.id) return data;
   }
   return null;
+}
+
+function validatePassword(pw: string): string | null {
+  const p = String(pw || "");
+  if (p.length < 8) return "Password must be at least 8 characters";
+  return null;
+}
+
+function validateContactEmail(email: string): string | null {
+  const e = String(email || "").trim();
+  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Valid email address required";
+  if (e.endsWith("@scanv.app")) return "Use your personal or business email, not a system address";
+  return null;
+}
+
+async function verifyOtpOrWa(
+  supabase: SupabaseClient,
+  mobile: string,
+  otp: string,
+  waToken: string,
+): Promise<boolean> {
+  if (otp) {
+    return await verifyOtpStored(supabase, mobile, otp)
+      || await verifyOtpRecentlyUsed(supabase, mobile, otp);
+  }
+  if (waToken) return await verifyWaToken(supabase, mobile, waToken);
+  return false;
 }
 
 async function verifyAuthMobileMatch(
@@ -278,26 +306,31 @@ async function ensureProfileAuthUser(
   supabaseUrl: string,
   serviceKey: string,
   mobile: string,
+  opts?: { newPassword?: string; resetToDefault?: boolean },
 ) {
   const canonicalEmail = profileAuthEmail(mobile);
-  const password = profileAuthPassword(mobile);
+  const profile = await findProfileByMobile(supabase, mobile);
+  const hasCustomPassword = !!(profile as { password_set_at?: string | null })?.password_set_at;
+  const password = opts?.newPassword
+    ?? ((opts?.resetToDefault || !hasCustomPassword) ? profileAuthPassword(mobile) : undefined);
 
   const existing = await findAuthUserForMobile(supabase, supabaseUrl, serviceKey, mobile);
 
   if (existing) {
-    const updates: { password: string; email_confirm: boolean; email?: string } = {
-      password,
+    const updates: { password?: string; email_confirm: boolean; email?: string } = {
       email_confirm: true,
     };
     if (existing.email !== canonicalEmail) updates.email = canonicalEmail;
+    if (password) updates.password = password;
     const { error: updateErr } = await supabase.auth.admin.updateUserById(existing.id, updates);
     if (updateErr) throw new Error(updateErr.message);
-    return { email: canonicalEmail, password };
+    return { email: canonicalEmail, password: password || profileAuthPassword(mobile) };
   }
 
+  const createPassword = password || profileAuthPassword(mobile);
   const { data: created, error: createErr } = await supabase.auth.admin.createUser({
     email: canonicalEmail,
-    password,
+    password: createPassword,
     email_confirm: true,
   });
   if (createErr) {
@@ -306,14 +339,14 @@ async function ensureProfileAuthUser(
     if (retryable) {
       const retry = await findAuthUserForMobile(supabase, supabaseUrl, serviceKey, mobile);
       if (retry) {
-        const updates: { password: string; email_confirm: boolean; email?: string } = {
-          password,
+        const updates: { password?: string; email_confirm: boolean; email?: string } = {
           email_confirm: true,
         };
+        if (createPassword) updates.password = createPassword;
         if (retry.email !== canonicalEmail) updates.email = canonicalEmail;
         const { error: updateErr } = await supabase.auth.admin.updateUserById(retry.id, updates);
         if (updateErr) throw new Error(updateErr.message);
-        return { email: canonicalEmail, password };
+        return { email: canonicalEmail, password: createPassword };
       }
     }
     if (/profiles_email_key|duplicate key/i.test(msg)) {
@@ -322,7 +355,7 @@ async function ensureProfileAuthUser(
     throw new Error(createErr.message);
   }
   if (!created.user) throw new Error("Could not create auth user");
-  return { email: canonicalEmail, password };
+  return { email: canonicalEmail, password: createPassword };
 }
 
 /** Client invoke sends apikey/Authorization; env SUPABASE_ANON_KEY is optional fallback */
@@ -466,11 +499,14 @@ Deno.serve(async (req: Request) => {
           }, 403);
         }
 
+        const profileRow = await findProfileByMobile(supabase, mobile);
+        const hasCustomPassword = !!(profileRow as { password_set_at?: string | null })?.password_set_at;
         const { email, password } = await ensureProfileAuthUser(
           supabase,
           supabaseUrl,
           serviceKey,
           mobile,
+          { resetToDefault: !hasCustomPassword },
         );
         const authKey = resolveAnonKey(req) || serviceKey;
         const tokens = await signInAndReturnTokens(supabaseUrl, authKey, email, password);
@@ -478,6 +514,109 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Session failed";
         return json({ success: false, error: msg });
+      }
+    }
+
+    if (action === "check_login") {
+      const existing = await findProfileByMobile(supabase, mobile);
+      const existingStatus = String(existing?.status || "").toLowerCase();
+      return json({
+        exists: !!existing,
+        registered: profileLooksRegistered(existing),
+        password_set: !!(existing as { password_set_at?: string | null })?.password_set_at,
+        mobile_verified: !!(existing as { mobile_verified?: boolean | null })?.mobile_verified,
+        paused: existingStatus === "paused" || existingStatus === "suspended",
+        contact_email: (existing as { contact_email?: string | null })?.contact_email || null,
+      });
+    }
+
+    if (action === "login_password") {
+      const password = String(body.password || "");
+      if (!password) return json({ success: false, error: "Password required" }, 400);
+
+      const existing = await findProfileByMobile(supabase, mobile);
+      const existingStatus = String(existing?.status || "").toLowerCase();
+      if (existingStatus === "paused" || existingStatus === "suspended") {
+        return json({
+          success: false,
+          code: "account_paused",
+          error: "This account is paused. Contact ScanV support.",
+        }, 403);
+      }
+      if (!(existing as { password_set_at?: string | null })?.password_set_at) {
+        return json({
+          success: false,
+          code: "password_not_set",
+          error: "Complete mobile verification and set a password first, or use Forgot Password.",
+        }, 400);
+      }
+
+      const email = profileAuthEmail(mobile);
+      const authKey = resolveAnonKey(req) || serviceKey;
+      try {
+        const tokens = await signInAndReturnTokens(supabaseUrl, authKey, email, password);
+        return json({ success: true, ...tokens });
+      } catch {
+        return json({ success: false, error: "Invalid mobile or password" }, 401);
+      }
+    }
+
+    if (action === "set_password" || action === "reset_password") {
+      try {
+        const password = String(body.password || "");
+        const pwErr = validatePassword(password);
+        if (pwErr) return json({ success: false, error: pwErr }, 400);
+
+        const contactEmail = String(body.contact_email || body.email || "").trim();
+        const emailErr = action === "set_password" ? validateContactEmail(contactEmail) : null;
+        if (emailErr) return json({ success: false, error: emailErr }, 400);
+
+        const otp = String(body.otp || "").trim();
+        const waToken = String(body.wa_token || body.token || "").trim();
+        const verified = await verifyOtpOrWa(supabase, mobile, otp, waToken);
+        if (!verified) {
+          return json({ success: false, error: "Invalid or expired OTP" }, 400);
+        }
+
+        const blocked = await findProfileByMobile(supabase, mobile);
+        const blockedStatus = String(blocked?.status || "").toLowerCase();
+        if (blockedStatus === "paused" || blockedStatus === "suspended") {
+          return json({
+            success: false,
+            code: "account_paused",
+            error: "This account is paused. Contact ScanV support.",
+          }, 403);
+        }
+
+        await ensureProfileAuthUser(supabase, supabaseUrl, serviceKey, mobile, { newPassword: password });
+
+        const profileId = (blocked as { id?: string })?.id || profileIdFromMobile(mobile);
+        const now = new Date().toISOString();
+        const patch: Record<string, unknown> = {
+          password_set_at: now,
+          mobile_verified: true,
+          mobile_verified_at: now,
+          phone: mobile,
+        };
+        if (action === "set_password" && contactEmail) patch.contact_email = contactEmail;
+
+        await supabase.from("profiles").upsert({
+          id: profileId,
+          email: profileAuthEmail(mobile),
+          ...patch,
+        }, { onConflict: "id" });
+
+        const authKey = resolveAnonKey(req) || serviceKey;
+        const tokens = await signInAndReturnTokens(
+          supabaseUrl,
+          authKey,
+          profileAuthEmail(mobile),
+          password,
+        );
+        return json({ success: true, profile_id: profileId, ...tokens });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Password update failed";
+        return json({ success: false, error: msg }, 400);
       }
     }
 
@@ -546,6 +685,7 @@ Deno.serve(async (req: Request) => {
         const row = {
           id: profileId,
           email: profileAuthEmail(mobile),
+          contact_email: incoming.contact_email ? String(incoming.contact_email).trim() : null,
           name: String(incoming.name || "").trim() || null,
           first_name: String(incoming.first_name || "").trim() || null,
           last_name: String(incoming.last_name || "").trim() || null,

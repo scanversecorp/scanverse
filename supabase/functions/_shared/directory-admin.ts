@@ -183,7 +183,7 @@ export async function updateProfileAdmin(
   if (!patch || typeof patch !== "object") throw new Error("patch object required");
 
   const allowed = [
-    "first_name", "last_name", "name", "phone", "email", "address", "village",
+    "first_name", "last_name", "name", "phone", "email", "contact_email", "address", "village",
     "city", "pincode", "status", "age", "gender", "upi_id", "notes", "role",
   ];
   const row: Record<string, unknown> = {};
@@ -263,6 +263,91 @@ async function deleteAuthUsersByEmail(
     if (!error) deleted.push(email);
   }
   return deleted;
+}
+
+async function findAuthUserIdForProfile(
+  sb: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+): Promise<string | null> {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const emails = profileAuthEmailsFor(profile);
+  for (const email of emails) {
+    const target = email.toLowerCase();
+    if (url && key) {
+      const res = await fetch(
+        `${url}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=50`,
+        { headers: { Authorization: `Bearer ${key}`, apikey: key } },
+      );
+      if (res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        const users = (payload as { users?: Array<{ id: string; email?: string }> }).users || [];
+        const match = users.find((u) => (u.email || "").toLowerCase() === target);
+        if (match?.id) return match.id;
+      }
+    }
+    for (let page = 1; page <= 5; page++) {
+      const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) break;
+      const match = (data.users || []).find((u) => (u.email || "").toLowerCase() === target);
+      if (match?.id) return match.id;
+      if (!data.users?.length || data.users.length < 1000) break;
+    }
+  }
+  return null;
+}
+
+export async function resetProfilePasswordAdmin(
+  sb: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+) {
+  const profileId = String(body.profile_id || "").trim();
+  const newPassword = String(body.new_password || "").trim();
+  if (!profileId) throw new Error("profile_id required");
+  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters");
+
+  const { data: profile, error: loadErr } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (loadErr) throw new Error(loadErr.message);
+  if (!profile) throw new Error("Profile not found");
+  if (profile.role === "admin") throw new Error("Cannot reset password for admin profile");
+
+  const userId = await findAuthUserIdForProfile(sb, profile);
+  if (!userId) {
+    const d10 = digits10(profile.phone) || (String(profile.id || "").startsWith("cust_")
+      ? digits10(String(profile.id).slice(5))
+      : "");
+    if (d10.length === 10) {
+      const canonicalEmail = `${d10}@scanv.app`;
+      const { data: created, error: createErr } = await sb.auth.admin.createUser({
+        email: canonicalEmail,
+        password: newPassword,
+        email_confirm: true,
+      });
+      if (createErr) throw new Error(createErr.message || "Could not create auth user");
+      if (!created.user?.id) throw new Error("Could not create auth user");
+    } else {
+      throw new Error("Auth user not found for this profile");
+    }
+  } else {
+    const { error: authErr } = await sb.auth.admin.updateUserById(userId, {
+      password: newPassword,
+      email_confirm: true,
+    });
+    if (authErr) throw new Error(authErr.message);
+  }
+
+  const { data: updated, error } = await sb
+    .from("profiles")
+    .update({ password_set_at: new Date().toISOString() })
+    .eq("id", profileId)
+    .select("id, phone, contact_email, password_set_at")
+    .single();
+  if (error) throw new Error(error.message);
+  return { profile: updated, password_reset: true };
 }
 
 export async function setProfileStatusAdmin(

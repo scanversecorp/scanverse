@@ -77,6 +77,7 @@ import {
   deleteProfileAdmin,
   directoryDetailAdmin,
   listVendorsBriefAdmin,
+  resetProfilePasswordAdmin,
   searchDirectoryAdmin,
   setProfileStatusAdmin,
   updateProfileAdmin,
@@ -1603,6 +1604,16 @@ Deno.serve(async (req) => {
       return json({ success: true, ...result });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Delete failed";
+      return json({ error: msg }, 400);
+    }
+  }
+
+  if (action === "reset_profile_password") {
+    try {
+      const result = await resetProfilePasswordAdmin(sb, body);
+      return json({ success: true, ...result });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Password reset failed";
       return json({ error: msg }, 400);
     }
   }

@@ -78,6 +78,7 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   update_profile: "hub.directory",
   set_profile_status: "hub.directory",
   delete_profile: "hub.directory",
+  reset_profile_password: "hub.directory",
   list_vendors_brief: "hub.directory",
   get_iam_catalog: "hub.access",
   list_staff_users: "hub.iam",

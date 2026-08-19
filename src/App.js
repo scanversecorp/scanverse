@@ -4611,6 +4611,41 @@ async function verifyOtpCode(mobile, code) {
   return false;
 }
 
+async function applyAuthTokens(data) {
+  const { access_token, refresh_token } = data || {};
+  if (!access_token || !refresh_token) throw new Error('Sign-in failed');
+  const { data: sess, error } = await sb().auth.setSession({ access_token, refresh_token });
+  if (error || !sess.session) throw new Error(error?.message || 'Could not sign in');
+  return sess.session;
+}
+
+async function invokeCheckLogin(mobile) {
+  const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
+  const r = await sb().functions.invoke('send-otp', { body: { mobile: norm, action: 'check_login' } });
+  return r.data || {};
+}
+
+async function invokeLoginPassword(mobile, password) {
+  const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
+  const r = await sb().functions.invoke('send-otp', { body: { mobile: norm, password, action: 'login_password' } });
+  const errMsg = await edgeFnErrorMessageAsync(r);
+  if (r.error || r.data?.success === false) throw new Error(errMsg || 'Invalid mobile or password');
+  return applyAuthTokens(r.data);
+}
+
+async function invokePasswordWithOtp(mobile, password, { contactEmail, otp, waToken, action = 'set_password' } = {}) {
+  const norm = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g,'').slice(-10)}`;
+  const body = { mobile: norm, password, action };
+  if (contactEmail) body.contact_email = contactEmail;
+  if (otp) body.otp = otp;
+  if (waToken) body.wa_token = waToken;
+  const r = await sb().functions.invoke('send-otp', { body });
+  const errMsg = await edgeFnErrorMessageAsync(r);
+  if (r.error || r.data?.success === false) throw new Error(errMsg || 'Could not save password');
+  await applyAuthTokens(r.data);
+  return r.data;
+}
+
 /** Parse edge function error body even when HTTP status is non-2xx */
 function edgeFnErrorMessage(r) {
   if (r.data?.error) return r.data.error;
@@ -4713,8 +4748,7 @@ async function invokeProfileAuthSession(mob, { otp, waToken } = {}) {
 }
 
 /** Establish Supabase auth session so profiles RLS (auth_matches_profile) allows own-row access */
-async function ensureProfileAuthSession(mob, { otp, waToken } = {}) {
-  const password = profileAuthPassword(mob);
+async function ensureProfileAuthSession(mob, { otp, waToken, password } = {}) {
   const emails = [
     profileAuthEmail(mob),
     `${String(mob).replace(/^\+/, '').replace(/\s/g, '')}@scanv.app`,
@@ -4725,21 +4759,28 @@ async function ensureProfileAuthSession(mob, { otp, waToken } = {}) {
     const { data: { session } } = await sb().auth.getSession();
     if (session?.user?.email && emailMatches(session.user.email)) return session;
   } catch (_) {}
+  if (password) return invokeLoginPassword(mob, password);
   if (otp || waToken) return invokeProfileAuthSession(mob, { otp, waToken });
+  let check;
+  try { check = await invokeCheckLogin(mob); } catch (_) { check = {}; }
+  if (check.password_set) {
+    throw new Error('Session expired — sign in with your password.');
+  }
   let lastErr;
+  const legacyPassword = profileAuthPassword(mob);
   for (const email of emails) {
     try {
-      const { data: su, error: se } = await sb().auth.signUp({ email, password });
+      const { data: su, error: se } = await sb().auth.signUp({ email, password: legacyPassword });
       if (su?.session) return su.session;
       if (se && !/already registered|already been registered/i.test(se.message || '')) lastErr = se;
-      const { data: si, error: sie } = await sb().auth.signInWithPassword({ email, password });
+      const { data: si, error: sie } = await sb().auth.signInWithPassword({ email, password: legacyPassword });
       if (si?.session) return si.session;
       if (sie) lastErr = sie;
     } catch (e) {
       lastErr = e;
     }
   }
-  throw new Error(lastErr?.message || 'Could not establish sign-in session. Try again.');
+  throw new Error(lastErr?.message || 'Could not establish sign-in session. Sign in with your password.');
 }
 
 /* --- WHATSAPP VERIFICATION (outbound message → user replies) --- */
@@ -4847,7 +4888,7 @@ async function resolveCustomerProfileId(mob) {
 
 /** Upsert customer profile in Supabase and persist uid locally */
 async function upsertCustomerProfile({
-  id, mob, firstName, lastName, address, village, city, pincode, email,
+  id, mob, firstName, lastName, address, village, city, pincode, email, contactEmail,
   lastLat, lastLng, silentGeo, ip, dev, mobileVerified = true,
   allowRegistered = false, dateOfBirth, gender, age, termsAcceptedAt,
 }) {
@@ -4873,6 +4914,7 @@ async function upsertCustomerProfile({
   const row = {
     id: targetId,
     email: fakeEmail,
+    contact_email: contactEmail ? String(contactEmail).trim() : null,
     name: `${firstName} ${lastName}`.trim(),
     first_name: (firstName || '').trim(),
     last_name: (lastName || '').trim(),
@@ -5117,6 +5159,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const [completeProfileMode, setCompleteProfileMode] = useState('login'); // login | booking
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState(null);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loginView, setLoginView] = useState('password'); // password | forgot | signup
   const acceptTerms = () => {
     const now = new Date().toISOString();
     writeScanvTermsAccepted(now);
@@ -5298,6 +5345,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const sendOTP = async (resend = false) => {
     if (!firstName.trim()) return setErr('Enter your first name');
     if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) return setErr('Enter a valid email address');
     if (!address.trim()) return setErr('Enter your address');
     if (!city.trim()) return setErr('Enter your city');
     if (!pincode.trim()||pincode.length<6) return setErr('Enter valid 6-digit PIN code');
@@ -5339,17 +5387,27 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     setLoading(true); setErr('');
     try {
       const mob = normalizeMobileE164(mobile);
+      const code = waVerified ? null : otpCode.join('');
+      if (!waVerified && code.length < 6) throw new Error('Enter 6-digit OTP');
       if (!waVerified) {
-        const code = otpCode.join('');
-        if (code.length < 6) throw new Error('Enter 6-digit OTP');
+        const ok = await verifyOtpCode(mob, code);
+        if (!ok) throw new Error('Invalid or expired OTP');
       }
-
-      await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
+      const check = await invokeCheckLogin(mob);
+      if (!check.password_set) {
+        setPendingLoginProfile({ id: customerProfileId(mob), phone: mob });
+        setCompleteProfileMode('booking');
+        setScreen('set-password');
+        addToast?.('Mobile verified — set your email and password to continue', 'success');
+        return;
+      }
+      await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: code });
       const uid = await resolveCustomerProfileId(mob);
       const dev = detectDevice();
       const profile = await upsertCustomerProfile({
         id: uid, mob, firstName, lastName, address, village, city, pincode,
         email: profileAuthEmail(mob),
+        contactEmail: check.contact_email || contactEmail,
         silentGeo, dev,
       });
 
@@ -5387,7 +5445,142 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     finally { setLoading(false); }
   };
 
-  /** Profile sign-in (guest bottom nav): OTP required every login, not on bookings */
+  const finishPasswordLogin = async (mob) => {
+    let existing = await resolveLoginProfile(mob);
+    if (!existing?.id) {
+      existing = {
+        id: customerProfileId(mob),
+        phone: mob,
+        email: profileAuthEmail(mob),
+      };
+    }
+    if (profileAccountBlocked(existing)) {
+      try { await sb().auth.signOut(); } catch (_) {}
+      localStorage.removeItem('scanv_uid');
+      throw new Error(ACCOUNT_PAUSED_MSG);
+    }
+    const loginGeo = await captureFreshGps(silentGeo);
+    const geoUpdates = {
+      mobile_verified: true,
+      mobile_verified_at: new Date().toISOString(),
+    };
+    if (profileLoginRevoked(existing)) geoUpdates.status = 'active';
+    if (loginGeo?.lat != null && loginGeo?.lng != null) {
+      geoUpdates.last_lat = loginGeo.lat;
+      geoUpdates.last_lng = loginGeo.lng;
+      if (loginGeo.address) geoUpdates.address = loginGeo.address;
+      if (loginGeo.village) geoUpdates.village = loginGeo.village;
+      if (loginGeo.city) geoUpdates.city = loginGeo.city;
+      if (loginGeo.pincode) geoUpdates.pincode = loginGeo.pincode;
+    }
+    const { data: prof } = await sb().from('profiles').update(geoUpdates).eq('id', existing.id).select().single();
+    const merged = prof || { ...existing, ...geoUpdates };
+    if (loginGeo?.lat != null && loginGeo?.lng != null) {
+      await sb().from('user_locations').insert({
+        user_id: existing.id,
+        lat: loginGeo.lat,
+        lng: loginGeo.lng,
+        address: loginGeo.address || null,
+        village: loginGeo.village || null,
+        city: loginGeo.city || null,
+        pincode: loginGeo.pincode || null,
+        source: 'gps',
+        consent_given: true,
+        consent_at: new Date().toISOString(),
+      }).then(() => {}).catch(() => {});
+    }
+    if (profileNeedsEnrollment(merged)) {
+      beginCompleteProfile(merged, 'login');
+      addToast?.('Sign in OK — complete your profile to continue', 'success');
+      return;
+    }
+    localStorage.setItem('scanv_uid', merged.id);
+    const welcomeName = (merged.first_name || merged.name || '').trim() || 'there';
+    addToast?.(`Welcome back, ${welcomeName}!`, 'success');
+    onRegistered(merged, null, loginIntent);
+  };
+
+  /** Profile sign-in: password when logged out; OTP only for forgot password or first-time setup */
+  const loginWithPassword = async () => {
+    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+    if (!loginPassword) return setErr('Enter your password');
+    setLoading(true); setErr('');
+    try {
+      const mob = normalizeMobileE164(mobile);
+      await invokeLoginPassword(mob, loginPassword);
+      await finishPasswordLogin(mob);
+    } catch(e) { setErr(e.message||'Sign-in failed.'); }
+    finally { setLoading(false); }
+  };
+
+  const resetPasswordWithOtp = async () => {
+    const code = otpCode.join('');
+    if (code.length < 6) return setErr('Enter 6-digit OTP');
+    if (!newPassword || newPassword.length < 8) return setErr('Password must be at least 8 characters');
+    if (newPassword !== confirmPassword) return setErr('Passwords do not match');
+    setLoading(true); setErr('');
+    try {
+      const mob = normalizeMobileE164(mobile);
+      await invokePasswordWithOtp(mob, newPassword, { otp: code, action: 'reset_password' });
+      setLoginPassword(newPassword);
+      setLoginView('password');
+      resetOtpFlow();
+      setNewPassword('');
+      setConfirmPassword('');
+      await finishPasswordLogin(mob);
+    } catch (e) { setErr(e.message || 'Could not reset password'); }
+    finally { setLoading(false); }
+  };
+
+  const completeSetPassword = async () => {
+    if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      return setErr('Enter a valid email address');
+    }
+    if (!newPassword || newPassword.length < 8) return setErr('Password must be at least 8 characters');
+    if (newPassword !== confirmPassword) return setErr('Passwords do not match');
+    const code = otpCode.join('');
+    if (code.length < 6 && !waToken) return setErr('OTP session expired — go back and verify mobile again');
+    setLoading(true); setErr('');
+    try {
+      const mob = pendingLoginProfile?.phone || normalizeMobileE164(mobile);
+      await invokePasswordWithOtp(mob, newPassword, {
+        contactEmail: contactEmail.trim(),
+        otp: code || undefined,
+        waToken: waToken || undefined,
+        action: 'set_password',
+      });
+      const uid = pendingLoginProfile?.id || customerProfileId(mob);
+      const dev = detectDevice();
+      const profile = await upsertCustomerProfile({
+        id: uid, mob,
+        firstName, lastName, address, village, city, pincode,
+        email: profileAuthEmail(mob),
+        contactEmail: contactEmail.trim(),
+        silentGeo, dev,
+        termsAcceptedAt,
+      });
+      setPendingLoginProfile(null);
+      setUserId(profile.id);
+      setPendingProfile(profile);
+      setNewPassword('');
+      setConfirmPassword('');
+      if (profileNeedsEnrollment(profile)) {
+        beginCompleteProfile(profile, completeProfileMode);
+        addToast?.('Account secured — complete your profile', 'success');
+        return;
+      }
+      if (completeProfileMode === 'booking') {
+        setScreen('schedule');
+        addToast?.('Account ready — pick date & time', 'success');
+      } else {
+        localStorage.setItem('scanv_uid', profile.id);
+        onRegistered(profile, null, loginIntent);
+      }
+    } catch (e) { setErr(e.message || 'Could not save password'); }
+    finally { setLoading(false); }
+  };
+
+  /** @deprecated OTP login — use loginWithPassword; kept for WA verify path migrating to set-password */
   const loginProfile = async (waVerified=false) => {
     if (!waVerified) {
       const code = otpCode.join('');
@@ -5397,73 +5590,18 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     setLoading(true); setErr('');
     try {
       const mob = normalizeMobileE164(mobile);
-      if (!waVerified) {
-        const code = otpCode.join('');
-        if (code.length < 6) throw new Error('Enter 6-digit OTP');
-      }
-      await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: otpCode.join('') });
-      let existing = await resolveLoginProfile(mob);
-      if (!existing?.id) {
-        existing = {
-          id: customerProfileId(mob),
-          phone: mob,
-          email: profileAuthEmail(mob),
-        };
-      }
-      if (profileAccountBlocked(existing)) {
-        try { await sb().auth.signOut(); } catch (_) {}
-        localStorage.removeItem('scanv_uid');
-        throw new Error(ACCOUNT_PAUSED_MSG);
-      }
-      if (!profileLooksRegistered(existing)) {
-        const patch = {
-          email: existing.email || profileAuthEmail(mob),
-          phone: existing.phone || mob,
-          mobile_verified: true,
-          mobile_verified_at: new Date().toISOString(),
-        };
-        const { data: patched } = await sb().from('profiles').update(patch).eq('id', existing.id).select().single();
-        existing = patched || { ...existing, ...patch };
-      }
-      const loginGeo = await captureFreshGps(silentGeo);
-      const geoUpdates = {
-        mobile_verified: true,
-        mobile_verified_at: new Date().toISOString(),
-      };
-      if (profileLoginRevoked(existing)) geoUpdates.status = 'active';
-      if (loginGeo?.lat != null && loginGeo?.lng != null) {
-        geoUpdates.last_lat = loginGeo.lat;
-        geoUpdates.last_lng = loginGeo.lng;
-        if (loginGeo.address) geoUpdates.address = loginGeo.address;
-        if (loginGeo.village) geoUpdates.village = loginGeo.village;
-        if (loginGeo.city) geoUpdates.city = loginGeo.city;
-        if (loginGeo.pincode) geoUpdates.pincode = loginGeo.pincode;
-      }
-      const { data: prof } = await sb().from('profiles').update(geoUpdates).eq('id', existing.id).select().single();
-      const merged = prof || { ...existing, ...geoUpdates };
-      if (loginGeo?.lat != null && loginGeo?.lng != null) {
-        await sb().from('user_locations').insert({
-          user_id: existing.id,
-          lat: loginGeo.lat,
-          lng: loginGeo.lng,
-          address: loginGeo.address || null,
-          village: loginGeo.village || null,
-          city: loginGeo.city || null,
-          pincode: loginGeo.pincode || null,
-          source: 'gps',
-          consent_given: true,
-          consent_at: new Date().toISOString(),
-        }).then(() => {}).catch(() => {});
-      }
-      if (profileNeedsEnrollment(merged)) {
-        beginCompleteProfile(merged, 'login');
-        addToast?.('Mobile verified — complete your profile to continue', 'success');
+      const code = waVerified ? null : otpCode.join('');
+      if (!waVerified && code.length < 6) throw new Error('Enter 6-digit OTP');
+      const check = await invokeCheckLogin(mob);
+      if (!check.password_set) {
+        setPendingLoginProfile({ id: customerProfileId(mob), phone: mob });
+        setCompleteProfileMode('login');
+        setScreen('set-password');
+        addToast?.('Mobile verified — set your email and password', 'success');
         return;
       }
-      localStorage.setItem('scanv_uid', merged.id);
-      const welcomeName = (merged.first_name || merged.name || '').trim() || 'there';
-      addToast?.(`Welcome back, ${welcomeName}!`, 'success');
-      onRegistered(merged, null, loginIntent);
+      await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: code });
+      await finishPasswordLogin(mob);
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
   };
@@ -5506,6 +5644,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       if (!saveCity) return setErr('Enter your city');
       if (!savePin || savePin.replace(/\D/g, '').length < 6) return setErr('Enter valid 6-digit PIN code');
     }
+    const saveEmail = (contactEmail || pendingLoginProfile?.contact_email || '').trim();
+    if (!saveEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(saveEmail)) return setErr('Enter a valid email address');
     setLoading(true); setErr('');
     try {
       const mob = pendingLoginProfile.phone || normalizeMobileE164(mobile);
@@ -5515,6 +5655,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       const profileFields = {
         id: pendingLoginProfile.id,
         email: pendingLoginProfile.email || profileAuthEmail(mob),
+        contact_email: saveEmail,
         name: `${saveFirst} ${saveLast}`.trim(),
         first_name: saveFirst,
         last_name: saveLast,
@@ -5564,6 +5705,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           city: saveCity,
           pincode: savePin,
           email: profileFields.email,
+          contactEmail: saveEmail,
           lastLat: profileFields.last_lat,
           lastLng: profileFields.last_lng,
           dev,
@@ -5956,10 +6098,37 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
 
   const topRatedItems = getTopRatedServices();
 
-  const startBrowseBook = () => {
+  const startBrowseBook = async () => {
     if (!guardBookStart(activeSvc, addToast)) return;
     if (activeSvc?.parent === 'cloud' || activeSvc?.id === 'cloud') {
       setScreen('cloud-admit');
+      return;
+    }
+    const uid = localStorage.getItem('scanv_uid');
+    if (uid) {
+      try {
+        const mob = phoneFromProfileId(uid);
+        if (mob) {
+          await ensureProfileAuthSession(mob);
+          const { data: prof } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
+          if (prof?.mobile_verified && prof?.password_set_at && !profileNeedsEnrollment(prof)) {
+            setUserId(prof.id);
+            setPendingProfile(prof);
+            setFirstName(prof.first_name || '');
+            setLastName(prof.last_name || '');
+            setMobile(prof.phone?.replace(/^\+91/, '') || mobile);
+            setAddress(prof.address || '');
+            setCity(prof.city || '');
+            setPincode(prof.pincode || '');
+            setScreen('schedule');
+            addToast?.('Welcome back — pick date & time', 'success');
+            return;
+          }
+        }
+      } catch (_) { /* fall through to verify/login */ }
+    }
+    if (browseAuthed) {
+      setScreen('schedule');
       return;
     }
     setScreen('verify');
@@ -6302,6 +6471,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     const sendWA = async () => {
       if (!firstName.trim()) return setErr('Enter your first name');
       if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
+      if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) return setErr('Enter a valid email address');
       if (!address.trim()) return setErr('Enter your address');
       if (!city.trim()) return setErr('Enter your city');
       if (!pincode.trim()||pincode.length<6) return setErr('Enter valid 6-digit PIN code');
@@ -6332,7 +6502,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP</div>
+          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, email, address & one-time mobile OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
             <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -6342,6 +6512,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
               <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
+          </Field>
+          <Field label="Email" req note="For receipts, bookings, and support">
+            <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" style={S.inp()} />
           </Field>
           <Field label="Address" req note="House no, street, area">
             <input value={address} {...browseBind('address', e=>setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')}/>
@@ -6382,6 +6555,35 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');resetOtpFlow();sendOTP();}}/>
           )}
+        </div>
+      </>
+    );
+  }
+
+  // -- SET PASSWORD: after first mobile OTP verify --------------------------------
+  if (screen === 'set-password') {
+    const mob10 = (pendingLoginProfile?.phone || mobile || '').replace(/\D/g, '').slice(-10);
+    return browseWrap(
+      <>
+        <BrowseFixedHeader>
+          <button type="button" aria-label="Go back" onClick={() => { setScreen(completeProfileMode === 'booking' ? 'verify' : 'login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Secure your account</div>
+        </BrowseFixedHeader>
+        <div style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
+          {err && <div style={S.err}>{err}</div>}
+          <div style={{ color: C.sub, fontSize: 13, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
+            Mobile +91 {mob10 || '—'} verified. Add your email and choose a password — you stay signed in; OTP is only needed after logout or Forgot Password.
+          </div>
+          <Field label="Email" req note="For receipts, bookings, and support">
+            <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" style={S.inp()} />
+          </Field>
+          <Field label="Password" req note="Minimum 8 characters">
+            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Choose a password" style={S.inp()} autoComplete="new-password" />
+          </Field>
+          <Field label="Confirm password" req>
+            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password" style={S.inp()} autoComplete="new-password" />
+          </Field>
+          <Btn full onClick={completeSetPassword} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : 'Save & continue →'}</Btn>
         </div>
       </>
     );
@@ -6432,32 +6634,37 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               </div>
             </>
           )}
+          <Field label="Email" req note="Your contact email — for receipts and support">
+            <input type="email" value={contactEmail || pendingLoginProfile?.contact_email || ''} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" style={S.inp()} />
+          </Field>
           <Btn full onClick={completeLoginProfile} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : (completeProfileMode === 'booking' ? 'Save & continue booking →' : 'Save & continue →')}</Btn>
         </div>
       </>
     );
   }
 
-  // -- LOGIN: Guest Bookings/Profile tab — OTP gate at sign-in -----------------------
+  // -- LOGIN: password when logged out; OTP only for Forgot Password ----------------
   if (screen==='login') {
     const loginTitle = loginIntent === 'profile' ? 'Sign in to Profile'
       : loginIntent === 'bookings' ? 'Sign in to Bookings'
       : 'Log in';
-    const loginHint = loginIntent === 'profile'
-      ? 'Verify mobile to view and update your address. Name and mobile are OTP-verified and read-only. Location is captured on sign-in.'
+    const loginHint = loginView === 'forgot'
+      ? 'Enter mobile, verify OTP, then set a new password.'
+      : loginIntent === 'profile'
+      ? 'Sign in with mobile + password. You stay logged in until you sign out.'
       : loginIntent === 'bookings'
-      ? 'Verify mobile to view your bookings and orders. OTP required each sign-in. Location is captured on sign-in.'
-      : 'Enter mobile + SMS OTP to sign in. We capture your GPS location to show nearby services — same as sign-up.';
+      ? 'Sign in with mobile + password to view bookings.'
+      : 'Sign in with mobile + password. New user? Book a service to register with one-time mobile OTP.';
     return browseWrap(
       <>
         <BrowseFixedHeader>
-          <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
-          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
+          <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setLoginView('password');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginView === 'forgot' ? 'Forgot password' : loginTitle}</div>
         </BrowseFixedHeader>
         <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
-          {(silentGeo?.village || silentGeo?.city) && (
+          {(silentGeo?.village || silentGeo?.city) && loginView === 'password' && (
             <div style={{fontSize:12,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {formatGeoBadge(silentGeo)} detected</div>
           )}
           <Field label="Mobile" req note="10-digit Indian mobile">
@@ -6466,37 +6673,44 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
-          <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
-          {!otpSent&&(
-            <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
-              {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
-                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:13,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
-              ))}
-            </div>
-          )}
-          {verifyMethod==='sms'&&!otpSent&&(
-            <Btn full onClick={sendLoginOTP} disabled={loading||!termsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send SMS OTP →'}</Btn>
-          )}
-          {verifyMethod==='sms'&&otpSent&&(
+          {loginView === 'password' && !otpSent && (
             <>
-              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} channel={otpChannel} />
-              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
-                {otpCode.map((d,i)=>(
-                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
-                    onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'lotp-')}
-                    onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'lotp-')}
-                    style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
-                ))}
-              </div>
-              <Btn full onClick={()=>loginProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying &amp; locating…</>:'Sign in →'}</Btn>
+              <Field label="Password" req>
+                <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && loginWithPassword()} placeholder="Your password" style={S.inp()} autoComplete="current-password" />
+              </Field>
+              <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
+              <Btn full onClick={loginWithPassword} disabled={loading || !termsAccepted}>{loading ? <><Spin size={16}/>Signing in…</> : 'Sign in →'}</Btn>
+              <button type="button" onClick={() => { setLoginView('forgot'); resetOtpFlow(); setErr(''); }} style={{ background: 'none', border: 'none', color: C.acc, fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%', marginTop: 12, fontFamily: FF }}>Forgot password?</button>
             </>
           )}
-          {verifyMethod==='whatsapp'&&!otpSent&&(
-            <Btn full onClick={sendLoginWA} disabled={loading||!termsAccepted} style={{background:'#25D366',boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>{loading?<><Spin size={16}/>…</>:<>💬 Verify via WhatsApp</>}</Btn>
-          )}
-          {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
-            <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
-              onUseSms={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendLoginOTP();}}/>
+          {loginView === 'forgot' && (
+            <>
+              <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
+              {!otpSent && (
+                <Btn full onClick={sendLoginOTP} disabled={loading||!termsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP to reset →'}</Btn>
+              )}
+              {otpSent && (
+                <>
+                  <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} channel={otpChannel} />
+                  <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
+                    {otpCode.map((d,i)=>(
+                      <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
+                        onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'lotp-')}
+                        onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'lotp-')}
+                        style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
+                    ))}
+                  </div>
+                  <Field label="New password" req note="Minimum 8 characters">
+                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={S.inp()} autoComplete="new-password" />
+                  </Field>
+                  <Field label="Confirm new password" req>
+                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={S.inp()} autoComplete="new-password" />
+                  </Field>
+                  <Btn full onClick={resetPasswordWithOtp} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Updating…</>:'Reset password & sign in →'}</Btn>
+                </>
+              )}
+              <button type="button" onClick={() => { setLoginView('password'); resetOtpFlow(); setNewPassword(''); setConfirmPassword(''); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', marginTop: 12, fontFamily: FF }}>← Back to sign in</button>
+            </>
           )}
         </div>
       </>
@@ -6537,6 +6751,8 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   }));
   const { markAuto: markRegAuto, inpStyle: regInpStyle, bind: regBind } = regAuto;
   const [digits, setDigits] = useState(['','','','','','']);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [cd, setCd]         = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr]       = useState('');
@@ -6627,6 +6843,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
     if (!form.lastName.trim())  return setErr('Enter your last name');
     if (!form.dateOfBirth || !ageFromDob(form.dateOfBirth)) return setErr('Enter a valid date of birth (age 5–120)');
     if (!form.mobile)           return setErr('Enter your mobile number');
+    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setErr('Enter a valid email address');
     if (!form.city.trim())      return setErr('Enter your city');
     if (!form.pincode.trim())   return setErr('Enter PIN code');
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
@@ -6677,20 +6894,44 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const verifyOTP_direct = async (mob) => {
     setLoading(true); setErr('');
     try {
-      await ensureProfileAuthSession(mob, { waToken });
-      setPhase('completing');
-      await finalise(null, profileAuthEmail(mob), mob);
-    } catch(e) {
-      const friendly = friendlySignupError(e);
-      if (friendly.type === 'phone_exists') {
+      const check = await invokeCheckLogin(mob);
+      if (check.password_set) {
         setLoginPrompt(true);
-        setErr(friendly.message);
-      } else {
-        setErr(friendly.message);
+        setErr(DUPLICATE_PHONE_MSG);
+        setPhase('form');
+        return;
       }
+      setPhase('set-password');
+    } catch(e) {
+      setErr(e.message || 'Verification failed.');
       setPhase('form');
     }
     finally { setLoading(false); }
+  };
+
+  const completeRegPassword = async () => {
+    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return setErr('Enter a valid email address');
+    }
+    if (!newPassword || newPassword.length < 8) return setErr('Password must be at least 8 characters');
+    if (newPassword !== confirmPassword) return setErr('Passwords do not match');
+    const token = digits.join('');
+    if (token.length < 6 && !waToken) return setErr('OTP session expired — go back and verify mobile again');
+    setLoading(true); setErr('');
+    try {
+      const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
+      await invokePasswordWithOtp(mob, newPassword, {
+        contactEmail: form.email.trim(),
+        otp: token.length >= 6 ? token : undefined,
+        waToken: waToken || undefined,
+        action: 'set_password',
+      });
+      setPhase('completing');
+      await finalise(null, profileAuthEmail(mob), mob);
+    } catch (e) {
+      setErr(e.message || 'Could not save password');
+      setPhase('set-password');
+    } finally { setLoading(false); }
   };
 
   const verifyOTP = async () => {
@@ -6707,9 +6948,14 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       } catch(e) { console.warn('[Verify]', e.message); }
       if (!ok) throw new Error('Invalid or expired OTP. Request a new one.');
 
-      await ensureProfileAuthSession(mob, { otp: token });
-      setPhase('completing');
-      await finalise(null, profileAuthEmail(mob), mob);
+      const check = await invokeCheckLogin(mob);
+      if (check.password_set) {
+        setLoginPrompt(true);
+        setErr(DUPLICATE_PHONE_MSG);
+        setPhase('form');
+        return;
+      }
+      setPhase('set-password');
     } catch(e) {
       const friendly = friendlySignupError(e);
       if (friendly.type === 'phone_exists') {
@@ -6732,6 +6978,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       const profileFields = {
         id: resolvedId,
         email: profileAuthEmail(mob),
+        contact_email: form.email.trim() || null,
         name: `${form.firstName} ${form.lastName}`.trim(),
         first_name: (form.firstName || '').trim(),
         last_name: (form.lastName || '').trim(),
@@ -6783,6 +7030,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
           city: form.city,
           pincode: form.pincode,
           email: profileAuthEmail(mob),
+          contactEmail: form.email.trim(),
           lastLat: geo?.lat,
           lastLng: geo?.lng,
           dev,
@@ -6845,13 +7093,13 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
     </div>
   );
 
-  const steps=['Consent','Your info','Verify','Done'];
-  const si=phase==='consent'?0:phase==='collecting'||phase==='gps'?0:phase==='form'?1:phase==='otp'?2:3;
+  const steps=['Consent','Your info','Verify','Secure','Done'];
+  const si=phase==='consent'?0:phase==='collecting'||phase==='gps'?0:phase==='form'?1:phase==='otp'?2:phase==='set-password'?3:4;
 
   const stepBar=(
     <div style={{display:'flex',justifyContent:'space-between',marginBottom:20,position:'relative'}}>
       <div style={{position:'absolute',top:14,left:'12%',right:'12%',height:2,background:C.deep}}/>
-      <div style={{position:'absolute',top:14,left:'12%',height:2,background:C.acc,width:`${si/3*76}%`,transition:'width .4s'}}/>
+      <div style={{position:'absolute',top:14,left:'12%',height:2,background:C.acc,width:`${si/4*76}%`,transition:'width .4s'}}/>
       {steps.map((l,i)=>(
         <div key={l} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,zIndex:1}}>
           <div style={{width:28,height:28,borderRadius:'50%',background:i<=si?C.acc:C.deep,border:`2px solid ${i<=si?C.acc:C.bdr}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',transition:'all .3s'}}>
@@ -6956,11 +7204,15 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         </Field>
       </div>
 
-      <Field label="Mobile number" req note="6-digit OTP will be sent via SMS">
+      <Field label="Mobile number" req note="One-time OTP to verify your number">
         <div style={{display:'flex',alignItems:'center',background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:10,overflow:'hidden'}}>
           <div style={{padding:'11px 12px',background:C.card,borderRight:`1px solid ${C.bdr}`,color:C.sub,fontSize:14,fontWeight:600,flexShrink:0}}>+91</div>
           <input type="tel" maxLength={10} value={form.mobile} onChange={e=>f('mobile',e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
         </div>
+      </Field>
+
+      <Field label="Email" req note="For receipts, bookings, and support">
+        <input type="email" value={form.email} onChange={e=>f('email',e.target.value)} placeholder="you@example.com" style={S.inp()}/>
       </Field>
 
       <Field label="Address" note="House no, street, area"><input value={form.address} {...regBind('address', e=>f('address',e.target.value))} placeholder="House no, street, area" style={regInpStyle('address')}/></Field>
@@ -7033,14 +7285,41 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
     </>
   );
 
+  /* SET PASSWORD */
+  if (phase==='set-password') return wrap(
+    <>
+      <div style={{color:C.txt,fontSize:15,fontWeight:600,marginBottom:4}}>Secure your account</div>
+      <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6}}>
+        Mobile +91 {form.mobile} verified. Choose a password — you stay signed in; OTP is only needed after logout or Forgot Password.
+      </div>
+      <Field label="Email" req note="For receipts, bookings, and support">
+        <input type="email" value={form.email} onChange={e=>f('email',e.target.value)} placeholder="you@example.com" style={S.inp()}/>
+      </Field>
+      <Field label="Password" req note="Minimum 8 characters">
+        <input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="Choose a password" style={S.inp()} autoComplete="new-password"/>
+      </Field>
+      <Field label="Confirm password" req>
+        <input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Repeat password" style={S.inp()} autoComplete="new-password"/>
+      </Field>
+      <Btn full onClick={completeRegPassword} disabled={loading}>
+        {loading?<><Spin size={16}/>Saving…</>:'Save & enter ScanV →'}
+      </Btn>
+      <div style={{textAlign:'center',marginTop:10}}>
+        <button onClick={()=>{setPhase('otp');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>← Back to OTP</button>
+      </div>
+    </>
+  );
+
   /* COMPLETING */
-  return wrap(
+  if (phase==='completing') return wrap(
     <div style={{textAlign:'center',padding:'20px 0'}}>
       <Spin size={40}/>
       <div style={{color:C.txt,fontSize:15,fontWeight:600,marginTop:18,marginBottom:6}}>Setting up your account…</div>
       <div style={{color:C.sub,fontSize:12}}>Saving your details securely</div>
     </div>
   );
+
+  return null;
 }
 
 /* ================================================================
@@ -10701,7 +10980,7 @@ function VendorOnboardPage() {
             <input type="date" min={minDobInput()} max={maxDobInput()} value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={S.inp()} />
           </Field>
           <Field label="Business / shop name" req><input value={businessName} onChange={e => setBusinessName(e.target.value)} style={S.inp()} placeholder="Sharma Home Services" /></Field>
-          <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={S.inp()} placeholder="partner@example.com" /></Field>
+          <Field label="Email" req note="For partner alerts and payouts"><input type="email" value={email} onChange={e => setEmail(e.target.value)} style={S.inp()} placeholder="partner@example.com" /></Field>
           <Field label="Alternate mobile (optional)" note="Second contact number">
             <div style={{ display: 'flex', alignItems: 'center', background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 10, overflow: 'hidden' }}>
               <div style={{ padding: '11px 12px', background: C.card, borderRight: `1px solid ${C.bdr}`, color: C.sub, fontSize: 14, fontWeight: 600 }}>+91</div>
@@ -10721,6 +11000,7 @@ function VendorOnboardPage() {
           )}
           <Btn full onClick={() => {
             if (!firstName.trim() || !lastName.trim() || !businessName.trim()) return setErr('First name, last name, and business name are required');
+            if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setErr('Enter a valid email address');
             if (!dateOfBirth || (ageFromDob(dateOfBirth) ?? 0) < 18) return setErr('Enter date of birth — partners must be 18 or older');
             setContactName(`${firstName.trim()} ${lastName.trim()}`.trim());
             setStep(3); setErr('');
@@ -15554,6 +15834,7 @@ function AdminDirectoryTab({ pin }) {
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [profilePatch, setProfilePatch] = useState({});
+  const [adminNewPassword, setAdminNewPassword] = useState('');
   const [vendors, setVendors] = useState([]);
 
   const loadDirectory = useCallback(async (searchQ = '', opts = {}) => {
@@ -15601,12 +15882,14 @@ function AdminDirectoryTab({ pin }) {
         last_name: p.last_name || '',
         phone: p.phone || '',
         email: p.email || '',
+        contact_email: p.contact_email || '',
         address: p.address || '',
         city: p.city || '',
         pincode: p.pincode || '',
         status: p.status || 'active',
         notes: p.notes || '',
       });
+      setAdminNewPassword('');
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   }, [pin]);
@@ -15649,7 +15932,7 @@ function AdminDirectoryTab({ pin }) {
   const deleteUser = async (profileId) => {
     if (!profileId) return;
     if (!window.confirm('Revoke this user\'s login? Their profile and booking history stay for records.')) return;
-    if (!window.confirm('They can sign in again with OTP using the same mobile number. Continue?')) return;
+    if (!window.confirm('They can sign in again with mobile + password using the same number. Continue?')) return;
     setLoading(true); setErr('');
     try {
       await adminHubFetch('delete_profile', { profile_id: profileId }, pin);
@@ -15722,6 +16005,22 @@ function AdminDirectoryTab({ pin }) {
     finally { setLoading(false); }
   };
 
+  const resetUserPassword = async () => {
+    const profileId = detail?.profile?.id;
+    if (!profileId) return setErr('No profile selected');
+    const pwd = adminNewPassword.trim();
+    if (pwd.length < 8) return setErr('Password must be at least 8 characters');
+    if (!window.confirm('Set a new password for this user? They must use it to sign in.')) return;
+    setLoading(true); setErr('');
+    try {
+      await adminHubFetch('reset_profile_password', { profile_id: profileId, new_password: pwd }, pin);
+      setAdminNewPassword('');
+      setMsg('Password reset — share the new password with the user securely');
+      await loadDetail(selected);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
   const v = detail?.vendor;
   const p = detail?.profile;
 
@@ -15788,7 +16087,11 @@ function AdminDirectoryTab({ pin }) {
           {p && (
             <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
               <div style={{ fontWeight: 800, color: C.txt, marginBottom: 8 }}>Profile · {p.name || p.id}</div>
-              <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>{p.phone} · {p.email || '—'} · {p.city || '—'} · role {p.role} · <Badge label={p.status || 'active'} color={directoryStatusColor(p.status)} /></div>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 10 }}>
+                {p.phone} · contact {p.contact_email || '—'} · auth {p.email || '—'} · {p.city || '—'} · role {p.role}
+                · <Badge label={p.status || 'active'} color={directoryStatusColor(p.status)} />
+                {p.password_set_at ? ' · password set' : ' · no password yet'}
+              </div>
               <DirectoryLifecycleBtns
                 status={p.status}
                 loading={loading}
@@ -15800,7 +16103,8 @@ function AdminDirectoryTab({ pin }) {
               <Field label="First name"><input value={profilePatch.first_name || ''} onChange={e => setProfilePatch(x => ({ ...x, first_name: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Last name"><input value={profilePatch.last_name || ''} onChange={e => setProfilePatch(x => ({ ...x, last_name: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Phone"><input value={profilePatch.phone || ''} onChange={e => setProfilePatch(x => ({ ...x, phone: e.target.value }))} style={S.inp()} /></Field>
-              <Field label="Email"><input value={profilePatch.email || ''} onChange={e => setProfilePatch(x => ({ ...x, email: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Contact email" note="User-provided email from onboarding"><input type="email" value={profilePatch.contact_email || ''} onChange={e => setProfilePatch(x => ({ ...x, contact_email: e.target.value }))} style={S.inp()} /></Field>
+              <Field label="Auth email" note="Sign-in identifier (+91mobile@scanv.app)"><input value={profilePatch.email || ''} onChange={e => setProfilePatch(x => ({ ...x, email: e.target.value }))} style={S.inp()} /></Field>
               <Field label="Address"><input value={profilePatch.address || ''} onChange={e => setProfilePatch(x => ({ ...x, address: e.target.value }))} style={S.inp()} /></Field>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <Field label="City"><input value={profilePatch.city || ''} onChange={e => setProfilePatch(x => ({ ...x, city: e.target.value }))} style={S.inp()} /></Field>
@@ -15808,6 +16112,14 @@ function AdminDirectoryTab({ pin }) {
               </div>
               <Field label="Notes"><textarea value={profilePatch.notes || ''} onChange={e => setProfilePatch(x => ({ ...x, notes: e.target.value }))} rows={2} style={{ ...S.inp(), resize: 'vertical' }} /></Field>
               <Btn onClick={saveProfile} disabled={loading}>Save profile</Btn>
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.bdr}` }}>
+                <div style={{ fontWeight: 700, color: C.txt, fontSize: 13, marginBottom: 8 }}>Reset password</div>
+                <div style={{ fontSize: 11, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>Set a new sign-in password for this user (minimum 8 characters).</div>
+                <Field label="New password">
+                  <input type="password" value={adminNewPassword} onChange={e => setAdminNewPassword(e.target.value)} placeholder="New password" style={S.inp()} autoComplete="new-password" />
+                </Field>
+                <Btn v="outline" onClick={resetUserPassword} disabled={loading || adminNewPassword.length < 8}>Reset password</Btn>
+              </div>
             </div>
           )}
           {v && (
