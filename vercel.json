@@ -3,6 +3,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "framework": "create-react-app",
+  "crons": [
+    {
+      "path": "/api/cron/instagram-daily",
+      "schedule": "30 4 * * *"
+    }
+  ],
   "build": {
     "env": {
       "DISABLE_ESLINT_PLUGIN": "true",

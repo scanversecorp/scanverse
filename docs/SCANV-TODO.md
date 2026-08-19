@@ -33,7 +33,7 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 | 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
 | 4 | Deploy official-app SEO + static files | ✅ Live | `4bf9f8c` · title "ScanV — Official App \| getscanv.com" |
 | 5 | **GSC domain verified** for `getscanv.com` | ✅ Done | DNS TXT via Cloudflare · account jasmeen.workmail@gmail.com |
-| 6 | Submit sitemap + request indexing | ⏳ Manual | GSC → Sitemaps → `sitemap.xml`; URL Inspection → `/` + `/scanv-brand.html` |
+| 6 | Submit sitemap + request indexing | ⏳ Manual | GSC → Sitemaps → `sitemap.xml`; URL Inspection → `/` + `/scanv-brand.html` — **retry after deploy** |
 | 7 | **Fix “ScanV coming to?” snippet** | ✅ Deployed | Update live IG/FB bio — remove "Coming soon" |
 
 ---
@@ -43,9 +43,14 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 1 | Daily Instagram Graph API post | ✅ Wired | `scripts/instagram_daily_post.mjs` · cron 10:00 AM IST |
-| 2 | GitHub Action cron | ✅ Wired | `.github/workflows/instagram-daily-post.yml` |
-| 3 | **Meta secrets in GitHub** | ⏳ Manual | `META_PAGE_ACCESS_TOKEN` + `META_IG_USER_ID` — [AUTOMATION.md](./social/AUTOMATION.md) |
-| 4 | Deploy `public/social/` images | ⏳ Push | Images must be live at getscanv.com/social/ for Graph API |
+| 2 | GitHub Action cron | ⏳ Push blocked | Commit `8439e37` local — PAT needs **`workflow` scope** to push `.github/workflows/` |
+| 2b | **Vercel Cron fallback** | ✅ Added | `api/cron/instagram-daily.js` + `vercel.json` — deploy + set `CRON_SECRET` + Meta env on Vercel |
+| 3 | **Meta secrets** | ⏳ OTP-only | No `META_PAGE_ACCESS_TOKEN` locally or in GitHub — one-time Meta Developer setup · [AUTOMATION.md](./social/AUTOMATION.md) |
+| 4 | Deploy `public/social/` images | ⏳ Push | `/social/*.png` serves SPA HTML until push + Vercel deploy (verified 19 Aug) |
+| 5 | **Post today @scanvapp** | ⏳ Blocked | Meta API: no token · Cursor browser MCP: tab unavailable · manual: Meta Business Suite or `credentials.env` + `node scripts/instagram_daily_post.mjs` |
+| 6 | **IG bio update** | ⏳ Manual | Copy from [instagram-profile.txt](./social/instagram-profile.txt) — remove any "Coming soon" |
+| 7 | User login outreach (social CTAs) | ✅ Content ready | `node scripts/social_services_campaign.mjs` · register URL `?utm_source=social&utm_medium=user_register` |
+| 8 | Vendor WhatsApp outreach | ⏳ OTP-only | Needs `ADMIN_HUB_PIN` in env + daytime window (9:30–19:00 IST) · `node scripts/send_vendor_outreach.mjs` |
 
 ---
 

@@ -3,7 +3,8 @@
 **Schedule:** every day **10:00 AM IST** (04:30 UTC)  
 **Method:** Meta Instagram Graph API (no browser automation)  
 **Script:** `node scripts/instagram_daily_post.mjs`  
-**Workflow:** `.github/workflows/instagram-daily-post.yml`
+**Workflow:** `.github/workflows/instagram-daily-post.yml`  
+**Fallback cron:** Vercel → `/api/cron/instagram-daily` (same schedule, no GitHub `workflow` scope needed)
 
 ---
 
@@ -132,11 +133,21 @@ After adding images, deploy to Vercel (push to `main`).
 
 ## Cron schedule
 
-| When | Cron (UTC) | Notes |
-|------|------------|-------|
-| 10:00 AM IST | `30 4 * * *` | GitHub Actions schedule |
+| When | Cron (UTC) | Runner |
+|------|------------|--------|
+| 10:00 AM IST | `30 4 * * *` | GitHub Actions **or** Vercel Cron |
 
-GitHub cron can drift ±15 min — acceptable for social posts.
+### Vercel fallback (when GitHub PAT lacks `workflow` scope)
+
+1. Push `api/cron/instagram-daily.js` + `vercel.json` crons (included in repo)
+2. Vercel project → Settings → Environment Variables:
+   - `META_PAGE_ACCESS_TOKEN`, `META_IG_USER_ID` (or `META_PAGE_ID`)
+   - `CRON_SECRET` — random string; Vercel sends `Authorization: Bearer …` on cron hits
+   - `ADMIN_HUB_PIN` — optional
+3. Redeploy. Cron appears under Vercel → Cron Jobs.
+4. Manual test: `curl -H "Authorization: Bearer $CRON_SECRET" "https://getscanv.com/api/cron/instagram-daily?dry_run=true"`
+
+GitHub/Vercel cron can drift ±15 min — acceptable for social posts.
 
 ---
 
