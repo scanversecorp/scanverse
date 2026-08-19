@@ -250,6 +250,7 @@ export function StudentCloudAdmitScreen({
   const [experience, setExperience] = useState('');
   const [dob, setDob] = useState('');
   const [mobile, setMobile] = useState('');
+  const [email, setEmail] = useState('');
   const [address, setAddress] = useState(silentGeo?.address || '');
   const [village, setVillage] = useState(silentGeo?.village || '');
   const [city, setCity] = useState(silentGeo?.city || '');
@@ -343,6 +344,9 @@ export function StudentCloudAdmitScreen({
     const dobErr = validateSgrDob(dob, ageFromDob);
     if (dobErr) return dobErr;
     if (digits10(mobile).length !== 10) return 'Enter valid 10-digit mobile';
+    const emailTrim = email.trim();
+    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) return 'Enter a valid email address';
+    if (emailTrim.endsWith('@scanv.app')) return 'Use your personal or business email';
     if (!address.trim()) return 'Enter address';
     if (!city.trim()) return 'Enter city';
     if (!state.trim()) return 'Enter state';
@@ -398,6 +402,7 @@ export function StudentCloudAdmitScreen({
       const r = await studentCloudFetch('submit', {
         mobile: `+91${digits10(mobile)}`,
         otp: code,
+        email: email.trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         experience: experience.trim(),
@@ -503,6 +508,9 @@ export function StudentCloudAdmitScreen({
             <div style={{ padding: '12px', background: C.deep, borderRight: BDR, color: C.sub, fontSize: 14, fontWeight: 700 }}>+91</div>
             <input type="tel" maxLength={10} value={mobile} onChange={(e) => { setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpSent(false); setOtpVerified(false); }} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={otpVerified} />
           </div>
+        </Field>
+        <Field label="Email" req note="For course updates and receipts">
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" style={S.inp()} disabled={otpVerified} />
         </Field>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
@@ -782,14 +790,14 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
   };
 
   const csv = () => {
-    const headers = ['Name', 'Mobile', 'Course', 'SGR paid', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Course paid', 'Pending (ScanV)', 'Inst 1', 'Inst 2', 'Comment', 'Payments'];
+    const headers = ['Name', 'Mobile', 'Email', 'Course', 'SGR paid', 'Course fee', 'ScanV ₹', 'Partner ₹', 'Discount', 'Course paid', 'Pending (ScanV)', 'Inst 1', 'Inst 2', 'Comment', 'Payments'];
     const lines = [headers.join(',')];
     for (const r of rows) {
       const scanv = catalogScanvPaise(r, r.course_id, courses);
       const partner = catalogPartnerPaise(r, r.course_id, courses);
       const pending = displayPendingPaise(r, courses, r.discount_paise);
       const vals = [
-        `${r.first_name} ${r.last_name}`, r.mobile, r.course_name,
+        `${r.first_name} ${r.last_name}`, r.mobile, r.email || '', r.course_name,
         fmtRs(r.sgr_paid_paise), fmtRs(r.effective_course_fee_paise || r.course_fee_paise),
         fmtRs(scanv), fmtRs(partner), fmtRs(r.discount_paise), fmtRs(r.course_paid_paise), fmtRs(pending),
         r.installment_1_date || '', r.installment_2_date || '', r.admin_comment || '',
@@ -829,7 +837,7 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
           <Btn sm onClick={load} disabled={loading}>{loading ? '…' : 'Refresh'}</Btn>
         </div>
       </div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, mobile, course…" style={{ ...S.inp(), marginBottom: 10 }} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, mobile, email, course…" style={{ ...S.inp(), marginBottom: 10 }} />
       {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>{err}</div>}
       {msg && <div style={{ color: C.grn, fontSize: 12, marginBottom: 8 }}>{msg}</div>}
       {loading && !rows.length ? <div style={{ padding: 24, display: 'flex', gap: 8, alignItems: 'center' }}><Spin size={16} /> Loading…</div> : (
@@ -859,6 +867,9 @@ export function StudentCloudDashboard({ pin, apikey, courses, C, S, FF, Spin, Bt
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 180, maxWidth: 240 }}>
                       <div style={{ fontWeight: 800 }}>{r.first_name} {r.last_name}</div>
                       <div style={{ marginTop: 4 }}><a href={`tel:+91${r.mobile}`} style={{ color: C.cyan, fontWeight: 700 }}>+91 {r.mobile}</a></div>
+                      {r.email ? (
+                        <div style={{ marginTop: 4 }}><a href={`mailto:${r.email}`} style={{ color: C.acc, fontWeight: 600, fontSize: 11 }}>{r.email}</a></div>
+                      ) : null}
                       <div style={{ color: C.dim, fontSize: 10, marginTop: 4, lineHeight: 1.45 }}>
                         DOB: {r.dob || '—'} · {r.experience || '—'}
                       </div>

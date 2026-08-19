@@ -63,6 +63,13 @@ function digits10(raw: string): string {
   return String(raw || "").replace(/\D/g, "").slice(-10);
 }
 
+function validateEmail(email: string): string | null {
+  const e = String(email || "").trim();
+  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Valid email address required";
+  if (e.endsWith("@scanv.app")) return "Use your personal or business email, not a system address";
+  return null;
+}
+
 function parseIsoDate(dateStr: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || "").trim());
   if (!m) return null;
@@ -339,6 +346,9 @@ Deno.serve(async (req) => {
       if (!parseIsoDate(dob) || ageFromDob(dob) == null) {
         return json({ error: "Enter a valid date of birth (age 5–120)" }, 400);
       }
+      const email = String(body.email || "").trim();
+      const emailErr = validateEmail(email);
+      if (emailErr) return json({ error: emailErr }, 400);
       if (!address) return json({ error: "Address required" }, 400);
       if (!city) return json({ error: "City required" }, 400);
       if (!state) return json({ error: "State required" }, 400);
@@ -354,6 +364,7 @@ Deno.serve(async (req) => {
         mobile: digits10(mobile),
         mobile_e164: mobile,
         mobile_verified: true,
+        email,
         first_name: firstName,
         last_name: lastName,
         experience,
@@ -511,7 +522,7 @@ Deno.serve(async (req) => {
       let rows = raw.map((r) => withPending(r, catalogPricing[String(r.course_id || "")] ?? null));
       if (q) {
         rows = rows.filter((r) => {
-          const hay = [r.first_name, r.last_name, r.mobile, r.course_name, r.city, r.status].join(" ").toLowerCase();
+          const hay = [r.first_name, r.last_name, r.mobile, r.email, r.course_name, r.city, r.status].join(" ").toLowerCase();
           return hay.includes(q);
         });
       }
@@ -523,7 +534,7 @@ Deno.serve(async (req) => {
       if (!id) return json({ error: "student_id required" }, 400);
       const patch: Record<string, unknown> = {};
       for (const k of [
-        "course_id", "course_name", "course_fee_paise", "discount_paise", "status", "notes",
+        "course_id", "course_name", "course_fee_paise", "discount_paise", "status", "notes", "email",
         "schedule_date", "schedule_time", "installment_1_date", "installment_2_date", "admin_comment",
       ]) {
         if (body[k] !== undefined) patch[k] = body[k];
