@@ -1,0 +1,50 @@
+[
+  {
+    "step": "UI: Services tab",
+    "status": "PASS",
+    "detail": "Services grid loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/10-services-tab.png"
+  },
+  {
+    "step": "UI: Restaurant Order detail (live track)",
+    "status": "PASS",
+    "detail": "Food live-track service",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/12-restaurant-detail.png"
+  },
+  {
+    "step": "UI: restaurant booking verify",
+    "status": "PASS",
+    "detail": "Verify step reached",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/13-restaurant-verify.png"
+  },
+  {
+    "step": "API: dispatch start without party auth",
+    "status": "PASS",
+    "detail": "HTTP 401 — {\"error\":\"Unauthorized\"}",
+    "screenshot": null
+  },
+  {
+    "step": "API: dispatch status without auth",
+    "status": "PASS",
+    "detail": "HTTP 401",
+    "screenshot": null
+  },
+  {
+    "step": "Auth: login/signup works (504165f)",
+    "status": "BLOCKED",
+    "detail": "signup HTTP 500; signin HTTP 400",
+    "screenshot": null
+  },
+  {
+    "step": "UI: booking form fill",
+    "status": "PASS",
+    "detail": "Test mobile entered (OTP not submitted — no real SMS)",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/14-form-filled.png"
+  },
+  {
+    "step": "UI: track screen route",
+    "status": "PASS",
+    "detail": "Track route loads (may need active booking)",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/15-track-screen.png"
+  }
+]

@@ -1,0 +1,2 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Customer — Bookings Login,UI-006,UI: login screen (Bookings nav),Automated expectation met,Bookings tab opened,PASSED,,Bottom nav Bookings → login / bookings screen,/Users/samir/Downloads/scanverse/smoke-screenshots/08-login-bookings.png

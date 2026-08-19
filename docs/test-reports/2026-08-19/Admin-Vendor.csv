@@ -1,0 +1,4 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Admin & Vendor,ADM-001,UI: admin hub PIN gate,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/#admin — PIN entry screen (no dashboard without PIN + 2FA),/Users/samir/Downloads/scanverse/smoke-screenshots/admin-hub-PIN-gate.png
+Admin & Vendor,ADM-002,UI: vendor-admin PIN gate,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/#vendor-admin — PIN gate before vendor console,/Users/samir/Downloads/scanverse/smoke-screenshots/vendor-admin-PIN-gate.png
+Admin & Vendor,ADM-003,UI: vendor onboard,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/#vendor-onboard — vendor registration form,/Users/samir/Downloads/scanverse/smoke-screenshots/vendor-onboard.png

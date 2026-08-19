@@ -1,0 +1,10 @@
+Report Date,2026-08-19
+Environment,Production https://getscanv.com
+Supabase Project,rwlwrmmqtedugcreweut
+Git HEAD,cf24243 (main)
+Smoke Command,node scripts/smoke-test.mjs
+Total Tests,30
+Passed,29
+Failed,0
+Accepted Risk,1
+Notes,Playwright chromium required: npx playwright install chromium

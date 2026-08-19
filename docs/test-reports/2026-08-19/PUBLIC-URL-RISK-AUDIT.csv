@@ -1,0 +1,44 @@
+Flow,URI / Endpoint,Risk Level,Safe For Public?,Status,Why / Notes,How To Test Manually
+Customer PWA,https://getscanv.com/,Low,Yes,PASSED,Main app — intended public entry,Open in browser; home + Services load
+Customer PWA,https://getscanv.com/?qr=1,Low,Yes,PASSED,QR campaign landing — same as home,Open URL; should show browse/services
+Legal,/privacy,Low,Yes,PASSED,Static legal page via SPA,Open https://getscanv.com/privacy
+Legal,/terms,Low,Yes,PASSED,Static legal page via SPA,Open https://getscanv.com/terms
+Legal,/refund,Low,Yes,PASSED,Refund policy page,Open https://getscanv.com/refund
+Legal,/payment,Low,Yes,PASSED,Payment policy page,Open https://getscanv.com/payment
+Customer Support,#faq,Low,Yes,PASSED,Public FAQ — no auth,Open https://getscanv.com/#faq
+Customer Support,#report,Low,Yes,PASSED,Public issue report form,Open https://getscanv.com/#report; submit test ticket
+Customer Support,#track-ticket,Low,Yes (with mobile proof),PASSED,Requires ticket # + mobile (full or last 4),Open #track-ticket; enter TKT-… + mobile
+Booking Track,#track?id={booking-uuid},Medium,Yes (link-only),PASSED,URL is public but booking UUID is hard to guess; anon DB read blocked (401); dispatch status requires party auth,Open #track?id=TEST123 (empty state OK); real track needs UUID from SMS
+Vendor,#vendor-onboard,Low,Yes (by design),PASSED,Self-service partner signup — OTP + eKYC,Open https://getscanv.com/#vendor-onboard
+Cloud / Student,#student-cloud,Low,Redirect only,PASSED,Redirects to #admin?tab=student-cloud (admin-only),Open #student-cloud → should land on admin PIN gate
+Payment return,/?payment=TXN-…&razorpay_payment_link_status=paid,Low,Yes,PASSED,Return URL after Razorpay — no secret in URL,Open with dummy TXN; payment resume UI loads
+Admin UI,#admin / #admin-hub,Medium,URL public — content NOT public,PASSED,PIN + 2FA required before data; smoke test shows PIN gate,Open #admin — must stop at PIN/2FA; no dashboard without auth
+Admin UI,#exec / #exec-dashboard,Medium,URL public — content NOT public,PASSED,Owner/exec PIN only,Open #exec — PIN gate only
+Admin UI,#pricing-admin,Medium,URL public — content NOT public,PASSED,PRICING_ADMIN_PIN required,Open #pricing-admin — PIN gate
+Admin UI,#customer-support,Medium,URL public — content NOT public,PASSED,SUPPORT_AGENT_PIN or admin PIN,Open #customer-support — PIN gate
+Admin UI,#vendor-admin,Medium,URL public — content NOT public,PASSED,VENDOR_ADMIN_PIN required,Open #vendor-admin — PIN gate
+Admin UI,#otp-delivery-report,Medium,URL public — content NOT public,PASSED,Admin PIN required (same as admin hub),Open #otp-delivery-report — PIN gate; no OTP logs without PIN
+Blocked static,/docs/*,Low,No (intentionally blocked),PASSED,vercel.json rewrites to 404 — architecture docs not served,Try https://getscanv.com/docs/architecture.html → 404
+Wrong deploy,https://scanverse.vercel.app,N/A,No — wrong app,WARNING,Legacy QR scanner — not ScanV; do not print on marketing,Open URL — verify it is NOT ScanV marketplace
+Supabase REST,/rest/v1/profiles,High,No,PASSED,Anon SELECT blocked — HTTP 401 in smoke test,curl with publishable key → 401
+Supabase REST,/rest/v1/bookings,High,No,PASSED,Anon revoked; authenticated + RLS only,curl anon → 401
+Supabase REST,/rest/v1/payment_intents,High,No,PASSED,Anon read returns 0 rows; insert blocked 400,curl SELECT/INSERT with anon key
+Supabase REST,/rest/v1/service_prices_public,Low,Yes,PASSED,Public pricing view — intentional,curl → 200 JSON array
+Edge API,POST /functions/v1/admin-hub,High,No,PASSED,401 without PIN,POST action ping without headers → 401
+Edge API,POST /functions/v1/pricing-admin,High,No,PASSED,401 without PIN,POST action list → 401
+Edge API,POST /functions/v1/student-cloud,High,No,PASSED,401 Admin PIN required,POST action list → 401
+Edge API,POST /functions/v1/booking-dispatch (tick),High,No,PASSED,401 without dispatch secret,POST action tick → 401
+Edge API,POST /functions/v1/booking-dispatch (status),Medium,No without party,PASSED,401 unless booking party or dispatch secret,POST status with random booking_id → 401
+Edge API,POST /functions/v1/send-otp,Medium,Public — abuse risk,MONITOR,Anyone can request OTP SMS — cost/spam risk; no strong rate limit in code,POST send to test mobile; monitor 2Factor spend
+Edge API,POST /functions/v1/razorpay-payment (register),Medium,Public — limited,MONITOR,Creates payment intent/link — amount validated server-side on check,POST register with TXN-test; verify no paid without webhook
+Edge API,POST /functions/v1/razorpay-payment (webhook),Low,Webhook only,PASSED,HMAC signature when RAZORPAY_WEBHOOK_SECRET set,Razorpay dashboard test webhook
+Edge API,GET/POST /functions/v1/otp-delivery-report,Medium,Webhook — key required,VERIFY,If OTP_REPORT_SECRET unset → accepts ALL requests (fail-open); docs show example key ScanV2026 — rotate if still used,Confirm secret set in Supabase; POST without key → 401
+Edge API,POST /functions/v1/platform-config,Low,Yes,PASSED,Returns vendor feature flags only — no secrets,GET/POST → JSON vendors flags
+Edge API,POST /functions/v1/vendor-onboard (public actions),Low,Yes (by design),PASSED,OTP-gated registration; admin actions need PIN,send-otp + verify flow on #vendor-onboard
+Edge API,POST /functions/v1/support-tickets (create/track),Low,Yes,PASSED,Public create + track with mobile match,Submit #report then #track-ticket
+Edge API,POST /functions/v1/whatsapp-verify,Low,Webhook,PASS (assumed),Inbound WhatsApp — provider only,Configured in MSG91/Twilio
+Auth,/auth/v1/signup + /token,Low,Yes (by design),PASSED,Supabase Auth — email/mobile auth,Smoke test signup/signin OK
+Build,npm run build,Low,N/A,PASSED,Production bundle compiles,npm run build
+Dependencies,npm audit,Medium,Dev only,ACCEPTED RISK,29 CVEs in react-scripts/jest dev chain — not in prod bundle,npm audit; plan CRA/Vite upgrade
+Secrets in repo,docs/*.md example PINs (ScanV2026),High,No,REVIEW,Example PINs/secrets in committed docs — rotate if these match production secrets,Audit Supabase secrets vs docs; rotate if matched
+Infrastructure,Supabase dashboard URLs,High,No,PASSED,Requires Supabase login — not app routes,Only for staff bookmarks

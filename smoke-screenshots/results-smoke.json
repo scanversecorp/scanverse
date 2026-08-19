@@ -1,0 +1,140 @@
+[
+  {
+    "step": "Security: profiles anon read",
+    "status": "PASS",
+    "detail": "HTTP 401",
+    "screenshot": null
+  },
+  {
+    "step": "Security: payment_intents anon read blocked",
+    "status": "PASS",
+    "detail": "HTTP 200, rows=0",
+    "screenshot": null
+  },
+  {
+    "step": "Security: payment_intents anon insert blocked",
+    "status": "PASS",
+    "detail": "HTTP 400",
+    "screenshot": null
+  },
+  {
+    "step": "API: public pricing readable",
+    "status": "PASS",
+    "detail": "HTTP 200, rows: 3",
+    "screenshot": null
+  },
+  {
+    "step": "Security: admin-hub without PIN",
+    "status": "PASS",
+    "detail": "HTTP 401",
+    "screenshot": null
+  },
+  {
+    "step": "Security: dispatch tick without secret",
+    "status": "PASS",
+    "detail": "HTTP 401",
+    "screenshot": null
+  },
+  {
+    "step": "API: razorpay register",
+    "status": "PASS",
+    "detail": "HTTP 200 link=false",
+    "screenshot": null
+  },
+  {
+    "step": "API: send-otp reachable",
+    "status": "PASS",
+    "detail": "HTTP 200 provider=2factor-voice",
+    "screenshot": null
+  },
+  {
+    "step": "Auth: signup/signin",
+    "status": "PASS",
+    "detail": "signup session ok",
+    "screenshot": null
+  },
+  {
+    "step": "UI: production app loads",
+    "status": "PASS",
+    "detail": "title=\"ScanV — Professional Services · Local Communities\"",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/01-home.png"
+  },
+  {
+    "step": "UI: terms gate",
+    "status": "PASS",
+    "detail": "Handled or not shown",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/02-after-terms.png"
+  },
+  {
+    "step": "UI: admin hub PIN gate",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/admin-hub-PIN-gate.png"
+  },
+  {
+    "step": "UI: vendor-admin PIN gate",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/vendor-admin-PIN-gate.png"
+  },
+  {
+    "step": "UI: vendor onboard",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/vendor-onboard.png"
+  },
+  {
+    "step": "UI: FAQ",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/FAQ.png"
+  },
+  {
+    "step": "UI: track screen",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/track-screen.png"
+  },
+  {
+    "step": "UI: payment return URL",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/payment-return-URL.png"
+  },
+  {
+    "step": "UI: privacy policy",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/privacy-policy.png"
+  },
+  {
+    "step": "UI: terms page",
+    "status": "PASS",
+    "detail": "Page loaded",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/terms-page.png"
+  },
+  {
+    "step": "UI: Services browse",
+    "status": "PASS",
+    "detail": "Category opened",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/03-category.png"
+  },
+  {
+    "step": "UI: booking verify form",
+    "status": "PASS",
+    "detail": "Reached verify step",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/04-verify-form.png"
+  },
+  {
+    "step": "UI: OTP send",
+    "status": "PASS",
+    "detail": "OTP UI shown for +91 9270194842",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/05-otp-sent.png"
+  },
+  {
+    "step": "UI: login screen (Bookings nav)",
+    "status": "PASS",
+    "detail": "Bookings tab opened",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/08-login-bookings.png"
+  }
+]

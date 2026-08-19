@@ -1,0 +1,2 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Customer — Browse,UI-003,UI: Services browse,Automated expectation met,Category opened,PASSED,,Home → Services tab → open Delivery/Food category → sub-service list loads,/Users/samir/Downloads/scanverse/smoke-screenshots/03-category.png

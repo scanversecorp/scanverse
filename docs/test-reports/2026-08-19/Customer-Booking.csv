@@ -1,0 +1,3 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Customer — Booking,UI-004,UI: booking verify form,Automated expectation met,Reached verify step,PASSED,,Pick a service → Book now → verify form with name/mobile/address fields,/Users/samir/Downloads/scanverse/smoke-screenshots/04-verify-form.png
+Customer — Booking,UI-005,UI: OTP send,Automated expectation met,OTP UI shown for +91 9270194842,PASSED,,Fill verify form → Send SMS OTP → 6-digit OTP inputs appear (uses test mobile 9270194842 in automation),/Users/samir/Downloads/scanverse/smoke-screenshots/05-otp-sent.png

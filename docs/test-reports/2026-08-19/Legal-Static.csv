@@ -1,0 +1,6 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Legal & Static,LEG-001,UI: FAQ,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/#faq,/Users/samir/Downloads/scanverse/smoke-screenshots/FAQ.png
+Legal & Static,LEG-002,UI: track screen,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/#track?id=TEST123,/Users/samir/Downloads/scanverse/smoke-screenshots/track-screen.png
+Legal & Static,LEG-003,UI: payment return URL,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/?payment=TXN-TEST&razorpay_payment_link_status=paid,/Users/samir/Downloads/scanverse/smoke-screenshots/payment-return-URL.png
+Legal & Static,LEG-004,UI: privacy policy,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/privacy,/Users/samir/Downloads/scanverse/smoke-screenshots/privacy-policy.png
+Legal & Static,LEG-005,UI: terms page,Automated expectation met,Page loaded,PASSED,,Open https://getscanv.com/terms,/Users/samir/Downloads/scanverse/smoke-screenshots/terms-page.png

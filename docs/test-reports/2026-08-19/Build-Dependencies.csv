@@ -1,0 +1,3 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Build & Dependencies,BLD-001,Production build compiles,npm run build succeeds,Compiled successfully,PASSED,,cd scanverse && npm run build → Compiled successfully,build/ folder
+Build & Dependencies,BLD-002,npm audit dev dependencies,No critical prod CVEs; dev toolchain documented,29 vulns (0 critical) in dev deps,ACCEPTED RISK,react-scripts/jest chain; see docs/SECURITY-AUDIT.md §3,cd scanverse && npm audit → review devDependency CVEs (accepted risk per docs/SECURITY-AUDIT.md),npm audit output

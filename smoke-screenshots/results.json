@@ -1,0 +1,92 @@
+[
+  {
+    "step": "Security: profiles anon read",
+    "status": "PASS",
+    "detail": "HTTP 401 — permission denied (expected)",
+    "screenshot": null
+  },
+  {
+    "step": "Security: custom_otp anon read",
+    "status": "PASS",
+    "detail": "HTTP 401",
+    "screenshot": null
+  },
+  {
+    "step": "Security: dispatch tick without secret",
+    "status": "PASS",
+    "detail": "HTTP 401 — {\"error\":\"Unauthorized\"}",
+    "screenshot": null
+  },
+  {
+    "step": "API: public pricing readable",
+    "status": "PASS",
+    "detail": "HTTP 200, rows: 3",
+    "screenshot": null
+  },
+  {
+    "step": "API: razorpay register",
+    "status": "PASS",
+    "detail": "HTTP 200 configured=true link=yes",
+    "screenshot": null
+  },
+  {
+    "step": "Security: admin-hub without PIN",
+    "status": "PASS",
+    "detail": "HTTP 401",
+    "screenshot": null
+  },
+  {
+    "step": "Security: vendor-admin without PIN",
+    "status": "PASS",
+    "detail": "HTTP 400",
+    "screenshot": null
+  },
+  {
+    "step": "UI: production app loads",
+    "status": "PASS",
+    "detail": "title=\"ScanV — Professional Services · PCMC Pune\"",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/01-home.png"
+  },
+  {
+    "step": "UI: terms gate",
+    "status": "PASS",
+    "detail": "Handled or not shown",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/02-after-terms.png"
+  },
+  {
+    "step": "UI: browse Food category (fallback)",
+    "status": "PASS",
+    "detail": "Category opened",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/03-food.png"
+  },
+  {
+    "step": "UI: vendor-admin PIN gate",
+    "status": "PASS",
+    "detail": "PIN input shown",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/06-vendor-admin.png"
+  },
+  {
+    "step": "UI: admin hub PIN gate",
+    "status": "PASS",
+    "detail": "PIN input shown",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/07-admin-hub.png"
+  },
+  {
+    "step": "UI: login screen (Bookings nav)",
+    "status": "PASS",
+    "detail": "Mobile OTP login form visible",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/08-login-bookings.png"
+  },
+  {
+    "step": "API: send-otp reachable",
+    "status": "PASS",
+    "detail": "HTTP 200 — {\"success\":true,\"provider\":\"2factor\"}",
+    "screenshot": null
+  },
+  {
+    "step": "UI: payment return URL",
+    "status": "PASS",
+    "detail": "Page loads on payment query param",
+    "screenshot": "/Users/samir/Downloads/scanverse/smoke-screenshots/09-payment-return.png"
+  }
+]

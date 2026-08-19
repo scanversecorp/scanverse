@@ -1,0 +1,18 @@
+{
+  "at": "2026-08-19T14:53:40.240Z",
+  "twilio": {
+    "url": "https://www.twilio.com/login?g=%2Fconsole-zen%2Fhttps%3A%2F%2Fconsole.twilio.com%2Fus1%2Faccount%2Fkeys-credentials%2Fapi-keys&t=4573f8c8bdfa63c3947320bb754d37c3090c76cc13998ead49c40c3c85a26956",
+    "title": "Twilio",
+    "text": "Welcome Email address Email address Continue or Create an account for free Login to Twilio Sendgrid | Login to Twilio Segment Terms of Service | Privacy Policy © 2026 Twilio Inc. all rights reserved."
+  },
+  "twilioSms": {
+    "url": "https://www.twilio.com/login?g=%2Fconsole-zen%2Fhttps%3A%2F%2Fconsole.twilio.com%2Fus1%2Fdevelop%2Fsms%2Ftry-it-out%2Fsend-an-sms&t=6762d0de0b3d51def1c4cfb09bca1a60264c0109763db35bdd72f58de00533f3",
+    "text": "Welcome Email address Email address Continue or Create an account for free Login to Twilio Sendgrid | Login to Twilio Segment Terms of Service | Privacy Policy © 2026 Twilio Inc. all rights reserved."
+  },
+  "mbs": {
+    "url": "https://business.facebook.com/business/loginpage/?next=https%3A%2F%2Fbusiness.facebook.com%2Flatest%2Fcomposer%2F%3Fasset_id%3Dscanvapp%26nav_ref%3Dbiz_unified_f3_login_page_to_mbs&login_options%5B0%5D=FB&login_options%5B1%5D=IG&login_options%5B2%5D=SSO&config_ref=biz_login_tool_flavor_mbs",
+    "text": "Get started with\nbusiness tools from Meta\nBy logging in, you can navigate to all business tools such as Meta Business Suite, Ads Manager and more to help you connect with your customers and get better business results.\nOur business tools can help you:\n•\nSave time by accessing everything that you need to manage your business across Facebook, Instagram and Messenger all in one place\n•\nConnect with the people who matter most to your business using a single inbox\n•\nTrack what's working best with performance insights across Meta technologies\nLog in to Business Tools from Meta\nContinue with Facebook\nContinue with Instagram\nCreate new account\nLog in with a Managed Meta Account\n\nMeta technologies\n\nFacebook\nInstagram\nMessenger\nWhatsApp\nAudience Network\nMeta Quest\nWorkplace\nMeta for Work\n\nTools\n\nFre"
+  },
+  "mbsPost": "no_composer",
+  "mbsProfiles": "Get started with\nbusiness tools from Meta\nBy logging in, you can navigate to all business tools such as Meta Business Suite, Ads Manager and more to help you connect with your customers and get better business results.\nOur business tools can help you:\n•\nSave time by accessing everything that you need to manage your business across Facebook, Instagram and Messenger all in one place\n•\nConnect with the people who matter most to your business using a single inbox\n•\nTrack what's working best with performance insights across Meta technologies\nLog in to Business Tools from Meta\nContinue with Facebook"
+}

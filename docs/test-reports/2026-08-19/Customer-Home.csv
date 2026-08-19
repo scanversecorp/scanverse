@@ -1,0 +1,3 @@
+Flow,Test ID,Test Case,Expected Result,Actual Result,Status,Failure Reason,How To Run Manually,Screenshot / Evidence
+Customer — Home,UI-001,UI: production app loads,Automated expectation met,"title=""ScanV — Professional Services · Local Communities""",PASSED,,Open https://getscanv.com — title contains ScanV; home service cards visible,/Users/samir/Downloads/scanverse/smoke-screenshots/01-home.png
+Customer — Home,UI-002,UI: terms gate,Automated expectation met,Handled or not shown,PASSED,,On first visit accept Terms checkbox if shown; app proceeds to Services,/Users/samir/Downloads/scanverse/smoke-screenshots/02-after-terms.png
