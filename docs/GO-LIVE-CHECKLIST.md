@@ -89,6 +89,8 @@ ScanV sends **SMS first**; voice is only a fallback if SMS fails. If users get c
 
 - [ ] MSG91 auth key set (`MSG91_AUTH_KEY`) if using MSG91 SMS fallback
 - [ ] MSG91 DLT template registered (separate from 2Factor DLT)
+- [ ] Fast2SMS API key set (`FAST2SMS_API_KEY`) — [Dev API](https://www.fast2sms.com) → third SMS fallback
+- [ ] Fast2SMS DLT sender + template registered (`FAST2SMS_SENDER_ID`, `FAST2SMS_DLT_MESSAGE_ID` or `FAST2SMS_DLT_TEMPLATE_ID`)
 - [ ] WhatsApp backup OTP configured — see [DEPLOY-WHATSAPP-VERIFY.md](./DEPLOY-WHATSAPP-VERIFY.md)
 - [ ] MSG91 WhatsApp template approved for `+91-9270194842`
 - [ ] `whatsapp-verify` edge function deployed
@@ -178,6 +180,7 @@ Tick these in Admin → **Go-Live** → Manual checklist (section **I. Backup & 
 | OTP delivery report | https://getscanv.com/#otp-delivery-report |
 | Supabase dashboard | https://supabase.com/dashboard/project/rwlwrmmqtedugcreweut |
 | 2Factor.in | https://2factor.in |
+| Fast2SMS | https://www.fast2sms.com |
 | Razorpay dashboard | https://dashboard.razorpay.com |
 
 ---

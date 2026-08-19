@@ -24,6 +24,7 @@ C4Context
     System_Ext(supabase, "Supabase", "Postgres · Auth · Edge Functions · Realtime · pg_cron")
     System_Ext(twofactor, "2Factor.in", "Primary India SMS OTP")
     System_Ext(msg91, "MSG91", "SMS / WhatsApp fallback")
+    System_Ext(fast2sms, "Fast2SMS", "DLT SMS fallback")
     System_Ext(twilio, "Twilio", "Intl SMS · voice OTP · dispatch notify")
     System_Ext(vyapar, "HDFC Vyapar UPI", "Merchant collect · Vyapar QR · webhooks")
     System_Ext(upiapps, "UPI apps", "Google Pay · PhonePe · Paytm · Navi · BHIM")
@@ -75,7 +76,7 @@ flowchart TB
     end
 
     subgraph External["External providers toggled in Admin Go-Live"]
-        OTP["2Factor / MSG91 / Twilio"]
+        OTP["2Factor / MSG91 / Fast2SMS / Twilio"]
         PAY["Vyapar UPI · Razorpay"]
         UPI["GPay · PhonePe · Paytm · Navi · BHIM"]
         DG["Digio eKYC"]
@@ -165,6 +166,7 @@ flowchart LR
 |------------|----------|-----------------|
 | `vendor_enable_2factor` | 2Factor.in | Skip 2Factor OTP route |
 | `vendor_enable_msg91` | MSG91 | Skip MSG91 SMS/WA |
+| `vendor_enable_fast2sms` | Fast2SMS | Skip Fast2SMS DLT SMS |
 | `vendor_enable_twilio` | Twilio | Skip Twilio SMS/voice |
 | `vendor_enable_whatsapp` | WhatsApp verify | Block WA verification |
 | `vendor_enable_razorpay` | Razorpay | Hide Razorpay; no links |
@@ -264,7 +266,7 @@ flowchart TB
 | Payments primary | HDFC Vyapar UPI · UPI deep links GPay PhonePe Paytm Navi BHIM |
 | Payments backup | Razorpay payment links |
 | SMS OTP primary | 2Factor.in |
-| SMS OTP fallback | MSG91 Twilio voice optional |
+| SMS OTP fallback | MSG91 → Fast2SMS → Twilio; voice optional |
 | WhatsApp | whatsapp-verify outbound plus reply |
 | Partner dispatch | In-app sequential offers plus SMS call WhatsApp backup |
 | Realtime | Supabase Realtime pricing |

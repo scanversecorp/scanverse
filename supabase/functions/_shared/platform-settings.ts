@@ -11,6 +11,7 @@ export const GO_LIVE_SWITCH_KEYS = new Set([
   "dispatch_open",
   "vendor_enable_2factor",
   "vendor_enable_msg91",
+  "vendor_enable_fast2sms",
   "vendor_enable_twilio",
   "vendor_enable_whatsapp",
   "vendor_enable_razorpay",

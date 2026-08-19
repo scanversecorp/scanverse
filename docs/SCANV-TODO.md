@@ -1,6 +1,6 @@
 # ScanV Todo List
 
-**Updated:** 19 Aug 2026, 9:05 PM IST  
+**Updated:** 20 Aug 2026, 1:00 AM IST  
 **Owners:** Samir + Jasmeen
 
 Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).
@@ -38,7 +38,24 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 ---
 
-## Twilio (virtual number / SMS fallback)
+---
+
+## Fast2SMS (SMS fallback #3)
+
+SMS chain (live in prod): **2Factor → MSG91 → Fast2SMS → Twilio**.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | Fast2SMS provider wired in `notify.ts` | ✅ Deployed | 20 Aug — edge functions + migration pushed |
+| 2 | `vendor_enable_fast2sms` Go-Live switch | ✅ Live | Migration `20260820000001` applied |
+| 3 | **Fast2SMS account + Dev API key** | ⏳ **Next** | Sign up [fast2sms.com](https://www.fast2sms.com) → Dev API → copy Authorization key |
+| 4 | **DLT registration** (sender + OTP template) | ⏳ Pending | Free DLT onboarding in Fast2SMS panel; separate from 2Factor/MSG91 DLT |
+| 5 | Supabase `FAST2SMS_*` secrets | ⏳ After #3 | See commands below + [SECRETS-AND-PINS-INVENTORY.md](./SECRETS-AND-PINS-INVENTORY.md) |
+| 6 | Test OTP via fallback | ⏳ After #5 | Temporarily disable 2Factor/MSG91 in Admin → Go-Live, or watch logs when primary fails |
+
+---
+
+## Twilio (virtual number / SMS fallback #4)
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
@@ -108,12 +125,20 @@ node scripts/instagram_daily_post.mjs --dry-run
 # Vercel cron dry run (production)
 curl -s "https://getscanv.com/api/cron/instagram-daily?dry_run=true"
 
-# Twilio secrets (after SMS trial)
+# Twilio secrets (after SMS trial — fallback #4)
 npx supabase secrets set \
   TWILIO_ACCOUNT_SID=ACxxxx \
   TWILIO_AUTH_TOKEN=xxxx \
   TWILIO_SMS_FROM=+1xxxxxxxxxx \
   TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
+
+# Fast2SMS secrets (fallback #3 — after Dev API key + DLT template)
+npx supabase secrets set \
+  FAST2SMS_API_KEY=your_dev_api_key \
+  FAST2SMS_SENDER_ID=SCANV \
+  FAST2SMS_DLT_MESSAGE_ID=your_fast2sms_dlt_message_id \
+  FAST2SMS_DLT_TEMPLATE_ID=your_trai_content_template_id \
+  FAST2SMS_DLT_ENTITY_ID=your_trai_entity_id
 
 # Manual health report test
 HEALTH_REPORT_SECRET=<secret> node scripts/ops-health-review.mjs
@@ -128,7 +153,8 @@ HEALTH_REPORT_SECRET=<secret> node scripts/ops-health-review.mjs
 | 12 | **HDFC Vyapar / UPI live collections** | ⏳ **Blocked — bank** | Owner reached out to **bank** (19 Aug 2026); still working on merchant KYC / VPA activation / webhook side. Go-Live §B items stay open until bank confirms. |
 | 13 | Vyapar webhook + `VYAPAR_WEBHOOK_SECRET` + ₹1 UPI test | ⏳ After bank | Depends on §12 — auto-confirm booking flow cannot sign off until live UPI works. |
 | 14 | **Razorpay live** backup path | ⏳ Parallel | Can complete while waiting on Vyapar — webhook + phone test does not require HDFC. |
-| 15 | **2Factor / DLT / OTP delivery** | ⏳ Parallel | Independent of Vyapar — fix SMS callbacks + delivery report before real bookings. |
+| 15 | **2Factor / DLT / OTP delivery** | ⏳ Parallel | Primary SMS path — fix SMS callbacks + delivery report before real bookings. |
+| 16 | **Fast2SMS secrets + DLT** | ⏳ Parallel | Fallback #3 — code deployed; needs API key + DLT template (see Fast2SMS section). |
 
 **While bank works on Vyapar:** OTP (§A), Razorpay backup (§C), E2E browse/OTP (partial §H), backup drill (§I), device testing (§F).
 

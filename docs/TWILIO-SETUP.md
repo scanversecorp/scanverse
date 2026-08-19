@@ -34,7 +34,7 @@ Twilio is a **fallback** provider, not primary for India OTP.
 | `TWILIO_PHONE_NUMBER` | Fallback if `*_FROM` unset |
 
 **Files:**
-- `supabase/functions/_shared/notify.ts` — SMS/voice/WhatsApp send; Twilio after MSG91, before 2Factor
+- `supabase/functions/_shared/notify.ts` — SMS/voice/WhatsApp send; SMS order **2Factor → MSG91 → Fast2SMS → Twilio**
 - `supabase/functions/booking-dispatch/index.ts` — voice TwiML, call status, inbound SMS webhooks
 - `supabase/functions/whatsapp-verify/index.ts` — optional Twilio WhatsApp verify fallback
 - `supabase/functions/_shared/vendor-providers.ts` — `vendor_enable_twilio` platform flag (default ON)

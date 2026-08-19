@@ -17,7 +17,7 @@ The full system context, deployment, edge-function, vendor-toggle, and security 
 | Supabase project | `rwlwrmmqtedugcreweut` |
 | Edge functions | 11 — see ARCHITECTURE.md §3 |
 | Payments | Vyapar UPI primary · GPay PhonePe Paytm Navi BHIM · Razorpay backup |
-| OTP | 2Factor primary · MSG91 Twilio fallback · WhatsApp verify |
+| OTP | 2Factor primary · MSG91 · Fast2SMS · Twilio fallback · WhatsApp verify |
 | Admin go-live | `#admin` → Go-Live tab · vendor toggles |
 | QR | `/?qr=1` direct browse · `/scanv-qr.png` print asset |
 

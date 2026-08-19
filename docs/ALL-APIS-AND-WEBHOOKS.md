@@ -27,7 +27,7 @@ All functions have `verify_jwt = false` in `supabase/config.toml`. Auth via head
 { "action": "verify", "mobile": "+919876543210", "otp": "123456" }
 ```
 
-**Secrets used:** `TWOFACTOR_API_KEY`, `MSG91_AUTH_KEY`, `TWILIO_*`, `OTP_DEV_MODE`
+**Secrets used:** `TWOFACTOR_API_KEY`, `MSG91_AUTH_KEY`, `FAST2SMS_API_KEY`, `TWILIO_*`, `OTP_DEV_MODE`
 
 Stores 2Factor `SessionId` on `vendor_otp.session_id` for delivery report correlation.
 
@@ -212,6 +212,7 @@ Events: payment.captured, payment_link.paid
 |----------|-----|-------------|-------------|
 | 2Factor.in | SMS OTP | `send-otp` / `_shared/notify.ts` | `TWOFACTOR_API_KEY` |
 | MSG91 | SMS, WhatsApp | `notify.ts`, `whatsapp-verify` | `MSG91_AUTH_KEY`, `MSG91_WHATSAPP_*` |
+| Fast2SMS | SMS (DLT) | `notify.ts` | `FAST2SMS_API_KEY`, `FAST2SMS_DLT_*` |
 | Twilio | SMS, Voice, WhatsApp | `notify.ts`, `booking-dispatch` | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_*_FROM` |
 | Razorpay | Payment links, webhooks | `razorpay-payment` | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
 | Digio | eKYC | `vendor-onboard` | `DIGIO_API_KEY`, `DIGIO_CLIENT_ID`, `DIGIO_CLIENT_SECRET` |

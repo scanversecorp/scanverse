@@ -48,10 +48,10 @@ export type DailyHealthReport = {
   total: number;
 };
 
-const EXPECTED_VENDORS = ["twofactor", "msg91", "twilio", "whatsapp", "razorpay", "vyapar_upi"];
+const EXPECTED_VENDORS = ["twofactor", "msg91", "fast2sms", "twilio", "whatsapp", "razorpay", "vyapar_upi"];
 const EXPECTED_UPI = ["gpay", "phonepe", "paytm", "navi", "bhim", "any"];
 const EXPECTED_VENDOR_SWITCHES = [
-  "vendor_enable_2factor", "vendor_enable_msg91", "vendor_enable_twilio",
+  "vendor_enable_2factor", "vendor_enable_msg91", "vendor_enable_fast2sms", "vendor_enable_twilio",
   "vendor_enable_whatsapp", "vendor_enable_razorpay", "vendor_enable_vyapar_upi",
   "vendor_enable_upi_gpay", "vendor_enable_upi_phonepe", "vendor_enable_upi_paytm",
   "vendor_enable_upi_navi", "vendor_enable_upi_bhim", "vendor_enable_upi_any",

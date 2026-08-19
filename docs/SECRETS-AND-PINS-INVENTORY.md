@@ -37,7 +37,7 @@
 | Secret Name | Where Set | Purpose | Notes |
 |-------------|-----------|---------|-------|
 | `TWOFACTOR_API_KEY` | Supabase secrets | 2Factor.in SMS OTP | Server-side only (removed from client) |
-| `MSG91_AUTH_KEY` | Supabase secrets | MSG91 SMS | Primary SMS provider |
+| `MSG91_AUTH_KEY` | Supabase secrets | MSG91 SMS | Fallback after 2Factor |
 | `MSG91_SMS_SENDER` | Supabase secrets | SMS sender ID | Default: `SCANV` |
 | `MSG91_SMS_TEMPLATE_ID` | Supabase secrets | DLT template | Optional |
 | `MSG91_WHATSAPP_AUTH_KEY` | Supabase secrets | MSG91 WhatsApp | |
@@ -46,7 +46,12 @@
 | `MSG91_WHATSAPP_TEMPLATE_NAMESPACE` | Supabase secrets | Template namespace | |
 | `MSG91_WHATSAPP_TEMPLATE_LANG` | Supabase secrets | Template language | Default: `en` |
 | `MSG91_WHATSAPP_TEMPLATE_BODY2` | Supabase secrets | Two-body template flag | |
-| `TWILIO_ACCOUNT_SID` | Supabase secrets | Twilio fallback | SMS/Voice/WhatsApp |
+| `FAST2SMS_API_KEY` | Supabase secrets | Fast2SMS DLT SMS | Fallback #3 after MSG91; alias `FAST2SMS_KEY` |
+| `FAST2SMS_SENDER_ID` | Supabase secrets | DLT sender header | Default: `SCANV` |
+| `FAST2SMS_DLT_MESSAGE_ID` | Supabase secrets | Fast2SMS DLT template ID | OTP route (`route: dlt`) |
+| `FAST2SMS_DLT_TEMPLATE_ID` | Supabase secrets | TRAI content template ID | Optional if registered in Fast2SMS DLT Manager |
+| `FAST2SMS_DLT_ENTITY_ID` | Supabase secrets | TRAI principal entity ID | Optional if registered in Fast2SMS DLT Manager |
+| `TWILIO_ACCOUNT_SID` | Supabase secrets | Twilio fallback | SMS/Voice/WhatsApp (last resort) |
 | `TWILIO_AUTH_TOKEN` | Supabase secrets | Twilio auth | |
 | `TWILIO_SMS_FROM` | Supabase secrets | SMS from number | |
 | `TWILIO_VOICE_FROM` | Supabase secrets | Voice from number | |
@@ -119,7 +124,7 @@
 | Item | Status |
 |------|--------|
 | `TWOFACTOR_KEY` in App.js | **Removed** — was unused; OTP via edge function |
-| `FAST2SMS_KEY` in App.js | **Removed** — was unused |
+| `FAST2SMS_KEY` in App.js | **Removed** — use server-side `FAST2SMS_API_KEY` in Supabase secrets |
 
 **Action:** Rotate the 2Factor API key in 2Factor dashboard if it was ever active, since it was previously in client bundle.
 

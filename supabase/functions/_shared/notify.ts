@@ -85,6 +85,85 @@ function msg91LooksSuccessful(data: unknown, bodyText: string): boolean {
   return !/invalid authkey|authentication fail|error/i.test(bodyText);
 }
 
+function fast2SmsApiKey(): string | undefined {
+  return Deno.env.get("FAST2SMS_API_KEY") || Deno.env.get("FAST2SMS_KEY");
+}
+
+function fast2SmsLooksSuccessful(data: unknown, bodyText: string): boolean {
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    if (o.return === true) return true;
+    if (String(o.status || "").toLowerCase() === "success") return true;
+  }
+  return /message sent successfully|"return"\s*:\s*true/i.test(bodyText);
+}
+
+/** Fast2SMS DLT route — India (+91) only; https://docs.fast2sms.com/reference/dlt-manual-single */
+async function sendFast2Sms(
+  norm: string,
+  message: string,
+  otpCode?: string,
+): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
+  const apiKey = fast2SmsApiKey();
+  if (!apiKey) return { ok: false, error: "Fast2SMS not configured" };
+  if (!norm.startsWith("+91")) return { ok: false, error: "Fast2SMS India only" };
+
+  const phone10 = mobileDigitsE164(norm).slice(-10);
+  const sender = Deno.env.get("FAST2SMS_SENDER_ID") || "SCANV";
+  const dltMessageId = Deno.env.get("FAST2SMS_DLT_MESSAGE_ID");
+  const dltTemplateId = Deno.env.get("FAST2SMS_DLT_TEMPLATE_ID");
+  const dltEntityId = Deno.env.get("FAST2SMS_DLT_ENTITY_ID");
+  const otp = otpCode || message.match(/\b(\d{6})\b/)?.[1];
+
+  const body: Record<string, string> = dltMessageId && otp
+    ? {
+      route: "dlt",
+      sender_id: sender,
+      message: dltMessageId,
+      variables_values: otp,
+      numbers: phone10,
+    }
+    : {
+      route: "dlt_manual",
+      sender_id: sender,
+      message: message.slice(0, 480),
+      numbers: phone10,
+      ...(dltTemplateId ? { template_id: dltTemplateId } : {}),
+      ...(dltEntityId ? { entity_id: dltEntityId } : {}),
+    };
+
+  const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+    method: "POST",
+    headers: {
+      Authorization: apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }).catch(() => null);
+
+  if (!res) return { ok: false, error: "Fast2SMS request failed" };
+
+  const bodyText = await res.text().catch(() => "");
+  let data: unknown;
+  try {
+    data = JSON.parse(bodyText);
+  } catch {
+    data = null;
+  }
+
+  if (res.ok && fast2SmsLooksSuccessful(data, bodyText)) {
+    const ref = data && typeof data === "object" && "request_id" in data
+      ? String((data as { request_id: string }).request_id)
+      : bodyText.slice(0, 120);
+    return { ok: true, provider: dltMessageId && otp ? "fast2sms-dlt" : "fast2sms", ref };
+  }
+
+  const errMsg = data && typeof data === "object"
+    ? String((data as Record<string, unknown>).message ?? (data as Record<string, unknown>).msg ?? bodyText)
+    : bodyText;
+  return { ok: false, error: errMsg.slice(0, 200) || "Fast2SMS failed" };
+}
+
 /** OTP delivery — prefers 2Factor.in for India (+91), voice fallback if SMS fails */
 export async function sendOtpDelivery(
   mobile: string,
@@ -94,6 +173,7 @@ export async function sendOtpDelivery(
     allowVoiceFallback?: boolean;
     skip2Factor?: boolean;
     skipMsg91?: boolean;
+    skipFast2Sms?: boolean;
     skipTwilio?: boolean;
   },
 ): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string; channel?: "sms" | "voice" }> {
@@ -113,8 +193,10 @@ export async function sendOtpDelivery(
 
   const sms = await sendSms(mobile, message, otpCode, {
     skipMsg91: opts?.skipMsg91,
+    skipFast2Sms: opts?.skipFast2Sms,
     skipTwilio: opts?.skipTwilio,
-    skip2Factor: opts?.skip2Factor,
+    // +91 path already tried 2Factor above — avoid duplicate send
+    skip2Factor: opts?.skip2Factor || (!!twoFactorKey && norm.startsWith("+91")),
   });
   if (sms.ok) return { ...sms, channel: "sms" };
 
@@ -134,7 +216,12 @@ export async function sendSms(
   mobile: string,
   message: string,
   otpCode?: string,
-  opts?: { skipMsg91?: boolean; skipTwilio?: boolean; skip2Factor?: boolean },
+  opts?: {
+    skip2Factor?: boolean;
+    skipMsg91?: boolean;
+    skipFast2Sms?: boolean;
+    skipTwilio?: boolean;
+  },
 ): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
   const norm = normalizeMobile(mobile);
   if (!norm) return { ok: false, error: "Invalid mobile" };
@@ -145,7 +232,30 @@ export async function sendSms(
   const twilioFrom = Deno.env.get("TWILIO_SMS_FROM") || Deno.env.get("TWILIO_PHONE_NUMBER");
   const twoFactorKey = Deno.env.get("TWOFACTOR_API_KEY");
 
-  // MSG91 SMS
+  // 2Factor.in — primary for India (+91); cheapest DLT route; fall through on failure
+  if (!opts?.skip2Factor && twoFactorKey && norm.startsWith("+91")) {
+    const phone10 = mobileDigitsE164(norm).slice(-10);
+    const otp = otpCode || message.match(/\b(\d{6})\b/)?.[1];
+    if (otp) {
+      const tf = await send2FactorOtpSms(twoFactorKey, norm, otp);
+      if (tf.ok) return tf;
+      console.warn("[SMS] 2Factor OTP failed:", tf.error);
+    } else {
+      const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";
+      const transUrl =
+        `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${encodeURIComponent(twoFactorKey)}` +
+        `&to=${encodeURIComponent(phone10)}&from=${encodeURIComponent(sender)}` +
+        `&msg=${encodeURIComponent(message.slice(0, 480))}`;
+      const transRes = await fetch(transUrl);
+      const transBody = await transRes.text().catch(() => "");
+      if (transRes.ok) {
+        return { ok: true, provider: "2factor-trans", ref: transBody.slice(0, 120) };
+      }
+      console.warn("[SMS] 2Factor transactional failed:", transBody.slice(0, 120));
+    }
+  }
+
+  // MSG91 SMS — fallback after 2Factor
   if (!opts?.skipMsg91 && msg91Key) {
     const sender = Deno.env.get("MSG91_SMS_SENDER") || "SCANV";
     const res = await fetch("https://control.msg91.com/api/v5/flow/", {
@@ -180,7 +290,14 @@ export async function sendSms(
     }
   }
 
-  // Twilio SMS
+  // Fast2SMS — third in chain (DLT); India (+91) only
+  if (!opts?.skipFast2Sms && norm.startsWith("+91")) {
+    const f2s = await sendFast2Sms(norm, message, otpCode);
+    if (f2s.ok) return f2s;
+    if (fast2SmsApiKey()) console.warn("[SMS] Fast2SMS failed:", f2s.error);
+  }
+
+  // Twilio SMS — last resort (expensive for India)
   if (!opts?.skipTwilio && twilioSid && twilioToken && twilioFrom) {
     const params = new URLSearchParams({
       From: twilioFrom,
@@ -208,7 +325,6 @@ export async function sendSms(
           : undefined,
       };
     }
-    // Fall through to 2Factor — Twilio often fails for unverified IN numbers
     console.warn(
       "[SMS] Twilio failed:",
       typeof data === "object" && data !== null && "message" in data
@@ -217,33 +333,16 @@ export async function sendSms(
     );
   }
 
-  // 2Factor.in (India) — OTP route when otpCode set; transactional SMS for dispatch alerts
-  if (!opts?.skip2Factor && twoFactorKey) {
-    const phone10 = mobileDigitsE164(norm).slice(-10);
+  // 2Factor for non-India numbers (international SMS route)
+  if (!opts?.skip2Factor && twoFactorKey && !norm.startsWith("+91")) {
     const otp = otpCode || message.match(/\b(\d{6})\b/)?.[1];
     if (otp) {
-      const url = `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`;
-      const res = await fetch(url);
-      const bodyText = await res.text().catch(() => "");
-      const parsed = parse2FactorResponse(bodyText);
-      if (parsed.ok) return { ok: true, provider: "2factor", ref: parsed.ref };
-      return { ok: false, error: parsed.error || bodyText || "2Factor SMS failed" };
+      const tf = await send2FactorOtpSms(twoFactorKey, norm, otp);
+      if (tf.ok) return tf;
     }
-    // Transactional SMS (booking alerts, not OTP)
-    const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";
-    const transUrl =
-      `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${encodeURIComponent(twoFactorKey)}` +
-      `&to=${encodeURIComponent(phone10)}&from=${encodeURIComponent(sender)}` +
-      `&msg=${encodeURIComponent(message.slice(0, 480))}`;
-    const transRes = await fetch(transUrl);
-    const transBody = await transRes.text().catch(() => "");
-    if (transRes.ok) {
-      return { ok: true, provider: "2factor-trans", ref: transBody.slice(0, 120) };
-    }
-    return { ok: false, error: transBody || "2Factor transactional SMS failed" };
   }
 
-  return { ok: false, error: "No SMS provider configured (MSG91/Twilio/2Factor)" };
+  return { ok: false, error: "No SMS provider configured (2Factor/MSG91/Fast2SMS/Twilio)" };
 }
 
 export async function makeOutboundCall(

@@ -14,7 +14,8 @@ export type VendorProviderDef = {
 export const VENDOR_PROVIDER_DEFS: VendorProviderDef[] = [
   { key: "vendor_enable_2factor", label: "2Factor.in", functions: "send-otp · vendor-onboard", description: "Primary India SMS OTP via 2Factor.in API", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_msg91", label: "MSG91", functions: "send-otp · whatsapp-verify", description: "SMS and WhatsApp fallback (MSG91)", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_twilio", label: "Twilio", functions: "send-otp · dispatch", description: "International SMS / voice fallback", defaultOn: true, production_recommendation: "on" },
+  { key: "vendor_enable_fast2sms", label: "Fast2SMS", functions: "send-otp · dispatch", description: "DLT SMS fallback after MSG91 (Fast2SMS)", defaultOn: true, production_recommendation: "on" },
+  { key: "vendor_enable_twilio", label: "Twilio", functions: "send-otp · dispatch", description: "International SMS / voice fallback (last resort)", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_whatsapp", label: "WhatsApp", functions: "whatsapp-verify", description: "WhatsApp OTP backup (+91-9270194842)", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_razorpay", label: "Razorpay", functions: "razorpay-payment", description: "Payment links — card / UPI via Razorpay checkout", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_vyapar_upi", label: "HDFC Vyapar UPI", functions: "UPI QR · collect", description: "dcoreglobalcorporati.82037575@hdfcbank — static QR + dynamic amount QR", defaultOn: true, production_recommendation: "on" },
@@ -49,6 +50,7 @@ export function clientVendorPayload(flags: Record<string, boolean>) {
   return {
     twofactor: on("vendor_enable_2factor"),
     msg91: on("vendor_enable_msg91"),
+    fast2sms: on("vendor_enable_fast2sms"),
     twilio: on("vendor_enable_twilio"),
     whatsapp: on("vendor_enable_whatsapp"),
     razorpay: on("vendor_enable_razorpay"),
@@ -78,6 +80,7 @@ export async function otpDeliveryVendorOpts(
     allowVoiceFallback,
     skip2Factor: !flags.vendor_enable_2factor,
     skipMsg91: !flags.vendor_enable_msg91,
+    skipFast2Sms: !flags.vendor_enable_fast2sms,
     skipTwilio: !flags.vendor_enable_twilio,
   };
 }
