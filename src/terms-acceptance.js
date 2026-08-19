@@ -160,57 +160,45 @@ export function PartnerLegalLinks({ accentColor = '#d63a56', fontSize = 12, sepa
   );
 }
 
-function TermsTimestampLine({ acceptedAt, C }) {
-  if (!acceptedAt) return null;
-  return (
-    <div style={{ fontSize: 11, color: C.grn, marginTop: 10, fontWeight: 600, lineHeight: 1.5 }}>
-      ✓ Manually accepted at {formatTermsAcceptedAt(acceptedAt)}
-    </div>
-  );
-}
-
 export function TermsAcceptanceField({ accepted, acceptedAt, onAccept, onRevoke, C, BDR }) {
+  const linkGreen = C.grn || '#007a4d';
+  if (accepted) {
+    return (
+      <div style={{ fontSize: 11, color: linkGreen, marginBottom: 10, fontWeight: 600, lineHeight: 1.5, textAlign: 'center' }}>
+        ✅ Accepted{' '}
+        <ScanvLegalLinks accentColor={linkGreen} fontSize={11} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
+        {acceptedAt ? (
+          <div style={{ fontSize: 10, marginTop: 4, fontWeight: 500 }}>
+            {formatTermsAcceptedAt(acceptedAt)}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
   return (
-    <div style={{ background: C.deep, border: BDR, borderRadius: 10, padding: 14, marginBottom: 14 }}>
-      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+    <div style={{ background: C.deep, border: BDR, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+      <label style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', justifyContent: 'center' }}>
         <input
           type="checkbox"
-          checked={!!accepted}
-          onChange={(e) => { if (e.target.checked) onAccept?.(); else onRevoke?.(); }}
-          style={{ marginTop: 2, accentColor: C.acc, width: 18, height: 18, flexShrink: 0 }}
+          checked={false}
+          onChange={(e) => { if (e.target.checked) onAccept?.(); }}
+          style={{ accentColor: linkGreen, width: 18, height: 18, flexShrink: 0 }}
         />
-        <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.65 }}>
-          I am joining ScanV ({SCANV_LEGAL_ENTITY}). I have read and{' '}
-          <strong style={{ color: C.txt }}>100% agree</strong> to the{' '}
-          <ScanvLegalLinks accentColor={C.acc} fontSize={13} mutedColor={C.dim} />
-          . {SCANV_LIABILITY_DISCLAIMER} {SCANV_MANDATORY_ONBOARD_ACCEPTANCE}
-          <span style={{ color: C.acc }}> *</span>
-        </span>
+        <ScanvLegalLinks accentColor={linkGreen} fontSize={13} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
       </label>
-      <TermsTimestampLine acceptedAt={acceptedAt} C={C} />
     </div>
   );
 }
 
 export function PartnerTermsAcceptanceField({ accepted, acceptedAt, onAccept, onRevoke, C, BDR }) {
   return (
-    <div style={{ background: C.deep, border: BDR, borderRadius: 10, padding: 14, marginBottom: 14 }}>
-      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={!!accepted}
-          onChange={(e) => { if (e.target.checked) onAccept?.(); else onRevoke?.(); }}
-          style={{ marginTop: 2, accentColor: C.acc, width: 18, height: 18, flexShrink: 0 }}
-        />
-        <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.65 }}>
-          I am joining ScanV ({SCANV_LEGAL_ENTITY}) as an independent Partner / vendor / service provider. I have read and{' '}
-          <strong style={{ color: C.txt }}>100% agree</strong> to the{' '}
-          <PartnerLegalLinks accentColor={C.acc} fontSize={13} mutedColor={C.dim} />
-          . {SCANV_LIABILITY_DISCLAIMER} {SCANV_MANDATORY_ONBOARD_ACCEPTANCE}
-          <span style={{ color: C.acc }}> *</span>
-        </span>
-      </label>
-      <TermsTimestampLine acceptedAt={acceptedAt} C={C} />
-    </div>
+    <TermsAcceptanceField
+      accepted={accepted}
+      acceptedAt={acceptedAt}
+      onAccept={onAccept}
+      onRevoke={onRevoke}
+      C={C}
+      BDR={BDR}
+    />
   );
 }
