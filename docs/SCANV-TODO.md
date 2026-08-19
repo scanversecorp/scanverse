@@ -38,7 +38,16 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 ---
 
-## Social automation (@scanvapp)
+## Twilio (virtual number / SMS fallback)
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | Twilio account (ScanV) | ✅ Live | Trial · 20 days left · see console |
+| 2 | **Start SMS trial** → free virtual number | ⏳ 1 click | Console home → **Start SMS trial** |
+| 3 | Supabase `TWILIO_*` secrets | ⏳ Manual | After trial — [TWILIO-SETUP.md](./TWILIO-SETUP.md) |
+| 4 | Webhooks on trial number | ⏳ After #2 | booking-dispatch + whatsapp-verify URLs in doc |
+
+---
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
