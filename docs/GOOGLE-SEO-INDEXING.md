@@ -6,6 +6,40 @@
 
 ---
 
+## Why Google shows “ScanV coming to?” (snippet issue)
+
+**Root cause:** The website HTML does **not** say “coming soon” — but your **pre-launch social copy** does, heavily:
+
+- Instagram/Facebook bios and posts: “🚀 Coming soon everywhere in Pune & PCMC”, “Coming Hot”, “Pune, I'm coming HOT”
+- Google often **rewrites snippets** from indexed social profiles, linked pages, or visible page text — not just `<meta description>`
+
+Because the homepage is a **JavaScript SPA** with almost no static body text, Google had little on-page copy to use and may pull from Instagram `@scanvapp` instead. That gets truncated to something like **“ScanV coming to?”**.
+
+**Competing names** also dilute brand search: Scanova, Scanva, Scany (Play Store / Chrome) rank for fuzzy “ScanV” queries.
+
+**Fixes shipped in code (19 Aug 2026):**
+
+| Change | File | Why |
+|--------|------|-----|
+| Title → “ScanV — Official App \| getscanv.com” | `index.html` | Brand-first, definitive (not pre-launch) |
+| Meta + OG + Twitter → “official booking app” | `index.html`, `scanv-brand.html` | Consistent snippet candidates |
+| Rich `<noscript>` + loader text | `index.html` | Crawlable copy without JS |
+| WebApplication JSON-LD + social `sameAs` | `index.html` | Brand ↔ domain ↔ Instagram/Facebook link |
+| Manifest name/description | `manifest.json` | PWA install label matches brand |
+
+**Manual actions still required:**
+
+1. **Update Instagram/Facebook bio** — replace “Coming soon…” with:  
+   `ScanV — Official app · getscanv.com · Pune & PCMC`
+2. **GSC** → Sitemaps → submit `sitemap.xml` (retry now that XML is live)
+3. **GSC** → URL inspection → Request indexing for `/` and `/scanv-brand.html` after deploy
+4. **Google Business Profile** — business name exactly `ScanV`, website `getscanv.com`
+5. **Link getscanv.com** from dcoreglobal.com footer
+
+**Timeline for #1 on “ScanV”:** 2–6 weeks after deploy + GSC re-crawl, assuming social bios updated and no stronger trademark conflict. Exact brand match + verified domain usually wins once authority signals align.
+
+---
+
 ## What we shipped in code
 
 | Asset | Path | Purpose |
@@ -117,10 +151,10 @@ node scripts/generate-sitemap.mjs
 
 ## Checklist
 
-- [ ] Deploy robots.txt + sitemap + brand page
-- [ ] GSC domain verified (DNS TXT)
-- [ ] Sitemap submitted
-- [ ] Top 4 URLs requested for indexing
+- [x] Deploy robots.txt + sitemap + brand page
+- [x] GSC domain verified (DNS TXT)
+- [ ] Sitemap submitted (retry in GSC → `sitemap.xml`)
+- [ ] Top 4 URLs requested for indexing (after official-app meta deploy)
 - [ ] Google Business Profile created
-- [ ] Social bios link to getscanv.com
+- [ ] Social bios updated — **remove “Coming soon”**, use “Official app · getscanv.com”
 - [ ] India registered address added to schema when available

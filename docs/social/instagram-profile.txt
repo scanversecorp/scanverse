@@ -7,11 +7,11 @@ Profile photo: docs/social/scanv-profile-picture.png
 Link: https://getscanv.com?utm_source=instagram&utm_medium=bio
 
 BIO (copy as-is)
-One App for everything ✨
+ScanV — Official app ✨
+One App for everything
 Local community · Local support · Global happiness
-🚀 Coming soon everywhere in Pune & PCMC
+Pune & PCMC · getscanv.com ↓
 Your mess, our problem 😉
-Book cleaning · delivery & more ↓
 
 HIGHLIGHTS
 1. How it works — Browse → Book → Track (cheeky slides)
@@ -30,7 +30,7 @@ App link + "Day 1 gang check in 👇"
 FIRST CAROUSEL SLIDE TEXT
 Slide 1: "One App for everything"
 Slide 2: "Local community · Local support · Global happiness"
-Slide 3: "Coming soon everywhere in Pune & PCMC 🚀"
+Slide 3: "Official app · Pune & PCMC · getscanv.com"
 
 CAPTION STYLE
 See docs/social/genz-week-posts.txt

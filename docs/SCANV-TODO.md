@@ -28,10 +28,13 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | [GOOGLE-SEO-INDEXING.md](./GOOGLE-SEO-INDEXING.md) |
+| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | GSC verified; **retry sitemap submit** → `sitemap.xml` |
 | 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Needs verified phone + address when available |
 | 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
-| 4 | Deploy `robots.txt`, `sitemap.xml`, `scanv-brand.html` | ⏳ Pending push | Fixes `/robots.txt` returning SPA HTML today |
+| 4 | Deploy `robots.txt`, `sitemap.xml`, `scanv-brand.html` | ✅ Live | `/sitemap.xml` + `/robots.txt` serve correctly on prod |
+| 5 | **GSC domain verified** for `getscanv.com` | ✅ Done | DNS TXT via Cloudflare · account jasmeen.workmail@gmail.com |
+| 6 | Submit sitemap + request indexing | ⏳ Manual | Submit in GSC; request `/` + `/scanv-brand.html` after next deploy |
+| 7 | **Fix “ScanV coming to?” snippet** | ✅ Code ready | Official-app meta + noscript + JSON-LD · **deploy + update IG/FB bio** |
 
 ---
 

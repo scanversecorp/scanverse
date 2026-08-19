@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
   <meta name="theme-color" content="#d63a56"/>
-  <meta name="description" content="ScanV (getscanv.com) — Official app to book verified services in Pune &amp; PCMC. Legal, Health, Cloud, Household, Food &amp; more. Operated by DCore."/>
+  <meta name="description" content="ScanV — the official booking app at getscanv.com. Book verified local services in Pune &amp; PCMC: household, legal, health, food, delivery &amp; more. Operated by DCore."/>
   <meta name="author" content="ScanV · DCore"/>
   <meta name="keywords" content="ScanV, getscanv, getscanv.com, Pune services, PCMC booking, verified partners"/>
   <link rel="canonical" href="https://getscanv.com/"/>
@@ -23,7 +23,23 @@
         "email": "hello@getscanv.com",
         "telephone": "+91-9270194842",
         "areaServed": { "@type": "AdministrativeArea", "name": "Pune, Maharashtra, India" },
-        "sameAs": ["https://www.dcoreglobal.com", "https://getscanv.com/scanv-brand.html"]
+        "description": "ScanV is the official marketplace app at getscanv.com to book verified local services in Pune and PCMC, India.",
+        "sameAs": [
+          "https://www.dcoreglobal.com",
+          "https://getscanv.com/scanv-brand.html",
+          "https://www.instagram.com/scanvapp",
+          "https://www.facebook.com/scanvapp"
+        ]
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://getscanv.com/#app",
+        "name": "ScanV",
+        "url": "https://getscanv.com/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+        "publisher": { "@id": "https://getscanv.com/#organization" }
       },
       {
         "@type": "WebSite",
@@ -46,14 +62,17 @@
   <meta name="msapplication-TileColor" content="#d63a56"/>
 
   <!-- Open Graph -->
-  <meta property="og:title" content="ScanV — Verified services · Local Communities"/>
-  <meta property="og:description" content="Legal · Health · Cloud · Property · Household · Food — verified partners in Local Communities. Designed & Developed with Incorporation, San Francisco, California, USA."/>
+  <meta property="og:title" content="ScanV — Official App | getscanv.com"/>
+  <meta property="og:description" content="ScanV is the official booking app at getscanv.com — verified local services in Pune &amp; PCMC. Operated by DCore."/>
   <meta property="og:type" content="website"/>
-  <meta property="og:url" content="https://getscanv.com"/>
+  <meta property="og:url" content="https://getscanv.com/"/>
   <meta property="og:image" content="https://getscanv.com/logo512.png"/>
   <meta property="og:image:width" content="512"/>
   <meta property="og:image:height" content="512"/>
+  <meta property="og:site_name" content="ScanV"/>
   <meta name="twitter:card" content="summary"/>
+  <meta name="twitter:title" content="ScanV — Official App"/>
+  <meta name="twitter:description" content="Official ScanV booking app — getscanv.com · Pune &amp; PCMC"/>
   <meta name="twitter:image" content="https://getscanv.com/logo512.png"/>
 
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json"/>
@@ -83,7 +102,7 @@
   <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-  <title>ScanV — Book Verified Services · Pune &amp; PCMC | getscanv.com</title>
+  <title>ScanV — Official App | getscanv.com · Pune &amp; PCMC</title>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -135,10 +154,22 @@
   </style>
 </head>
 <body>
-  <noscript>ScanV requires JavaScript to run. Please enable JavaScript in your browser.</noscript>
+  <noscript>
+    <h1>ScanV — Official App</h1>
+    <p>
+      <strong>ScanV</strong> is the official booking app at
+      <a href="https://getscanv.com/">getscanv.com</a>.
+      Book verified local services in Pune and PCMC — household help, legal, health at home,
+      food, delivery, beauty, repairs, and vehicle care. Operated by DCore.
+    </p>
+    <p><a href="https://getscanv.com/">Open ScanV app</a></p>
+  </noscript>
 
   <div id="root-loader">
-    <img class="logo" src="%PUBLIC_URL%/scanv-brand-logo.png" alt="ScanV" width="96" height="96"/>
+    <img class="logo" src="%PUBLIC_URL%/scanv-brand-logo.png" alt="ScanV — official app at getscanv.com" width="96" height="96"/>
+    <p style="font-size:14px;font-weight:600;color:#444;text-align:center;max-width:300px;line-height:1.4">
+      ScanV — official app at getscanv.com
+    </p>
     <div class="spin"></div>
   </div>
 
