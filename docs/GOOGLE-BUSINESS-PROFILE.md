@@ -2,7 +2,9 @@
 
 **Updated:** 19 Aug 2026  
 **Account:** jasmeen.workmail@gmail.com (same as Google Search Console)  
-**Status:** ⏳ Manual setup required — address now documented in code + schema
+**Status:** ⏳ Owner profile started (19 Aug 2026) — share link exists but **not publicly visible on Google Maps yet** until verification completes.
+
+**Owner share link (login required):** https://share.google/dQErySuU5oYD5mjvK
 
 ScanV Corp is registered at **Gera Imperium Gateway**, a commercial office building in PCMC, Pune. Use this address for Google Business Profile (GBP), MCA/GST filings, and merchant KYC once your virtual-office or suite number is confirmed with the provider.
 
@@ -85,6 +87,20 @@ Gera Imperium Gateway, C.T.S. No. 2656(P), Nashik Phata Flyover, Opp. Bhosari Me
 | Website | https://getscanv.com |
 | Hours | By appointment / 24×7 online (app) — or Mon–Sat 9:00–18:00 if you staff the office |
 
+### Business description (paste into GBP)
+
+```
+ScanV is the official local services app for Pune & PCMC. Book verified partners for household help, deep cleaning, repairs, beauty, food delivery, legal, health, and more — all in one app.
+
+Browse services, book in minutes, pay via UPI, and track your booking on getscanv.com. We connect Punekars with trusted local professionals so you skip random WhatsApp forwards and get verified, accountable service.
+
+ScanV Corp · Operated by DCore · Serving Pune, Pimpri-Chinchwad & surrounding areas.
+
+Register at getscanv.com · Partners welcome.
+```
+
+*(~520 characters — under GBP 750 limit)*
+
 ### 5. Verify
 
 Google will offer one or more of:
@@ -105,7 +121,7 @@ Google will offer one or more of:
 ### 6. After verification
 
 - [ ] Add logo (`logo512.png`) and cover photo
-- [ ] Add description: *“ScanV is the official app at getscanv.com — book verified local services in Pune & PCMC.”*
+- [ ] Add description (see **Business description** above)
 - [ ] Link Instagram + Facebook (`@scanvapp`)
 - [ ] Enable messaging (optional)
 - [ ] Post first update (link to https://getscanv.com)
