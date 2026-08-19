@@ -19,7 +19,7 @@ import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
 import { StudentCloudAdmitScreen, useStudentCloudFeeView, resolveUserMobile10 } from './student-cloud';
-import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL, useScanvTermsAcceptance, ScanvLegalLinks } from './terms-acceptance';
+import { writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL, useScanvTermsAcceptance, ScanvLegalLinks, PartnerTermsAcceptanceField, SCANV_PARTNER_TERMS_ACCEPTED_LABEL, usePartnerTermsAcceptance, PartnerLegalLinks, SCANV_LEGAL_ENTITY, SCANV_LIABILITY_DISCLAIMER, SCANV_MANDATORY_ONBOARD_ACCEPTANCE, SCANV_TERMS_VERSION, formatTermsAcceptedAt } from './terms-acceptance';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -2721,7 +2721,7 @@ function CopyrightLine({ style }) {
   return (
     <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.45, ...style }}>
       <div>© ScanV</div>
-      <div style={{ marginTop: 4, fontSize: 10, color: '#888' }}>Operated by DCore - All Rights Reserved</div>
+      <div style={{ marginTop: 4, fontSize: 10, color: '#888' }}>Operated by {SCANV_LEGAL_ENTITY} — All Rights Reserved</div>
       <div style={{ marginTop: 4 }}>{INCORPORATION_ORIGIN}</div>
     </div>
   );
@@ -3305,7 +3305,7 @@ const APP_CSS = `
   .rzp-pay-wrap{display:flex;justify-content:center;align-items:center;width:100%;max-width:480px;margin:0 auto}
 `;
 
-const LEGAL_ROUTES = new Set(['privacy','terms','refund','payment','dpdp']);
+const LEGAL_ROUTES = new Set(['privacy','terms','refund','payment','dpdp','partner-terms']);
 
 /** First path segment only; empty for `/` — never treat home as a legal page. */
 function legalSegment() {
@@ -4827,7 +4827,7 @@ async function resolveCustomerProfileId(mob) {
 async function upsertCustomerProfile({
   id, mob, firstName, lastName, address, village, city, pincode, email,
   lastLat, lastLng, silentGeo, ip, dev, mobileVerified = true,
-  allowRegistered = false, dateOfBirth, gender, age,
+  allowRegistered = false, dateOfBirth, gender, age, termsAcceptedAt,
 }) {
   const normMob = normalizeMobileE164(mob);
   const fakeEmail = email || profileAuthEmail(mob);
@@ -4872,6 +4872,8 @@ async function upsertCustomerProfile({
     language: device.language,
     mobile_verified: mobileVerified,
     mobile_verified_at: mobileVerified ? new Date().toISOString() : null,
+    terms_accepted_at: termsAcceptedAt || null,
+    terms_version: termsAcceptedAt ? SCANV_TERMS_VERSION : null,
     role: 'customer',
     status: 'active',
     avatar: '👤',
@@ -5091,8 +5093,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const [waChecking, setWaChecking] = useState(false);
   const [pendingLoginProfile, setPendingLoginProfile] = useState(null);
   const [completeProfileMode, setCompleteProfileMode] = useState('login'); // login | booking
-  const [termsAccepted, setTermsAccepted] = useState(readScanvTermsAccepted);
-  const acceptTerms = () => { writeScanvTermsAccepted(); setTermsAccepted(true); };
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsAcceptedAt, setTermsAcceptedAt] = useState(null);
+  const acceptTerms = () => {
+    const now = new Date().toISOString();
+    writeScanvTermsAccepted(now);
+    setTermsAccepted(true);
+    setTermsAcceptedAt(now);
+  };
+  const revokeTerms = () => { setTermsAccepted(false); setTermsAcceptedAt(null); };
 
   const browsePrice = activeSvc?.price || 50000;
   const browseFee = Math.round(browsePrice * FEE_PCT);
@@ -5504,6 +5513,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         language: dev.language,
         mobile_verified: true,
         mobile_verified_at: new Date().toISOString(),
+        terms_accepted_at: termsAcceptedAt,
+        terms_version: termsAcceptedAt ? SCANV_TERMS_VERSION : null,
         role: 'customer',
         status: 'active',
         avatar: '👤',
@@ -5537,6 +5548,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           ip: ipAddr,
           dateOfBirth: saveDob,
           allowRegistered: true,
+          termsAcceptedAt,
         });
       }
       setPendingLoginProfile(null);
@@ -6316,7 +6328,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <Field label="City" req><input value={city} {...browseBind('city', e=>setCity(e.target.value))} placeholder="Your city" style={inpStyle('city')}/></Field>
             <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e=>setPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={inpStyle('pincode')}/></Field>
           </div>
-          <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} C={C} BDR={BDR} />
+          <TermsAcceptanceField accepted={termsAccepted} acceptedAt={termsAcceptedAt} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
           {!otpSent&&(
             <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
               {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
@@ -6432,7 +6444,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
-          <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} C={C} BDR={BDR} />
+          <TermsAcceptanceField accepted={termsAccepted} acceptedAt={termsAcceptedAt} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
           {!otpSent&&(
             <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
               {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
@@ -6507,7 +6519,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr]       = useState('');
   const timer = useRef(null);
-  const { accepted: termsAccepted, accept: acceptTerms } = useScanvTermsAcceptance();
+  const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
   const f = (k,v) => setForm(p=>({...p,[k]:v}));
 
   useEffect(()=>{
@@ -6719,6 +6731,8 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         language: device.language,
         mobile_verified: true,
         mobile_verified_at: new Date().toISOString(),
+        terms_accepted_at: termsAcceptedAt,
+        terms_version: termsAcceptedAt ? SCANV_TERMS_VERSION : null,
         role: 'customer',
         status: 'active',
         avatar: '👤',
@@ -6753,6 +6767,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
           ip,
           dateOfBirth: form.dateOfBirth,
           gender: form.gender,
+          termsAcceptedAt,
         });
         if (location) {
           await sb().from('user_locations').insert({
@@ -6875,7 +6890,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{color:C.sub,fontSize:12,textAlign:'center',lineHeight:1.65,marginBottom:10}}>
         Find and book verified services near you — Legal & Consulting, Health at Home, AI Cloud & Data Center, Property, Home Help, Food & more.
       </div>
-      <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} C={C} BDR={BDR} />
+      <TermsAcceptanceField accepted={termsAccepted} acceptedAt={termsAcceptedAt} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
       <Btn full onClick={startCollection} disabled={!termsAccepted}>Continue →</Btn>
     </>
   );
@@ -6936,7 +6951,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:11,color:C.dim}}>
         🔒 Name, date of birth, mobile, location & device stored in India per DPDP Act 2023
       </div>
-      <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} C={C} BDR={BDR} />
+      <TermsAcceptanceField accepted={termsAccepted} acceptedAt={termsAcceptedAt} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
       <Btn full onClick={sendOTP} disabled={loading||!termsAccepted}>
         {loading?<><Spin size={16}/>Sending OTP…</>:'Send OTP →'}
       </Btn>
@@ -7502,7 +7517,7 @@ function BookScreen() {
   const [bookAddress,setBookAddress]=useState(user?.address||'');
   const [bookCity,setBookCity]=useState(user?.city||'');
   const [bookPincode,setBookPincode]=useState(user?.pincode||'');
-  const { accepted: bookTermsAccepted, accept: acceptBookTerms } = useScanvTermsAcceptance();
+  const { accepted: bookTermsAccepted, acceptedAt: bookTermsAcceptedAt, accept: acceptBookTerms, revoke: revokeBookTerms } = useScanvTermsAcceptance();
   const initialLoc = [user?.village, user?.city, user?.pincode].filter(Boolean).join(', ') || '';
   const bookAuto = useAutoFillFields(autoFlagsFromValues({
     firstName: user?.first_name,
@@ -7867,7 +7882,7 @@ function BookScreen() {
             <Field label="City" req><input value={bookCity} {...bookBind('city', e=>setBookCity(e.target.value))} placeholder="Your city" style={bookInpStyle('city')}/></Field>
             <Field label="PIN code" req><input type="tel" maxLength={6} value={bookPincode} {...bookBind('pincode', e=>setBookPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={bookInpStyle('pincode')}/></Field>
           </div>
-          <TermsAcceptanceField accepted={bookTermsAccepted} onAccept={acceptBookTerms} C={C} BDR={BDR} />
+          <TermsAcceptanceField accepted={bookTermsAccepted} acceptedAt={bookTermsAcceptedAt} onAccept={acceptBookTerms} onRevoke={revokeBookTerms} C={C} BDR={BDR} />
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading||!bookTermsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
               <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} channel={bookOtpChannel} />
@@ -10331,7 +10346,7 @@ function VendorOnboardPage() {
   const [appInstalledConfirmed, setAppInstalledConfirmed] = useState(false);
   const [gpsAllowedConfirmed, setGpsAllowedConfirmed] = useState(false);
   const [selectedSvcs, setSelectedSvcs] = useState({});
-  const { accepted: vendorTermsAccepted, accept: acceptVendorTerms } = useScanvTermsAcceptance();
+  const { accepted: vendorTermsAccepted, acceptedAt: vendorTermsAcceptedAt, accept: acceptVendorTerms, revoke: revokeVendorTerms } = usePartnerTermsAcceptance();
   const allSvcs = allVendorSelectableServices();
   const mobileE164 = () => '+91' + phone.replace(/\D/g, '');
 
@@ -10411,10 +10426,14 @@ function VendorOnboardPage() {
 
   const sendOtp = async (resend = false) => {
     if (phone.replace(/\D/g, '').length !== 10) return setErr('Enter valid 10-digit mobile');
-    if (!vendorTermsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
+    if (!vendorTermsAccepted || !vendorTermsAcceptedAt) return setErr(`Please accept ${SCANV_PARTNER_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
-      await vendorOnboardFetch('send-otp', { mobile: '+91' + phone.replace(/\D/g, '') });
+      await vendorOnboardFetch('send-otp', {
+        mobile: '+91' + phone.replace(/\D/g, ''),
+        partner_terms_accepted: true,
+        partner_terms_accepted_at: vendorTermsAcceptedAt,
+      });
       setOtpSent(true);
       setOtp(emptyOtpDigits());
       if (resend) setErr('');
@@ -10428,6 +10447,7 @@ function VendorOnboardPage() {
   const verifyOtp = async () => {
     const code = otp.join('');
     if (code.length < 6) return setErr('Enter 6-digit OTP');
+    if (!vendorTermsAccepted || !vendorTermsAcceptedAt) return setErr(`Please accept ${SCANV_PARTNER_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
       await vendorOnboardFetch('verify-otp', { mobile: mobileE164(), otp: code });
@@ -10533,6 +10553,7 @@ function VendorOnboardPage() {
       service_id: s.service_id, category_id: s.category_id,
     }));
     if (!services.length) return setErr('Select at least one service');
+    if (!vendorTermsAccepted || !vendorTermsAcceptedAt) return setErr(`Please accept ${SCANV_PARTNER_TERMS_ACCEPTED_LABEL} to continue`);
     if (!addServicesMode) {
       if (!aadhaarOk) return setErr('Complete Aadhaar eKYC first');
       if (!appInstalledConfirmed || !gpsAllowedConfirmed) {
@@ -10545,6 +10566,8 @@ function VendorOnboardPage() {
         const r = await vendorOnboardFetch('update-services', {
           phone: mobileE164(),
           services,
+          partner_terms_accepted: true,
+          partner_terms_accepted_at: vendorTermsAcceptedAt,
         });
         setMsg(r.message || 'Services updated!');
         setStep(8);
@@ -10599,6 +10622,8 @@ function VendorOnboardPage() {
         highest_education: highestEducation.trim() || null,
         app_installed_confirmed: appInstalledConfirmed,
         gps_allowed_confirmed: gpsAllowedConfirmed,
+        partner_terms_accepted: true,
+        partner_terms_accepted_at: vendorTermsAcceptedAt,
         services,
       });
       setMsg(r.message || 'Registration submitted!');
@@ -10632,7 +10657,7 @@ function VendorOnboardPage() {
               <input type="tel" maxLength={10} value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={phoneVerified} />
             </div>
           </Field>
-          <TermsAcceptanceField accepted={vendorTermsAccepted} onAccept={acceptVendorTerms} C={C} BDR={BDR} />
+          <PartnerTermsAcceptanceField accepted={vendorTermsAccepted} acceptedAt={vendorTermsAcceptedAt} onAccept={acceptVendorTerms} onRevoke={revokeVendorTerms} C={C} BDR={BDR} />
           {!otpSent ? <Btn full onClick={() => sendOtp()} disabled={loading || !vendorTermsAccepted}>{loading ? <><Spin size={16} /> Sending…</> : 'Send OTP →'}</Btn> : <>
             <OtpSentFooter mobile={phone} onChangeNumber={resetPhoneOtp} onResend={() => sendOtp(true)} loading={loading} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
@@ -10838,6 +10863,11 @@ function VendorOnboardPage() {
                   : 'Service selections saved. ScanV will activate your partner account shortly.')
                 : 'ScanV will review and activate your partner account. Once active, you\'ll receive booking alerts via SMS, call & WhatsApp.'}
             </div>
+            {vendorTermsAcceptedAt && (
+              <div style={{ fontSize: 11, color: C.grn, marginTop: 16, fontWeight: 600 }}>
+                Partner Terms manually accepted at {formatTermsAcceptedAt(vendorTermsAcceptedAt)}
+              </div>
+            )}
           </div>
         )}
 
@@ -16681,11 +16711,13 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.grn}22`,border:`1px solid ${C.grn}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 Data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your personal data · By using ScanV you consent as described below</p>
+            <p style={{margin:0,color:C.grn,fontSize:13}}>🔒 Data stored in India (AWS Mumbai) · DPDP Act 2023 compliant · We never sell your personal data · {SCANV_MANDATORY_ONBOARD_ACCEPTANCE} · {SCANV_LIABILITY_DISCLAIMER}</p>
           </div>
           {[
-            ['Who We Are',`ScanV is operated by DCore ("we", "us"). We connect customers with independent service providers across ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. DCore is a technology marketplace, not the provider of booked services. Data Protection Officer: privacy@dcoreglobal.com · Grievance officer under DPDP: privacy@dcoreglobal.com (response within 30 days).`],
-            ['Acceptance & Consent',`By ticking the acceptance box before OTP, opening the app, or placing a booking, you provide explicit consent to this Privacy Policy, our Terms & Conditions, processing under the Digital Personal Data Protection Act, 2023, and GPS location collection/tracking as described in our Terms. You may withdraw consent for non-essential processing via Profile or email; withdrawal may limit platform features. Nothing in this Policy limits mandatory rights under applicable Indian consumer or data-protection law.`],
+            ['Who We Are',`ScanV (getscanv.com) is operated by ${SCANV_LEGAL_ENTITY} ("DCore", "we", "us"). We connect customers with independent service providers across ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. DCore Global Corporation is a technology marketplace intermediary, not the provider of booked services. Data Protection Officer: privacy@dcoreglobal.com · Grievance officer under DPDP: privacy@dcoreglobal.com (response within 30 days).`],
+            ['Mandatory Acceptance Before Joining',`${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} No user, customer, candidate, vendor, partner, service provider, company, or other person may browse, register, book, onboard, or use ScanV without ticking the acceptance checkbox and completing OTP verification where required. Acceptance is recorded with timestamp.`],
+            ['No Liability — ScanV / DCore Global Corporation',`${SCANV_LIABILITY_DISCLAIMER} This applies to all platform use, bookings, partner services, recruitment/candidate flows, and interactions on or off the platform to the maximum extent permitted by Indian law.`],
+            ['Acceptance & Consent',`By ticking the acceptance box before OTP, opening the app, or placing a booking, you provide explicit, informed, and unconditional consent to this Privacy Policy, our Terms & Conditions, processing under the Digital Personal Data Protection Act, 2023, and GPS location collection/tracking as described in our Terms. You confirm you have read and agree to these policies in full (100%). You may withdraw consent for non-essential processing via Profile or email; withdrawal may limit platform features. Nothing in this Policy limits mandatory rights under applicable Indian consumer or data-protection law.`],
             ['Data We Collect','Identity (name, date of birth where required), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city, village), Device (type, OS, browser, timezone, language, screen, session metadata), Booking and payment references, Partner assignment details, and usage analytics. We do NOT collect or store Aadhaar, PAN, passport, full card numbers, passwords, or biometrics on customer accounts.'],
             ['Lawful Basis (DPDP 2023)','Consent (OTP, location, marketing where opted in) · Performance of contract (booking fulfilment) · Legitimate interests (fraud prevention, platform security, service quality) · Legal obligation (GST, tax, court orders). Where consent is the basis, you may withdraw it subject to ongoing legal/contractual requirements.'],
             ['How We Use It','Verify identity via OTP before bookings · Match you with nearby Partners · Send booking, payment, and service updates via SMS/WhatsApp/email · Process platform fees and GST · Prevent fraud and abuse · Improve the platform through aggregated analytics · Comply with Indian law. We do not use your data for unrelated profiling or sale to advertisers.'],
@@ -16695,7 +16727,7 @@ function LegalPage({page}) {
             ['Cross-Border Transfer','Primary storage and processing occur in India. If any subprocessors process data outside India, we ensure contractual safeguards consistent with applicable law. You consent to such transfers where required for service delivery.'],
             ['Retention','Bookings and invoices: 7 years (GST/tax) · OTP logs: 30 days · Device/session logs: 12 months · Support and dispute records: 3 years · Deleted accounts: personal data erased within 30 days except where retention is legally required or needed to defend legal claims.'],
             ['Your Rights (DPDP Act 2023)','Access · Correction · Erasure (subject to legal retention) · Grievance redressal · Nominate a representative · Withdraw consent for consent-based processing. Email privacy@dcoreglobal.com with your registered mobile. We may verify identity before acting on requests. We may refuse manifestly unfounded or repetitive requests where permitted by law.'],
-            ['Security & Disclaimer','TLS 1.3 in transit · AES-256 at rest · AWS Mumbai · OTP-only customer auth · Row-level database security · Access controls and audit logging. While we use reasonable safeguards, no system is completely secure. To the extent permitted by law, DCore is not liable for unauthorised access caused by factors outside our reasonable control (including user device compromise or third-party breaches).'],
+            ['Security & Disclaimer','TLS 1.3 in transit · AES-256 at rest · AWS Mumbai · OTP-only customer auth · Row-level database security · Access controls and audit logging. While we use reasonable safeguards, no system is completely secure. To the maximum extent permitted by law, ScanV and DCore Global Corporation are not liable for unauthorised access, data incidents, mental distress, financial loss, or harm caused by factors outside our reasonable control (including user device compromise, Partner or service-provider misconduct, or third-party breaches).'],
             ['Children','ScanV is for users 18+. We do not knowingly collect data from minors. Contact privacy@dcoreglobal.com if you believe a minor has registered; we will delete the account.'],
             ['Changes','We may update this policy. Material changes will be reflected on this page with a new "Updated" date. Continued use after changes constitutes acceptance unless law requires separate consent.'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
@@ -16709,31 +16741,68 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By checking the acceptance box, using ScanV, or placing a booking, you agree to these Terms (including GPS tracking), our Privacy Policy, and DPDP Act 2023 processing in full.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ {SCANV_MANDATORY_ONBOARD_ACCEPTANCE} By checking the acceptance box, using ScanV, or placing a booking, you agree to these Terms (including GPS tracking), our Privacy Policy, and DPDP Act 2023 processing in full — 100% and without reservation. {SCANV_LIABILITY_DISCLAIMER}</p>
           </div>
           {[
-            ['ScanV as Marketplace Intermediary','DCore operates ScanV as an IT Intermediary under the Information Technology Act, 2000 and applicable intermediary guidelines. We provide a technology platform connecting Users with independent Partners. We do not employ Partners, do not perform services ourselves, and are not responsible for Partner conduct, service quality, safety, timeliness, outcomes, injury, loss, theft, or disputes between Users and Partners except as expressly stated here or required by non-waivable law.'],
-            ['Acceptance','You must tick the checkbox for Terms & Conditions, Privacy Policy & DPDP Act 2023 before OTP verification on every service sub-card and booking flow. Accepting includes GPS location tracking as set out in these Terms. This constitutes a legally binding electronic record under the IT Act. If you do not agree, do not use ScanV.'],
+            ['Mandatory Acceptance — All Persons Joining ScanV',`${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} This requirement applies without exception to every individual, company, firm, vendor, partner, service provider, candidate, user, and customer. You may not proceed to OTP, registration, partner onboarding, booking, or any platform feature until you tick the acceptance checkbox. Acceptance is a legally binding electronic record under the IT Act, 2000.`],
+            ['No Liability — ScanV / DCore Global Corporation',`${SCANV_LIABILITY_DISCLAIMER} This includes (without limitation) liability for misuse of the platform, acts or omissions of partners, vendors, or service providers, service outcomes, personal injury, property damage, emotional or mental impact, financial loss, data loss, candidate or recruitment outcomes, food or health incidents, transport incidents, and disputes between any parties.`],
+            ['ScanV as Marketplace Intermediary',`${SCANV_LEGAL_ENTITY} operates ScanV as an IT Intermediary under the Information Technology Act, 2000 and applicable intermediary guidelines. We provide a technology platform connecting Users with independent Partners and service providers. We do not employ Partners, do not perform services ourselves, and are not responsible or liable for Partner, vendor, or service-provider conduct, service quality, safety, timeliness, outcomes, injury, loss, theft, misuse, financial impact, mental impact, or disputes between Users and Partners except as expressly stated here or required by non-waivable law.`],
+            ['Acceptance','You must tick the checkbox for Terms & Conditions, Privacy Policy & DPDP Act 2023 before OTP verification on every service sub-card, booking flow, and onboarding path. Accepting includes GPS location tracking as set out in these Terms. This constitutes a legally binding electronic record under the IT Act. By accepting you confirm you have read, understood, and agree to these Terms in full (100%). If you do not agree, do not use ScanV.'],
             ['GPS Location & Tracking Consent','You consent to ScanV accessing device GPS (and IP-based fallback) to: show nearby services; auto-fill address and PIN; match you with Partners; route deliveries; record sign-in location; and enable live job tracking on supported categories (e.g. delivery, bike/car mechanic, towing). Partners receive your service location only to fulfil the booking. Denying GPS may block booking or dispatch. Consent is recorded with your OTP acceptance timestamp.'],
             ['Eligibility','Must be 18+ · Valid Indian mobile · Legally capable of entering contracts · Accurate information only · One account per mobile unless authorised by ScanV · Not barred by law from using marketplace services.'],
-            ['Platform Provided "As Is"','ScanV is provided on an "as is" and "as available" basis. To the maximum extent permitted by law, DCore disclaims all warranties — express, implied, or statutory — including merchantability, fitness for a particular purpose, accuracy of listings, availability of Partners, and uninterrupted operation. Prices, ETAs, ratings, and descriptions are informational and may change.'],
-            ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + legal and GPS acceptance recorded + unique TXN ID generated + applicable platform fee paid (where required). DCore may cancel, modify, or reassign bookings if no Partner is available, fraud is suspected, safety concerns arise, or terms are violated — without liability beyond refund of platform fee actually collected for that booking where applicable.'],
-            ['User Responsibilities','Provide accurate details · Be present at agreed time/location · Treat Partners respectfully · Pay agreed fees · Report issues within 48 hours · Do not use ScanV for unlawful purposes · Do not circumvent the platform to deal directly with Partners discovered via ScanV · Indemnify DCore against claims arising from your misuse or false information.'],
-            ['Partner Relationship & Verification','Partners are independent contractors, not employees or agents of DCore. DCore does not control how Partners perform services. Partner onboarding checks (mobile OTP, documents, GPS) are best-effort verification tools, not a guarantee of skill, licensure, background, or future conduct. Any warranty, advice, or outcome is solely between you and the Partner unless DCore explicitly states otherwise in writing.'],
-            ['User–Partner Disputes','Disputes about service quality, pricing beyond platform fee, damage, delay, professional advice, food quality, health outcomes, or conduct are primarily between you and the Partner. DCore may, at its sole discretion, provide support routing or record complaints but is not obligated to mediate, arbitrate, or compensate except as stated in our Refund Policy or required by law.'],
+            ['Platform Provided "As Is"','ScanV is provided on an "as is" and "as available" basis. To the maximum extent permitted by law, DCore Global Corporation disclaims all warranties — express, implied, or statutory — including merchantability, fitness for a particular purpose, accuracy of listings, availability of Partners, and uninterrupted operation. Prices, ETAs, ratings, and descriptions are informational and may change.'],
+            ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + legal and GPS acceptance recorded + unique TXN ID generated + applicable platform fee paid (where required). DCore Global Corporation may cancel, modify, or reassign bookings if no Partner is available, fraud is suspected, safety concerns arise, or terms are violated — without liability beyond refund of platform fee actually collected for that booking where applicable.'],
+            ['User Responsibilities','Provide accurate details · Be present at agreed time/location · Treat Partners respectfully · Pay agreed fees · Report issues within 48 hours · Do not use ScanV for unlawful purposes · Do not circumvent the platform to deal directly with Partners discovered via ScanV · Indemnify DCore Global Corporation against claims arising from your misuse, false information, or violation of law.'],
+            ['Partner Relationship & Verification','Partners are independent contractors bound by separate Partner Terms & Conditions accepted at onboarding. They are not employees, agents, or representatives of DCore Global Corporation. We do not control how Partners perform services. Partner onboarding checks (mobile OTP, documents, GPS) are best-effort verification tools, not a guarantee of skill, licensure, background, or future conduct. Any warranty, advice, or outcome is solely between you and the Partner unless DCore Global Corporation explicitly states otherwise in writing.'],
+            ['User–Partner Disputes','Disputes about service quality, pricing beyond platform fee, damage, delay, professional advice, food quality, health outcomes, candidate placement, training outcomes, or conduct are primarily between you and the Partner. DCore Global Corporation may, at its sole discretion, provide support routing or record complaints but is not obligated to mediate, arbitrate, compensate, or assume liability except as stated in our Refund Policy or required by law.'],
             ['Payment & Fees','Platform fee: 10% of service value (unless shown otherwise) · GST at applicable rates · Service fees are indicative; final scope/pricing may be agreed with the Partner · Cash-on-service: platform fee still payable online where required · Failed or disputed UPI must include TXN ID · Chargebacks without valid cause may lead to account suspension and recovery of costs.'],
-            ['Professional & Regulated Services','Legal, medical, healthcare, training, cloud, property, and consulting services are provided by independent Partners. DCore does not provide professional advice and has no liability for professional outcomes, diagnoses, legal opinions, certification results, cloud/training performance, or regulatory compliance of Partners. Users must independently verify credentials where required by law.'],
-            ['Food, Health & Safety','For food, healthcare, home services, and on-site visits, Partners are solely responsible for hygiene, licensing, safety protocols, and quality. DCore does not inspect every premises or meal. Report safety concerns promptly; we may suspend Partners but are not insurers of on-site harm or food-borne illness except where non-waivable law applies.'],
-            ['Ratings & Content','Ratings, reviews, and listing content may be submitted by Users or Partners. DCore may moderate or remove content but does not guarantee accuracy. Opinions expressed are those of the author, not DCore.'],
-            ['Limitation of Liability','TO THE MAXIMUM EXTENT PERMITTED BY LAW, DCORE\'S TOTAL LIABILITY FOR ANY CLAIM ARISING FROM A BOOKING OR USE OF SCANV IS LIMITED TO THE PLATFORM FEE ACTUALLY COLLECTED BY DCORE FOR THAT BOOKING. WE ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, LOST PROFITS, DATA LOSS, PERSONAL INJURY, PROPERTY DAMAGE, OR PARTNER ACTS/OMISSIONS. Nothing here excludes liability that cannot be excluded under the Consumer Protection Act, 2019 or other mandatory Indian law.'],
-            ['Indemnity','You agree to indemnify, defend, and hold harmless DCore, its directors, officers, employees, and affiliates from claims, losses, penalties, and expenses (including reasonable legal fees) arising from your breach of these Terms, your booking or use of services, content you submit, your dispute with a Partner where you are at fault, or your violation of applicable law.'],
-            ['Suspension & Termination','We may suspend or terminate access for fraud, abuse, chargebacks, false identity, harassment, or legal requirement without prior notice. Sections on liability, indemnity, and governing law survive termination.'],
-            ['Force Majeure','DCore is not liable for delays or failures due to events beyond reasonable control including natural disasters, network outages, government action, strikes, or third-party service failures.'],
+            ['Professional & Regulated Services','Legal, medical, healthcare, training, cloud, property, recruitment/candidate services, and consulting are provided by independent Partners. DCore Global Corporation does not provide professional advice and has no liability for professional outcomes, diagnoses, legal opinions, certification results, hiring decisions, cloud/training performance, or regulatory compliance of Partners. Users must independently verify credentials where required by law.'],
+            ['Food, Health & Safety','For food, healthcare, home services, and on-site visits, Partners are solely responsible for hygiene, licensing, safety protocols, and quality. DCore Global Corporation does not inspect every premises or meal. Report safety concerns promptly; we may suspend Partners but are not insurers of on-site harm, food-borne illness, or health outcomes except where non-waivable law applies.'],
+            ['Ratings & Content','Ratings, reviews, and listing content may be submitted by Users or Partners. DCore Global Corporation may moderate or remove content but does not guarantee accuracy. Opinions expressed are those of the author, not DCore Global Corporation.'],
+            ['Assumption of Risk & Release','You voluntarily use ScanV and any Partner or service-provider services at your own risk. To the maximum extent permitted by law, you release ScanV, DCore Global Corporation, and their directors, officers, employees, affiliates, and contractors from any claims arising from use of the platform, Partner or service-provider services, misuse by any party, personal injury, property damage, financial loss, mental or emotional impact, data loss, or any harm to users, candidates, vendors, partners, service providers, or customers — whether direct or indirect — except where liability cannot be excluded under mandatory Indian law.'],
+            ['Limitation of Liability','TO THE MAXIMUM EXTENT PERMITTED BY LAW, SCANV AND DCORE GLOBAL CORPORATION\'S TOTAL LIABILITY FOR ANY CLAIM ARISING FROM A BOOKING OR USE OF SCANV IS LIMITED TO THE PLATFORM FEE ACTUALLY COLLECTED BY DCORE GLOBAL CORPORATION FOR THAT BOOKING. WE ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, LOST PROFITS, DATA LOSS, PERSONAL INJURY, PROPERTY DAMAGE, FINANCIAL IMPACT, MENTAL OR EMOTIONAL IMPACT, MISUSE, OR PARTNER, VENDOR, OR SERVICE-PROVIDER ACTS/OMISSIONS. Nothing here excludes liability that cannot be excluded under the Consumer Protection Act, 2019 or other mandatory Indian law.'],
+            ['Indemnity','You agree to indemnify, defend, and hold harmless DCore Global Corporation, ScanV, their directors, officers, employees, and affiliates from claims, losses, penalties, and expenses (including reasonable legal fees) arising from your breach of these Terms, your booking or use of services, content you submit, your dispute with a Partner where you are at fault, or your violation of applicable law.'],
+            ['Suspension & Termination','We may suspend or terminate access for fraud, abuse, chargebacks, false identity, harassment, or legal requirement without prior notice. Sections on liability, indemnity, release, and governing law survive termination.'],
+            ['Force Majeure','DCore Global Corporation is not liable for delays or failures due to events beyond reasonable control including natural disasters, network outages, government action, strikes, or third-party service failures.'],
             ['Prohibited Uses','Illegal purposes · Reverse engineering · Scraping · Fake bookings/reviews · Soliciting Partners off-platform · Harassment · Circumventing fees · Automated abuse · Impersonation.'],
-            ['Off-Platform Dealings','If you transact with a Partner outside ScanV after being introduced through the platform, you do so entirely at your own risk. DCore is not responsible for payment, safety, quality, or disputes in off-platform arrangements and may suspend accounts that circumvent platform fees.'],
+            ['Off-Platform Dealings','If you transact with a Partner outside ScanV after being introduced through the platform, you do so entirely at your own risk. DCore Global Corporation is not responsible for payment, safety, quality, or disputes in off-platform arrangements and may suspend accounts that circumvent platform fees.'],
             ['Changes to Terms','We may update these Terms. The "Updated" date will change. Continued use after publication constitutes acceptance. Material changes may require renewed checkbox acceptance before OTP.'],
-            ['Severability & Entire Agreement','If any provision is held invalid, the remainder stays in effect. These Terms, Privacy Policy, DPDP summary, Refund Policy, and Payment Policy together form the entire agreement regarding ScanV.'],
+            ['Severability & Entire Agreement','If any provision is held invalid, the remainder stays in effect. These Terms, Privacy Policy, DPDP summary, Refund Policy, Payment Policy, and (for Partners) Partner Terms & Conditions together form the entire agreement regarding ScanV.'],
             ['Governing Law & Disputes','Laws of India · Exclusive jurisdiction: courts at Pune, Maharashtra · Mandatory 30-day good-faith negotiation before formal proceedings · Contact: legal@dcoreglobal.com · You waive any objection to venue in Pune to the extent permitted by law.'],
+          ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
+        </>
+      )
+    },
+    'partner-terms': {
+      title:'Partner Terms & Conditions',
+      badge:'PARTNER TERMS',
+      updated:'20 August 2026',
+      content: (
+        <>
+          <div style={{background:`${C.acc}22`,border:`1px solid ${C.acc}44`,borderRadius:10,padding:14,marginBottom:24}}>
+            <p style={{margin:0,color:C.acc,fontSize:13}}>⚠️ {SCANV_MANDATORY_ONBOARD_ACCEPTANCE} By checking the acceptance box and completing OTP, you agree to these Partner Terms, Customer Terms, Privacy Policy, and DPDP Act 2023 — <strong>100% and without reservation</strong>. {SCANV_LIABILITY_DISCLAIMER}</p>
+          </div>
+          {[
+            ['Mandatory Acceptance — Partners, Vendors & Service Providers',`${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} Partner, vendor, and service-provider onboarding is blocked until you tick the acceptance checkbox on step 1 and complete OTP. Returning partners updating services must re-accept before submission. Acceptance is recorded with timestamp and mobile verification.`],
+            ['No Liability — ScanV / DCore Global Corporation',`${SCANV_LIABILITY_DISCLAIMER} As a Partner, vendor, or service provider you additionally acknowledge that you — not ScanV or DCore Global Corporation — are solely responsible for every service you deliver and for any harm, misuse, damages, financial or mental impact to users, candidates, customers, or third parties.`],
+            ['Who We Are & Your Relationship',`ScanV (getscanv.com) is operated by ${SCANV_LEGAL_ENTITY} ("DCore", "we", "us"). You are applying as an independent Partner, vendor, or service provider (contractor), not an employee, agent, joint venturer, or franchisee of DCore Global Corporation. Nothing in these Terms creates an employment, partnership, or agency relationship. You have no authority to bind DCore Global Corporation.`],
+            ['Mandatory Acceptance at Onboarding','Before Send OTP on partner onboarding, you must tick the acceptance checkbox confirming you have read and 100% agree to: (1) these Partner Terms & Conditions, (2) Customer Terms & Conditions, (3) Privacy Policy, and (4) DPDP Act 2023 summary. Acceptance is recorded with timestamp and mobile OTP verification. Returning partners updating services must re-accept before submission. If you do not agree in full, do not onboard.'],
+            ['Services You Provide','You alone are responsible for every service you perform, list, price, schedule, and deliver through ScanV — including quality, safety, timeliness, licensing, insurance, taxes, employment of your staff, and compliance with all applicable laws (GST, labour, food safety, transport, professional regulations, etc.). DCore Global Corporation does not supervise your work methods.'],
+            ['No Liability of DCore Global Corporation / ScanV',`TO THE MAXIMUM EXTENT PERMITTED BY LAW, SCANV AND DCORE GLOBAL CORPORATION ARE NOT RESPONSIBLE OR LIABLE FOR ANY LIABILITY, MISUSE, HARM, INJURY, DEATH, PROPERTY DAMAGE, DATA BREACH, FINANCIAL LOSS, MENTAL OR EMOTIONAL IMPACT, PENALTIES, FINES, REPUTATIONAL HARM, OR ANY OTHER DAMAGES OR IMPACT TO YOU, USERS, CANDIDATES, CUSTOMERS, VENDORS, PARTNERS, SERVICE PROVIDERS, OR ANY THIRD PARTY arising from: (a) your services or conduct; (b) your use of the platform; (c) interactions between you and customers or candidates; (d) off-platform dealings; (e) GPS/location data you share; (f) food, health, transport, professional, recruitment, or home services you deliver; or (g) any act or omission by any party connected to a booking — except where liability cannot be excluded under mandatory Indian law.`],
+            ['Independent Contractor & Taxes','You are solely responsible for your income tax, GST registration and remittance where applicable, TDS obligations, insurance, permits, and statutory contributions for yourself and anyone you employ. DCore Global Corporation may deduct TDS on payouts as required by law but does not guarantee tax advice.'],
+            ['Verification & Documents','Mobile OTP, Aadhaar eKYC, PAN, GPS, and photo checks are best-effort onboarding tools. Passing verification is not a warranty of your skill, background, licensure, or future conduct. DCore Global Corporation may suspend or offboard you at any time for fraud, safety, complaints, or legal requirement.'],
+            ['GPS, Location & App Requirements','You consent to ScanV collecting your GPS location during onboarding, while the app is open, and during active jobs for dispatch, live tracking, and fraud prevention. You confirm you will install the ScanV partner app and allow location permissions as required. Denying GPS may block job offers or activation.'],
+            ['Customer Data & DPDP','You may receive customer name, mobile, and service location solely to fulfil bookings. You must not misuse, sell, retain beyond necessity, or contact customers for off-platform solicitation. You are an independent data handler for data you collect directly during service delivery and must comply with DPDP Act 2023 and applicable law.'],
+            ['Pricing, Fees & Payouts','Platform fees, GST, and payout schedules are as shown in the app or Payment Policy. You agree not to circumvent platform fees by soliciting off-platform payments from customers discovered through ScanV. Chargebacks, refunds, and disputes may be deducted from future payouts where permitted.'],
+            ['Indemnity (100%)','You agree to indemnify, defend, and hold harmless DCore Global Corporation, ScanV, and their directors, officers, employees, affiliates, and contractors from any and all claims, demands, losses, liabilities, penalties, and expenses (including full legal fees) arising from your services, your breach of these Terms, your violation of law, your tax obligations, injury or damage you cause, disputes with customers or candidates, or any misuse of the platform — without limitation.'],
+            ['Release of Claims','You release DCore Global Corporation and ScanV from any claims you may have against them relating to platform availability, job volume, earnings, account suspension, verification outcomes, or third-party conduct — to the maximum extent permitted by law.'],
+            ['Limitation of Liability','DCore Global Corporation\'s total liability to you for any claim relating to ScanV is limited to platform fees actually collected by DCore Global Corporation from bookings assigned to you in the 30 days before the claim (or INR 1,000 if greater). We are not liable for indirect, consequential, or punitive damages, lost profits, or business interruption.'],
+            ['Insurance & Licensing','You represent you hold (or will obtain before performing services) all licences, registrations, and insurance required for your categories. Food, healthcare, legal, transport, and regulated services require valid credentials under applicable law. You perform services at your own risk.'],
+            ['Conduct & Prohibited Acts','No harassment, discrimination, fraud, fake listings, price gouging, sharing customer data, impersonation, unsafe practices, or operating under suspended accounts. Violations may result in immediate offboarding and legal action.'],
+            ['Intellectual Property','ScanV brand, logos, and software remain property of DCore Global Corporation. Limited licence to use partner tools during active partnership only.'],
+            ['Suspension & Offboarding','We may pause, offboard, or delete partner accounts without prior notice for safety, fraud, legal orders, or breach. Surviving sections include indemnity, release, limitation of liability, and governing law.'],
+            ['Changes','We may update these Partner Terms. Material changes may require renewed checkbox acceptance at next login or onboarding. Continued use after update constitutes acceptance.'],
+            ['Governing Law & Disputes','Laws of India · Exclusive jurisdiction: courts at Pune, Maharashtra · Mandatory 30-day good-faith negotiation · Contact: legal@dcoreglobal.com · These Partner Terms supplement (and for partners prevail over conflicting general terms on partner-specific matters) the Customer Terms, Privacy Policy, and DPDP summary.'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
@@ -16745,10 +16814,11 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.cyan}22`,border:`1px solid ${C.cyan}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.cyan,fontSize:13}}>🇮🇳 ScanV processes personal data in compliance with the Digital Personal Data Protection Act, 2023 (DPDP). This page summarises how we meet our obligations as a Data Fiduciary.</p>
+            <p style={{margin:0,color:C.cyan,fontSize:13}}>🇮🇳 ScanV processes personal data in compliance with the Digital Personal Data Protection Act, 2023 (DPDP). {SCANV_MANDATORY_ONBOARD_ACCEPTANCE} {SCANV_LIABILITY_DISCLAIMER}</p>
           </div>
           {[
-            ['Data Fiduciary','DCore (operating ScanV) is the Data Fiduciary for personal data collected through the ScanV platform. Partners may act as separate fiduciaries for data they collect directly during service delivery.'],
+            ['Data Fiduciary',`${SCANV_LEGAL_ENTITY} (operating ScanV) is the Data Fiduciary for personal data collected through the ScanV platform. Partners, vendors, and service providers may act as separate fiduciaries for data they collect directly during service delivery and must comply with DPDP when handling customer or candidate data.`],
+            ['Mandatory Acceptance Before Joining',`${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} Consent via the acceptance checkbox before OTP is required for all users, customers, candidates, vendors, partners, and service providers.`],
             ['Personal Data We Process','Name, mobile number, location, device identifiers, booking history, payment references, and communications necessary to provide the marketplace service. Sensitive personal data is not collected on standard customer flows except where a specific service requires it and separate consent is obtained.'],
             ['Purpose & Consent','We process data only for specified purposes: account verification (OTP), booking fulfilment, payments, fraud prevention, support, and legal compliance. Explicit consent — including GPS location collection and tracking — is obtained via the acceptance checkbox before OTP on all service sub-cards and at app open/sign-in.'],
             ['Your Rights','Right to access · Correction · Erasure (subject to retention law) · Grievance redressal · Nominate a person to exercise rights on your behalf · Withdraw consent for consent-based processing. Exercise via privacy@dcoreglobal.com or Profile settings.'],
@@ -16839,8 +16909,12 @@ function LegalPage({page}) {
           <div style={{display:'inline-block',background:C.acc,color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,letterSpacing:1,marginBottom:10}}>{pg.badge}</div>
           <div style={{color:C.txt,fontSize:24,fontWeight:800,marginBottom:4}}>{pg.title}</div>
           <div style={{color:C.sub,fontSize:12}}>ScanV · Updated: {pg.updated}</div>
-          <div style={{ marginTop: 10 }}><ScanvLegalLinks accentColor={C.acc} fontSize={12} mutedColor={C.dim} /></div>
-          <div style={{color:C.dim,fontSize:10,marginTop:4}}>Operated by DCore</div>
+          <div style={{ marginTop: 10 }}>
+            {page === 'partner-terms'
+              ? <PartnerLegalLinks accentColor={C.acc} fontSize={12} mutedColor={C.dim} />
+              : <ScanvLegalLinks accentColor={C.acc} fontSize={12} mutedColor={C.dim} />}
+          </div>
+          <div style={{color:C.dim,fontSize:10,marginTop:4}}>Operated by {SCANV_LEGAL_ENTITY}</div>
         </div>
         {/* Content */}
         {pg.content}

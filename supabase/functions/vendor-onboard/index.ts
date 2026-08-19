@@ -42,6 +42,28 @@ import { otpDeliveryVendorOpts } from "../_shared/vendor-providers.ts";
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
+const PARTNER_TERMS_VERSION = "2026-08-20";
+
+function assertPartnerTermsAccepted(body: Record<string, unknown>):
+  | { ok: true; acceptedAt: string }
+  | { ok: false; error: string } {
+  if (body.partner_terms_accepted !== true) {
+    return { ok: false, error: "Accept Partner Terms & Conditions before continuing" };
+  }
+  const raw = body.partner_terms_accepted_at;
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { ok: false, error: "Partner terms acceptance timestamp required — tick the checkbox manually" };
+  }
+  const acceptedMs = Date.parse(raw.trim());
+  if (Number.isNaN(acceptedMs)) {
+    return { ok: false, error: "Invalid partner terms acceptance timestamp" };
+  }
+  if (acceptedMs > Date.now() + 60_000) {
+    return { ok: false, error: "Invalid partner terms acceptance timestamp" };
+  }
+  return { ok: true, acceptedAt: new Date(acceptedMs).toISOString() };
+}
+
 type VendorAdminRole = "admin" | "readonly" | null;
 
 function resolveVendorAdminRole(req: Request): VendorAdminRole {
@@ -79,18 +101,24 @@ function adminPinOk(req: Request): boolean {
 async function assertRecentOtpVerified(
   supabase: SupabaseClient,
   mobile: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; partnerTermsAcceptedAt: string | null } | { ok: false; error: string }> {
   const { data: otpRow } = await supabase
     .from("vendor_otp")
-    .select("id")
+    .select("id, partner_terms_accepted_at")
     .eq("mobile", mobile)
     .eq("purpose", "onboard")
     .eq("verified", true)
     .gt("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!otpRow) return { ok: false, error: "Phone not verified — complete OTP first" };
-  return { ok: true };
+  return {
+    ok: true,
+    partnerTermsAcceptedAt: otpRow.partner_terms_accepted_at
+      ? String(otpRow.partner_terms_accepted_at)
+      : null,
+  };
 }
 
 async function storeEkycSession(
@@ -586,6 +614,9 @@ Deno.serve(async (req: Request) => {
       const mobile = normalizeMobile(String(body.mobile || ""));
       if (!mobile) return json({ error: "Invalid mobile" }, 400);
 
+      const termsCheck = assertPartnerTermsAccepted(body);
+      if (!termsCheck.ok) return json({ error: termsCheck.error }, 400);
+
       const otp = generateOtp();
       const otpHash = await hashOtp(otp);
       await supabase.from("vendor_otp").insert({
@@ -593,6 +624,8 @@ Deno.serve(async (req: Request) => {
         otp_hash: otpHash,
         purpose: "onboard",
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        partner_terms_accepted_at: termsCheck.acceptedAt,
+        partner_terms_version: PARTNER_TERMS_VERSION,
       });
 
       const allowVoice = await isPlatformFlagOn(supabase, "voice_otp_fallback", { defaultValue: true });
@@ -875,7 +908,19 @@ Deno.serve(async (req: Request) => {
         Array.isArray(body.services) ? body.services : [];
       if (!services.length) return json({ error: "Select at least one service" }, 400);
 
+      const termsCheck = assertPartnerTermsAccepted(body);
+      if (!termsCheck.ok) return json({ error: termsCheck.error }, 400);
+      const partnerTermsAt = otpCheck.partnerTermsAcceptedAt || termsCheck.acceptedAt;
+
       await upsertPartnerServices(supabase, partner.id, services, true);
+
+      await supabase
+        .from("vendor_partners")
+        .update({
+          partner_terms_accepted_at: partnerTermsAt,
+          partner_terms_version: PARTNER_TERMS_VERSION,
+        })
+        .eq("id", partner.id);
 
       return json({
         success: true,
@@ -893,6 +938,10 @@ Deno.serve(async (req: Request) => {
 
       const otpCheck = await assertRecentOtpVerified(supabase, mobile);
       if (!otpCheck.ok) return json({ error: otpCheck.error }, 400);
+
+      const termsCheck = assertPartnerTermsAccepted(body);
+      if (!termsCheck.ok) return json({ error: termsCheck.error }, 400);
+      const partnerTermsAt = otpCheck.partnerTermsAcceptedAt || termsCheck.acceptedAt;
 
       const lat = Number(body.gps_lat || body.address_lat);
       const lng = Number(body.gps_lng || body.address_lng);
@@ -961,6 +1010,8 @@ Deno.serve(async (req: Request) => {
         highest_education: profileFields.highest_education,
         app_installed_confirmed: profileFields.app_installed_confirmed,
         gps_allowed_confirmed: profileFields.gps_allowed_confirmed,
+        partner_terms_accepted_at: partnerTermsAt,
+        partner_terms_version: PARTNER_TERMS_VERSION,
         status: "pending",
       };
 

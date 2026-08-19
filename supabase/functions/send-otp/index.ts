@@ -539,6 +539,10 @@ Deno.serve(async (req: Request) => {
 
         const profileId = existing?.id || profileIdFromMobile(mobile);
         const incoming = (body.profile || {}) as Record<string, unknown>;
+        const termsAtRaw = incoming.terms_accepted_at;
+        const termsAcceptedAt = typeof termsAtRaw === "string" && termsAtRaw.trim()
+          ? new Date(termsAtRaw.trim()).toISOString()
+          : null;
         const row = {
           id: profileId,
           email: profileAuthEmail(mobile),
@@ -574,6 +578,8 @@ Deno.serve(async (req: Request) => {
           language: incoming.language ?? null,
           mobile_verified: incoming.mobile_verified !== false,
           mobile_verified_at: incoming.mobile_verified_at || new Date().toISOString(),
+          terms_accepted_at: termsAcceptedAt,
+          terms_version: termsAcceptedAt ? String(incoming.terms_version || "2026-08-20") : null,
           role: "customer",
           status: "active",
           avatar: incoming.avatar || "👤",

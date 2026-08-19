@@ -1,6 +1,6 @@
 /** Student Cloud — AI / Cloud / Data Center admission + admin fee tracker */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL } from './terms-acceptance';
+import { useScanvTermsAcceptance, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL } from './terms-acceptance';
 
 export const SGR_FEE_FALLBACK_PAISE = 50000;
 /** @deprecated use sgrFeePaise prop / pricing catalog */
@@ -275,7 +275,7 @@ export function StudentCloudAdmitScreen({
   const [loading, setLoading] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [sgrFeeAck, setSgrFeeAck] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(readScanvTermsAccepted);
+  const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
   const [err, setErr] = useState('');
 
   const courseName = useMemo(
@@ -521,17 +521,24 @@ export function StudentCloudAdmitScreen({
             {courseList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Field label="Schedule date" req note="Today or a future date within 12 months">
-            <input type="date" min={schedBounds.minStr} max={schedBounds.maxStr} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={S.inp()} disabled={otpVerified} />
-          </Field>
-          <Field label="Time" req><input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} style={S.inp()} disabled={otpVerified} /></Field>
+        <div style={{ marginBottom: 13 }}>
+          <div style={{ fontSize: 10, color: C.dim, marginBottom: 8, lineHeight: 1.35, whiteSpace: 'nowrap' }}>
+            Today or a future date within 12 months
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Field label="Schedule date" req>
+              <input type="date" min={schedBounds.minStr} max={schedBounds.maxStr} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={S.inp()} disabled={otpVerified} />
+            </Field>
+            <Field label="Time" req><input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} style={S.inp()} disabled={otpVerified} /></Field>
+          </div>
         </div>
 
         {!otpVerified && (
           <TermsAcceptanceField
             accepted={termsAccepted}
-            onAccept={() => { writeScanvTermsAccepted(); setTermsAccepted(true); }}
+            acceptedAt={termsAcceptedAt}
+            onAccept={acceptTerms}
+            onRevoke={revokeTerms}
             C={C}
             BDR={BDR}
           />
