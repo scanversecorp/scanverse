@@ -90,14 +90,15 @@ Data usually appears in 24–72 hours.
 
 ## Step 2 — Google Business Profile (strong for “ScanV” local brand)
 
-1. [business.google.com](https://business.google.com) → Create profile
+**Full runbook:** [GOOGLE-BUSINESS-PROFILE.md](./GOOGLE-BUSINESS-PROFILE.md)
+
+1. [business.google.com](https://business.google.com) → Create profile (account: jasmeen.workmail@gmail.com)
 2. **Business name:** `ScanV` (exact brand)
-3. **Category:** Software company / Internet marketing service (pick closest)
+3. **Category:** Software company / Local services app (pick closest)
 4. **Website:** `https://getscanv.com`
 5. **Phone:** +91-9270194842
-6. **Service area:** Pune, Pimpri-Chinchwad (not a fake storefront unless you have one)
-7. **Address:** Use **registered / virtual office address** once India entity is live ([VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md))
-8. Verify by postcard or video per Google’s prompt
+6. **Address:** Gera Imperium Gateway, C.T.S. No. 2656(P), Nashik Phata Flyover, Opp. Bhosari Metro Station, Bhosari, Pimpri-Chinchwad, Pune 411034 — or **service area only** if no walk-in office
+7. Verify by postcard, phone, or video per Google’s prompt
 
 ---
 
@@ -157,4 +158,4 @@ node scripts/generate-sitemap.mjs
 - [ ] Top 4 URLs requested for indexing (after official-app meta deploy)
 - [ ] Google Business Profile created
 - [ ] Social bios updated — **remove “Coming soon”**, use “Official app · getscanv.com”
-- [ ] India registered address added to schema when available
+- [x] India registered address added to schema (Gera Imperium Gateway — [GOOGLE-BUSINESS-PROFILE.md](./GOOGLE-BUSINESS-PROFILE.md))

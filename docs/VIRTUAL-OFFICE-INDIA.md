@@ -1,8 +1,8 @@
 # ScanV — Virtual Office (India)
 
-**Updated:** 19 Aug 2026 · **Status:** ❌ Not registered yet
+**Updated:** 19 Aug 2026 · **Status:** ⏳ Address identified — MCA/GST registration pending
 
-ScanV does **not** currently have an India **virtual office / registered office** on file in the repo, legal pages, or MCA/GST records referenced in code.
+ScanV’s intended **registered / virtual office** is at **Gera Imperium Gateway**, Kasarwadi / Bhosari, PCMC, Pune. The full postal address is now in site schema, `scanv-brand.html`, and [GOOGLE-BUSINESS-PROFILE.md](./GOOGLE-BUSINESS-PROFILE.md).
 
 **What exists today**
 
@@ -12,7 +12,28 @@ ScanV does **not** currently have an India **virtual office / registered office*
 | Operating entity | DCore (`dcoreglobal.com`, HDFC Vyapar UPI) |
 | Market city | Pune & PCMC (app copy, vendor outreach) |
 | Contact | +91-9270194842 · `hello@getscanv.com` / `connect@dcoreglobal.com` |
+| **Office address (target)** | Gera Imperium Gateway — see below |
 | India company docs | Planned in [REGULATORY-APPROVALS-INDIA.md](./REGULATORY-APPROVALS-INDIA.md) (A1–A3: incorporation, PAN, GST) |
+
+### Gera Imperium Gateway address
+
+```
+Gera Imperium Gateway
+C.T.S. No. 2656(P), Nashik Phata Flyover
+Opp. Bhosari Metro Station (Nashik Phata)
+Bhosari, Pimpri-Chinchwad
+Pune, Maharashtra 411034
+India
+```
+
+| | |
+|--|--|
+| **Maps** | https://www.google.com/maps/search/?api=1&query=Gera+Imperium+Gateway,+Nashik+Phata,+Bhosari,+Pune,+411034 |
+| **Coordinates** | 18.6094°N, 73.8201°E (adjacent Nashik Phata Metro) |
+| **Developer** | Gera Developments Pvt. Ltd. · MahaRERA P52100030184 |
+| **Code** | `src/business-address.js` · JSON-LD in `public/index.html` |
+
+Add **suite / unit number** from your virtual-office provider once the rent agreement is signed.
 
 A **virtual office** is not the app — it is a **legal mailing + registered office address** used for:
 
@@ -52,10 +73,12 @@ A **virtual office** is not the app — it is a **legal mailing + registered off
 
 5. **After registration — update ScanV**
 
-   - [ ] Terms / Privacy / Payment footers → registered office address
+   - [ ] Terms / Privacy / Payment footers → registered office address (partial: footer via `CopyrightLine`)
+   - [x] JSON-LD `address` + geo on `public/index.html` and `scanv-brand.html`
+   - [x] `src/business-address.js` shared constants
+   - [ ] Suite / unit number when virtual-office contract is signed
    - [ ] GSTIN on invoices & payment screens
-   - [ ] `public/scanv-brand.html` + JSON-LD `address` field
-   - [ ] Google Business Profile (see [GOOGLE-SEO-INDEXING.md](./GOOGLE-SEO-INDEXING.md))
+   - [ ] Google Business Profile — [GOOGLE-BUSINESS-PROFILE.md](./GOOGLE-BUSINESS-PROFILE.md)
    - [ ] HDFC Vyapar / Razorpay merchant profile address
    - [ ] Grievance officer address (IT Rules)
 
@@ -63,7 +86,7 @@ A **virtual office** is not the app — it is a **legal mailing + registered off
 
 ## Do not use a fake address
 
-Until MCA/GST registration is complete, keep using **Pune, Maharashtra** (city-level) in marketing copy only — not a specific door number.
+The **Gera Imperium Gateway** building address is documented for GBP and schema.org. Add your **specific suite / unit** only when the virtual-office provider confirms it on the rent agreement. Until MCA/GST registration is complete, marketing may use city-level “Pune & PCMC” copy; the full street address is on `scanv-brand.html` and JSON-LD for Google.
 
 ---
 

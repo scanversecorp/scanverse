@@ -16,6 +16,7 @@ import {
 } from 'react';
 import QRCode from 'qrcode';
 import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
+import { SCANV_OFFICE_LINE, SCANV_MAPS_URL } from './business-address';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
 import { StudentCloudAdmitScreen, useStudentCloudFeeView, resolveUserMobile10 } from './student-cloud';
@@ -2635,6 +2636,11 @@ function CopyrightLine({ style }) {
     <div style={{ textAlign: 'center', fontSize: 10, color: C.dim, lineHeight: 1.45, ...style }}>
       <div>© ScanV</div>
       <div style={{ marginTop: 4, fontSize: 10, color: '#888' }}>Operated by DCore - All Rights Reserved</div>
+      <div style={{ marginTop: 6, fontSize: 10, color: '#888', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+        {SCANV_OFFICE_LINE}
+        {' · '}
+        <a href={SCANV_MAPS_URL} target="_blank" rel="noopener noreferrer" style={{ color: C.acc, textDecoration: 'none', fontWeight: 600 }}>Find us</a>
+      </div>
       <div style={{ marginTop: 4 }}>{INCORPORATION_ORIGIN}</div>
     </div>
   );

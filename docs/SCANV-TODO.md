@@ -29,8 +29,8 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ✅ Verified | Domain verified · homepage indexed · `robots.txt` declares sitemap |
-| 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Needs verified phone + address when available |
-| 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
+| 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Address ready — [GOOGLE-BUSINESS-PROFILE.md](./GOOGLE-BUSINESS-PROFILE.md) · verify at business.google.com |
+| 3 | **Virtual office / India registered address** | ⏳ In progress | Gera Imperium Gateway address in code — CA + provider for suite # & MCA |
 | 4 | Deploy official-app SEO + static files | ✅ Live | title "ScanV — Official App \| getscanv.com" · GSC meta tag present |
 | 5 | **GSC domain verified** for `getscanv.com` | ✅ Done | DNS TXT via Cloudflare · account jasmeen.workmail@gmail.com |
 | 6 | Submit sitemap + request indexing | ⚠️ UI quirk | GSC form rejects `sitemap.xml` though prod serves valid XML — discovery via `robots.txt` OK |
