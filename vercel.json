@@ -15,7 +15,7 @@
       "destination": "/404.html"
     },
     {
-      "source": "/((?!static/|robots\\.txt|sitemap\\.xml|scanv-brand\\.html|.*\\.(png|webp|jpg|jpeg|ico|json|js|txt|xml|html)$).*)",
+      "source": "/((?!.*\\.).*)",
       "destination": "/index.html"
     }
   ],
