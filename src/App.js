@@ -2707,13 +2707,14 @@ function FooterShareQrButtons({ small }) {
 function FooterLegalLinks({ current, small }) {
   const fs = small ? 10 : 12;
   const coreLegal = new Set(['terms', 'privacy', 'dpdp']);
+  const linkFontSize = (k) => (k === 'faq' || coreLegal.has(k) ? fs - 2 : fs);
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
       {FOOTER_LINKS.map(([k, l, kind]) => (
         <a
           key={k}
           href={kind === 'hash' ? `#${k}` : `/${k}`}
-          style={{ color: current === k ? C.acc : C.dim, fontSize: coreLegal.has(k) ? fs - 2 : fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600, padding: '8px 0', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+          style={{ color: current === k ? C.acc : C.dim, fontSize: linkFontSize(k), textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600, padding: '8px 0', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
         >
           {l}
         </a>
