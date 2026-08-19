@@ -218,6 +218,12 @@
         "note": "Switch board · 12 vendors + runtime toggles"
       },
       {
+        "label": "Ops Todo",
+        "adminTab": "todo",
+        "url": "https://getscanv.com/#admin?tab=todo",
+        "note": "SCANV-TODO reminders · Fast2SMS · Twilio · social · payments"
+      },
+      {
         "label": "Vendor Leads",
         "adminTab": "vendor-leads",
         "url": "https://getscanv.com/#admin?tab=vendor-leads",

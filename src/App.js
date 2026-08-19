@@ -13183,6 +13183,7 @@ const ADMIN_TABS = [
   { id: 'student-cloud', label: 'Student Cloud', icon: '🎓' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
+  { id: 'todo', label: 'Ops Todo', icon: '📝' },
   { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
   { id: 'logistics', label: 'Logistics API', icon: '🚛' },
   { id: 'social', label: 'Social Media', icon: '📱' },
@@ -14708,6 +14709,186 @@ function AdminGoLiveTab({ pin, onMsg, onErr, onGoVendors }) {
         <pre style={{ fontSize: 11, color: C.acc, background: C.deep, padding: 12, borderRadius: 8, overflow: 'auto', lineHeight: 1.6, margin: 0 }}>{(cfg.deploy_commands || []).join('\n')}</pre>
         <div style={{ fontSize: 11, color: C.dim, marginTop: 10 }}>Repo docs: docs/GO-LIVE-CHECKLIST.md · docs/SECRETS-AND-PINS-INVENTORY.md</div>
       </div>
+
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{err}</div>}
+    </div>
+  );
+}
+
+function scanvTodoStatusColor(st) {
+  return ({
+    done: C.grn,
+    pending: C.gold,
+    blocked: C.red,
+    watch: C.cyan,
+    active: C.acc,
+  }[st] || C.sub);
+}
+
+function scanvTodoStatusLabel(st) {
+  return ({
+    done: 'Done',
+    pending: 'Pending',
+    blocked: 'Blocked',
+    watch: 'Watch',
+    active: 'Active',
+  }[st] || st);
+}
+
+function AdminScanvTodoTab({ pin, onMsg, onErr, onNavigateTab }) {
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busyKey, setBusyKey] = useState('');
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true);
+    setErr('');
+    try {
+      const data = await adminHubFetch('get_scanv_todo', {}, pin);
+      if (data?.error) throw new Error(data.error);
+      setCfg(data);
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [pin, onErr]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleItem = async (item, next) => {
+    setBusyKey(item.key);
+    setErr('');
+    try {
+      await adminHubFetch('update_scanv_todo_item', { key: item.key, done: next }, pin);
+      onMsg?.(next ? `Marked done: ${item.title}` : `Reopened: ${item.title}`);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+      onErr?.(e.message);
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const copyText = (text, label) => {
+    navigator.clipboard?.writeText(text).then(() => onMsg?.(`Copied ${label || 'command'}`)).catch(() => {});
+  };
+
+  if (loading) return <div style={{ ...S.card(), padding: 24 }}><Spin size={24} /></div>;
+  if (!cfg) return <div style={{ ...S.card(), padding: 16, color: C.red }}>{err || 'Could not load todo list'}</div>;
+
+  const p = cfg.progress || {};
+  const openCount = p.open ?? 0;
+
+  return (
+    <div>
+      <div style={{
+        ...S.card(), padding: 16, marginBottom: 14,
+        border: `1.5px solid ${openCount === 0 ? C.grn : C.gold}`,
+        background: openCount === 0 ? `${C.grn}12` : `${C.gold}12`,
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, marginBottom: 4 }}>
+          {openCount === 0 ? '✓ All tracked todos complete' : `⚠ ${openCount} open reminder${openCount === 1 ? '' : 's'}`}
+        </div>
+        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>
+          Mirrors <code style={{ color: C.acc }}>docs/SCANV-TODO.md</code> · Owners: {cfg.owners || 'Samir + Jasmeen'}
+          · SMS chain: <strong style={{ color: C.txt }}>{cfg.sms_chain || '2Factor → MSG91 → Fast2SMS → Twilio'}</strong>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          {[
+            ['Done', p.done, C.grn],
+            ['Pending', p.pending, C.gold],
+            ['Blocked', p.blocked, C.red],
+            ['Watch', p.watch, C.cyan],
+          ].map(([label, n, color]) => (
+            <div key={label} style={{ ...S.card({ padding: '8px 12px' }), minWidth: 88 }}>
+              <div style={{ fontSize: 10, color: C.dim, fontWeight: 700 }}>{label}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color }}>{n ?? 0}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn v="outline" sm onClick={load}>Refresh</Btn>
+          <button type="button" onClick={() => onNavigateTab?.('go-live')} style={{ padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.acc}`, background: `${C.acc}12`, color: C.acc, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>🚀 Go-Live →</button>
+        </div>
+      </div>
+
+      {(cfg.sections || []).map((section) => (
+        <div key={section.id} style={{ ...S.card(), padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 16px', borderBottom: BDR, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{section.title}</div>
+              {section.subtitle ? <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{section.subtitle}</div> : null}
+            </div>
+            {section.open_count > 0 ? (
+              <span style={{ fontSize: 10, fontWeight: 800, color: C.gold, padding: '4px 10px', borderRadius: 999, background: `${C.gold}18` }}>
+                {section.open_count} open
+              </span>
+            ) : (
+              <span style={{ fontSize: 10, fontWeight: 800, color: C.grn, padding: '4px 10px', borderRadius: 999, background: `${C.grn}18` }}>All done</span>
+            )}
+          </div>
+          {(section.items || []).map((item) => {
+            const color = scanvTodoStatusColor(item.status);
+            return (
+              <div key={item.key} style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.6fr) minmax(0,2fr) auto auto', gap: 10, padding: '12px 16px', borderBottom: BDR, alignItems: 'center' }}>
+                {item.toggleable ? (
+                  <AdminToggleSwitch
+                    on={!!item.checked}
+                    disabled={busyKey === item.key}
+                    onChange={(v) => toggleItem(item, v)}
+                  />
+                ) : (
+                  <div style={{ fontSize: 16, textAlign: 'center' }}>{item.status === 'done' ? '✓' : '·'}</div>
+                )}
+                <div>
+                  <div style={{ fontWeight: 700, color: item.status === 'done' ? C.dim : C.txt, fontSize: 13, textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>{item.title}</div>
+                  {item.secret_key ? (
+                    <div style={{ fontSize: 9, color: item.secret_configured ? C.grn : C.red, marginTop: 3, fontWeight: 700 }}>
+                      {item.secret_key}: {item.secret_configured ? 'SET' : 'MISSING'}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.45 }}>{item.notes || '—'}</div>
+                <span style={{ fontSize: 10, fontWeight: 800, color, padding: '4px 8px', borderRadius: 999, background: `${color}18`, whiteSpace: 'nowrap' }}>
+                  {scanvTodoStatusLabel(item.status)}
+                </span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {item.admin_tab ? (
+                    <button type="button" onClick={() => onNavigateTab?.(item.admin_tab)} style={{ padding: '5px 8px', borderRadius: 14, border: `1px solid ${C.acc}`, background: `${C.acc}10`, color: C.acc, fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>
+                      Open
+                    </button>
+                  ) : null}
+                  {item.link ? (
+                    <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: '5px 8px', borderRadius: 14, border: `1px solid ${C.bdr}`, background: C.surf, color: C.sub, fontSize: 9, fontWeight: 700, textDecoration: 'none' }}>
+                      ↗
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {(cfg.commands || []).length ? (
+        <div style={{ ...S.card(), padding: 16, marginBottom: 14 }}>
+          <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 10 }}>Quick commands</div>
+          {(cfg.commands || []).map((cmd) => (
+            <div key={cmd.label} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>{cmd.label}</div>
+                <button type="button" onClick={() => copyText(cmd.command, cmd.label)} style={{ background: C.deep, border: `1px solid ${C.bdr}`, borderRadius: 8, padding: '4px 8px', fontSize: 10, color: C.acc, cursor: 'pointer', fontWeight: 700 }}>Copy</button>
+              </div>
+              <pre style={{ fontSize: 10, color: C.acc, background: C.deep, padding: 10, borderRadius: 8, overflow: 'auto', lineHeight: 1.5, margin: 0 }}>{cmd.command}</pre>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{err}</div>}
     </div>
@@ -16356,6 +16537,10 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'go-live' && (
           <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => navigateAdminTab('vendors')} />
+        )}
+
+        {tab === 'todo' && (
+          <AdminScanvTodoTab pin={usePin} onMsg={setMsg} onErr={setErr} onNavigateTab={navigateAdminTab} />
         )}
 
         {tab === 'business' && usePin && (

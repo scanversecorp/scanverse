@@ -1,7 +1,8 @@
 # ScanV Todo List
 
-**Updated:** 20 Aug 2026, 1:00 AM IST  
-**Owners:** Samir + Jasmeen
+**Updated:** 20 Aug 2026, 1:05 AM IST  
+
+**Admin reminder:** [#admin → Ops Todo](https://getscanv.com/#admin?tab=todo) (PIN required) — same items as this doc, with toggles + secret auto-checks.
 
 Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md).
 

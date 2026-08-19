@@ -20,6 +20,8 @@
  *   exec_charts      — chart-only subset for refresh (owner PIN only)
  *   get_platform_settings — { keys? } dispatch_mode etc.
  *   get_go_live_config — switches + secret status (no values)
+ *   get_scanv_todo — ops todo board (mirrors docs/SCANV-TODO.md)
+ *   update_scanv_todo_item — { key, done } manual todo tick
  *   update_go_live_switch — { key, enabled } owner PIN only
  *   update_go_live_check — { key, checked } manual checklist tick
  *   update_razorpay_route_ticket — { status?, notes?, mark_checked? } Route support ticket tracker
@@ -106,6 +108,10 @@ import {
   updateGoLiveCheck,
   updateRazorpayRouteTicket,
 } from "../_shared/go-live-config.ts";
+import {
+  buildScanvTodoConfig,
+  updateScanvTodoItem,
+} from "../_shared/scanv-todo-config.ts";
 import {
   EXEC_ONLY_SWITCH_KEYS,
   otpDeliveryVendorOpts,
@@ -1036,6 +1042,22 @@ async function pricing2faResetConfirm(
   });
 }
 
+async function getScanvTodoConfig(sb: ReturnType<typeof adminSb>): Promise<Response> {
+  const payload = await buildScanvTodoConfig(sb);
+  return json(payload);
+}
+
+async function updateScanvTodoItemAction(
+  sb: ReturnType<typeof adminSb>,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const key = String(body.key || "").trim();
+  const done = body.done === true || body.done === 1 || body.done === "1";
+  const result = await updateScanvTodoItem(sb, key, done);
+  if (result.error) return json({ error: result.error }, 400);
+  return json({ success: true, key, done });
+}
+
 async function getGoLiveConfig(sb: ReturnType<typeof adminSb>): Promise<Response> {
   const payload = await buildGoLiveConfig(sb);
   return json(payload);
@@ -1399,6 +1421,14 @@ Deno.serve(async (req) => {
 
   if (action === "get_go_live_config") {
     return getGoLiveConfig(sb);
+  }
+
+  if (action === "get_scanv_todo") {
+    return getScanvTodoConfig(sb);
+  }
+
+  if (action === "update_scanv_todo_item") {
+    return updateScanvTodoItemAction(sb, body);
   }
 
   if (action === "update_go_live_switch") {
