@@ -24,6 +24,17 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 
 ---
 
+## SEO & India entity
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | [GOOGLE-SEO-INDEXING.md](./GOOGLE-SEO-INDEXING.md) |
+| 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Needs verified phone + address when available |
+| 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
+| 4 | Deploy `robots.txt`, `sitemap.xml`, `scanv-brand.html` | ⏳ Pending push | Fixes `/robots.txt` returning SPA HTML today |
+
+---
+
 ## Code & deploy
 
 | # | Item | Status | Notes |

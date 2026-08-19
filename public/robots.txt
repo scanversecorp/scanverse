@@ -1,0 +1,17 @@
+# ScanV — getscanv.com
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /refund
+Allow: /payment
+Allow: /scanv-brand.html
+
+# Admin / ops hash routes are not useful in search
+Disallow: /#admin
+Disallow: /#exec
+Disallow: /#vendor-admin
+Disallow: /#pricing-admin
+Disallow: /#customer-support
+
+Sitemap: https://getscanv.com/sitemap.xml
