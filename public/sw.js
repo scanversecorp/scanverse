@@ -1,6 +1,6 @@
-/* ScanV Service Worker v21 — precache webp tiles + stale-while-revalidate images */
-const CACHE = 'scanv-v21';
-const IMAGE_CACHE = 'scanv-v21-images';
+/* ScanV Service Worker v22 — app update + image precache */
+const CACHE = 'scanv-v22';
+const IMAGE_CACHE = 'scanv-v22-images';
 
 const PRECACHE_IMAGES = [
   '/home-models/beauty.webp',
@@ -159,6 +159,10 @@ self.addEventListener('activate', e => {
   );
 });
 
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
@@ -198,6 +202,12 @@ self.addEventListener('fetch', e => {
 
   const isNavigation = e.request.mode === 'navigate';
   const isShell = url.endsWith('/index.html') || url.endsWith('/');
+  const isVersionJson = url.includes('/version.json');
+
+  if (isVersionJson) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
 
   if (isNavigation || isShell) {
     e.respondWith(

@@ -1,6 +1,6 @@
 {
   "name": "scanv",
-  "version": "5.5.3.1786665000000",
+  "version": "5.5.4.1786666000000",
   "description": "ScanV — Professional Services Marketplace · PCMC Pune",
   "private": true,
   "homepage": "https://getscanv.com",
@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "REACT_APP_TS=1786665000000 react-scripts build",
+    "build": "node scripts/write-version-json.mjs && REACT_APP_TS=1786666000000 react-scripts build && node scripts/write-version-json.mjs",
     "optimize-images": "node scripts/optimize-images.mjs",
     "logo:original": "node scripts/generate-logo-original.mjs",
     "logo:qr": "node scripts/generate-logo-with-qr.mjs",

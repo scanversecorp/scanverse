@@ -4761,11 +4761,6 @@ async function ensureProfileAuthSession(mob, { otp, waToken, password } = {}) {
   } catch (_) {}
   if (password) return invokeLoginPassword(mob, password);
   if (otp || waToken) return invokeProfileAuthSession(mob, { otp, waToken });
-  let check;
-  try { check = await invokeCheckLogin(mob); } catch (_) { check = {}; }
-  if (check.password_set) {
-    throw new Error('Session expired — sign in with your password.');
-  }
   let lastErr;
   const legacyPassword = profileAuthPassword(mob);
   for (const email of emails) {
@@ -5159,11 +5154,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const [completeProfileMode, setCompleteProfileMode] = useState('login'); // login | booking
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState(null);
-  const [loginPassword, setLoginPassword] = useState('');
   const [contactEmail, setContactEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loginView, setLoginView] = useState('password'); // password | forgot | signup
   const acceptTerms = () => {
     const now = new Date().toISOString();
     writeScanvTermsAccepted(now);
@@ -5393,21 +5384,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         const ok = await verifyOtpCode(mob, code);
         if (!ok) throw new Error('Invalid or expired OTP');
       }
-      const check = await invokeCheckLogin(mob);
-      if (!check.password_set) {
-        setPendingLoginProfile({ id: customerProfileId(mob), phone: mob });
-        setCompleteProfileMode('booking');
-        setScreen('set-password');
-        addToast?.('Mobile verified — set your email and password to continue', 'success');
-        return;
-      }
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: code });
       const uid = await resolveCustomerProfileId(mob);
       const dev = detectDevice();
       const profile = await upsertCustomerProfile({
         id: uid, mob, firstName, lastName, address, village, city, pincode,
         email: profileAuthEmail(mob),
-        contactEmail: check.contact_email || contactEmail,
+        contactEmail: contactEmail.trim(),
         silentGeo, dev,
       });
 
@@ -5445,7 +5428,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     finally { setLoading(false); }
   };
 
-  const finishPasswordLogin = async (mob) => {
+  const finishOtpLogin = async (mob) => {
     let existing = await resolveLoginProfile(mob);
     if (!existing?.id) {
       existing = {
@@ -5500,87 +5483,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     onRegistered(merged, null, loginIntent);
   };
 
-  /** Profile sign-in: password when logged out; OTP only for forgot password or first-time setup */
-  const loginWithPassword = async () => {
-    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
-    if (!loginPassword) return setErr('Enter your password');
-    setLoading(true); setErr('');
-    try {
-      const mob = normalizeMobileE164(mobile);
-      await invokeLoginPassword(mob, loginPassword);
-      await finishPasswordLogin(mob);
-    } catch(e) { setErr(e.message||'Sign-in failed.'); }
-    finally { setLoading(false); }
-  };
-
-  const resetPasswordWithOtp = async () => {
-    const code = otpCode.join('');
-    if (code.length < 6) return setErr('Enter 6-digit OTP');
-    if (!newPassword || newPassword.length < 8) return setErr('Password must be at least 8 characters');
-    if (newPassword !== confirmPassword) return setErr('Passwords do not match');
-    setLoading(true); setErr('');
-    try {
-      const mob = normalizeMobileE164(mobile);
-      await invokePasswordWithOtp(mob, newPassword, { otp: code, action: 'reset_password' });
-      setLoginPassword(newPassword);
-      setLoginView('password');
-      resetOtpFlow();
-      setNewPassword('');
-      setConfirmPassword('');
-      await finishPasswordLogin(mob);
-    } catch (e) { setErr(e.message || 'Could not reset password'); }
-    finally { setLoading(false); }
-  };
-
-  const completeSetPassword = async () => {
-    if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
-      return setErr('Enter a valid email address');
-    }
-    if (!newPassword || newPassword.length < 8) return setErr('Password must be at least 8 characters');
-    if (newPassword !== confirmPassword) return setErr('Passwords do not match');
-    const code = otpCode.join('');
-    if (code.length < 6 && !waToken) return setErr('OTP session expired — go back and verify mobile again');
-    setLoading(true); setErr('');
-    try {
-      const mob = pendingLoginProfile?.phone || normalizeMobileE164(mobile);
-      await invokePasswordWithOtp(mob, newPassword, {
-        contactEmail: contactEmail.trim(),
-        otp: code || undefined,
-        waToken: waToken || undefined,
-        action: 'set_password',
-      });
-      const uid = pendingLoginProfile?.id || customerProfileId(mob);
-      const dev = detectDevice();
-      const profile = await upsertCustomerProfile({
-        id: uid, mob,
-        firstName, lastName, address, village, city, pincode,
-        email: profileAuthEmail(mob),
-        contactEmail: contactEmail.trim(),
-        silentGeo, dev,
-        termsAcceptedAt,
-      });
-      setPendingLoginProfile(null);
-      setUserId(profile.id);
-      setPendingProfile(profile);
-      setNewPassword('');
-      setConfirmPassword('');
-      if (profileNeedsEnrollment(profile)) {
-        beginCompleteProfile(profile, completeProfileMode);
-        addToast?.('Account secured — complete your profile', 'success');
-        return;
-      }
-      if (completeProfileMode === 'booking') {
-        setScreen('schedule');
-        addToast?.('Account ready — pick date & time', 'success');
-      } else {
-        localStorage.setItem('scanv_uid', profile.id);
-        onRegistered(profile, null, loginIntent);
-      }
-    } catch (e) { setErr(e.message || 'Could not save password'); }
-    finally { setLoading(false); }
-  };
-
-  /** @deprecated OTP login — use loginWithPassword; kept for WA verify path migrating to set-password */
+  /** Sign-in when logged out — mobile OTP only (stay signed in until logout) */
   const loginProfile = async (waVerified=false) => {
     if (!waVerified) {
       const code = otpCode.join('');
@@ -5592,16 +5495,12 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       const mob = normalizeMobileE164(mobile);
       const code = waVerified ? null : otpCode.join('');
       if (!waVerified && code.length < 6) throw new Error('Enter 6-digit OTP');
-      const check = await invokeCheckLogin(mob);
-      if (!check.password_set) {
-        setPendingLoginProfile({ id: customerProfileId(mob), phone: mob });
-        setCompleteProfileMode('login');
-        setScreen('set-password');
-        addToast?.('Mobile verified — set your email and password', 'success');
-        return;
+      if (!waVerified) {
+        const ok = await verifyOtpCode(mob, code);
+        if (!ok) throw new Error('Invalid or expired OTP');
       }
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: code });
-      await finishPasswordLogin(mob);
+      await finishOtpLogin(mob);
     } catch(e) { setErr(e.message||'Sign-in failed.'); }
     finally { setLoading(false); }
   };
@@ -6111,7 +6010,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         if (mob) {
           await ensureProfileAuthSession(mob);
           const { data: prof } = await sb().from('profiles').select('*').eq('id', uid).maybeSingle();
-          if (prof?.mobile_verified && prof?.password_set_at && !profileNeedsEnrollment(prof)) {
+          if (prof?.mobile_verified && !profileNeedsEnrollment(prof)) {
             setUserId(prof.id);
             setPendingProfile(prof);
             setFirstName(prof.first_name || '');
@@ -6560,30 +6459,66 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     );
   }
 
-  // -- SET PASSWORD: after first mobile OTP verify --------------------------------
-  if (screen === 'set-password') {
-    const mob10 = (pendingLoginProfile?.phone || mobile || '').replace(/\D/g, '').slice(-10);
+  // -- LOGIN: OTP when logged out — stay signed in until logout -------------------
+  if (screen==='login') {
+    const loginTitle = loginIntent === 'profile' ? 'Sign in to Profile'
+      : loginIntent === 'bookings' ? 'Sign in to Bookings'
+      : 'Log in';
+    const loginHint = loginIntent === 'profile'
+      ? 'Verify mobile with OTP to view and update your profile. You stay signed in until you sign out.'
+      : loginIntent === 'bookings'
+      ? 'Verify mobile with OTP to view your bookings.'
+      : 'Enter mobile + SMS OTP to sign in. New user? Book a service — mobile is verified once at registration.';
     return browseWrap(
       <>
         <BrowseFixedHeader>
-          <button type="button" aria-label="Go back" onClick={() => { setScreen(completeProfileMode === 'booking' ? 'verify' : 'login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Secure your account</div>
+          <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
         </BrowseFixedHeader>
-        <div style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
-          {err && <div style={S.err}>{err}</div>}
-          <div style={{ color: C.sub, fontSize: 13, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
-            Mobile +91 {mob10 || '—'} verified. Add your email and choose a password — you stay signed in; OTP is only needed after logout or Forgot Password.
-          </div>
-          <Field label="Email" req note="For receipts, bookings, and support">
-            <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" style={S.inp()} />
+        <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
+          {err&&<div style={S.err}>{err}</div>}
+          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
+          {(silentGeo?.village || silentGeo?.city) && (
+            <div style={{fontSize:12,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {formatGeoBadge(silentGeo)} detected</div>
+          )}
+          <Field label="Mobile" req note="10-digit Indian mobile">
+            <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
+              <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
+              <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+            </div>
           </Field>
-          <Field label="Password" req note="Minimum 8 characters">
-            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Choose a password" style={S.inp()} autoComplete="new-password" />
-          </Field>
-          <Field label="Confirm password" req>
-            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password" style={S.inp()} autoComplete="new-password" />
-          </Field>
-          <Btn full onClick={completeSetPassword} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : 'Save & continue →'}</Btn>
+          <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
+          {!otpSent&&(
+            <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
+              {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
+                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:13,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
+              ))}
+            </div>
+          )}
+          {verifyMethod==='sms'&&!otpSent&&(
+            <Btn full onClick={sendLoginOTP} disabled={loading||!termsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send SMS OTP →'}</Btn>
+          )}
+          {verifyMethod==='sms'&&otpSent&&(
+            <>
+              <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} channel={otpChannel} />
+              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
+                {otpCode.map((d,i)=>(
+                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
+                    onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'lotp-')}
+                    onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'lotp-')}
+                    style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
+                ))}
+              </div>
+              <Btn full onClick={()=>loginProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying &amp; locating…</>:'Sign in →'}</Btn>
+            </>
+          )}
+          {verifyMethod==='whatsapp'&&!otpSent&&(
+            <Btn full onClick={sendLoginWA} disabled={loading||!termsAccepted} style={{background:'#25D366',boxShadow:'0 4px 14px rgba(37,211,102,0.35)'}}>{loading?<><Spin size={16}/>…</>:<>💬 Verify via WhatsApp</>}</Btn>
+          )}
+          {verifyMethod==='whatsapp'&&otpSent&&waToken&&(
+            <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
+              onUseSms={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendLoginOTP();}}/>
+          )}
         </div>
       </>
     );
@@ -6643,80 +6578,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     );
   }
 
-  // -- LOGIN: password when logged out; OTP only for Forgot Password ----------------
-  if (screen==='login') {
-    const loginTitle = loginIntent === 'profile' ? 'Sign in to Profile'
-      : loginIntent === 'bookings' ? 'Sign in to Bookings'
-      : 'Log in';
-    const loginHint = loginView === 'forgot'
-      ? 'Enter mobile, verify OTP, then set a new password.'
-      : loginIntent === 'profile'
-      ? 'Sign in with mobile + password. You stay logged in until you sign out.'
-      : loginIntent === 'bookings'
-      ? 'Sign in with mobile + password to view bookings.'
-      : 'Sign in with mobile + password. New user? Book a service to register with one-time mobile OTP.';
-    return browseWrap(
-      <>
-        <BrowseFixedHeader>
-          <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setLoginView('password');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
-          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginView === 'forgot' ? 'Forgot password' : loginTitle}</div>
-        </BrowseFixedHeader>
-        <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
-          {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
-          {(silentGeo?.village || silentGeo?.city) && loginView === 'password' && (
-            <div style={{fontSize:12,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {formatGeoBadge(silentGeo)} detected</div>
-          )}
-          <Field label="Mobile" req note="10-digit Indian mobile">
-            <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
-              <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
-              <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
-            </div>
-          </Field>
-          {loginView === 'password' && !otpSent && (
-            <>
-              <Field label="Password" req>
-                <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && loginWithPassword()} placeholder="Your password" style={S.inp()} autoComplete="current-password" />
-              </Field>
-              <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
-              <Btn full onClick={loginWithPassword} disabled={loading || !termsAccepted}>{loading ? <><Spin size={16}/>Signing in…</> : 'Sign in →'}</Btn>
-              <button type="button" onClick={() => { setLoginView('forgot'); resetOtpFlow(); setErr(''); }} style={{ background: 'none', border: 'none', color: C.acc, fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%', marginTop: 12, fontFamily: FF }}>Forgot password?</button>
-            </>
-          )}
-          {loginView === 'forgot' && (
-            <>
-              <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
-              {!otpSent && (
-                <Btn full onClick={sendLoginOTP} disabled={loading||!termsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP to reset →'}</Btn>
-              )}
-              {otpSent && (
-                <>
-                  <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} channel={otpChannel} />
-                  <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
-                    {otpCode.map((d,i)=>(
-                      <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
-                        onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'lotp-')}
-                        onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'lotp-')}
-                        style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
-                    ))}
-                  </div>
-                  <Field label="New password" req note="Minimum 8 characters">
-                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={S.inp()} autoComplete="new-password" />
-                  </Field>
-                  <Field label="Confirm new password" req>
-                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={S.inp()} autoComplete="new-password" />
-                  </Field>
-                  <Btn full onClick={resetPasswordWithOtp} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Updating…</>:'Reset password & sign in →'}</Btn>
-                </>
-              )}
-              <button type="button" onClick={() => { setLoginView('password'); resetOtpFlow(); setNewPassword(''); setConfirmPassword(''); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', marginTop: 12, fontFamily: FF }}>← Back to sign in</button>
-            </>
-          )}
-        </div>
-      </>
-    );
-  }
-
   return null;
 }
 
@@ -6751,8 +6612,6 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   }));
   const { markAuto: markRegAuto, inpStyle: regInpStyle, bind: regBind } = regAuto;
   const [digits, setDigits] = useState(['','','','','','']);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [cd, setCd]         = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr]       = useState('');
@@ -6894,44 +6753,20 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const verifyOTP_direct = async (mob) => {
     setLoading(true); setErr('');
     try {
-      const check = await invokeCheckLogin(mob);
-      if (check.password_set) {
-        setLoginPrompt(true);
-        setErr(DUPLICATE_PHONE_MSG);
-        setPhase('form');
-        return;
-      }
-      setPhase('set-password');
+      await ensureProfileAuthSession(mob, { waToken });
+      setPhase('completing');
+      await finalise(null, profileAuthEmail(mob), mob);
     } catch(e) {
-      setErr(e.message || 'Verification failed.');
+      const friendly = friendlySignupError(e);
+      if (friendly.type === 'phone_exists') {
+        setLoginPrompt(true);
+        setErr(friendly.message);
+      } else {
+        setErr(friendly.message);
+      }
       setPhase('form');
     }
     finally { setLoading(false); }
-  };
-
-  const completeRegPassword = async () => {
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      return setErr('Enter a valid email address');
-    }
-    if (!newPassword || newPassword.length < 8) return setErr('Password must be at least 8 characters');
-    if (newPassword !== confirmPassword) return setErr('Passwords do not match');
-    const token = digits.join('');
-    if (token.length < 6 && !waToken) return setErr('OTP session expired — go back and verify mobile again');
-    setLoading(true); setErr('');
-    try {
-      const mob = `+91${form.mobile.replace(/\D/g,'').slice(0,10)}`;
-      await invokePasswordWithOtp(mob, newPassword, {
-        contactEmail: form.email.trim(),
-        otp: token.length >= 6 ? token : undefined,
-        waToken: waToken || undefined,
-        action: 'set_password',
-      });
-      setPhase('completing');
-      await finalise(null, profileAuthEmail(mob), mob);
-    } catch (e) {
-      setErr(e.message || 'Could not save password');
-      setPhase('set-password');
-    } finally { setLoading(false); }
   };
 
   const verifyOTP = async () => {
@@ -6948,14 +6783,9 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       } catch(e) { console.warn('[Verify]', e.message); }
       if (!ok) throw new Error('Invalid or expired OTP. Request a new one.');
 
-      const check = await invokeCheckLogin(mob);
-      if (check.password_set) {
-        setLoginPrompt(true);
-        setErr(DUPLICATE_PHONE_MSG);
-        setPhase('form');
-        return;
-      }
-      setPhase('set-password');
+      await ensureProfileAuthSession(mob, { otp: token });
+      setPhase('completing');
+      await finalise(null, profileAuthEmail(mob), mob);
     } catch(e) {
       const friendly = friendlySignupError(e);
       if (friendly.type === 'phone_exists') {
@@ -7093,13 +6923,13 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
     </div>
   );
 
-  const steps=['Consent','Your info','Verify','Secure','Done'];
-  const si=phase==='consent'?0:phase==='collecting'||phase==='gps'?0:phase==='form'?1:phase==='otp'?2:phase==='set-password'?3:4;
+  const steps=['Consent','Your info','Verify','Done'];
+  const si=phase==='consent'?0:phase==='collecting'||phase==='gps'?0:phase==='form'?1:phase==='otp'?2:3;
 
   const stepBar=(
     <div style={{display:'flex',justifyContent:'space-between',marginBottom:20,position:'relative'}}>
       <div style={{position:'absolute',top:14,left:'12%',right:'12%',height:2,background:C.deep}}/>
-      <div style={{position:'absolute',top:14,left:'12%',height:2,background:C.acc,width:`${si/4*76}%`,transition:'width .4s'}}/>
+      <div style={{position:'absolute',top:14,left:'12%',height:2,background:C.acc,width:`${si/3*76}%`,transition:'width .4s'}}/>
       {steps.map((l,i)=>(
         <div key={l} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,zIndex:1}}>
           <div style={{width:28,height:28,borderRadius:'50%',background:i<=si?C.acc:C.deep,border:`2px solid ${i<=si?C.acc:C.bdr}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',transition:'all .3s'}}>
@@ -7281,31 +7111,6 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       </Btn>
       <div style={{textAlign:'center',marginTop:10}}>
         <button onClick={()=>{setPhase('form');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>← Change number</button>
-      </div>
-    </>
-  );
-
-  /* SET PASSWORD */
-  if (phase==='set-password') return wrap(
-    <>
-      <div style={{color:C.txt,fontSize:15,fontWeight:600,marginBottom:4}}>Secure your account</div>
-      <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6}}>
-        Mobile +91 {form.mobile} verified. Choose a password — you stay signed in; OTP is only needed after logout or Forgot Password.
-      </div>
-      <Field label="Email" req note="For receipts, bookings, and support">
-        <input type="email" value={form.email} onChange={e=>f('email',e.target.value)} placeholder="you@example.com" style={S.inp()}/>
-      </Field>
-      <Field label="Password" req note="Minimum 8 characters">
-        <input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="Choose a password" style={S.inp()} autoComplete="new-password"/>
-      </Field>
-      <Field label="Confirm password" req>
-        <input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Repeat password" style={S.inp()} autoComplete="new-password"/>
-      </Field>
-      <Btn full onClick={completeRegPassword} disabled={loading}>
-        {loading?<><Spin size={16}/>Saving…</>:'Save & enter ScanV →'}
-      </Btn>
-      <div style={{textAlign:'center',marginTop:10}}>
-        <button onClick={()=>{setPhase('otp');setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>← Back to OTP</button>
       </div>
     </>
   );
@@ -15932,7 +15737,7 @@ function AdminDirectoryTab({ pin }) {
   const deleteUser = async (profileId) => {
     if (!profileId) return;
     if (!window.confirm('Revoke this user\'s login? Their profile and booking history stay for records.')) return;
-    if (!window.confirm('They can sign in again with mobile + password using the same number. Continue?')) return;
+    if (!window.confirm('They can sign in again with OTP using the same mobile number. Continue?')) return;
     setLoading(true); setErr('');
     try {
       await adminHubFetch('delete_profile', { profile_id: profileId }, pin);
