@@ -10,6 +10,8 @@
 
 # production
 /build
+/public/package.json
+/public/version.json
 
 # misc
 .DS_Store

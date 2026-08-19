@@ -203,8 +203,9 @@ self.addEventListener('fetch', e => {
   const isNavigation = e.request.mode === 'navigate';
   const isShell = url.endsWith('/index.html') || url.endsWith('/');
   const isVersionJson = url.includes('/version.json');
+  const isPackageJson = url.includes('/package.json');
 
-  if (isVersionJson) {
+  if (isVersionJson || isPackageJson) {
     e.respondWith(fetch(e.request));
     return;
   }
