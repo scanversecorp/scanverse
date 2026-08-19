@@ -19,7 +19,7 @@ import { SOCIAL_LINKS, SOCIAL_LABELS } from './social-links';
 import { fetchServiceSchedule, validateBookingSlot, normalizeScheduleRow, findNextAvailableSlot } from './schedule-utils';
 import { ScheduleBookingPanel } from './admin-service-schedule';
 import { StudentCloudAdmitScreen, useStudentCloudFeeView, resolveUserMobile10 } from './student-cloud';
-import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL, useScanvTermsAcceptance } from './terms-acceptance';
+import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL, useScanvTermsAcceptance, ScanvLegalLinks } from './terms-acceptance';
 /* --- CONFIG ------------------------------------------------------- */
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
@@ -2584,14 +2584,22 @@ function trackTicketIdFromHash() {
 }
 
 const FOOTER_LINKS = [
-  ['privacy', 'Privacy', 'path'],
-  ['terms', 'Terms', 'path'],
-  ['dpdp', 'DPDP', 'path'],
-  ['refund', 'Refund', 'path'],
-  ['payment', 'Payment', 'path'],
+  ['terms', 'Terms & Conditions', 'path'],
+  ['privacy', 'Privacy Policy', 'path'],
+  ['dpdp', 'DPDP Act 2023', 'path'],
+  ['refund', 'Refund Policy', 'path'],
+  ['payment', 'Payment Policy', 'path'],
   ['faq', 'FAQ', 'hash'],
   ['report', 'Report', 'hash'],
 ];
+
+function BrowseLegalStrip() {
+  return (
+    <div style={{ flexShrink: 0, borderTop: BDR, padding: '10px 16px 8px', textAlign: 'center', background: C.surf }}>
+      <ScanvLegalLinks accentColor={C.acc} fontSize={11} mutedColor={C.dim} />
+    </div>
+  );
+}
 
 function FooterSocialLinks({ small }) {
   const fs = small ? 10 : 11;
@@ -2697,7 +2705,7 @@ function FooterLegalLinks({ current, small }) {
           href={kind === 'hash' ? `#${k}` : `/${k}`}
           style={{ color: current === k ? C.acc : C.dim, fontSize: fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600, padding: '8px 0', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
         >
-          {l}{!small && kind === 'path' ? ' Policy' : ''}
+          {l}
         </a>
       ))}
       <FooterShareQrButtons small={small} />
@@ -3995,8 +4003,8 @@ const TRUST_COMMITMENT_PAGES = {
     sections: [
       ['Before you book — customer validation', [
         'Mobile OTP via SMS or WhatsApp before payment — no anonymous bookings',
-        'Terms, Privacy Policy, and DPDP Act 2023 consent required on first booking',
-        'Name, address, and GPS location captured for dispatch and fraud prevention',
+        'Terms, Privacy Policy, DPDP Act 2023, and GPS location tracking consent required on first booking',
+        'Name, address, and GPS location captured for dispatch, nearby matching, and fraud prevention',
         'Platform fee paid through UPI or Razorpay with a unique transaction reference',
         'Inactive or paused services are blocked at booking with a clear message',
       ]],
@@ -4039,7 +4047,8 @@ const TRUST_COMMITMENT_PAGES = {
     action: { label: 'Report an issue →', type: 'hash', target: '#report' },
     links: [
       { label: 'Privacy Policy', type: 'href', target: '/privacy' },
-      { label: 'Terms', type: 'href', target: '/terms' },
+      { label: 'Terms & Conditions', type: 'href', target: '/terms' },
+      { label: 'DPDP Act 2023', type: 'href', target: '/dpdp' },
       { label: 'Refund Policy', type: 'href', target: '/refund' },
     ],
   },
@@ -5872,6 +5881,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         </div>
         {sticky}
       </div>
+      <BrowseLegalStrip />
       <GuestBottomNav
         activeTab={guestActiveTab}
         loggedIn={browseAuthed}
@@ -6347,6 +6357,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');resetOtpFlow();sendOTP();}}/>
           )}
+          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </>
     );
@@ -6398,6 +6409,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             </>
           )}
           <Btn full onClick={completeLoginProfile} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : (completeProfileMode === 'booking' ? 'Save & continue booking →' : 'Save & continue →')}</Btn>
+          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </>
     );
@@ -6583,9 +6595,10 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   };
 
   useEffect(() => {
-    if (phase === 'consent') startCollection();
+    if (phase !== 'consent') return;
+    // GPS/device collection starts only after explicit terms + GPS acceptance (see consent screen).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [phase]);
 
   const sendOTP = async () => {
     if (!form.firstName.trim()) return setErr('Enter your first name');
@@ -6874,16 +6887,8 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
       <div style={{color:C.sub,fontSize:12,textAlign:'center',lineHeight:1.65,marginBottom:10}}>
         Find and book verified services near you — Legal & Consulting, Health at Home, AI Cloud & Data Center, Property, Home Help, Food & more.
       </div>
-      {/* DPDP consent -- compact as requested */}
-      <div style={{background:C.gls,border:`1px solid ${C.bdr}`,borderRadius:8,padding:'9px 12px',marginBottom:18,fontSize:11,color:C.dim,lineHeight:1.6}}>
-        <strong style={{color:C.sub}}>Before we begin:</strong> ScanV collects your GPS location, IP address and device details to show nearby services and enable local deliveries. Data is stored securely in India under the <strong style={{color:C.sub}}>DPDP Act 2023</strong>. You can update or delete your data anytime in Profile.
-      </div>
-      {(phase === 'collecting' || phase === 'gps') && (
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <Spin size={32} />
-          <div style={{ color: C.sub, fontSize: 12, marginTop: 10 }}>Getting your location… tap Allow if prompted</div>
-        </div>
-      )}
+      <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} C={C} BDR={BDR} />
+      <Btn full onClick={startCollection} disabled={!termsAccepted}>Continue →</Btn>
     </>
   );
 
@@ -7932,6 +7937,7 @@ function BookScreen() {
             onConfirm={() => confirmPaid('UPI')}
           />
         </>}
+        <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ padding: '12px 0 24px', marginTop: 0 }} />
       </div>
     </div>
   );
@@ -16677,7 +16683,7 @@ npx supabase db push`}</pre>
    ROOT APP
 ================================================================ */
 /* ================================================================
-   LEGAL PAGES -- Served at /privacy /terms /refund /payment
+   LEGAL PAGES -- Served at /privacy /terms /dpdp /refund /payment
 ================================================================ */
 function LegalPage({page}) {
   const pages = {
@@ -16692,12 +16698,12 @@ function LegalPage({page}) {
           </div>
           {[
             ['Who We Are',`ScanV is operated by DCore ("we", "us"). We connect customers with independent service providers across ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. Data Protection Officer: privacy@dcoreglobal.com · Grievance officer under DPDP: privacy@dcoreglobal.com (response within 30 days).`],
-            ['Acceptance & Consent',`By ticking the acceptance box before OTP, opening the app, or placing a booking, you provide explicit consent to this Privacy Policy, our Terms & Conditions, and processing under the Digital Personal Data Protection Act, 2023. You may withdraw consent for non-essential processing via Profile or email; withdrawal may limit platform features.`],
+            ['Acceptance & Consent',`By ticking the acceptance box before OTP, opening the app, or placing a booking, you provide explicit consent to this Privacy Policy, our Terms & Conditions, processing under the Digital Personal Data Protection Act, 2023, and GPS location collection/tracking as described below. You may withdraw consent for non-essential processing via Profile or email; withdrawal may limit platform features (including nearby service matching and live tracking).`],
             ['Data We Collect','Identity (name, date of birth where required), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city, village), Device (type, OS, browser, timezone, language, screen, session metadata), Booking and payment references, Partner assignment details, and usage analytics. We do NOT collect or store Aadhaar, PAN, passport, full card numbers, passwords, or biometrics on customer accounts.'],
             ['Lawful Basis (DPDP 2023)','Consent (OTP, location, marketing where opted in) · Performance of contract (booking fulfilment) · Legitimate interests (fraud prevention, platform security, service quality) · Legal obligation (GST, tax, court orders). Where consent is the basis, you may withdraw it subject to ongoing legal/contractual requirements.'],
             ['How We Use It','Verify identity via OTP before bookings · Match you with nearby Partners · Send booking, payment, and service updates via SMS/WhatsApp/email · Process platform fees and GST · Prevent fraud and abuse · Improve the platform through aggregated analytics · Comply with Indian law. We do not use your data for unrelated profiling or sale to advertisers.'],
             ['Electronic Communications','You consent to receive transactional SMS, WhatsApp messages, and emails for OTP verification, booking updates, payment confirmations, and support. Promotional messages are opt-in only. Standard carrier/data charges may apply.'],
-            ['Location Data','ScanV requests GPS when you open the app and when you book. Location is used to show nearby services, route deliveries, and verify service areas. IP-based location is a fallback only. Location is shared with your assigned Partner solely to fulfil the booking. We never sell location data.'],
+            ['Location Data & GPS Tracking','By accepting before OTP, you consent to ScanV collecting and processing your GPS coordinates, IP-based location, PIN code, and address. We request GPS when you open the app, sign in, book any service (including all category sub-cards), and during eligible jobs for live partner tracking and delivery routing. Location is shared with your assigned Partner solely to fulfil the booking. You may disable GPS in device settings, but core features may not work. We never sell location data.'],
             ['Data Sharing','Name, mobile, and service location with your assigned Partner · Payment references with Razorpay (PCI-DSS L1) · Mobile with SMS providers (2Factor, MSG91, Fast2SMS, Twilio) for OTP · Cloud infrastructure in India · Government, regulators, or courts when legally required. We never share with advertisers or data brokers.'],
             ['Cross-Border Transfer','Primary storage and processing occur in India. If any subprocessors process data outside India, we ensure contractual safeguards consistent with applicable law. You consent to such transfers where required for service delivery.'],
             ['Retention','Bookings and invoices: 7 years (GST/tax) · OTP logs: 30 days · Device/session logs: 12 months · Support tickets: 3 years · Deleted accounts: personal data erased within 30 days except where retention is legally required.'],
@@ -16716,13 +16722,14 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By checking the acceptance box, using ScanV, or placing a booking, you agree to these Terms, our Privacy Policy, and DPDP Act 2023 processing in full.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By checking the acceptance box, using ScanV, or placing a booking, you agree to these Terms, our Privacy Policy, DPDP Act 2023 processing, and GPS location tracking in full.</p>
           </div>
           {[
             ['ScanV as Marketplace Intermediary','DCore operates ScanV as an IT Intermediary under the Information Technology Act, 2000 and applicable intermediary guidelines. We provide a technology platform connecting Users with independent Partners. We do not employ Partners, do not perform services ourselves, and are not responsible for Partner conduct, service quality, safety, timeliness, outcomes, or disputes between Users and Partners except as expressly stated here.'],
-            ['Acceptance','You must tick the checkbox for Terms & Conditions, Privacy Policy & DPDP Act 2023 before OTP verification. This constitutes a legally binding electronic record under the IT Act. If you do not agree, do not use ScanV.'],
+            ['Acceptance','You must tick the checkbox for Terms & Conditions, Privacy Policy, DPDP Act 2023, and GPS location tracking before OTP verification on every service sub-card and booking flow. This constitutes a legally binding electronic record under the IT Act. If you do not agree, do not use ScanV.'],
+            ['GPS Location & Tracking Consent','You consent to ScanV accessing device GPS (and IP-based fallback) to: show nearby services; auto-fill address and PIN; match you with Partners; route deliveries; record sign-in location; and enable live job tracking on supported categories (e.g. delivery, bike/car mechanic, towing). Partners receive your service location only to fulfil the booking. Denying GPS may block booking or dispatch. Consent is recorded with your OTP acceptance timestamp.'],
             ['Eligibility','Must be 18+ · Valid Indian mobile · Legally capable of entering contracts · Accurate information only · One account per mobile unless authorised by ScanV.'],
-            ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + legal acceptance recorded + unique TXN ID generated + applicable platform fee paid (where required). DCore may cancel, modify, or reassign bookings if no Partner is available, fraud is suspected, or terms are violated — without liability beyond refund of platform fee where applicable.'],
+            ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + legal and GPS acceptance recorded + unique TXN ID generated + applicable platform fee paid (where required). DCore may cancel, modify, or reassign bookings if no Partner is available, fraud is suspected, or terms are violated — without liability beyond refund of platform fee where applicable.'],
             ['User Responsibilities','Provide accurate details · Be present at agreed time/location · Treat Partners respectfully · Pay agreed fees · Report issues within 48 hours · Do not use ScanV for unlawful purposes · Do not circumvent the platform to deal directly with Partners discovered via ScanV · Indemnify DCore against claims arising from your misuse or false information.'],
             ['Partner Relationship','Partners are independent contractors, not employees or agents of DCore. DCore does not control how Partners perform services. Any warranty, advice, or outcome is solely between you and the Partner unless DCore explicitly states otherwise in writing.'],
             ['Payment & Fees','Platform fee: 10% of service value (unless shown otherwise) · GST at applicable rates · Service fees are indicative; final scope/pricing may be agreed with the Partner · Cash-on-service: platform fee still payable online where required · Failed or disputed UPI must include TXN ID.'],
@@ -16750,14 +16757,14 @@ function LegalPage({page}) {
           {[
             ['Data Fiduciary','DCore (operating ScanV) is the Data Fiduciary for personal data collected through the ScanV platform. Partners may act as separate fiduciaries for data they collect directly during service delivery.'],
             ['Personal Data We Process','Name, mobile number, location, device identifiers, booking history, payment references, and communications necessary to provide the marketplace service. Sensitive personal data is not collected on standard customer flows except where a specific service requires it and separate consent is obtained.'],
-            ['Purpose & Consent','We process data only for specified purposes: account verification (OTP), booking fulfilment, payments, fraud prevention, support, and legal compliance. Explicit consent is obtained via the acceptance checkbox before OTP and location consent at app open.'],
+            ['Purpose & Consent','We process data only for specified purposes: account verification (OTP), booking fulfilment, payments, fraud prevention, support, and legal compliance. Explicit consent — including GPS location collection and tracking — is obtained via the acceptance checkbox before OTP on all service sub-cards and at app open/sign-in.'],
             ['Your Rights','Right to access · Correction · Erasure (subject to retention law) · Grievance redressal · Nominate a person to exercise rights on your behalf · Withdraw consent for consent-based processing. Exercise via privacy@dcoreglobal.com or Profile settings.'],
             ['Grievance Redressal','Email privacy@dcoreglobal.com with subject "DPDP Grievance" and your registered mobile. We acknowledge within 7 days and aim to resolve within 30 days. Unresolved grievances may be escalated to the Data Protection Board of India when constituted.'],
             ['Data Principal Duties','Provide accurate information · Do not impersonate others · Do not submit false grievances · Comply with applicable laws when using the platform.'],
             ['Children','ScanV is not directed at children under 18. We do not knowingly process minors\' data without verifiable parental consent.'],
             ['Security Safeguards','Reasonable security practices including encryption, access controls, and India-based hosting. Report suspected breaches to privacy@dcoreglobal.com promptly.'],
             ['Cross-Border','Primary processing in India. International subprocessors, if any, are bound by contract to protect data consistent with DPDP requirements.'],
-            ['Relationship to Other Policies','This summary supplements our Privacy Policy and Terms & Conditions. In case of conflict, the most specific provision for data protection applies. Checkbox acceptance covers all three documents together.'],
+            ['Relationship to Other Policies','This summary supplements our Privacy Policy and Terms & Conditions. In case of conflict, the most specific provision for data protection applies. Checkbox acceptance covers Terms, Privacy, DPDP, and GPS tracking together.'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
@@ -16839,6 +16846,7 @@ function LegalPage({page}) {
           <div style={{display:'inline-block',background:C.acc,color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,letterSpacing:1,marginBottom:10}}>{pg.badge}</div>
           <div style={{color:C.txt,fontSize:24,fontWeight:800,marginBottom:4}}>{pg.title}</div>
           <div style={{color:C.sub,fontSize:12}}>ScanV · Updated: {pg.updated}</div>
+          <div style={{ marginTop: 10 }}><ScanvLegalLinks accentColor={C.acc} fontSize={12} mutedColor={C.dim} /></div>
           <div style={{color:C.dim,fontSize:10,marginTop:4}}>Operated by DCore</div>
         </div>
         {/* Content */}

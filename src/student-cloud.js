@@ -1,6 +1,6 @@
 /** Student Cloud — AI / Cloud / Data Center admission + admin fee tracker */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL } from './terms-acceptance';
+import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL, ScanvLegalLinks } from './terms-acceptance';
 
 export const SGR_FEE_FALLBACK_PAISE = 50000;
 /** @deprecated use sgrFeePaise prop / pricing catalog */
@@ -468,7 +468,14 @@ export function StudentCloudAdmitScreen({
           <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>₹{sgrFeeLabel} paid · {courseName} · {scheduleDate} {scheduleTime}</div>
           <Btn full onClick={onBack} style={{ marginTop: 18 }}>Back to Cloud courses</Btn>
         </div>
-        {showCopyright && CopyrightLine ? <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} /> : null}
+        {showCopyright && CopyrightLine ? (
+          <>
+            <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 12, borderTop: BDR }}>
+              <ScanvLegalLinks accentColor={C.acc} fontSize={11} mutedColor={C.dim} />
+            </div>
+            <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 8 }} />
+          </>
+        ) : null}
       </div>
     );
   }
@@ -569,7 +576,14 @@ export function StudentCloudAdmitScreen({
             {paid && <div style={{ fontSize: 12, color: C.grn, marginTop: 8, fontWeight: 700 }}>Payment seen — confirming…</div>}
           </div>
         )}
-        {showCopyright && CopyrightLine ? <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} /> : null}
+        {showCopyright && CopyrightLine ? (
+          <>
+            <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 12, borderTop: BDR }}>
+              <ScanvLegalLinks accentColor={C.acc} fontSize={11} mutedColor={C.dim} />
+            </div>
+            <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 8 }} />
+          </>
+        ) : null}
       </div>
     </>
   );
