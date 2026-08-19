@@ -1,5 +1,6 @@
 /** Student Cloud — AI / Cloud / Data Center admission + admin fee tracker */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { readScanvTermsAccepted, writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LABEL } from './terms-acceptance';
 
 export const SGR_FEE_FALLBACK_PAISE = 50000;
 /** @deprecated use sgrFeePaise prop / pricing catalog */
@@ -274,6 +275,7 @@ export function StudentCloudAdmitScreen({
   const [loading, setLoading] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [sgrFeeAck, setSgrFeeAck] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(readScanvTermsAccepted);
   const [err, setErr] = useState('');
 
   const courseName = useMemo(
@@ -352,6 +354,7 @@ export function StudentCloudAdmitScreen({
   const sendOtp = async () => {
     const v = validateForm();
     if (v) return setErr(v);
+    if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
       await invokeSendOtp(`+91${digits10(mobile)}`);
@@ -525,8 +528,17 @@ export function StudentCloudAdmitScreen({
           <Field label="Time" req><input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} style={S.inp()} disabled={otpVerified} /></Field>
         </div>
 
+        {!otpVerified && (
+          <TermsAcceptanceField
+            accepted={termsAccepted}
+            onAccept={() => { writeScanvTermsAccepted(); setTermsAccepted(true); }}
+            C={C}
+            BDR={BDR}
+          />
+        )}
+
         {!otpVerified && !otpSent && (
-          <Btn full onClick={sendOtp} disabled={loading}>{loading ? <><Spin size={16} /> Sending OTP…</> : 'Send OTP →'}</Btn>
+          <Btn full onClick={sendOtp} disabled={loading || !termsAccepted}>{loading ? <><Spin size={16} /> Sending OTP…</> : 'Send OTP →'}</Btn>
         )}
         {!otpVerified && otpSent && (
           <>
