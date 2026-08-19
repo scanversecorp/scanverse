@@ -3140,10 +3140,10 @@ class Boundary extends Component {
 /* --- STYLES ------------------------------------------------------- */
 const S = {
   center: {height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:16,fontFamily:FF,padding:20},
-  inp: (x={}) => ({width:'100%',background:C.surf,border:BDR,borderRadius:10,padding:'12px 14px',color:C.txt,fontSize:15,outline:'none',fontFamily:FF,boxSizing:'border-box',...x}),
-  lbl: {fontSize:11,fontWeight:700,color:C.sub,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:5,display:'block'},
+  inp: (x={}) => ({width:'100%',background:C.surf,border:BDR,borderRadius:10,padding:'12px 14px',color:C.txt,fontSize:16,outline:'none',fontFamily:FF,boxSizing:'border-box',...x}),
+  lbl: {fontSize:12,fontWeight:700,color:C.sub,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:5,display:'block'},
   card: (x={}) => ({background:C.card,border:IG_TILE.border,borderRadius:IG_TILE.radius,padding:16,boxShadow:IG_TILE.shadow,...x}),
-  err: {background:`${C.red}12`,border:`1.5px solid ${C.red}55`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:13,marginBottom:14},
+  err: {background:`${C.red}12`,border:`1.5px solid ${C.red}55`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:14,marginBottom:14},
 };
 
 const APP_CSS = `
@@ -3246,7 +3246,7 @@ function Field({label,req,note,children}) {
     <div style={{marginBottom:13}}>
       {label && <label style={S.lbl}>{label}{req&&<span style={{color:C.acc}}> *</span>}</label>}
       {children}
-      {note && <div style={{fontSize:11,color:C.dim,marginTop:3}}>{note}</div>}
+      {note && <div style={{fontSize:12,color:C.dim,marginTop:3}}>{note}</div>}
     </div>
   );
 }
@@ -3471,7 +3471,7 @@ function CategoryPill({ categoryId, theme, sm }) {
   const t = SUB_CATEGORIES[categoryId]?.themes?.[theme];
   if (!t) return null;
   return (
-    <span style={{ background: t.bg, color: t.color, border: `1.5px solid ${t.border}`, borderRadius: 99, fontSize: sm ? 9 : 10, fontWeight: 800, padding: sm ? '2px 8px' : '3px 10px' }}>
+    <span style={{ background: t.bg, color: t.color, border: `1.5px solid ${t.border}`, borderRadius: 99, fontSize: sm ? 11 : 12, fontWeight: 800, padding: sm ? '2px 8px' : '3px 10px' }}>
       {t.label}
     </span>
   );
@@ -3485,9 +3485,9 @@ function PriceTag({ svc, sm }) {
   const pctOff = mrp > price ? Math.round((1 - price / mrp) * 100) : 0;
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-      {mrp > price && <span style={{ color: C.dim, fontSize: sm ? 10 : 11, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>}
-      <span style={{ color: C.acc, fontSize: sm ? 13 : 15, fontWeight: 800 }}>₹{fmtRs(price)}{unit}</span>
-      {pctOff > 0 && <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>{pctOff}% OFF</span>}
+      {mrp > price && <span style={{ color: C.dim, fontSize: sm ? 12 : 13, textDecoration: 'line-through', fontWeight: 600 }}>₹{fmtRs(mrp)}{unit}</span>}
+      <span style={{ color: C.acc, fontSize: sm ? 15 : 17, fontWeight: 800 }}>₹{fmtRs(price)}{unit}</span>
+      {pctOff > 0 && <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>{pctOff}% OFF</span>}
     </div>
   );
 }
@@ -3513,7 +3513,7 @@ function CloudCoursePriceTag({ svc, sm, feeView, onFillSgr }) {
           padding: 0,
           cursor: onFillSgr ? 'pointer' : 'default',
           color: C.gold,
-          fontSize: sm ? 11 : 12,
+          fontSize: sm ? 13 : 14,
           fontWeight: 800,
           letterSpacing: '0.02em',
           fontFamily: FF,
@@ -3566,12 +3566,12 @@ function CategorySvcCard({ categoryId, svc, onClick, compact, cloudFeeView, onFi
       </div>
       <div style={{ padding: compact ? '10px 10px 12px' : '12px 12px 14px', background: '#fff', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ marginBottom: 6 }}><CategoryPill categoryId={categoryId} theme={svc.theme} sm={compact} /></div>
-        <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 12 : 13, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
-        <div style={{ color: C.sub, fontSize: 10, lineHeight: 1.4, marginBottom: 8, flex: 1 }}>{svc.sub}</div>
+        <div style={{ color: C.txt, fontWeight: 800, fontSize: compact ? 14 : 15, lineHeight: 1.3, marginBottom: 3 }}>{svc.name}</div>
+        <div style={{ color: C.sub, fontSize: 12, lineHeight: 1.4, marginBottom: 8, flex: 1 }}>{svc.sub}</div>
         <ServicePriceTag svc={svc} sm={compact} categoryId={categoryId} cloudFeeView={cloudFeeView} onFillSgr={onFillSgr} />
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          <span style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{svc.rating}</span>
-          <span style={{ color: C.dim, fontSize: 10 }}>· {svc.turnaround}</span>
+          <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{svc.rating}</span>
+          <span style={{ color: C.dim, fontSize: 12 }}>· {svc.turnaround}</span>
         </div>
       </div>
     </div>
@@ -3598,8 +3598,8 @@ function CategoryListBody({ categoryId, onSelect, onAdmit, onFillSgr, apikey, cl
     return (
       <div style={{ padding: '32px 16px', textAlign: 'center' }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
-        <div style={{ color: C.txt, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>No services available</div>
-        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>This category is being updated — check back soon.</div>
+        <div style={{ color: C.txt, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>No services available</div>
+        <div style={{ color: C.dim, fontSize: 14, lineHeight: 1.5 }}>This category is being updated — check back soon.</div>
       </div>
     );
   }
@@ -3607,13 +3607,13 @@ function CategoryListBody({ categoryId, onSelect, onAdmit, onFillSgr, apikey, cl
     <div style={{ padding: '14px 16px 24px' }}>
       {categoryId === 'cloud' && onAdmit && (
         <button type="button" onClick={onAdmit} style={{ width: '100%', textAlign: 'left', marginBottom: 14, border: '1.5px solid #93C5FD', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', borderRadius: 14, padding: '14px 14px', cursor: 'pointer', fontFamily: FF }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Skill Gap Review (SGR) - Form A1</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>Verify mobile · book a schedule · Razorpay. A consultant calls you within 72 hours.</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Skill Gap Review (SGR) - Form A1</div>
+          <div style={{ fontSize: 14, color: C.sub, marginTop: 4, lineHeight: 1.45 }}>Verify mobile · book a schedule · Razorpay. A consultant calls you within 72 hours.</div>
         </button>
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
         {pills.map(([k, l, col, bg]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
+          <button key={k} onClick={() => setFilter(k)} style={{ padding: '8px 14px', borderRadius: 99, border: filter === k ? `2px solid ${col}` : BDR, background: filter === k ? bg : C.surf, color: filter === k ? col : C.sub, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: FF }}>
             {l}
           </button>
         ))}
@@ -3626,7 +3626,7 @@ function CategoryListBody({ categoryId, onSelect, onAdmit, onFillSgr, apikey, cl
           <div key={theme} style={{ marginBottom: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
               <CategoryPill categoryId={categoryId} theme={theme} />
-              <span style={{ color: C.dim, fontSize: 11, fontWeight: 600 }}>{t.tagline}</span>
+              <span style={{ color: C.dim, fontSize: 13, fontWeight: 600 }}>{t.tagline}</span>
             </div>
             <SvcGrid2
               items={items}
@@ -3654,20 +3654,20 @@ function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderC
     return (
       <div style={{ ...S.card(), padding: 24, textAlign: 'center', marginBottom: 14 }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
-        <div style={{ color: C.txt, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>No services found</div>
-        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;doctor home&rdquo;, &ldquo;legal&rdquo;, or &ldquo;tiffin&rdquo;</div>
+        <div style={{ color: C.txt, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>No services found</div>
+        <div style={{ color: C.dim, fontSize: 14, lineHeight: 1.5 }}>Try &ldquo;kitchen clean&rdquo;, &ldquo;doctor home&rdquo;, &ldquo;legal&rdquo;, or &ldquo;tiffin&rdquo;</div>
       </div>
     );
   }
   return (
     <>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ color: C.txt, fontSize: 16, fontWeight: 800, marginBottom: 3 }}>Search results</div>
-        <div style={{ color: C.dim, fontSize: 12, fontWeight: 500 }}>{total} found for &ldquo;{q}&rdquo;</div>
+        <div style={{ color: C.txt, fontSize: 17, fontWeight: 800, marginBottom: 3 }}>Search results</div>
+        <div style={{ color: C.dim, fontSize: 14, fontWeight: 500 }}>{total} found for &ldquo;{q}&rdquo;</div>
       </div>
       {subBlocks.map(({ id, title, items }) => (
         <div key={id} style={{ marginBottom: 16 }}>
-          <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>{title} · {items.length}</div>
+          <div style={{ color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 10 }}>{title} · {items.length}</div>
           <SvcGrid2
             items={items}
             renderItem={(svc) => <CategorySvcCard categoryId={id} svc={svc} onClick={() => onSubSvc(id, svc)} compact />}
@@ -3676,7 +3676,7 @@ function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderC
       ))}
       {categories.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          {subBlocks.length > 0 && <div style={{ color: C.txt, fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
+          {subBlocks.length > 0 && <div style={{ color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 10 }}>Categories · {categories.length}</div>}
           <SvcGrid2 gap={12} items={categories} renderItem={(s, i) => renderCategory(s, i)} />
         </div>
       )}
@@ -3700,8 +3700,8 @@ function AssistBanner() {
   return (
     <a href={`tel:${ASSIST.replace(/-/g,'')}`} style={{display:'flex',alignItems:'center',gap:12,background:C.surf,border:'1.5px solid #f0c040',borderRadius:12,padding:'12px 14px',textDecoration:'none',marginBottom:16,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
       <span style={{fontSize:22}}>📞</span>
-      <div><div style={{color:C.txt,fontSize:13,fontWeight:700}}>Need help booking?</div><div style={{color:C.sub,fontSize:11}}>{ASSIST} · Call our team</div></div>
-      <div style={{marginLeft:'auto',background:C.acc,color:'#fff',fontSize:11,fontWeight:800,padding:'8px 12px',borderRadius:8,boxShadow:'0 4px 12px rgba(214,58,86,0.3)'}}>Call</div>
+      <div><div style={{color:C.txt,fontSize:15,fontWeight:700}}>Need help booking?</div><div style={{color:C.sub,fontSize:13}}>{ASSIST} · Call our team</div></div>
+      <div style={{marginLeft:'auto',background:C.acc,color:'#fff',fontSize:13,fontWeight:800,padding:'8px 12px',borderRadius:8,boxShadow:'0 4px 12px rgba(214,58,86,0.3)'}}>Call</div>
     </a>
   );
 }
@@ -3992,29 +3992,29 @@ function TrustCommitmentBody({ pageKey, onAction, showCopyright = true }) {
   return (
     <>
       <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#e6f4ee', border: '2px solid rgba(0,122,77,0.35)' }}>
-        <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>{pg.headline}</div>
-        <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>{pg.intro}</div>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>{pg.headline}</div>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55 }}>{pg.intro}</div>
       </div>
       {pg.pipeline?.length ? (
         <div style={S.card({ marginBottom: 12, padding: '14px 16px' })}>
-          <div style={{ color: C.txt, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Trust validation flow</div>
+          <div style={{ color: C.txt, fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Trust validation flow</div>
           {pg.pipeline.map((step, i) => (
             <div key={step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < pg.pipeline.length - 1 ? 10 : 0 }}>
               <div style={{ width: 22, height: 22, borderRadius: 99, background: C.grn, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</div>
-              <div style={{ color: C.sub, fontSize: 12, lineHeight: 1.55, paddingTop: 2 }}>{step}</div>
+              <div style={{ color: C.sub, fontSize: 13, lineHeight: 1.55, paddingTop: 2 }}>{step}</div>
             </div>
           ))}
         </div>
       ) : null}
       {pg.sections.map(([heading, body]) => (
         <div key={heading} style={S.card({ marginBottom: 12, padding: '14px 16px' })}>
-          <div style={{ color: C.txt, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+          <div style={{ color: C.txt, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
           {Array.isArray(body) ? (
-            <ul style={{ margin: 0, paddingLeft: 18, color: C.sub, fontSize: 12, lineHeight: 1.6 }}>
+            <ul style={{ margin: 0, paddingLeft: 18, color: C.sub, fontSize: 13, lineHeight: 1.6 }}>
               {body.map((item) => <li key={item} style={{ marginBottom: 4 }}>{item}</li>)}
             </ul>
           ) : (
-            <p style={{ margin: 0, color: C.sub, fontSize: 12, lineHeight: 1.6 }}>{body}</p>
+            <p style={{ margin: 0, color: C.sub, fontSize: 13, lineHeight: 1.6 }}>{body}</p>
           )}
         </div>
       ))}
@@ -4108,8 +4108,8 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
           ←
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.txt }}>{title}</div>
-          {subtitle ? <div style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>{subtitle}</div> : null}
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>{title}</div>
+          {subtitle ? <div style={{ fontSize: 13, color: C.dim, fontWeight: 600 }}>{subtitle}</div> : null}
         </div>
       </div>
       <div
@@ -4151,7 +4151,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onLogin, on
 function StickyCta({ children, onClick }) {
   return (
     <div style={{flexShrink:0,padding:'10px 16px',background:C.bg,borderTop:BDR,zIndex:40}}>
-      <button onClick={onClick} style={{width:'100%',background:C.acc,color:'#fff',border:'none',borderRadius:12,padding:14,fontSize:15,fontWeight:800,fontFamily:FF,cursor:'pointer',boxShadow:'0 6px 20px rgba(214,58,86,0.4)'}}>{children}</button>
+      <button onClick={onClick} style={{width:'100%',background:C.acc,color:'#fff',border:'none',borderRadius:12,padding:14,fontSize:16,fontWeight:800,fontFamily:FF,cursor:'pointer',boxShadow:'0 6px 20px rgba(214,58,86,0.4)'}}>{children}</button>
     </div>
   );
 }
@@ -5986,8 +5986,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         {topRatedItems.length ? (
           <>
             <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#fffbeb', border: '2px solid rgba(251,191,36,0.45)' }}>
-              <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>⭐ Hand-picked by ScanV</div>
-              <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>
+              <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>⭐ Hand-picked by ScanV</div>
+              <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55 }}>
                 Services, offerings, and courses marked Top Rated by our team — verified quality and great value.
               </div>
             </div>
@@ -6006,7 +6006,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <div style={{ ...S.card(), padding: 32, textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>⭐</div>
             <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>No Top Rated services yet</div>
-            <div style={{ color: C.sub, fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
+            <div style={{ color: C.sub, fontSize: 14, lineHeight: 1.55, marginBottom: 16 }}>
               Check back soon — our team updates Top Rated picks from the pricing admin.
             </div>
             <Btn onClick={goBrowseHome}>Browse all services</Btn>
@@ -6035,23 +6035,23 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <div style={{...S.card(),padding:22,textAlign:'center',marginBottom:12}}>
             {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={activeSvc.theme} /></div>}
             {!isSubSvc && <div style={{fontSize:52,marginBottom:8}}>{activeSvc.icon}</div>}
-            <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
-            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
+            <div style={{color:C.txt,fontSize:18,fontWeight:800,marginBottom:4}}>{activeSvc.name}</div>
+            <div style={{color:C.sub,fontSize:14,lineHeight:1.6,marginBottom:12}}>{d.desc||activeSvc.sub}</div>
             {isSubSvc && (
               <div style={{ marginBottom: 12 }}>
                 <ServicePriceTag svc={activeSvc} categoryId={parentCat} cloudFeeView={cloudFeeView} onFillSgr={parentCat === 'cloud' ? openBrowseCloudSgr : undefined} />
               </div>
             )}
             <div style={{display:'flex',justifyContent:'center',gap:22}}>
-              <div><div style={{color:C.acc,fontSize:14,fontWeight:800}}>{d.rating||activeSvc.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Rating</div></div>
-              <div><div style={{color:C.grn,fontSize:14,fontWeight:800}}>{d.bookings||activeSvc.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Bookings</div></div>
-              <div><div style={{color:C.cyan,fontSize:14,fontWeight:800}}>{d.turnaround||activeSvc.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:10,fontWeight:600}}>Response</div></div>
+              <div><div style={{color:C.acc,fontSize:16,fontWeight:800}}>{d.rating||activeSvc.rating||'4.8 ⭐'}</div><div style={{color:C.dim,fontSize:12,fontWeight:600}}>Rating</div></div>
+              <div><div style={{color:C.grn,fontSize:16,fontWeight:800}}>{d.bookings||activeSvc.bookings||'1000+'}</div><div style={{color:C.dim,fontSize:12,fontWeight:600}}>Bookings</div></div>
+              <div><div style={{color:C.cyan,fontSize:16,fontWeight:800}}>{d.turnaround||activeSvc.turnaround||'Same day'}</div><div style={{color:C.dim,fontSize:12,fontWeight:600}}>Response</div></div>
             </div>
           </div>
           <div style={S.card({marginBottom:12,padding:'12px 14px'})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:700,marginBottom:8}}>What&#39;s included</div>
+            <div style={{color:C.txt,fontSize:15,fontWeight:700,marginBottom:8}}>What&#39;s included</div>
             {(d.features||[activeSvc.sub]).slice(0,6).map(f=>(
-              <div key={f} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:12,color:C.sub}}>
+              <div key={f} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid ${C.bdr}`,fontSize:14,color:C.sub}}>
                 <span style={{color:C.grn,fontWeight:700}}>✓</span>{f}
               </div>
             ))}
@@ -6075,10 +6075,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>setScreen('verify')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{isDeliveryShipment ? 'Schedule pickup' : 'Pick date & time'}</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{isDeliveryShipment ? 'Schedule pickup' : 'Pick date & time'}</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 2 of 3 · Choose schedule before payment</div>
+          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 2 of 3 · Choose schedule before payment</div>
           <ScheduleBookingPanel
             serviceId={activeSvc.id}
             schedule={sched}
@@ -6123,7 +6123,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               <input value={scheduleLoc} {...browseBind('loc', e=>{ setScheduleLoc(e.target.value); setBookingDetail(b=>({...b,loc:e.target.value})); })} placeholder="Address, city, PIN" style={inpStyle('loc',{flex:1})}/>
               <button onClick={doGPS} disabled={bookGps==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{bookGps==='loading'?<Spin size={16}/>:'📍'}</button>
             </div>
-            {bookGps==='done'&&<div style={{fontSize:11,color:C.grn,marginTop:4,fontWeight:600}}>✅ Location updated</div>}
+            {bookGps==='done'&&<div style={{fontSize:13,color:C.grn,marginTop:4,fontWeight:600}}>✅ Location updated</div>}
           </Field>
           )}
           <Field label="Notes (optional)"><input defaultValue={bookingDetail?.notes||''} onChange={e=>setBookingDetail(b=>({...b,notes:e.target.value}))} placeholder="Any special requirements…" style={S.inp()}/></Field>
@@ -6143,22 +6143,22 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>{setScreen('schedule');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           {bookingDetail?.date && (
-            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.txt,fontWeight:600}}>
+            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:14,color:C.txt,fontWeight:600}}>
               📅 Scheduled · {bookingDetail.date} · {bookingDetail.time || '10:00'}
             </div>
           )}
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
-            <div style={{fontSize:13,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
+            <div style={{fontSize:15,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
-            <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
+            <div style={{fontSize:13,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
             {[['Service (indicative)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Pay now',total]].map(([k,v],i)=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?15:13}}>
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?16:14}}>
                 <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
               </div>
             ))}
@@ -6208,11 +6208,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP</div>
+          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, address & mobile OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
             <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
@@ -6234,15 +6234,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <div style={{background:C.deep,border:BDR,borderRadius:10,padding:14,marginBottom:14}}>
               <label style={{display:'flex',gap:10,alignItems:'flex-start',cursor:'pointer'}}>
                 <input type="checkbox" onChange={e=>e.target.checked&&acceptTerms()} style={{marginTop:2,accentColor:C.acc,width:18,height:18,flexShrink:0}}/>
-                <span style={{fontSize:12,color:C.sub,lineHeight:1.6}}>I accept <a href="/terms" style={{color:C.acc}}>Terms</a>, <a href="/privacy" style={{color:C.acc}}>Privacy</a> & DPDP Act 2023 <span style={{color:C.acc}}>*</span></span>
+                <span style={{fontSize:13,color:C.sub,lineHeight:1.6}}>I accept <a href="/terms" style={{color:C.acc}}>Terms</a>, <a href="/privacy" style={{color:C.acc}}>Privacy</a> & DPDP Act 2023 <span style={{color:C.acc}}>*</span></span>
               </label>
             </div>
           )}
-          {termsAccepted&&<div style={{fontSize:11,color:C.grn,marginBottom:10,fontWeight:700}}>✅ Terms & DPDP accepted</div>}
+          {termsAccepted&&<div style={{fontSize:12,color:C.grn,marginBottom:10,fontWeight:700}}>✅ Terms & DPDP accepted</div>}
           {!otpSent&&(
             <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
               {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
-                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:12,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
+                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:13,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
               ))}
             </div>
           )}
@@ -6291,11 +6291,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <>
         <BrowseFixedHeader>
           <button type="button" aria-label="Go back" onClick={() => { setPendingLoginProfile(null); setScreen(completeProfileMode === 'booking' ? 'verify' : 'login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Complete your profile</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Complete your profile</div>
         </BrowseFixedHeader>
         <div style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
           {err && <div style={S.err}>{err}</div>}
-          <div style={{ color: C.sub, fontSize: 12, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
+          <div style={{ color: C.sub, fontSize: 13, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
             Mobile +91 {mob10 || '—'} verified. {hint}
           </div>
           {needsName && (
@@ -6340,13 +6340,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <>
         <BrowseFixedHeader>
           <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
-          <div style={{fontSize:15,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
         </BrowseFixedHeader>
         <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
-          <div style={{color:C.sub,fontSize:12,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
+          <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
           {(silentGeo?.village || silentGeo?.city) && (
-            <div style={{fontSize:11,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {formatGeoBadge(silentGeo)} detected</div>
+            <div style={{fontSize:12,color:C.grn,fontWeight:700,marginBottom:12}}>📍 {formatGeoBadge(silentGeo)} detected</div>
           )}
           <Field label="Mobile" req note="10-digit Indian mobile">
             <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
@@ -6357,7 +6357,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           {!otpSent&&(
             <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
               {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
-                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:12,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
+                <button key={v} onClick={()=>setVerifyMethod(v)} style={{flex:1,padding:'10px',borderRadius:8,border:'none',cursor:'pointer',fontFamily:FF,fontSize:13,fontWeight:700,background:verifyMethod===v?(v==='whatsapp'?'#25D366':C.acc):'transparent',color:verifyMethod===v?'#fff':C.dim}}>{l}</button>
               ))}
             </div>
           )}
@@ -7190,8 +7190,8 @@ function TopRatedScreen() {
         {items.length ? (
           <>
             <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#fffbeb', border: '1.5px solid #fbbf2444' }}>
-              <div style={{ fontWeight: 800, color: C.txt, fontSize: 15, marginBottom: 6 }}>⭐ Hand-picked by ScanV</div>
-              <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55 }}>
+              <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>⭐ Hand-picked by ScanV</div>
+              <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55 }}>
                 Services, offerings, and courses marked Top Rated by our team — verified quality and great value.
               </div>
             </div>
@@ -7211,7 +7211,7 @@ function TopRatedScreen() {
           <div style={{ ...S.card(), padding: 32, textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>⭐</div>
             <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>No Top Rated services yet</div>
-            <div style={{ color: C.sub, fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
+            <div style={{ color: C.sub, fontSize: 14, lineHeight: 1.55, marginBottom: 16 }}>
               Check back soon — our team updates Top Rated picks from the pricing admin.
             </div>
             <Btn onClick={() => setScreen('services')}>Browse all services</Btn>
@@ -7327,7 +7327,7 @@ function ServicesScreen() {
             {isSubSvc && <div style={{ marginBottom: 10 }}><CategoryPill categoryId={parentCat} theme={detail.theme} /></div>}
             {!isSubSvc && <div style={{fontSize:56,marginBottom:10}}>{detail.icon}</div>}
             <div style={{color:C.txt,fontSize:18,fontWeight:700,marginBottom:4}}>{detail.name}</div>
-            <div style={{color:C.sub,fontSize:12,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
+            <div style={{color:C.sub,fontSize:14,lineHeight:1.6,marginBottom:12}}>{d.desc||detail.sub}</div>
             {isSubSvc ? (
               <div style={{ marginBottom: 12 }}>
                 <ServicePriceTag svc={detail} categoryId={parentCat} cloudFeeView={cloudFeeView} onFillSgr={parentCat === 'cloud' ? openCloudSgr : undefined} />
@@ -7336,17 +7336,17 @@ function ServicesScreen() {
               <div style={{ marginBottom: 12 }}><PriceTag svc={detail} sm /></div>
             )}
             <div style={{display:'flex',justifyContent:'center',gap:20,flexWrap:'wrap'}}>
-              <div style={{textAlign:'center'}}><div style={{color:C.gold,fontSize:14,fontWeight:700}}>{d.rating||detail.rating}</div><div style={{color:C.dim,fontSize:10}}>Rating</div></div>
-              <div style={{textAlign:'center'}}><div style={{color:C.grn,fontSize:14,fontWeight:700}}>{d.bookings||detail.bookings}</div><div style={{color:C.dim,fontSize:10}}>Bookings</div></div>
-              <div style={{textAlign:'center'}}><div style={{color:C.cyan,fontSize:14,fontWeight:700}}>{d.turnaround||detail.turnaround}</div><div style={{color:C.dim,fontSize:10}}>Response</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.gold,fontSize:15,fontWeight:700}}>{d.rating||detail.rating}</div><div style={{color:C.dim,fontSize:11}}>Rating</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.grn,fontSize:15,fontWeight:700}}>{d.bookings||detail.bookings}</div><div style={{color:C.dim,fontSize:11}}>Bookings</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:C.cyan,fontSize:15,fontWeight:700}}>{d.turnaround||detail.turnaround}</div><div style={{color:C.dim,fontSize:11}}>Response</div></div>
             </div>
           </div>
           <div style={S.card({marginBottom:16})}>
-            <div style={{color:C.txt,fontSize:13,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
+            <div style={{color:C.txt,fontSize:14,fontWeight:600,marginBottom:10}}>What&#39;s included</div>
             {(d.features||[]).map(f=>(
               <div key={f} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.bdr}`}}>
                 <span style={{color:C.grn,fontSize:14}}>✓</span>
-                <span style={{color:C.sub,fontSize:13}}>{f}</span>
+                <span style={{color:C.sub,fontSize:14}}>{f}</span>
               </div>
             ))}
           </div>
@@ -7746,7 +7746,7 @@ function BookScreen() {
       <div style={{ ...S.center, minHeight: '60vh', padding: 24 }}>
         <div style={{ fontSize: 44, marginBottom: 12 }}>⏸️</div>
         <div style={{ color: C.txt, fontSize: 17, fontWeight: 800, marginBottom: 8, textAlign: 'center', maxWidth: 300 }}>{bookBlockMsg}</div>
-        <div style={{ color: C.sub, fontSize: 13, marginBottom: 20, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>Browse other active services on the home page.</div>
+        <div style={{ color: C.sub, fontSize: 14, marginBottom: 20, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>Browse other active services on the home page.</div>
         <Btn onClick={() => setScreen('services')}>Browse services</Btn>
       </div>
     );
@@ -7763,17 +7763,17 @@ function BookScreen() {
               {svc.theme && <div style={{marginBottom:8}}><HhCategoryPill theme={svc.theme} /></div>}
               {!svc.img && <div style={{fontSize:48,textAlign:'center',marginBottom:12}}>{svc.icon}</div>}
               <div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div>
-              <div style={{color:C.sub,fontSize:13,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
+              <div style={{color:C.sub,fontSize:14,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
-              {[['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?16:14}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+              {[['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
             </div>
           </div>
-          {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
+          {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:13,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
           <Btn full onClick={goFromService}>{skipVerify?'Continue to schedule →':'Continue →'}</Btn>
         </>}
 
         {step===2&&!skipVerify&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Step 2 · Name, address & OTP</div>
+          <div style={{color:C.txt,fontSize:15,fontWeight:700,marginBottom:12}}>Step 2 · Name, address & OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
             <Field label="First name" req><input value={bookFirstName} {...bookBind('firstName', e=>setBookFirstName(e.target.value))} placeholder="Rahul" style={bookInpStyle('firstName')}/></Field>
             <Field label="Last name"><input value={bookLastName} {...bookBind('lastName', e=>setBookLastName(e.target.value))} placeholder="Sharma" style={bookInpStyle('lastName')}/></Field>
@@ -7808,7 +7808,7 @@ function BookScreen() {
         </>}
 
         {step===scheduleStep&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Pick date & time · before payment</div>
+          <div style={{color:C.txt,fontSize:15,fontWeight:700,marginBottom:12}}>Pick date & time · before payment</div>
           <ScheduleBookingPanel
             serviceId={svc.id}
             schedule={serviceSchedule || normalizeScheduleRow(null)}
@@ -7822,23 +7822,23 @@ function BookScreen() {
             onUseNext={(next) => { setDate(next.date); setTime(next.time); setScheduleOutsideOk(false); }}
             C={C} S={S} FF={FF} Btn={Btn} Field={Field} Spin={Spin}
           >
-            <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} {...bookBind('loc', e=>setLoc(e.target.value))} placeholder="Address or area" style={bookInpStyle('loc',{flex:1})}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:11,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
+            <Field label="Service location"><div style={{display:'flex',gap:8,marginBottom:6}}><input value={loc} {...bookBind('loc', e=>setLoc(e.target.value))} placeholder="Address or area" style={bookInpStyle('loc',{flex:1})}/><button onClick={doGPS} disabled={gpsState==='loading'} style={{background:C.surf,border:`1.5px solid ${C.acc}`,borderRadius:10,padding:'11px 14px',color:C.acc,cursor:'pointer',fontSize:18,flexShrink:0}}>{gpsState==='loading'?<Spin size={16}/>:'📍'}</button></div>{gpsState==='done'&&<div style={{fontSize:12,color:C.grn,fontWeight:600}}>✅ GPS captured</div>}</Field>
             <Field label="Notes"><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any special requirements…" style={S.inp()}/></Field>
           </ScheduleBookingPanel>
           <Btn full onClick={proceedBookToPayment}>Continue to payment →</Btn>
         </>}
 
         {step===payStep&&<>
-          <div style={{color:C.txt,fontSize:14,fontWeight:700,marginBottom:12}}>Pay platform fee</div>
+          <div style={{color:C.txt,fontSize:15,fontWeight:700,marginBottom:12}}>Pay platform fee</div>
           {date && (
-            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:12,color:C.txt,fontWeight:600}}>
+            <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:13,color:C.txt,fontWeight:600}}>
               📅 Scheduled · {date} · {time || '10:00'}
             </div>
           )}
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
-            <div style={{fontSize:13,color:C.sub,marginBottom:6}}>Amount due now</div>
+            <div style={{fontSize:14,color:C.sub,marginBottom:6}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
-            <div style={{fontSize:11,color:C.dim}}>Ref: {txnId}</div>
+            <div style={{fontSize:12,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <UpiPaymentPanel
             pay={bookPay}
@@ -8248,8 +8248,8 @@ function TrackServiceScreen() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
               <div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: C.txt }}>{booking?.service_name || 'Your service'}</div>
-                <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{booking?.date} · {booking?.time || 'TBD'}</div>
-                {booking?.location_text && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>📍 {booking.location_text}</div>}
+                <div style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>{booking?.date} · {booking?.time || 'TBD'}</div>
+                {booking?.location_text && <div style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>📍 {booking.location_text}</div>}
               </div>
               <Badge label={status.label} color={status.color} />
             </div>
@@ -8258,11 +8258,11 @@ function TrackServiceScreen() {
                 <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: status.step >= i ? (i === 3 && live ? C.grn : C.acc) : C.deep }} title={s} />
               ))}
             </div>
-            <div style={{ fontSize: 10, color: C.dim, textAlign: 'center' }}>{steps[status.step] || status.label}</div>
+            <div style={{ fontSize: 11, color: C.dim, textAlign: 'center' }}>{steps[status.step] || status.label}</div>
           </div>
 
           {!booking?.partner_id && booking?.status === 'confirmed' && (
-            <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: C.sub, lineHeight: 1.5 }}>
+            <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: C.sub, lineHeight: 1.5 }}>
               <strong style={{ color: C.txt }}>Searching for nearby partner</strong> — we offer the job to the <strong>3 nearest active partners</strong> one-by-one in the ScanV app (SMS, call & WhatsApp are sent as backup). First to accept gets the job and live map tracking starts.
               {!dispatch && (
                 <div style={{ marginTop: 10 }}>
@@ -8295,7 +8295,7 @@ function TrackServiceScreen() {
           </div>
 
           {dispatch?.accept_code && !booking?.partner_id && (
-            <div style={{ fontSize: 11, color: C.dim, textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginBottom: 12 }}>
               Dispatch code {dispatch.accept_code} · attempt {dispatch.attempt_num || 1} of 2 per partner
             </div>
           )}
@@ -8303,8 +8303,8 @@ function TrackServiceScreen() {
           {booking?.status === 'confirmed' && <WaitEngagementPanel />}
 
           <div style={{ ...S.card(), marginBottom: 12, padding: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Explore more services</div>
-            <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, marginBottom: 6 }}>Explore more services</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>
               While we find your partner, browse other ScanV services — your tracking link stays saved.
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -8313,7 +8313,7 @@ function TrackServiceScreen() {
                   key={s.id}
                   type="button"
                   onClick={() => { if (!guardBookStart(s, addToast)) return; setActiveSvc(s); setScreen('book'); }}
-                  style={{ background: C.deep, border: BDR, borderRadius: 10, padding: '8px 12px', cursor: 'pointer', fontFamily: FF, fontSize: 11, fontWeight: 700, color: C.txt, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ background: C.deep, border: BDR, borderRadius: 10, padding: '8px 12px', cursor: 'pointer', fontFamily: FF, fontSize: 12, fontWeight: 700, color: C.txt, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   <span>{s.icon}</span> {s.name}
                 </button>
@@ -8912,7 +8912,7 @@ function BookingsScreen() {
     return (
     <div key={b.id} style={{...S.card(),marginBottom:10}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-        <div><div style={{color:C.txt,fontWeight:600,fontSize:15}}>{b.service_name}</div><div style={{color:C.sub,fontSize:12,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{user.role==='partner'&&b.partner_id===user.id&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:700,fontFamily:'monospace'}}>Booking {formatBookingRef(b)}</div>}{b.location_text&&<div style={{color:C.dim,fontSize:11,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:11,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
+        <div><div style={{color:C.txt,fontWeight:600,fontSize:16}}>{b.service_name}</div><div style={{color:C.sub,fontSize:13,marginTop:2}}>{b.date||'TBD'} {b.time||''}</div>{user.role==='partner'&&b.partner_id===user.id&&<div style={{color:C.cyan,fontSize:12,marginTop:4,fontWeight:700,fontFamily:'monospace'}}>Booking {formatBookingRef(b)}</div>}{b.location_text&&<div style={{color:C.dim,fontSize:12,marginTop:2}}>📍 {b.location_text}</div>}{b.partner_id&&user.role==='customer'&&<div style={{color:C.cyan,fontSize:12,marginTop:4,fontWeight:600}}>🤝 {partners[b.partner_id]||'Partner assigned'}</div>}</div>
         <div style={{textAlign:'right'}}>
           <div style={{color:C.acc,fontWeight:700}}>₹{((b.total||0)/100).toLocaleString('en-IN')}</div>
           <Badge label={bookingStatusGroup(b.status).label} color={bookingStatusGroup(b.status).color}/>
@@ -8925,7 +8925,7 @@ function BookingsScreen() {
         </div>
       </div>
       {refundRec && (
-        <div style={{ fontSize: 11, color: refundRec.refund_status === 'completed' ? C.grn : C.gold, marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: refundRec.refund_status === 'completed' ? C.grn : C.gold, marginBottom: 8 }}>
           Refund ₹{fmtRs(refundRec.refund_paise)} · {refundLabel}
           {refundRec.refund_status !== 'completed' && refundRec.refund_due_by ? ` · due ${fmtDt(refundRec.refund_due_by)}` : ''}
         </div>
@@ -8956,8 +8956,8 @@ function BookingsScreen() {
       )}
       {b.status==='completed'&&user.role==='customer'&&(
         <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}>
-          {!stars[b.id]?<><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:12}}>✅ Rated {stars[b.id]}⭐</div>}
-          <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:12,cursor:'pointer',fontFamily:FF,marginTop:8,display:'block'}}>Raise a dispute</button>
+          {!stars[b.id]?<><div style={{fontSize:13,color:C.sub,marginBottom:6}}>Rate this service</div><div style={{display:'flex',gap:6}}>{[1,2,3,4,5].map(s=><button key={s} onClick={async()=>{await sb().from('reviews').insert({booking_id:b.id,reviewer_id:user.id,target_id:b.partner_id,rating:s,review_type:'customer_to_partner'});setStars(r=>({...r,[b.id]:s}));addToast(`Rated ${s}⭐`,'success');}} style={{background:'none',border:'none',fontSize:22,cursor:'pointer'}}>⭐</button>)}</div></>:<div style={{color:C.grn,fontSize:13}}>✅ Rated {stars[b.id]}⭐</div>}
+          <button onClick={()=>setDisputing(b.id)} style={{background:'none',border:'none',color:C.red,fontSize:13,cursor:'pointer',fontFamily:FF,marginTop:8,display:'block'}}>Raise a dispute</button>
         </div>
       )}
       {disputing===b.id&&<div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:8}}><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue…" style={{...S.inp(),marginBottom:10}}/><div style={{display:'flex',gap:8}}><Btn sm v="danger" onClick={async()=>{if(!reason)return addToast('Enter reason','error');await sb().from('disputes').insert({booking_id:b.id,raised_by:user.id,reason});await sbIgnore(sb().from('vendor_live_locations').update({tracking_active:false}).eq('booking_id',b.id));addToast('Dispute raised','success');setDisputing(null);setReason('');load();}}>Submit</Btn><Btn sm v="ghost" onClick={()=>setDisputing(null)}>Cancel</Btn></div></div>}
@@ -9025,20 +9025,20 @@ function BookingsScreen() {
       )}
       <div style={{padding:16}}>
         {recoverBusy && user.role === 'customer' && (
-          <div style={{ ...S.card(), marginBottom: 14, padding: 16, display: 'flex', alignItems: 'center', gap: 10, color: C.grn, fontSize: 12, fontWeight: 600 }}>
+          <div style={{ ...S.card(), marginBottom: 14, padding: 16, display: 'flex', alignItems: 'center', gap: 10, color: C.grn, fontSize: 13, fontWeight: 600 }}>
             <Spin size={16} /> Completing your booking and alerting nearby partners…
           </div>
         )}
         {!!orphans.length && user.role === 'customer' && (
           <div style={{ ...S.card(), marginBottom: 14, padding: 14, border: `1.5px solid rgba(0,122,77,0.35)`, background: '#e6f4ee' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Payment received — finish booking</div>
-            <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.grn, marginBottom: 6 }}>Payment received — finish booking</div>
+            <div style={{ fontSize: 13, color: C.sub, marginBottom: 10, lineHeight: 1.5 }}>
               We found {orphans.length} paid order{orphans.length > 1 ? 's' : ''} without a booking. Pick date & time to confirm.
             </div>
             {orphans.map((intent) => (
               <div key={intent.txn_id} style={{ marginBottom: recovering === intent.txn_id ? 10 : 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: 12, color: C.txt }}>
+                  <div style={{ fontSize: 13, color: C.txt }}>
                     <div style={{ fontWeight: 700 }}>{resolveServiceForPaidIntent(intent, bookingDraftForIntent(intent))?.name || intent.service_name || 'Service'}</div>
                     <div style={{ color: C.dim }}>{intent.txn_id} · ₹{((intent.amount_paise || 0) / 100).toLocaleString('en-IN')}</div>
                   </div>
@@ -9062,17 +9062,17 @@ function BookingsScreen() {
         {loading?<div style={{textAlign:'center',padding:40}}><Spin/></div>
         :bookings.length?(<>
           {activeBookings.length>0&&<>
-            <div style={{fontSize:13,fontWeight:700,color:C.txt,marginBottom:10}}>In-progress ({activeBookings.length})</div>
+            <div style={{fontSize:14,fontWeight:700,color:C.txt,marginBottom:10}}>In-progress ({activeBookings.length})</div>
             {activeBookings.map(renderBookingCard)}
           </>}
           {doneBookings.length>0&&<>
-            <div style={{fontSize:13,fontWeight:700,color:C.txt,marginBottom:10,marginTop:activeBookings.length?16:0}}>Past ({doneBookings.length})</div>
+            <div style={{fontSize:14,fontWeight:700,color:C.txt,marginBottom:10,marginTop:activeBookings.length?16:0}}>Past ({doneBookings.length})</div>
             {doneBookings.map(renderBookingCard)}
           </>}
         </>):<div style={{...S.card(),padding:40,textAlign:'center',color:C.dim}}>
           <div style={{fontSize:32,marginBottom:8}}>📅</div>
           <div style={{fontWeight:600,marginBottom:4}}>No bookings yet</div>
-          <div style={{fontSize:12}}>Book a service to see your orders here</div>
+          <div style={{fontSize:13}}>Book a service to see your orders here</div>
         </div>}
         <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} />
       </div>
