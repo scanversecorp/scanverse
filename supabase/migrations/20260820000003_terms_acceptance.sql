@@ -1,4 +1,12 @@
--- Terms acceptance timestamps on OTP sessions and customer profiles
+-- Partner / customer terms acceptance timestamps (manual checkbox + OTP/onboarding)
+
+ALTER TABLE public.vendor_partners
+  ADD COLUMN IF NOT EXISTS partner_terms_accepted_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS partner_terms_version TEXT;
+
+COMMENT ON COLUMN public.vendor_partners.partner_terms_accepted_at IS 'When partner manually accepted Partner Terms at onboarding';
+COMMENT ON COLUMN public.vendor_partners.partner_terms_version IS 'Version string of Partner Terms accepted (e.g. 2026-08-20)';
+
 ALTER TABLE public.vendor_otp
   ADD COLUMN IF NOT EXISTS partner_terms_accepted_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS partner_terms_version TEXT;
