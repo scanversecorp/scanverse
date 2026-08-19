@@ -3196,15 +3196,15 @@ const APP_CSS = `
   #root>.scanv-root{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .trust-pills-row button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
   @media (max-width:480px){
-    body{font-size:16px;-webkit-text-size-adjust:100%}
+    body{font-size:17px;-webkit-text-size-adjust:100%}
     .scanv-mobile-zoom{font-size:108%;line-height:1.35}
     .trust-pills-row{gap:4px!important;padding:10px 8px 12px!important}
-    .trust-pills-row button{font-size:8px!important;padding:5px 3px!important;line-height:1.3!important}
+    .trust-pills-row button{font-size:9px!important;padding:5px 3px!important;line-height:1.3!important}
     .browse-home-stack{gap:12px!important;padding-left:14px!important;padding-right:14px!important}
     .scanv-bottom-nav .nav-row{padding:3px 0!important}
     .scanv-bottom-nav button{gap:2px!important;padding:2px 0 3px!important}
-    .scanv-bottom-nav .nav-icon{font-size:17px!important;line-height:1!important}
-    .scanv-bottom-nav .nav-label{font-size:9px!important;line-height:1.15!important;font-weight:700!important}
+    .scanv-bottom-nav .nav-icon{font-size:18px!important;line-height:1!important}
+    .scanv-bottom-nav .nav-label{font-size:10px!important;line-height:1.15!important;font-weight:700!important}
   }
   input,select,textarea,button{font-family:${FF}}
   input::placeholder,textarea::placeholder{color:${C.dim}}
@@ -3292,8 +3292,8 @@ function Badge({label,color}) {
 }
 
 const HOME_CARD_SUB_STYLE = {
-  default: { color: C.sub, fontSize: 10, fontWeight: 600, lineHeight: 1.3 },
-  beauty: { color: C.dim, fontSize: 8, fontWeight: 600, lineHeight: 1.25, letterSpacing: '-0.01em' },
+  default: { color: C.sub, fontSize: 11, fontWeight: 600, lineHeight: 1.3 },
+  beauty: { color: C.dim, fontSize: 9, fontWeight: 600, lineHeight: 1.25, letterSpacing: '-0.01em' },
 };
 
 function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
@@ -3306,10 +3306,10 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
   const imgH = compact ? 72 : hero ? 168 : 132;
   const badgeRow = (sm) => (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:6, width:'100%' }}>
-      <span style={{ background: sm ? 'rgba(255,255,255,0.95)' : '#fef3c7', color:'#b45309', fontSize: sm ? 8 : 9, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99, border: sm ? IG_TILE.border : 'none', flexShrink:0 }}>25% OFF</span>
+      <span style={{ background: sm ? 'rgba(255,255,255,0.95)' : '#fef3c7', color:'#b45309', fontSize: sm ? 9 : 10, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99, border: sm ? IG_TILE.border : 'none', flexShrink:0 }}>25% OFF</span>
       <div style={{ display:'flex', gap:4, flexWrap:'wrap', justifyContent:'flex-end' }}>
-        {svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize: sm ? 8 : 9, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99 }}>☁️ ENTERPRISE</span>}
-        {theme.tag && !svc.cloud && <span style={{ background: sm ? 'rgba(255,255,255,0.95)' : theme.b2, color: sm ? theme.b2 : '#fff', fontSize: sm ? 8 : 9, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99, border: sm ? IG_TILE.border : 'none' }}>{theme.tag}</span>}
+        {svc.cloud && <span style={{ background:theme.b2, color:'#fff', fontSize: sm ? 9 : 10, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99 }}>☁️ ENTERPRISE</span>}
+        {theme.tag && !svc.cloud && <span style={{ background: sm ? 'rgba(255,255,255,0.95)' : theme.b2, color: sm ? theme.b2 : '#fff', fontSize: sm ? 9 : 10, fontWeight:800, padding: sm ? '2px 7px' : '3px 9px', borderRadius:99, border: sm ? IG_TILE.border : 'none' }}>{theme.tag}</span>}
       </div>
     </div>
   );
@@ -3320,13 +3320,13 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
         <div style={{ display:'flex', alignItems:'stretch', height:'100%', width:'100%', minWidth:0, background:C.card }}>
           <div style={{ flex:1, minWidth:0, padding:'12px 12px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:5, overflow:'hidden' }}>
             {badgeRow(false)}
-            <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>&ldquo;{meta.commitment}&rdquo;</div>
-            <div style={{ color:C.txt, fontWeight:800, fontSize:16, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
+            <div style={{ color:theme.b2, fontSize:13, fontWeight:700, fontStyle:'italic', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>&ldquo;{meta.commitment}&rdquo;</div>
+            <div style={{ color:C.txt, fontWeight:800, fontSize:17, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
             {svc.sub && svc.id === 'beauty' && <div style={{ ...HOME_CARD_SUB_STYLE.beauty, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{svc.sub}</div>}
-            {meta.face && svc.id !== 'beauty' && <div style={{ color:C.sub, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>}
+            {meta.face && svc.id !== 'beauty' && <div style={{ color:C.sub, fontSize:12, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{meta.face}</div>}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'nowrap', marginTop:2, minWidth:0 }}>
-              <span style={{ color:C.acc, fontSize:13, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
-              <span style={{ color:C.dim, fontSize:10, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              <span style={{ color:C.acc, fontSize:14, fontWeight:800, flexShrink:0 }}>From ₹{fmtRs(svc.price)} →</span>
+              <span style={{ color:C.dim, fontSize:11, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {d.rating||'4.8 ⭐'} · {subSvcCount(svc) ? `${subSvcCount(svc)} options` : (d.turnaround?.split(' ').slice(0, 2).join(' ') || 'Same day')}
               </span>
             </div>
@@ -3346,9 +3346,9 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
           <ServiceImg src={theme.img} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:imgPos, filter:imgFilter }} />
         </div>
         <div style={{ flex:1, padding:'10px 12px', display:'flex', flexDirection:'column', justifyContent:'center', gap:3 }}>
-          <div style={{ color:theme.b2, fontSize:10, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
-          <div style={{ color:C.txt, fontWeight:800, fontSize:13 }}>{title}</div>
-          <span style={{ color:C.acc, fontSize:11, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
+          <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.3 }}>&ldquo;{meta.commitment}&rdquo;</div>
+          <div style={{ color:C.txt, fontWeight:800, fontSize:14 }}>{title}</div>
+          <span style={{ color:C.acc, fontSize:12, fontWeight:800 }}>From ₹{fmtRs(svc.price)} →</span>
         </div>
       </div>
     );
@@ -3363,15 +3363,15 @@ function HomeModelCard({ svc, onClick, compact, index = 0, hero }) {
         </div>
       </div>
       <div style={{ padding:'11px 12px 13px', background:C.card, display:'flex', flexDirection:'column', gap:5, flex:1 }}>
-        {meta.face && svc.id !== 'beauty' && <div style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{meta.face}</div>}
-        <div style={{ color:theme.b2, fontSize:11, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
-        <div style={{ color:C.txt, fontWeight:800, fontSize:14, lineHeight:1.2 }}>{title}</div>
+        {meta.face && svc.id !== 'beauty' && <div style={{ color:C.dim, fontSize:11, fontWeight:600 }}>{meta.face}</div>}
+        <div style={{ color:theme.b2, fontSize:12, fontWeight:700, fontStyle:'italic', lineHeight:1.35 }}>&ldquo;{meta.commitment}&rdquo;</div>
+        <div style={{ color:C.txt, fontWeight:800, fontSize:15, lineHeight:1.2 }}>{title}</div>
         {svc.sub && (
           <div style={svc.id === 'beauty' ? HOME_CARD_SUB_STYLE.beauty : HOME_CARD_SUB_STYLE.default}>{svc.sub}</div>
         )}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginTop:'auto' }}>
-          <span style={{ color:C.acc, fontSize:12, fontWeight:800 }}>₹{fmtRs(svc.price)} →</span>
-          <span style={{ color:C.dim, fontSize:9, fontWeight:600 }}>{d.rating||'4.8 ⭐'}</span>
+          <span style={{ color:C.acc, fontSize:13, fontWeight:800 }}>₹{fmtRs(svc.price)} →</span>
+          <span style={{ color:C.dim, fontSize:10, fontWeight:600 }}>{d.rating||'4.8 ⭐'}</span>
         </div>
       </div>
     </div>
@@ -3814,7 +3814,7 @@ const TRUST_PILLS_ROW = {
   borderTop: BDR,
 };
 const TRUST_PILL = {
-  fontSize: 7,
+  fontSize: 8,
   fontWeight: 800,
   color: C.grn,
   background: '#e6f4ee',
@@ -4139,7 +4139,7 @@ function GuestBottomNav({ activeTab, onHome, onTopRated, onBookings, onLogin, on
       {tabs.map(t=>(
         <button key={t.id} onClick={t.go} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 0',position:'relative'}}>
           <span className="nav-icon" style={{fontSize:20}}>{t.icon}</span>
-          <span className="nav-label" style={{fontSize:10,fontWeight:700,fontFamily:FF,color:activeTab===t.id?C.acc:C.dim}}>{t.label}</span>
+          <span className="nav-label" style={{fontSize:11,fontWeight:700,fontFamily:FF,color:activeTab===t.id?C.acc:C.dim}}>{t.label}</span>
           {activeTab===t.id&&<div style={{position:'absolute',bottom:0,left:'25%',right:'25%',height:2,background:C.acc,borderRadius:2}}/>}
         </button>
       ))}
@@ -5899,19 +5899,19 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     <>
       <div style={{background:C.surf,borderBottom:BDR,padding:`6px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
         <ScanVLogoMark size={LOGO_SIZE.md} />
-        <div style={{fontSize:10,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
           📍 {formatGeoBadge(silentGeo)}
         </div>
       </div>
       <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
         <div style={BROWSE_PROMO_BANNER}>
-          <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
-          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
+          <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
         </div>
         <div style={{ ...BROWSE_HOME_STACK_ITEM, background: C.surf, border: BDR, borderRadius: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)', padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
             <span style={{ fontSize: 14, lineHeight: 1 }}>🔍</span>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13, fontFamily: FF, color: C.txt, boxSizing: 'border-box', padding: 0, lineHeight: 1.3 }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search IaaS, kitchen clean, legal…" style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 14, fontFamily: FF, color: C.txt, boxSizing: 'border-box', padding: 0, lineHeight: 1.3 }} />
             {search && <button type="button" onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0, boxSizing: 'border-box' }} aria-label="Clear search">×</button>}
           </div>
           <TrustPillsRow onSelect={goBrowseTrustPill} />
@@ -5930,8 +5930,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         ) : (
           <>
             <div id="scanv-commitments" style={{marginBottom:14}}>
-              <div style={{color:C.txt,fontSize:16,fontWeight:800,marginBottom:6}}>Our commitments</div>
-              <div style={{fontSize:12,fontWeight:700,lineHeight:1.55}}>
+              <div style={{color:C.txt,fontSize:17,fontWeight:800,marginBottom:6}}>Our commitments</div>
+              <div style={{fontSize:13,fontWeight:700,lineHeight:1.55}}>
                 <span style={{color:'#ea580c'}}>Local Community</span>
                 <span style={{color:C.dim}}>, </span>
                 <span style={{color:C.grn}}>Local Support</span>
@@ -7369,8 +7369,8 @@ function ServicesScreen() {
       <TopBar />
       <div style={{padding:'12px 16px 16px'}}>
         <div style={{ ...BROWSE_PROMO_BANNER, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
-          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
+          <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.92, marginTop: 3, lineHeight: 1.25 }}>Verified partners · 25% Off · Support local community</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:10,background:C.deep,border:`1px solid ${C.bdr}`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
           <span>🔍</span>
