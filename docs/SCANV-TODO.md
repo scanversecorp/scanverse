@@ -31,10 +31,21 @@ Track ops and follow-ups here. For full launch gates see [GO-LIVE-CHECKLIST.md](
 | 1 | **Google Search Console** — verify `getscanv.com`, submit sitemap | ⏳ Manual | GSC verified; **retry sitemap submit** → `sitemap.xml` |
 | 2 | **Google Business Profile** for ScanV (Pune service area) | ⏳ Manual | Needs verified phone + address when available |
 | 3 | **Virtual office / India registered address** | ❌ Not started | [VIRTUAL-OFFICE-INDIA.md](./VIRTUAL-OFFICE-INDIA.md) — CA + provider required |
-| 4 | Deploy `robots.txt`, `sitemap.xml`, `scanv-brand.html` | ✅ Live | `/sitemap.xml` + `/robots.txt` serve correctly on prod |
+| 4 | Deploy official-app SEO + static files | ✅ Live | `4bf9f8c` · title "ScanV — Official App \| getscanv.com" |
 | 5 | **GSC domain verified** for `getscanv.com` | ✅ Done | DNS TXT via Cloudflare · account jasmeen.workmail@gmail.com |
-| 6 | Submit sitemap + request indexing | ⏳ Manual | Submit in GSC; request `/` + `/scanv-brand.html` after next deploy |
-| 7 | **Fix “ScanV coming to?” snippet** | ✅ Code ready | Official-app meta + noscript + JSON-LD · **deploy + update IG/FB bio** |
+| 6 | Submit sitemap + request indexing | ⏳ Manual | GSC → Sitemaps → `sitemap.xml`; URL Inspection → `/` + `/scanv-brand.html` |
+| 7 | **Fix “ScanV coming to?” snippet** | ✅ Deployed | Update live IG/FB bio — remove "Coming soon" |
+
+---
+
+## Social automation (@scanvapp)
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | Daily Instagram Graph API post | ✅ Wired | `scripts/instagram_daily_post.mjs` · cron 10:00 AM IST |
+| 2 | GitHub Action cron | ✅ Wired | `.github/workflows/instagram-daily-post.yml` |
+| 3 | **Meta secrets in GitHub** | ⏳ Manual | `META_PAGE_ACCESS_TOKEN` + `META_IG_USER_ID` — [AUTOMATION.md](./social/AUTOMATION.md) |
+| 4 | Deploy `public/social/` images | ⏳ Push | Images must be live at getscanv.com/social/ for Graph API |
 
 ---
 

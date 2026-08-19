@@ -37,6 +37,11 @@ CLI
 node scripts/social_prelaunch.mjs          — pre-launch HOT waitlist (users + partners)
 node scripts/social_pulse.mjs
 node scripts/social_services_campaign.mjs  — today's service ad + register CTAs
+node scripts/instagram_daily_post.mjs      — daily @scanvapp auto-post (Graph API)
+node scripts/instagram_daily_post.mjs --dry-run  — preview without publishing
+
+AUTOMATION (10:00 AM IST daily)
+See docs/social/AUTOMATION.md · GitHub Action: .github/workflows/instagram-daily-post.yml
 
 REGISTER LINKS
 User (OTP on first book): https://getscanv.com?utm_source=social&utm_medium=user_register

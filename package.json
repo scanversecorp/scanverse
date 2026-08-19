@@ -21,7 +21,9 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "validate:url-index": "node scripts/validate-url-index.mjs",
-    "maintenance": "node scripts/maintenance-mode.mjs"
+    "maintenance": "node scripts/maintenance-mode.mjs",
+    "social:instagram:daily": "node scripts/instagram_daily_post.mjs",
+    "social:instagram:dry-run": "node scripts/instagram_daily_post.mjs --dry-run"
   },
   "eslintConfig": {
     "extends": [

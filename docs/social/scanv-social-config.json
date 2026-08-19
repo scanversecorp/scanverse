@@ -10,7 +10,12 @@
   "business_phone": "+91-9270194842",
   "business_email": "connect@dcoreglobal.com",
   "profile_photo": "docs/social/scanv-profile-picture.png",
-  "posting_window_ist": "09:30-19:00",
+  "posting_window_ist": "10:00-19:00",
+  "daily_instagram_cron_ist": "10:00",
+  "daily_instagram_cron_utc": "04:30",
+  "daily_instagram_script": "node scripts/instagram_daily_post.mjs",
+  "daily_instagram_workflow": ".github/workflows/instagram-daily-post.yml",
+  "automation_doc": "docs/social/AUTOMATION.md",
   "platforms": {
     "facebook": {
       "priority": 1,
