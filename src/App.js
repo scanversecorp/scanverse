@@ -2593,14 +2593,6 @@ const FOOTER_LINKS = [
   ['report', 'Report', 'hash'],
 ];
 
-function BrowseLegalStrip() {
-  return (
-    <div style={{ flexShrink: 0, borderTop: BDR, padding: '10px 16px 8px', textAlign: 'center', background: C.surf }}>
-      <ScanvLegalLinks accentColor={C.acc} fontSize={11} mutedColor={C.dim} />
-    </div>
-  );
-}
-
 function FooterSocialLinks({ small }) {
   const fs = small ? 10 : 11;
   return (
@@ -4003,7 +3995,7 @@ const TRUST_COMMITMENT_PAGES = {
     sections: [
       ['Before you book — customer validation', [
         'Mobile OTP via SMS or WhatsApp before payment — no anonymous bookings',
-        'Terms, Privacy Policy, DPDP Act 2023, and GPS location tracking consent required on first booking',
+        'Terms, Privacy Policy & DPDP Act 2023 consent required on first booking',
         'Name, address, and GPS location captured for dispatch, nearby matching, and fraud prevention',
         'Platform fee paid through UPI or Razorpay with a unique transaction reference',
         'Inactive or paused services are blocked at booking with a clear message',
@@ -5881,7 +5873,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         </div>
         {sticky}
       </div>
-      <BrowseLegalStrip />
       <GuestBottomNav
         activeTab={guestActiveTab}
         loggedIn={browseAuthed}
@@ -6357,7 +6348,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');resetOtpFlow();sendOTP();}}/>
           )}
-          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </>
     );
@@ -6409,7 +6399,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             </>
           )}
           <Btn full onClick={completeLoginProfile} disabled={loading}>{loading ? <><Spin size={16} />Saving…</> : (completeProfileMode === 'booking' ? 'Save & continue booking →' : 'Save & continue →')}</Btn>
-          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </>
     );
@@ -6475,7 +6464,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendLoginOTP();}}/>
           )}
-          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 16 }} />
         </div>
       </>
     );
@@ -7937,7 +7925,6 @@ function BookScreen() {
             onConfirm={() => confirmPaid('UPI')}
           />
         </>}
-        <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ padding: '12px 0 24px', marginTop: 0 }} />
       </div>
     </div>
   );
@@ -16722,11 +16709,11 @@ function LegalPage({page}) {
       content: (
         <>
           <div style={{background:`${C.gold}22`,border:`1px solid ${C.gold}44`,borderRadius:10,padding:14,marginBottom:24}}>
-            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By checking the acceptance box, using ScanV, or placing a booking, you agree to these Terms, our Privacy Policy, DPDP Act 2023 processing, and GPS location tracking in full.</p>
+            <p style={{margin:0,color:C.gold,fontSize:13}}>⚠️ By checking the acceptance box, using ScanV, or placing a booking, you agree to these Terms (including GPS tracking), our Privacy Policy, and DPDP Act 2023 processing in full.</p>
           </div>
           {[
             ['ScanV as Marketplace Intermediary','DCore operates ScanV as an IT Intermediary under the Information Technology Act, 2000 and applicable intermediary guidelines. We provide a technology platform connecting Users with independent Partners. We do not employ Partners, do not perform services ourselves, and are not responsible for Partner conduct, service quality, safety, timeliness, outcomes, or disputes between Users and Partners except as expressly stated here.'],
-            ['Acceptance','You must tick the checkbox for Terms & Conditions, Privacy Policy, DPDP Act 2023, and GPS location tracking before OTP verification on every service sub-card and booking flow. This constitutes a legally binding electronic record under the IT Act. If you do not agree, do not use ScanV.'],
+            ['Acceptance','You must tick the checkbox for Terms & Conditions, Privacy Policy & DPDP Act 2023 before OTP verification on every service sub-card and booking flow. Accepting includes GPS location tracking as set out in these Terms. This constitutes a legally binding electronic record under the IT Act. If you do not agree, do not use ScanV.'],
             ['GPS Location & Tracking Consent','You consent to ScanV accessing device GPS (and IP-based fallback) to: show nearby services; auto-fill address and PIN; match you with Partners; route deliveries; record sign-in location; and enable live job tracking on supported categories (e.g. delivery, bike/car mechanic, towing). Partners receive your service location only to fulfil the booking. Denying GPS may block booking or dispatch. Consent is recorded with your OTP acceptance timestamp.'],
             ['Eligibility','Must be 18+ · Valid Indian mobile · Legally capable of entering contracts · Accurate information only · One account per mobile unless authorised by ScanV.'],
             ['Booking Confirmation','A booking is confirmed only when: mobile OTP/WhatsApp verified + legal and GPS acceptance recorded + unique TXN ID generated + applicable platform fee paid (where required). DCore may cancel, modify, or reassign bookings if no Partner is available, fraud is suspected, or terms are violated — without liability beyond refund of platform fee where applicable.'],

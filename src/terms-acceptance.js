@@ -1,4 +1,4 @@
-/** Shared Terms / Privacy / DPDP / GPS acceptance for OTP gates */
+/** Shared Terms / Privacy / DPDP acceptance for OTP gates (GPS consent in /terms) */
 
 import { useCallback, useState } from 'react';
 
@@ -10,9 +10,6 @@ export const SCANV_LEGAL_LINKS = [
   { key: 'privacy', href: '/privacy', label: 'Privacy Policy' },
   { key: 'dpdp', href: '/dpdp', label: 'DPDP Act 2023' },
 ];
-
-export const SCANV_GPS_CONSENT_TEXT =
-  'GPS location collection and tracking (while using ScanV, during booking, and for live service tracking where available) to show nearby services, match Partners, route deliveries, and fulfil your booking';
 
 export function readScanvTermsAccepted() {
   try {
@@ -30,6 +27,7 @@ export function readScanvGpsConsent() {
   }
 }
 
+/** Terms acceptance also records GPS consent (see Terms & Conditions page). */
 export function writeScanvTermsAccepted() {
   const now = new Date().toISOString();
   try {
@@ -40,8 +38,7 @@ export function writeScanvTermsAccepted() {
   }
 }
 
-export const SCANV_TERMS_ACCEPTED_LABEL =
-  'Terms & Conditions, Privacy Policy, DPDP Act 2023 & GPS location tracking';
+export const SCANV_TERMS_ACCEPTED_LABEL = 'Terms & Conditions, Privacy Policy & DPDP Act 2023';
 
 export function useScanvTermsAcceptance() {
   const [accepted, setAccepted] = useState(readScanvTermsAccepted);
@@ -75,11 +72,11 @@ export function ScanvLegalLinks({ accentColor = '#d63a56', fontSize = 12, separa
 }
 
 export function TermsAcceptanceField({ accepted, onAccept, C, BDR }) {
-  const legal = <ScanvLegalLinks accentColor={C.acc} fontSize={13} mutedColor={C.dim} />;
   if (accepted) {
     return (
-      <div style={{ fontSize: 12, color: C.grn, marginBottom: 10, fontWeight: 700, lineHeight: 1.65 }}>
-        ✅ Accepted {legal} and GPS location tracking
+      <div style={{ fontSize: 10, color: C.grn, marginBottom: 8, fontWeight: 600, lineHeight: 1.5, textAlign: 'center' }}>
+        ✅ Accepted{' '}
+        <ScanvLegalLinks accentColor={C.grn} fontSize={10} mutedColor={C.grn} linkStyle={{ fontWeight: 600 }} />
       </div>
     );
   }
@@ -92,8 +89,9 @@ export function TermsAcceptanceField({ accepted, onAccept, C, BDR }) {
           style={{ marginTop: 2, accentColor: C.acc, width: 18, height: 18, flexShrink: 0 }}
         />
         <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.65 }}>
-          I accept {legal} and consent to {SCANV_GPS_CONSENT_TEXT}.{' '}
-          <span style={{ color: C.acc }}>*</span>
+          I accept{' '}
+          <ScanvLegalLinks accentColor={C.acc} fontSize={13} mutedColor={C.dim} />
+          <span style={{ color: C.acc }}> *</span>
         </span>
       </label>
     </div>
