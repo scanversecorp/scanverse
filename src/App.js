@@ -2706,13 +2706,14 @@ function FooterShareQrButtons({ small }) {
 
 function FooterLegalLinks({ current, small }) {
   const fs = small ? 10 : 12;
+  const coreLegal = new Set(['terms', 'privacy', 'dpdp']);
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
       {FOOTER_LINKS.map(([k, l, kind]) => (
         <a
           key={k}
           href={kind === 'hash' ? `#${k}` : `/${k}`}
-          style={{ color: current === k ? C.acc : C.dim, fontSize: fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600, padding: '8px 0', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+          style={{ color: current === k ? C.acc : C.dim, fontSize: coreLegal.has(k) ? fs - 2 : fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600, padding: '8px 0', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
         >
           {l}
         </a>
@@ -17083,8 +17084,8 @@ function LegalPage({ page, catalogTick = 0 }) {
           <div style={{color:C.sub,fontSize:12}}>ScanV · Updated: {pg.updated}</div>
           <div style={{ marginTop: 10 }}>
             {page === 'partner-terms'
-              ? <PartnerLegalLinks accentColor={C.acc} fontSize={12} mutedColor={C.dim} />
-              : <ScanvLegalLinks accentColor={C.acc} fontSize={12} mutedColor={C.dim} />}
+              ? <PartnerLegalLinks accentColor={C.acc} fontSize={10} mutedColor={C.dim} />
+              : <ScanvLegalLinks accentColor={C.acc} fontSize={10} mutedColor={C.dim} />}
           </div>
           <div style={{color:C.dim,fontSize:10,marginTop:4}}>Operated by {SCANV_LEGAL_ENTITY}</div>
         </div>

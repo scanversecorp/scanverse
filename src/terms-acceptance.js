@@ -144,7 +144,7 @@ function LegalLinksList({ links, accentColor, fontSize, separator, style, linkSt
   );
 }
 
-export function ScanvLegalLinks({ accentColor = '#d63a56', fontSize = 12, separator = ' · ', style, linkStyle, mutedColor = '#888' }) {
+export function ScanvLegalLinks({ accentColor = '#d63a56', fontSize = 10, separator = ' · ', style, linkStyle, mutedColor = '#888' }) {
   return (
     <LegalLinksList
       links={SCANV_LEGAL_LINKS}
@@ -158,7 +158,7 @@ export function ScanvLegalLinks({ accentColor = '#d63a56', fontSize = 12, separa
   );
 }
 
-export function PartnerLegalLinks({ accentColor = '#d63a56', fontSize = 12, separator = ' · ', style, linkStyle, mutedColor = '#888' }) {
+export function PartnerLegalLinks({ accentColor = '#d63a56', fontSize = 10, separator = ' · ', style, linkStyle, mutedColor = '#888' }) {
   return (
     <LegalLinksList
       links={SCANV_PARTNER_LEGAL_LINKS}
@@ -178,7 +178,7 @@ export function TermsAcceptanceField({ accepted, onAccept, onRevoke, C, BDR }) {
     return (
       <div style={{ fontSize: 11, color: linkGreen, marginBottom: 10, fontWeight: 600, lineHeight: 1.5, textAlign: 'center' }}>
         ✅ Accepted{' '}
-        <ScanvLegalLinks accentColor={linkGreen} fontSize={11} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
+        <ScanvLegalLinks accentColor={linkGreen} fontSize={9} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
       </div>
     );
   }
@@ -191,7 +191,7 @@ export function TermsAcceptanceField({ accepted, onAccept, onRevoke, C, BDR }) {
           onChange={(e) => { if (e.target.checked) onAccept?.(); else onRevoke?.(); }}
           style={{ accentColor: linkGreen, width: 18, height: 18, flexShrink: 0 }}
         />
-        <ScanvLegalLinks accentColor={linkGreen} fontSize={13} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
+        <ScanvLegalLinks accentColor={linkGreen} fontSize={11} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
       </label>
     </div>
   );
