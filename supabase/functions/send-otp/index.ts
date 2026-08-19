@@ -662,6 +662,10 @@ Deno.serve(async (req: Request) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     const purpose = String(body.purpose || "general");
+    const termsAtRaw = body.terms_accepted_at;
+    const termsAcceptedAt = typeof termsAtRaw === "string" && termsAtRaw.trim()
+      ? new Date(termsAtRaw.trim()).toISOString()
+      : null;
     const { data: otpRow, error: insertErr } = await supabase
       .from("vendor_otp")
       .insert({
@@ -669,6 +673,8 @@ Deno.serve(async (req: Request) => {
         otp_hash: otpHash,
         purpose,
         expires_at: expiresAt,
+        partner_terms_accepted_at: termsAcceptedAt,
+        partner_terms_version: termsAcceptedAt ? "2026-08-20" : null,
       })
       .select("id")
       .single();

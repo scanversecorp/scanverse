@@ -72,10 +72,22 @@ export const SCANV_PARTNER_TERMS_ACCEPTED_LABEL =
   'Partner Terms & Conditions, Terms & Conditions, Privacy Policy & DPDP Act 2023';
 
 export const SCANV_LIABILITY_DISCLAIMER =
-  `We (ScanV or '${SCANV_LEGAL_ENTITY}') are not responsible for any liability, misuse, harm, damages, financial or mental impact, or any damages to any user, candidate, vendor, partner, service provider, or customer. You agree to these Terms & Conditions 100%.`;
+  `We (ScanV or '${SCANV_LEGAL_ENTITY}') are not responsible for any liability, misuse, harm, damages, financial or mental impact, or any other damages to Cloud candidates, service providers, vendors, client users, or any related or unrelated consumer, third party, or visitor. You agree to these policies 100%.`;
 
 export const SCANV_MANDATORY_ONBOARD_ACCEPTANCE =
-  `Each and every person, company, or anybody joining ScanV (${SCANV_LEGAL_ENTITY}) — including users, customers, candidates, vendors, partners, service providers, or anyone else — must accept the Terms & Conditions before onboarding or use.`;
+  `Each person, company, or entity joining ScanV (${SCANV_LEGAL_ENTITY}) must manually accept the Terms & Conditions, Privacy Policy, and DPDP Act 2023 before onboarding, registration, booking, payment, or use.`;
+
+/** Five ScanV joiner categories — used across Terms, Privacy, Refund */
+export const SCANV_JOINER_TYPES_INTRO =
+  `ScanV (operated by ${SCANV_LEGAL_ENTITY}) serves five categories of joiners, plus any other person who accesses the platform:`;
+
+export const SCANV_JOINER_TYPES = [
+  ['Cloud & IT Candidates', 'Individuals applying for Skill Gap Review (SGR), cloud, data-centre, or IT training programmes via ScanV. Candidates are not employees of DCore; training outcomes, placement, certification, and fees are governed by programme terms and independent instructors/partners where applicable.'],
+  ['Service Providers', 'Independent professionals or businesses listing and performing on-demand services (home repair, beauty, delivery, healthcare visits, legal consults, etc.) through ScanV. Service providers are independent contractors, not agents of DCore Global Corporation.'],
+  ['Vendors', 'Independent sellers or suppliers providing goods or bundled goods-and-services (food, retail, parts, equipment, etc.) through ScanV listings or dispatch. Vendors are solely responsible for product quality, safety, licensing, and fulfilment.'],
+  ['Client Users (End Users)', 'Customers who browse, book, pay platform fees, and receive services or goods through ScanV. Client users contract with independent service providers or vendors; DCore provides the technology marketplace only.'],
+  ['Other Consumers & Third Parties', 'Any related or unrelated consumer, visitor, referrer, guest OTP user, support contact, or third party who interacts with ScanV — all subject to these policies and mandatory acceptance where OTP or onboarding applies.'],
+];
 
 /** Manual acceptance only — never pre-checked from localStorage. */
 export function useScanvTermsAcceptance() {
@@ -160,18 +172,13 @@ export function PartnerLegalLinks({ accentColor = '#d63a56', fontSize = 12, sepa
   );
 }
 
-export function TermsAcceptanceField({ accepted, acceptedAt, onAccept, onRevoke, C, BDR }) {
+export function TermsAcceptanceField({ accepted, onAccept, onRevoke, C, BDR }) {
   const linkGreen = C.grn || '#007a4d';
   if (accepted) {
     return (
       <div style={{ fontSize: 11, color: linkGreen, marginBottom: 10, fontWeight: 600, lineHeight: 1.5, textAlign: 'center' }}>
         ✅ Accepted{' '}
         <ScanvLegalLinks accentColor={linkGreen} fontSize={11} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
-        {acceptedAt ? (
-          <div style={{ fontSize: 10, marginTop: 4, fontWeight: 500 }}>
-            {formatTermsAcceptedAt(acceptedAt)}
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -181,7 +188,7 @@ export function TermsAcceptanceField({ accepted, acceptedAt, onAccept, onRevoke,
         <input
           type="checkbox"
           checked={false}
-          onChange={(e) => { if (e.target.checked) onAccept?.(); }}
+          onChange={(e) => { if (e.target.checked) onAccept?.(); else onRevoke?.(); }}
           style={{ accentColor: linkGreen, width: 18, height: 18, flexShrink: 0 }}
         />
         <ScanvLegalLinks accentColor={linkGreen} fontSize={13} mutedColor={linkGreen} linkStyle={{ fontWeight: 600 }} />
@@ -190,11 +197,10 @@ export function TermsAcceptanceField({ accepted, acceptedAt, onAccept, onRevoke,
   );
 }
 
-export function PartnerTermsAcceptanceField({ accepted, acceptedAt, onAccept, onRevoke, C, BDR }) {
+export function PartnerTermsAcceptanceField({ accepted, onAccept, onRevoke, C, BDR }) {
   return (
     <TermsAcceptanceField
       accepted={accepted}
-      acceptedAt={acceptedAt}
       onAccept={onAccept}
       onRevoke={onRevoke}
       C={C}

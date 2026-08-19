@@ -357,7 +357,7 @@ export function StudentCloudAdmitScreen({
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
-      await invokeSendOtp(`+91${digits10(mobile)}`);
+      await invokeSendOtp(`+91${digits10(mobile)}`, termsAcceptedAt);
       setOtpSent(true);
       addToast?.('OTP sent', 'success');
     } catch (e) {
@@ -412,6 +412,8 @@ export function StudentCloudAdmitScreen({
         course_name: courseName,
         schedule_date: scheduleDate,
         schedule_time: scheduleTime,
+        terms_accepted_at: termsAcceptedAt || null,
+        terms_version: termsAcceptedAt ? '2026-08-20' : null,
       }, { apikey: SB_KEY });
       setOtpVerified(true);
       setStudent(r.student);
@@ -536,7 +538,6 @@ export function StudentCloudAdmitScreen({
         {!otpVerified && (
           <TermsAcceptanceField
             accepted={termsAccepted}
-            acceptedAt={termsAcceptedAt}
             onAccept={acceptTerms}
             onRevoke={revokeTerms}
             C={C}

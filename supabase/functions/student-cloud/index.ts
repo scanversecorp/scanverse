@@ -371,6 +371,10 @@ Deno.serve(async (req) => {
         schedule_time: scheduleTime,
         sgr_fee_paise: sgrFeePaise,
         consultant_due_at: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
+        terms_accepted_at: body.terms_accepted_at
+          ? new Date(String(body.terms_accepted_at)).toISOString()
+          : null,
+        terms_version: body.terms_accepted_at ? String(body.terms_version || "2026-08-20") : null,
       };
 
       const { data: existing } = await sb
