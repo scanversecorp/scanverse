@@ -33,6 +33,7 @@ const AdminStudentCloudTab = lazy(() => import('./student-cloud').then((m) => ({
 const SB_URL   = 'https://rwlwrmmqtedugcreweut.supabase.co';
 const SB_KEY   = 'sb_publishable_sx3krTi2ijpvn-K8wAQP6w_VFwH0vR3';
 const APP_URL  = 'https://getscanv.com';
+const SCANV_SHARE_TAGLINE = 'ScanV — Professional Services Marketplace · PCMC Pune';
 /** Scan this URL — opens ScanV in the browser; no “Add to Home Screen” step. */
 const SCANV_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
 const UPI_PA   = 'dcoreglobalcorporati.82037575@hdfcbank';
@@ -2614,19 +2615,105 @@ function FooterSocialLinks({ small }) {
   );
 }
 
+function FooterShareQrButtons({ small }) {
+  const [qrOpen, setQrOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const fs = small ? 10 : 12;
+  const btnStyle = {
+    color: C.acc,
+    fontSize: fs,
+    fontWeight: 600,
+    textDecoration: 'none',
+    margin: small ? '0 6px' : '0 8px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: FF,
+    padding: '8px 4px',
+    minHeight: 44,
+    minWidth: 44,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+  const copyShareLink = async () => {
+    await navigator.clipboard.writeText(`${SCANV_SHARE_TAGLINE}\n${APP_URL}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const shareApp = async () => {
+    const payload = { title: 'ScanV', text: SCANV_SHARE_TAGLINE, url: APP_URL };
+    try {
+      if (navigator.share) {
+        await navigator.share(payload);
+        return;
+      }
+      await copyShareLink();
+    } catch (e) {
+      if (e?.name === 'AbortError') return;
+      try { await copyShareLink(); } catch (_) { /* non-blocking */ }
+    }
+  };
+  return (
+    <>
+      <button type="button" onClick={shareApp} aria-label="Share ScanV" style={btnStyle}>
+        {copied ? 'Copied ✓' : 'Share'}
+      </button>
+      <button type="button" onClick={() => setQrOpen(true)} aria-label="Show ScanV QR code" style={btnStyle}>
+        QR
+      </button>
+      {qrOpen ? (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={() => setQrOpen(false)}
+        >
+          <div
+            style={{ background: C.surf, borderRadius: '16px 16px 0 0', padding: '20px 16px calc(32px + env(safe-area-inset-bottom, 0px))', width: '100%', maxWidth: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.txt, textAlign: 'center', marginBottom: 6 }}>Share ScanV</div>
+            <div style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginBottom: 16 }}>Scan to open getscanv.com</div>
+            <QRCodeDisplay url={APP_URL} size={200} />
+            <button
+              type="button"
+              onClick={() => setQrOpen(false)}
+              style={{ background: 'none', border: 'none', color: C.sub, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'block', margin: '16px auto 0', minHeight: 44, padding: '8px 16px', fontFamily: FF }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function FooterLegalLinks({ current, small }) {
   const fs = small ? 10 : 12;
   return (
-    <>
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
       {FOOTER_LINKS.map(([k, l, kind]) => (
         <a
           key={k}
           href={kind === 'hash' ? `#${k}` : `/${k}`}
-          style={{ color: current === k ? C.acc : C.dim, fontSize: fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600 }}
+          style={{ color: current === k ? C.acc : C.dim, fontSize: fs, textDecoration: 'none', margin: small ? '0 6px' : '0 8px', fontWeight: 600, padding: '8px 0', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
         >
           {l}{!small && kind === 'path' ? ' Policy' : ''}
         </a>
       ))}
+      <FooterShareQrButtons small={small} />
+    </div>
+  );
+}
+
+function CustomerFooterBar({ current, showSocial, linksStyle, copyrightStyle }) {
+  return (
+    <>
+      <div style={{ textAlign: 'center', padding: '12px 0 8px', borderTop: BDR, marginTop: 8, ...linksStyle }}>
+        <FooterLegalLinks small current={current} />
+        {showSocial ? <FooterSocialLinks small /> : null}
+      </div>
+      <CopyrightLine style={copyrightStyle || { padding: '0 0 8px' }} />
     </>
   );
 }
@@ -4033,7 +4120,7 @@ function TrustCommitmentBody({ pageKey, onAction, showCopyright = true }) {
         </div>
       ) : null}
       <AssistBanner />
-      {showCopyright ? <CopyrightLine style={{ padding: '12px 0 0' }} /> : null}
+      {showCopyright ? <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ padding: '12px 0 0' }} /> : null}
     </>
   );
 }
@@ -4123,7 +4210,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
         style={bodyStyle}
       >
         {children}
-        {showCopyright ? <CopyrightLine style={{ padding: '12px 16px 24px' }} /> : null}
+        {showCopyright ? <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', padding: '12px 16px 0' }} copyrightStyle={{ padding: '12px 16px 24px' }} /> : null}
       </div>
     </div>
   );
@@ -5950,11 +6037,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           </>
         )}
         <AssistBanner/>
-        <div style={{textAlign:'center',padding:'12px 0 8px',borderTop:BDR,marginTop:8}}>
-          <FooterLegalLinks small current={null}/>
-          <FooterSocialLinks small />
-        </div>
-        <CopyrightLine style={{ padding: '0 0 8px' }} />
+        <CustomerFooterBar showSocial copyrightStyle={{ padding: '0 0 8px' }} />
       </div>
     </>
   );
@@ -6019,7 +6102,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           </div>
         )}
         <AssistBanner />
-        <CopyrightLine style={{ padding: '12px 0 0' }} />
+        <CustomerFooterBar copyrightStyle={{ padding: '12px 0 0' }} />
       </div>
     </>
   );
@@ -6391,7 +6474,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <WaSentPanel mobile10={mobile} token={waToken} waChecking={waChecking}
               onUseSms={()=>{setVerifyMethod('sms');setOtpSent(false);setWaToken('');setWaChecking(false);setOtpCode(['','','','','','']);sendLoginOTP();}}/>
           )}
-          <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} />
+          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 16 }} />
         </div>
       </>
     );
@@ -6785,7 +6868,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
           ) : null}
           {content}
         </div>
-        <CopyrightLine style={{ marginTop: 12 }} />
+        <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ marginTop: 12 }} />
       </div>
     </div>
     </div>
@@ -9080,7 +9163,7 @@ function BookingsScreen() {
           <div style={{fontWeight:600,marginBottom:4}}>No bookings yet</div>
           <div style={{fontSize:13}}>Book a service to see your orders here</div>
         </div>}
-        <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} />
+        <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ padding: '16px 0 8px', marginTop: 0 }} />
       </div>
       {cancelModalBooking && (
         <CancelBookingModal
@@ -10773,7 +10856,7 @@ function VendorOnboardPage() {
         <div style={{ marginTop: 24, fontSize: 11, color: C.dim, textAlign: 'center' }}>
           Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#vendor-onboard</code>
         </div>
-        <CopyrightLine style={{ marginTop: 12 }} />
+        <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ marginTop: 12 }} />
       </div>
     </div>
   );
@@ -11129,7 +11212,7 @@ function VendorAdminPage() {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#vendor-admin</code>
           </div>
-          <CopyrightLine style={{ marginTop: 12 }} />
+          <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </div>
     );
@@ -11380,7 +11463,7 @@ function ReportPage() {
           <div style={{ marginTop: 14 }}>
             <a href="#" onClick={e => { e.preventDefault(); window.location.hash = ''; window.history.back(); }} style={{ color: C.dim, fontSize: 12 }}>← Back to home</a>
           </div>
-          <CopyrightLine style={{ marginTop: 16 }} />
+          <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 0 }} />
         </div>
       </div>
     );
@@ -11412,7 +11495,7 @@ function ReportPage() {
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <a href="#track-ticket" style={{ color: C.dim, fontSize: 11 }}>Already have a ticket? Check status →</a>
         </div>
-        <CopyrightLine style={{ marginTop: 16 }} />
+        <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 0 }} />
       </div>
     </div>
   );
@@ -11488,7 +11571,7 @@ function TrackTicketPage() {
             </div>
           </>
         )}
-        <CopyrightLine style={{ marginTop: 20 }} />
+        <CustomerFooterBar linksStyle={{ marginTop: 20, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 0 }} />
       </div>
     </div>
   );
@@ -12242,7 +12325,7 @@ function CustomerSupportPage() {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#customer-support</code>
           </div>
-          <CopyrightLine style={{ marginTop: 12 }} />
+          <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </div>
     );
@@ -12680,7 +12763,7 @@ function ExecDashboardPage() {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#exec</code>
           </div>
-          <CopyrightLine style={{ marginTop: 12 }} />
+          <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ marginTop: 12 }} />
         </div>
       </div>
     );
@@ -16066,7 +16149,7 @@ function AdminControlCenter({ onPricesUpdated }) {
           <div style={{ marginTop: 16, fontSize: 11, color: C.dim, textAlign: 'center' }}>
             Bookmark: <code style={{ color: C.acc }}>{APP_URL}/#admin</code>
           </div>
-          <CopyrightLine style={{ marginTop: 12 }} />
+          <CustomerFooterBar linksStyle={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }} copyrightStyle={{ marginTop: 12 }} />
         </div>
         </div>
       </div>
@@ -16976,7 +17059,12 @@ export default function App() {
         <div className="scanv-shell" style={APP_SHELL}>
           <div className="scanv-mobile-zoom" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
             <Boundary>{renderScreen()}</Boundary>
-            {screen !== 'bookings' && <CopyrightLine style={{ padding: '6px 16px 16px' }} />}
+            {screen !== 'bookings' && (
+              <CustomerFooterBar
+                linksStyle={{ marginTop: 0, borderTop: BDR, padding: '8px 16px 0' }}
+                copyrightStyle={{ padding: '6px 16px 16px' }}
+              />
+            )}
           </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>
