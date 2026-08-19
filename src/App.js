@@ -1368,10 +1368,27 @@ const PARENT_IDS = new Set(['legal', 'cloud', 'vip', 'health', 'property', 'hous
  * 4. App boot: fetchCatalogFromDb() reads service_prices_public, merges prices/names into
  *    SVCS + SUB_CATEGORIES (static templates supply desc/img/features only)
  * 5. Home cards, sub-cards, booking, and pricing admin all use merged svc.price / svc.mrp
+ * 6. Privacy, Terms & Refund — Service Providers read live names via buildServiceProviderCatalogNames()
  */
 let subByIdIndex = {};
 function getAllSubSvcs() {
   return Object.values(SUB_CATEGORIES).flatMap(c => c.svcs);
+}
+function buildServiceProviderCatalogNames() {
+  const mainCards = sortSvcsByName(SVCS).map((s) => s.name).join(' · ');
+  const subCards = sortSvcsByName(getAllSubSvcs()).map((s) => s.name).join(' · ');
+  return { mainCards, subCards };
+}
+/** Main + sub-card names for Privacy/Terms — Service Providers; refreshes after applyDbCatalog. */
+function buildServiceProviderLegalText() {
+  const { mainCards, subCards } = buildServiceProviderCatalogNames();
+  const body = `Independent professionals or businesses listing and performing on-demand or scheduled services through ScanV — across every main card on the platform (${mainCards}) and every sub-card or listing (${subCards}), or any other service, product, or anything offered, listed, booked, dispatched, or fulfilled through ScanV now or in the future. Service providers are independent contractors, not employees, agents, joint venturers, or representatives of ${SCANV_LEGAL_ENTITY}. They alone are responsible for service quality, safety, licensing, insurance, taxes, outcomes, professional advice, and legal compliance. DCore Global Corporation provides the technology marketplace only and bears no liability for service-provider conduct, data handling beyond platform integration, disputes, or any harm to users, customers, candidates, vendors, or third parties.`;
+  return { mainCards, subCards, body };
+}
+/** Refund rules for Service Providers — same live catalog as Privacy/Terms. */
+function buildServiceProviderRefundText() {
+  const { mainCards, subCards } = buildServiceProviderCatalogNames();
+  return `Platform fees collected by DCore from client users for services booked through ScanV — across every main card (${mainCards}) and every sub-card or listing (${subCards}), or any other service, product, or anything offered, listed, booked, or fulfilled through ScanV now or in the future — may be refunded only per the booking cancellation rules below. Service providers are independent contractors, not employees or agents of ${SCANV_LEGAL_ENTITY}. They do not receive refunds of their own taxes, penalties, or chargebacks caused by their conduct. Disputes over service quality, outcomes, licensing, safety, professional advice, or fulfilment are solely between the client user and the service provider. DCore Global Corporation is not liable for service outcomes, provider conduct, or any refund beyond platform fees actually collected as stated here.`;
 }
 function svcNameAsc(a, b) {
   return String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' });
@@ -16702,20 +16719,34 @@ npx supabase db push`}</pre>
 /* ================================================================
    LEGAL PAGES -- Served at /privacy /terms /dpdp /refund /payment
 ================================================================ */
-function LegalPage({page}) {
-  const joinerTypeSections = SCANV_JOINER_TYPES.map(([title, body]) => [title, body]);
+function LegalPage({ page, catalogTick = 0 }) {
   const termsLiabilityDisclaimer = SCANV_LIABILITY_DISCLAIMER.replace(
     'Cloud candidates,',
     'Candidates, any human, any business or anything,'
   );
-  const termsJoinerTypeSections = SCANV_JOINER_TYPES.map(([title, body], i) =>
-    i === 0
-      ? [
-          'Candidates, Any Human, Any Business or Anything',
-          'Any individual, human, business, entity, organisation, or thing applying for or using ScanV — including Skill Gap Review (SGR), cloud, data-centre, or IT training programmes, or any other ScanV offering. Candidates and joiners are not employees of DCore; outcomes, placement, certification, and fees are governed by programme terms and independent instructors/partners where applicable.',
-        ]
-      : [title, body]
+  const serviceProviderLegalBody = useMemo(
+    () => buildServiceProviderLegalText().body,
+    [catalogTick]
   );
+  const serviceProviderRefundBody = useMemo(
+    () => buildServiceProviderRefundText(),
+    [catalogTick]
+  );
+  const termsJoinerTypeSections = useMemo(() => SCANV_JOINER_TYPES.map(([title, body], i) => {
+    if (i === 0) {
+      return [
+        'Candidates, Any Human, Any Business or Anything',
+        'Any individual, human, business, entity, organisation, or thing applying for or using ScanV — including Skill Gap Review (SGR), cloud, data-centre, or IT training programmes, or any other ScanV offering. Candidates and joiners are not employees of DCore; outcomes, placement, certification, and fees are governed by programme terms and independent instructors/partners where applicable.',
+      ];
+    }
+    if (title === 'Service Providers') return [title, serviceProviderLegalBody];
+    return [title, body];
+  }), [serviceProviderLegalBody]);
+  const privacyJoinerSuffix = ` Personal data you provide is processed only for stated ScanV platform purposes (OTP, booking, training intake, dispatch, payments, support). To the maximum extent permitted by law, ${SCANV_LEGAL_ENTITY} is not liable for any use, misuse, loss, breach, or harm arising from data shared with or collected by independent service providers, vendors, Partners, or any third party during fulfilment.`;
+  const privacyJoinerTypeSections = useMemo(() => SCANV_JOINER_TYPES.map(([title, body]) => {
+    const text = title === 'Service Providers' ? serviceProviderLegalBody : body;
+    return [`Privacy — ${title}`, text + privacyJoinerSuffix];
+  }), [serviceProviderLegalBody, privacyJoinerSuffix]);
   const pages = {
     privacy:  {
       title:'Privacy Policy',
@@ -16729,20 +16760,20 @@ function LegalPage({page}) {
           {[
             ['Who We Are',`ScanV (getscanv.com) is operated by ${SCANV_LEGAL_ENTITY} ("DCore", "we", "us"). We operate a technology platform connecting client users with independent service providers and vendors across ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. DCore Global Corporation is a marketplace intermediary — not the employer of partners, not the trainer of cloud candidates, and not the seller of vendor goods. Data Protection Officer: privacy@dcoreglobal.com · Grievance officer: privacy@dcoreglobal.com (response within 30 days).`],
             ['Who This Policy Covers',`${SCANV_JOINER_TYPES_INTRO} (1) Cloud & IT candidates (SGR and training flows), (2) service providers, (3) vendors supplying goods or services, (4) client users (end customers), and (5) any related or unrelated consumer or third party. ${SCANV_MANDATORY_ONBOARD_ACCEPTANCE} ${SCANV_LIABILITY_DISCLAIMER}`],
-            ...joinerTypeSections.map(([t, b]) => [`Privacy — ${t}`, b + ' Personal data you provide is processed only for the stated ScanV purpose (OTP, booking, training intake, dispatch, payments, support). DCore Global Corporation is not liable for how independent service providers or vendors use data they collect directly during fulfilment.']),
+            ...privacyJoinerTypeSections,
             ['Acceptance & Consent',`By manually ticking the acceptance checkbox before OTP, you consent to this Privacy Policy, Terms & Conditions, DPDP Act 2023 processing, and GPS tracking as described in our Terms. Acceptance is recorded with date and time (IST). Full legal acceptance wording is on our Terms & Conditions page.`],
             ['Data We Collect','Identity (name, date of birth where required), Contact (mobile — OTP verified), Location (GPS, IP, PIN code, city, village), Device (type, OS, browser, timezone, language, screen, session metadata), Booking and payment references, Partner assignment details, and usage analytics. We do NOT collect or store Aadhaar, PAN, passport, full card numbers, passwords, or biometrics on customer accounts.'],
-            ['Lawful Basis (DPDP 2023)','Consent (OTP, location, marketing where opted in) · Performance of contract (booking fulfilment) · Legitimate interests (fraud prevention, platform security, service quality) · Legal obligation (GST, tax, court orders). Where consent is the basis, you may withdraw it subject to ongoing legal/contractual requirements.'],
-            ['How We Use It','Verify identity via OTP before bookings · Match you with nearby Partners · Send booking, payment, and service updates via SMS/WhatsApp/email · Process platform fees and GST · Prevent fraud and abuse · Improve the platform through aggregated analytics · Comply with Indian law. We do not use your data for unrelated profiling or sale to advertisers.'],
+            ['Lawful Basis (DPDP 2023)','Consent (OTP, location, marketing where opted in) · Performance of contract (booking fulfilment) · Legitimate interests (fraud prevention, platform security, service quality) · Legal obligation (GST, tax, court orders). Withdrawal of consent may limit platform features where consent is required.'],
+            ['How We Use It','Verify identity via OTP before bookings · Match you with nearby Partners · Send booking, payment, and service updates via SMS/WhatsApp/email · Process platform fees and GST · Prevent fraud and abuse · Improve the platform through aggregated analytics · Comply with Indian law. Data is used only for stated ScanV platform purposes.'],
             ['Electronic Communications','You consent to receive transactional SMS, WhatsApp messages, and emails for OTP verification, booking updates, payment confirmations, and support. Promotional messages are opt-in only. Standard carrier/data charges may apply.'],
-            ['Location Data & GPS Tracking','By accepting before OTP, you consent to ScanV collecting and processing your GPS coordinates, IP-based location, PIN code, and address. We request GPS when you open the app, sign in, book any service (including all category sub-cards), and during eligible jobs for live partner tracking and delivery routing. Location is shared with your assigned Partner solely to fulfil the booking. You may disable GPS in device settings, but core features may not work. We never sell location data.'],
-            ['Data Sharing','Name, mobile, and service location with your assigned Partner · Payment references with Razorpay (PCI-DSS L1) · Mobile with SMS providers (2Factor, MSG91, Fast2SMS, Twilio) for OTP · Cloud infrastructure in India · Government, regulators, or courts when legally required · Professional advisers under confidentiality where necessary. We never share with advertisers or data brokers. Partners are independent; their use of data during service delivery is their responsibility subject to law.'],
-            ['Cross-Border Transfer','Primary storage and processing occur in India. If any subprocessors process data outside India, we ensure contractual safeguards consistent with applicable law. You consent to such transfers where required for service delivery.'],
+            ['Location Data & GPS Tracking','By accepting before OTP, you consent to ScanV collecting and processing your GPS coordinates, IP-based location, PIN code, and address. We request GPS when you open the app, sign in, book any service (including all category sub-cards), and during eligible jobs for live partner tracking and delivery routing. Location is shared with your assigned Partner solely to fulfil the booking. Denying GPS may block booking or dispatch.'],
+            ['Data Sharing','Name, mobile, and service location with your assigned Partner · Payment references with Razorpay (PCI-DSS L1) · Mobile with SMS providers (2Factor, MSG91, Fast2SMS, Twilio) for OTP · Cloud infrastructure in India · Government, regulators, or courts when legally required · Professional advisers under confidentiality where necessary. DCore Global Corporation is not liable for how any third party uses data shared for booking fulfilment or platform operations.'],
+            ['Cross-Border Transfer','Primary storage and processing occur in India. Any subprocessors process data outside India. You consent to such transfers where required for service delivery.'],
             ['Retention','Bookings and invoices: 7 years (GST/tax) · OTP logs: 30 days · Device/session logs: 12 months · Support and dispute records: 3 years · Deleted accounts: personal data erased within 30 days except where retention is legally required or needed to defend legal claims.'],
             ['Your Rights (DPDP Act 2023)','Access · Correction · Erasure (subject to legal retention) · Grievance redressal · Nominate a representative · Withdraw consent for consent-based processing. Email privacy@dcoreglobal.com with your registered mobile. We may verify identity before acting on requests. We may refuse manifestly unfounded or repetitive requests where permitted by law.'],
-            ['Security & Disclaimer','TLS 1.3 in transit · AES-256 at rest · AWS Mumbai · OTP-only customer auth · Row-level database security · Access controls and audit logging. While we use reasonable safeguards, no system is completely secure. To the maximum extent permitted by law, ScanV and DCore Global Corporation are not liable for unauthorised access, data incidents, mental distress, financial loss, or harm caused by factors outside our reasonable control (including user device compromise, Partner or service-provider misconduct, or third-party breaches).'],
+            ['Security & Disclaimer','TLS 1.3 in transit · AES-256 at rest · AWS Mumbai · OTP-only customer auth · Row-level database security · Access controls and audit logging. To the maximum extent permitted by law, ScanV and DCore Global Corporation are not liable for any unauthorised access, data incidents, loss, misuse, mental distress, financial harm, or any damage arising from use of the platform, user devices, Partners, service providers, vendors, subprocessors, or any third party — including breaches or misconduct outside DCore\'s control.'],
             ['Children','ScanV is for users 18+. We do not knowingly collect data from minors. Contact privacy@dcoreglobal.com if you believe a minor has registered; we will delete the account.'],
-            ['Changes','We may update this policy. Material changes will be reflected on this page with a new "Updated" date. Continued use after changes constitutes acceptance unless law requires separate consent.'],
+            ['Changes','We may update this policy at any time. Material changes will be reflected on this page with a new "Updated" date. Continued use after changes constitutes your acceptance.'],
           ].map(([h,b])=>(<div key={h} style={{marginBottom:20}}><div style={{color:C.txt,fontWeight:600,fontSize:14,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.bdr}`}}>{h}</div><p style={{color:C.sub,fontSize:13,lineHeight:1.7,margin:0}}>{b}</p></div>))}
         </>
       )
@@ -16859,7 +16890,7 @@ function LegalPage({page}) {
           {[
             ['Who This Refund Policy Covers',`${SCANV_JOINER_TYPES_INTRO} Refund eligibility differs by category. Client-user booking cancellations follow the 70% rule below. Cloud candidate SGR fees, vendor goods, and service-provider disputes have separate rules.`],
             ['Cloud & IT Candidates (SGR / Training)', 'Skill Gap Review (SGR) fees and cloud-programme fees are generally non-refundable once paid and form submitted, except where DCore Global Corporation cancels the programme or a duplicate/erroneous charge is confirmed. Training outcomes, placement, certification, or consultant callbacks are not guaranteed. Candidates agree 100% to these terms at OTP acceptance.'],
-            ['Service Providers', 'Platform fees collected by DCore from client users may be refunded per booking cancellation rules below. Service providers do not receive refunds of their own taxes, penalties, or chargebacks caused by their conduct. Disputes over service quality are between the client user and the service provider; DCore is not liable for service outcomes.'],
+            ['Service Providers', serviceProviderRefundBody],
             ['Vendors (Goods or Services)', 'Refunds for goods or vendor-supplied services depend on the booking category and cancellation timing. Vendor quality, delivery damage, or product safety claims are primarily between the client user and the vendor. DCore may assist with support routing but is not responsible for vendor fulfilment except where a platform fee was incorrectly charged.'],
             ['Client Users (End Users)', 'In-app booking cancellations: 70% of total paid refunded after two-step review (support + owner OTP). 30% cancellation fee applies (18% GST + 12% platform service). See schedule below. Client users agree 100% to these refund limits at acceptance.'],
             ['Other Consumers & Third Parties', 'Any related or unrelated person who pays through ScanV (guest checkout, support-assisted payment, investment inquiry fees where applicable) is subject to the same refund review process. No refund for misuse, fraud, or off-platform arrangements.'],
@@ -17218,7 +17249,7 @@ export default function App() {
 
   const legalPath = legalSegment();
   if (isLegalRoute()) {
-    return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath}/></Boundary>;
+    return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath} catalogTick={catalogTick}/></Boundary>;
   }
 
   if (isFaqRoute()) {
