@@ -295,11 +295,16 @@ export function StudentCloudAdmitScreen({
   const [sgrFeeLocked, setSgrFeeLocked] = useState(null);
   const effectiveSgrFee = sgrFeeLocked ?? sgrFeePaise;
   const sgrFeeLabel = useMemo(() => fmtRs(effectiveSgrFee), [effectiveSgrFee]);
+  const activePayPaise = payMode === 'course' ? coursePayPaise : effectiveSgrFee;
+  const activePayLabel = useMemo(() => fmtRs(activePayPaise), [activePayPaise]);
   const [done, setDone] = useState(false);
   const [doneMsg, setDoneMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [sgrFeeAck, setSgrFeeAck] = useState(false);
+  const [bypassPin, setBypassPin] = useState('');
+  const [payMode, setPayMode] = useState('sgr');
+  const [coursePayPaise, setCoursePayPaise] = useState(null);
   const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
   const [err, setErr] = useState('');
 
@@ -393,10 +398,11 @@ export function StudentCloudAdmitScreen({
     } finally { setLoading(false); }
   };
 
-  const preparePayLink = useCallback(async (tid, feePaise) => {
+  const preparePayLink = useCallback(async (tid, feePaise, meta = {}) => {
+    const isCourse = meta.kind === 'course';
     const pay = await registerPaymentIntent(tid, feePaise, null, {
-      serviceId: 'cl-sgr',
-      serviceName: 'Skill Gap Review (SGR)',
+      serviceId: meta.serviceId || (isCourse ? courseId : 'cl-sgr'),
+      serviceName: meta.serviceName || (isCourse ? courseName : 'Skill Gap Review (SGR)'),
       servicePricePaise: feePaise,
     });
     if (pay?.txn_id && pay.txn_id !== tid) setTxnId(pay.txn_id);
@@ -414,7 +420,21 @@ export function StudentCloudAdmitScreen({
     setErr(payErr);
     addToast?.(payErr, 'error');
     return false;
-  }, [registerPaymentIntent, addToast]);
+  }, [registerPaymentIntent, addToast, courseId, courseName]);
+
+  const startCoursePayment = useCallback(async (studentRow, payPaise) => {
+    setPayMode('course');
+    setCoursePayPaise(payPaise);
+    setPaid(false);
+    setPayUrl(null);
+    setSgrFeeAck(true);
+    setStudent(studentRow);
+    const tid = `TXN-COURSE-${Date.now()}`;
+    setTxnId(tid);
+    const ok = await preparePayLink(tid, payPaise, { kind: 'course', serviceId: courseId, serviceName: courseName });
+    if (ok) addToast?.('SGR waived — continue to course fee payment', 'success');
+    return ok;
+  }, [preparePayLink, addToast, courseId, courseName]);
 
   const verifyAndSubmit = async () => {
     const code = otpCode.join('');
@@ -441,12 +461,17 @@ export function StudentCloudAdmitScreen({
         course_name: courseName,
         schedule_date: scheduleDate,
         schedule_time: scheduleTime,
+        bypass_pin: bypassPin.trim() || undefined,
         terms_accepted_at: termsAcceptedAt || null,
         terms_version: termsAcceptedAt ? '2026-08-20' : null,
       }, { apikey: SB_KEY });
       setOtpVerified(true);
       setStudent(r.student);
       if (r.student?.id) setStoredStudentCloudId(r.student.id);
+      if (r.sgr_waived && Number(r.course_pay_paise) >= 100) {
+        await startCoursePayment(r.student, Number(r.course_pay_paise));
+        return;
+      }
       const lockedFee = Number(r.sgr_fee_paise) >= 100 ? Number(r.sgr_fee_paise) : sgrFeePaise;
       setSgrFeeLocked(lockedFee);
       const tid = `TXN-SGR-${Date.now()}`;
@@ -460,24 +485,27 @@ export function StudentCloudAdmitScreen({
   };
 
   const openPay = () => {
-    if (!sgrFeeAck) { addToast?.('Please confirm SGR fee is non-refundable', 'error'); return; }
+    if (payMode === 'sgr' && !sgrFeeAck) { addToast?.('Please confirm SGR fee is non-refundable', 'error'); return; }
     if (!payUrl) { addToast?.('Razorpay link not ready — wait a moment', 'error'); return; }
     window.open(payUrl, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {
-    if (!txnId || !student?.id || paid || done) return undefined;
+    if (!txnId || !student?.id || paid || done || !activePayPaise) return undefined;
     let cancelled = false;
     const poll = async () => {
-      const ok = await checkPaymentVerified(txnId, effectiveSgrFee);
+      const ok = await checkPaymentVerified(txnId, activePayPaise);
       if (cancelled || !ok) return;
       setPaid(true);
       try {
-        const r = await studentCloudFetch('confirm_sgr', { student_id: student.id, txn_id: txnId }, { apikey: SB_KEY });
+        const action = payMode === 'course' ? 'confirm_course' : 'confirm_sgr';
+        const r = await studentCloudFetch(action, { student_id: student.id, txn_id: txnId }, { apikey: SB_KEY });
         setStoredStudentCloudId(student.id);
         setDone(true);
-        setDoneMsg(r.message || 'Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours');
-        addToast?.('SGR payment confirmed', 'success');
+        setDoneMsg(r.message || (payMode === 'course'
+          ? 'Course fee payment confirmed. One of our consultants will call you in the next 72 hours'
+          : 'Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours'));
+        addToast?.(payMode === 'course' ? 'Course payment confirmed' : 'SGR payment confirmed', 'success');
       } catch (e) {
         setErr(e.message);
       }
@@ -485,7 +513,7 @@ export function StudentCloudAdmitScreen({
     poll();
     const id = setInterval(poll, 3000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [txnId, student?.id, paid, done, effectiveSgrFee, checkPaymentVerified, addToast, SB_KEY]);
+  }, [txnId, student?.id, paid, done, activePayPaise, payMode, checkPaymentVerified, addToast, SB_KEY]);
 
   if (done) {
     return (
@@ -496,7 +524,11 @@ export function StudentCloudAdmitScreen({
           <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.6, fontWeight: 600 }}>
             {doneMsg || 'Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours'}
           </div>
-          <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>₹{sgrFeeLabel} paid · {courseName} · {scheduleDate} {scheduleTime}</div>
+          <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>
+            {payMode === 'course'
+              ? `Course fee ₹${activePayLabel} paid · ${courseName} · ${scheduleDate} ${scheduleTime}`
+              : `₹${sgrFeeLabel} paid · ${courseName} · ${scheduleDate} ${scheduleTime}`}
+          </div>
           <Btn full onClick={onBack} style={{ marginTop: 18 }}>Back to Cloud courses</Btn>
         </div>
         {showCopyright && CopyrightLine ? <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} /> : null}
@@ -567,6 +599,20 @@ export function StudentCloudAdmitScreen({
           </div>
         </div>
 
+        <Field label="6 Digit PIN password" note="Optional — skips SGR fee and goes to course payment">
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={bypassPin}
+            onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="••••••"
+            style={S.inp()}
+            disabled={otpVerified}
+          />
+        </Field>
+
         {!otpVerified && (
           <TermsAcceptanceField
             accepted={termsAccepted}
@@ -595,14 +641,22 @@ export function StudentCloudAdmitScreen({
 
         {otpVerified && !done && (
           <div style={{ ...S.card(), padding: 16, marginTop: 8 }}>
-            <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>Razorpay · we confirm automatically after payment.</div>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 11, color: C.dim, lineHeight: 1.45 }}>
-              <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 2, accentColor: C.acc, flexShrink: 0 }} />
-              <span>I understand that SGR fees ₹{sgrFeeLabel} is non-refundable</span>
-            </label>
-            <Btn full onClick={openPay} disabled={!payUrl || loading || !sgrFeeAck}>{payUrl ? 'Pay with Razorpay →' : 'Preparing Razorpay…'}</Btn>
+            <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>
+              {payMode === 'course'
+                ? `SGR waived · pay course fee ₹${activePayLabel} via Razorpay — we confirm automatically after payment.`
+                : 'Razorpay · we confirm automatically after payment.'}
+            </div>
+            {payMode === 'sgr' && (
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 11, color: C.dim, lineHeight: 1.45 }}>
+                <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 2, accentColor: C.acc, flexShrink: 0 }} />
+                <span>I understand that SGR fees ₹{sgrFeeLabel} is non-refundable</span>
+              </label>
+            )}
+            <Btn full onClick={openPay} disabled={!payUrl || loading || (payMode === 'sgr' && !sgrFeeAck)}>
+              {payUrl ? (payMode === 'course' ? `Pay course fee ₹${activePayLabel} →` : 'Pay with Razorpay →') : 'Preparing Razorpay…'}
+            </Btn>
             {!payUrl && txnId && !paid && (
-              <Btn v="outline" full onClick={async () => { setLoading(true); await preparePayLink(txnId, effectiveSgrFee); setLoading(false); }} disabled={loading} style={{ marginTop: 8 }}>
+              <Btn v="outline" full onClick={async () => { setLoading(true); await preparePayLink(txnId, activePayPaise, payMode === 'course' ? { kind: 'course', serviceId: courseId, serviceName: courseName } : {}); setLoading(false); }} disabled={loading} style={{ marginTop: 8 }}>
                 Retry Razorpay link
               </Btn>
             )}

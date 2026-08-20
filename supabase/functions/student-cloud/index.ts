@@ -4,6 +4,7 @@
  * Public (OTP required):
  *   submit   — create/update admission after OTP
  *   confirm_sgr — mark ₹500 Skill Gap Review paid after Razorpay
+ *   confirm_course — mark course fee paid after Razorpay (PIN bypass path)
  *   fee_view — course fee visibility for a student (by student_id)
  *
  * Admin PIN:
@@ -152,15 +153,57 @@ function partnerSharePaise(row: Record<string, unknown>, catalog?: CatalogPricin
   return Math.max(0, courseFee - scanvSharePaise(row, catalog));
 }
 
-function pendingOf(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
-  const fee = Number(row.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
-  const sgrDue = isSgrPaid(row) ? 0 : Math.max(0, fee - Number(row.sgr_paid_paise || 0));
+function coursePayDuePaise(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
   const courseFee = effectiveCourseFee(row, catalog);
   const scanvFee = scanvSharePaise(row, catalog);
   const discount = Number(row.discount_paise || 0);
   const scanvDiscount = courseFee > 0 ? Math.round(discount * scanvFee / courseFee) : 0;
-  const scanvDue = Math.max(0, scanvFee - scanvDiscount - Number(row.course_paid_paise || 0));
-  return sgrDue + scanvDue;
+  return Math.max(0, scanvFee - scanvDiscount - Number(row.course_paid_paise || 0));
+}
+
+function pendingOf(row: Record<string, unknown>, catalog?: CatalogPricing | null): number {
+  const fee = Number(row.sgr_fee_paise || 0) >= 100 ? Number(row.sgr_fee_paise) : SGR_FEE_FALLBACK_PAISE;
+  const sgrDue = isSgrPaid(row) ? 0 : Math.max(0, fee - Number(row.sgr_paid_paise || 0));
+  return sgrDue + coursePayDuePaise(row, catalog);
+}
+
+function sgrBypassPinOk(pin: string): boolean {
+  const expected = Deno.env.get("SGR_BYPASS_PIN") || "758375";
+  return String(pin || "").trim() === expected;
+}
+
+async function waiveSgrForPin(
+  sb: ReturnType<typeof adminSb>,
+  student: Record<string, unknown>,
+  sgrFeePaise: number,
+): Promise<{ student: Record<string, unknown>; course_pay_paise: number; catalog: CatalogPricing | null }> {
+  const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
+  const catalog = catalogPricing[String(student.course_id || "")] ?? null;
+  const courseFee = effectiveCourseFee(student, catalog);
+  const waivePatch: Record<string, unknown> = {
+    sgr_paid_paise: sgrFeePaise,
+    sgr_paid_at: new Date().toISOString(),
+    sgr_txn_id: "PIN-WAIVED",
+    status: "fee_due",
+  };
+  if (courseFee > 0 && !Number(student.course_fee_paise || 0)) {
+    waivePatch.course_fee_paise = courseFee;
+  }
+  const { data: updated, error } = await sb.from("student_cloud").update(waivePatch).eq("id", student.id).select("*").single();
+  if (error) throw error;
+
+  await sb.from("student_cloud_payments").insert({
+    student_id: student.id,
+    kind: "sgr",
+    amount_paise: 0,
+    txn_id: "PIN-WAIVED",
+    status: "captured",
+    note: "SGR waived via PIN",
+    created_by: "student",
+  });
+
+  const coursePay = coursePayDuePaise(updated as Record<string, unknown>, catalog);
+  return { student: updated as Record<string, unknown>, course_pay_paise: coursePay, catalog };
 }
 
 function withPending(row: Record<string, unknown>, catalog?: CatalogPricing | null) {
@@ -394,6 +437,11 @@ Deno.serve(async (req) => {
         .eq("mobile_e164", mobile)
         .maybeSingle();
 
+      const bypassPin = String(body.bypass_pin || "").trim();
+      if (bypassPin && !sgrBypassPinOk(bypassPin)) {
+        return json({ error: "Invalid PIN" }, 401);
+      }
+
       let student;
       if (existing?.id) {
         const { data, error } = await sb.from("student_cloud").update(row).eq("id", existing.id).select("*").single();
@@ -403,6 +451,20 @@ Deno.serve(async (req) => {
         const { data, error } = await sb.from("student_cloud").insert(row).select("*").single();
         if (error) throw error;
         student = data;
+      }
+
+      if (bypassPin) {
+        const waived = await waiveSgrForPin(sb, student as Record<string, unknown>, sgrFeePaise);
+        if (waived.course_pay_paise < 100) {
+          return json({ error: "Course fee not configured for this course" }, 400);
+        }
+        return json({
+          success: true,
+          student: withPending(waived.student, waived.catalog),
+          sgr_fee_paise: sgrFeePaise,
+          sgr_waived: true,
+          course_pay_paise: waived.course_pay_paise,
+        });
       }
 
       return json({ success: true, student: withPending(student), sgr_fee_paise: sgrFeePaise });
@@ -457,6 +519,68 @@ Deno.serve(async (req) => {
         success: true,
         student: withPending(updated),
         message: "Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours",
+      });
+    }
+
+    if (action === "confirm_course") {
+      const studentId = String(body.student_id || "");
+      const txnId = String(body.txn_id || "");
+      if (!studentId || !txnId) return json({ error: "student_id and txn_id required" }, 400);
+      const { data: student, error: se } = await sb.from("student_cloud").select("*").eq("id", studentId).maybeSingle();
+      if (se || !student) return json({ error: "Student not found" }, 404);
+      if (!isSgrPaid(student as Record<string, unknown>)) {
+        return json({ error: "Complete SGR first" }, 400);
+      }
+
+      const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
+      const catalog = catalogPricing[String(student.course_id || "")] ?? null;
+      const expectedPay = coursePayDuePaise(student as Record<string, unknown>, catalog);
+      if (expectedPay < 100) {
+        return json({
+          success: true,
+          student: withPending(student, catalog),
+          message: "Course fee already recorded",
+        });
+      }
+
+      const paid = await paymentCaptured(sb, txnId, expectedPay);
+      if (!paid) {
+        return json({ error: `Razorpay payment of ₹${fmtRsPaise(expectedPay)} not confirmed yet` }, 400);
+      }
+
+      const paymentAt = new Date().toISOString();
+      const { error: pe } = await sb.from("student_cloud_payments").insert({
+        student_id: studentId,
+        kind: "course",
+        amount_paise: expectedPay,
+        txn_id: txnId,
+        status: "captured",
+        note: "Course fee (online)",
+        created_by: "student",
+        payment_app: "Razorpay",
+        payment_at: paymentAt,
+      });
+      if (pe && !/duplicate/i.test(pe.message || "")) throw pe;
+
+      const patch: Record<string, unknown> = {
+        course_paid_paise: Number(student.course_paid_paise || 0) + expectedPay,
+        ...applyInstallmentFromPayment(student as Record<string, unknown>, expectedPay, paymentAt),
+      };
+      const merged = { ...student, ...patch };
+      const due = pendingOf(merged as Record<string, unknown>, catalog);
+      patch.status = due <= 0 ? "enrolled" : "fee_due";
+      if (!Number(student.course_fee_paise || 0)) {
+        const courseFee = effectiveCourseFee(student as Record<string, unknown>, catalog);
+        if (courseFee > 0) patch.course_fee_paise = courseFee;
+      }
+
+      const { data: updated, error } = await sb.from("student_cloud").update(patch).eq("id", studentId).select("*").single();
+      if (error) throw error;
+
+      return json({
+        success: true,
+        student: withPending(updated, catalog),
+        message: "Course fee payment confirmed. One of our consultants will call you in the next 72 hours",
       });
     }
 
