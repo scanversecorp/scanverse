@@ -1756,6 +1756,19 @@ function intentHasSavedSchedule(intent) {
   return !!scheduleFromDraft(draft).date;
 }
 
+function isCloudSubCardPaidIntent(intent) {
+  const svc = resolveServiceForPaidIntent(intent, bookingDraftForIntent(intent));
+  return isCloudSubCardService(svc);
+}
+
+function defaultScheduleForPaidIntent(intent) {
+  const { date, time } = scheduleFromDraft(bookingDraftForIntent(intent));
+  return {
+    date: date || new Date().toISOString().slice(0, 10),
+    time: time || '10:00',
+  };
+}
+
 /** Create booking + dispatch after Razorpay payment when schedule was already chosen. */
 async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, schedule = {}) {
   const draft = bookingDraftForIntent(intent);
@@ -9214,8 +9227,31 @@ function BookingsScreen() {
     }
     if (user.role === 'customer') {
       let pending = await findOrphanPaidIntents(user.id);
+      const cloudOrphans = pending.filter(isCloudSubCardPaidIntent);
+      if (cloudOrphans.length) {
+        setRecoverBusy(true);
+        try {
+          for (const intent of cloudOrphans) {
+            const sched = defaultScheduleForPaidIntent(intent);
+            const finalized = await finalizePaidIntentBooking(
+              user,
+              intent,
+              addToast,
+              { setTrackBookingId, setScreen },
+              sched,
+            );
+            if (finalized.ok && finalized.bookingId) {
+              pending = pending.filter((i) => i.txn_id !== intent.txn_id);
+            }
+          }
+        } catch (e) {
+          addToast(e.message || 'Could not complete booking', 'error');
+        } finally {
+          setRecoverBusy(false);
+        }
+      }
       if (pending.length && !autoRecoverRef.current) {
-        const autoIntent = pending.find((intent) => intentHasSavedSchedule(intent));
+        const autoIntent = pending.find((intent) => intentHasSavedSchedule(intent) && !isCloudSubCardPaidIntent(intent));
         if (autoIntent) {
           autoRecoverRef.current = true;
           setRecoverBusy(true);
@@ -9232,7 +9268,7 @@ function BookingsScreen() {
           }
         }
       }
-      setOrphans(pending.filter((intent) => !intentHasSavedSchedule(intent)));
+      setOrphans(pending.filter((intent) => !intentHasSavedSchedule(intent) && !isCloudSubCardPaidIntent(intent)));
     } else {
       setOrphans([]);
     }
@@ -9300,21 +9336,35 @@ function BookingsScreen() {
         clearPaymentReturnUrl();
         clearBookingDraft();
         setOrphans((prev) => prev.filter((i) => i.txn_id !== returnTxn));
-        addToast('Booking found for your payment — opening track', 'success');
-        goToTrack(setTrackBookingId, setScreen, existing.id);
+        if (isCloudSubCardBooking(existing)) {
+          addToast('Booking confirmed — see Bookings', 'success');
+          setScreen('services');
+        } else {
+          addToast('Booking found for your payment — opening track', 'success');
+          goToTrack(setTrackBookingId, setScreen, existing.id);
+        }
         return;
       }
       const draft = loadBookingDraft();
-      if (draft?.txnId === returnTxn && scheduleFromDraft(draft).date) {
+      const returnSched = scheduleFromDraft(draft);
+      const returnIntent = draft?.txnId === returnTxn ? {
+        txn_id: returnTxn,
+        amount_paise: draft.amountPaise,
+        service_id: draft.serviceId,
+        service_name: draft.serviceName,
+      } : null;
+      const returnIsCloud = returnIntent && isCloudSubCardPaidIntent(returnIntent);
+      if (returnIntent && (returnSched.date || returnIsCloud)) {
         setRecoverBusy(true);
         try {
-          const intent = {
-            txn_id: returnTxn,
-            amount_paise: draft.amountPaise,
-            service_id: draft.serviceId,
-            service_name: draft.serviceName,
-          };
-          const finalized = await finalizePaidIntentBooking(user, intent, addToast, { setTrackBookingId, setScreen });
+          const sched = returnIsCloud ? defaultScheduleForPaidIntent(returnIntent) : returnSched;
+          const finalized = await finalizePaidIntentBooking(
+            user,
+            returnIntent,
+            addToast,
+            { setTrackBookingId, setScreen },
+            sched,
+          );
           if (cancelled) return;
           if (finalized.ok && finalized.bookingId) {
             navigateAfterPaidBookingFinalized(finalized, addToast, { setTrackBookingId, setScreen });
@@ -9377,8 +9427,8 @@ function BookingsScreen() {
     if (b.partner_id) return `Waiting for ${partners[b.partner_id] || 'partner'} to share live GPS…`;
     return 'Searching for nearby partner · map shows your service location';
   };
-  const activeBookings=bookings.filter(b=>bookingStatusGroup(b.status).label==='In-progress');
-  const doneBookings=bookings.filter(b=>['Completed','Cancelled'].includes(bookingStatusGroup(b.status).label));
+  const activeBookings=bookings.filter(b=>!isCloudSubCardBooking(b)&&bookingStatusGroup(b.status).label==='In-progress');
+  const doneBookings=bookings.filter(b=>isCloudSubCardBooking(b)||['Completed','Cancelled'].includes(bookingStatusGroup(b.status).label));
 
   const confirmCancelBooking=async(b)=>{
     setCancellingId(b.id);
@@ -9396,6 +9446,19 @@ function BookingsScreen() {
   };
 
   const renderBookingCard=(b)=>{
+    if (isCloudSubCardBooking(b)) {
+      return (
+        <div key={b.id} style={{ ...S.card(), marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div>
+              <div style={{ color: C.txt, fontWeight: 600, fontSize: 16 }}>{b.service_name}</div>
+              <div style={{ color: C.sub, fontSize: 13, marginTop: 2 }}>{b.date || '—'} {b.time || ''}</div>
+            </div>
+            <Badge label="Complete" color={C.grn} />
+          </div>
+        </div>
+      );
+    }
     const refundRec = refundsByBooking[b.id];
     const refundLabel = refundRec ? refundStatusCustomerLabel(refundRec.refund_status) : null;
     return (
