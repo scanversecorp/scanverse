@@ -1763,6 +1763,15 @@ function cloudBookingSplitFields(svc) {
   };
 }
 
+function CloudCourseFeeAmount({ amountPaise, subColor = C.dim }) {
+  return (
+    <div style={{ textAlign: 'right' }}>
+      <span>₹{fmtRs(amountPaise)}</span>
+      <div style={{ fontSize: 9, color: subColor, fontWeight: 500, marginTop: 1, lineHeight: 1.2 }}>(+ GST Platform)</div>
+    </div>
+  );
+}
+
 function inferServiceFromTotalPaise(totalPaise, hints = {}) {
   const { serviceId = null, serviceName = null } = hints;
   const matches = [];
@@ -6680,7 +6689,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           )}
           {browseCloudBook && (
             <div style={{...S.card(),marginBottom:12,padding:14,fontSize:13}}>
-              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>Course fee</span><span>₹{fmtRs(browseCourseFee)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>Course fee</span><CloudCourseFeeAmount amountPaise={browseCourseFee} subColor={C.dim} /></div>
               <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>ScanV share + fees</span><span style={{fontWeight:700,color:C.acc}}>₹{fmtRs(total)}</span></div>
               <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`1px solid ${C.bdr}`,color:C.gold,fontWeight:700}}><span>Pending center payment</span><span>₹{fmtRs(browseCenterPending)}</span></div>
             </div>
@@ -6692,18 +6701,25 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <div style={{fontSize:13,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
-            {(browseCloudBook
-              ? [['Course fee', browseCourseFee], ['Pay now', total]]
-              : [['Service (indicative)', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]]
-            ).map(([k,v],i)=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i=== (browseCloudBook ? 1 : 3)?800:500,color:i=== (browseCloudBook ? 1 : 3)?C.acc:C.sub,fontSize:i=== (browseCloudBook ? 1 : 3)?16:14}}>
+            {browseCloudBook ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', color: C.sub, fontSize: 14 }}>
+                  <span>Course fee</span>
+                  <CloudCourseFeeAmount amountPaise={browseCourseFee} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: `1px solid ${C.bdr}`, fontWeight: 800, color: C.acc, fontSize: 16 }}>
+                  <span>Pay now</span><span>₹{(total/100).toLocaleString('en-IN')}</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:14}}>
+                  <span>Pending center payment</span><span>₹{fmtRs(browseCenterPending)}</span>
+                </div>
+              </>
+            ) : (
+            [['Service (indicative)', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]].map(([k,v],i)=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?16:14}}>
                 <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
               </div>
-            ))}
-            {browseCloudBook && (
-              <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:14}}>
-                <span>Pending center payment</span><span>₹{fmtRs(browseCenterPending)}</span>
-              </div>
+            ))
             )}
           </div>
           <UpiPaymentPanel
@@ -8374,7 +8390,13 @@ function BookScreen() {
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
               {isCloudBook ? (
                 <>
-                  {[['Course fee', courseFee], ['Pay now (Razorpay)', total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===1?700:400,color:i===1?C.acc:C.txt,fontSize:i===1?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', color: C.txt, fontSize: 15 }}>
+                    <span>Course fee</span>
+                    <CloudCourseFeeAmount amountPaise={courseFee} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: `1px solid ${C.bdr}`, fontWeight: 700, color: C.acc, fontSize: 17 }}>
+                    <span>Pay now (Razorpay)</span><span>₹{fmtRs(total)}</span>
+                  </div>
                   <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:15}}>
                     <span>Pending center payment</span>
                     <span>₹{fmtRs(centerPending)}</span>
@@ -8456,7 +8478,7 @@ function BookScreen() {
           )}
           {isCloudBook && (
             <div style={{...S.card(),marginBottom:12,padding:14,fontSize:13}}>
-              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>Course fee</span><span>₹{fmtRs(courseFee)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>Course fee</span><CloudCourseFeeAmount amountPaise={courseFee} subColor={C.dim} /></div>
               <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>ScanV share + fees</span><span style={{fontWeight:700,color:C.acc}}>₹{fmtRs(total)}</span></div>
               <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`1px solid ${C.bdr}`,color:C.gold,fontWeight:700}}><span>Pending center payment</span><span>₹{fmtRs(centerPending)}</span></div>
             </div>
