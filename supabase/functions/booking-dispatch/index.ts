@@ -19,6 +19,7 @@ import {
   sendWhatsAppText,
   generateAcceptCode,
   bookingAcceptMessage,
+  bookingConfirmationMessage,
   callFailedStatuses,
   geocodeAddress,
 } from "../_shared/notify.ts";
@@ -30,6 +31,73 @@ const RETRY_GAP_MS = 2 * 60 * 1000; // 2 minutes between retry rounds
 const OFFER_TIMEOUT_MS = 60 * 1000; // 60s per partner before moving to next nearest
 const MAX_VENDORS = 3;
 const MAX_ATTEMPTS_PER_VENDOR = 2;
+
+function customerPhoneFromBooking(
+  profilePhone: string | null | undefined,
+  customerEmail: string | null | undefined,
+): string | null {
+  const norm = normalizeMobile(String(profilePhone || ""));
+  if (norm) return norm;
+  const em = String(customerEmail || "").trim().toLowerCase();
+  const m = em.match(/^(\d{10})@scanv\.app$/);
+  if (m) return normalizeMobile(`+91${m[1]}`);
+  return null;
+}
+
+/** One transactional SMS per booking after payment confirmed (idempotent). */
+async function maybeSendBookingConfirmationSms(
+  supabase: ReturnType<typeof createClient>,
+  bookingId: string,
+): Promise<{ sent: boolean; skipped?: string; provider?: string; error?: string }> {
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select(
+      "id, service_name, date, time, total, txn_id, customer_id, customer_email, status, confirmation_sms_sent_at",
+    )
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking) return { sent: false, skipped: "booking_not_found" };
+  if (booking.confirmation_sms_sent_at) return { sent: false, skipped: "already_sent" };
+  if (String(booking.status || "").toLowerCase() === "cancelled") {
+    return { sent: false, skipped: "cancelled" };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("phone, first_name")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  const phone = customerPhoneFromBooking(profile?.phone, booking.customer_email);
+  if (!phone) return { sent: false, skipped: "no_phone" };
+
+  const msg = bookingConfirmationMessage({
+    firstName: profile?.first_name,
+    serviceName: String(booking.service_name || "ScanV service"),
+    date: String(booking.date || ""),
+    time: booking.time ? String(booking.time) : null,
+    amountPaise: Number(booking.total) || 0,
+    txnId: booking.txn_id,
+    bookingId: String(booking.id),
+  });
+
+  const sms = await sendSms(phone, msg);
+  if (!sms.ok) {
+    console.warn("[booking-dispatch] confirmation SMS failed:", sms.error);
+    return { sent: false, error: sms.error };
+  }
+
+  const { data: marked } = await supabase
+    .from("bookings")
+    .update({ confirmation_sms_sent_at: new Date().toISOString() })
+    .eq("id", bookingId)
+    .is("confirmation_sms_sent_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (!marked) return { sent: false, skipped: "race_or_already_sent" };
+  return { sent: true, provider: sms.provider };
+}
 
 type DispatchMode = "both" | "in_app" | "external" | "disabled";
 const DISPATCH_MODES = new Set<string>(["both", "in_app", "external", "disabled"]);
@@ -1017,6 +1085,15 @@ Deno.serve(async (req: Request) => {
       const serviceName = String(body.service_name || "Service");
       if (!bookingId) return json({ error: "booking_id required" }, 400);
 
+      if (!(await dispatchSecretOk(req, supabase))) {
+        const authorized = await bookingPartyAuthorized(
+          supabase, supabaseUrl, req, bookingId, body,
+        );
+        if (!authorized) return json({ error: "Unauthorized" }, 401);
+      }
+
+      const confirmationSms = await maybeSendBookingConfirmationSms(supabase, bookingId);
+
       const dispatchModeAtStart = await getDispatchMode(supabase);
       if (dispatchModeAtStart === "disabled") {
         return json({
@@ -1024,14 +1101,8 @@ Deno.serve(async (req: Request) => {
           dispatch_skipped: true,
           dispatch_mode: dispatchModeAtStart,
           message: "Partner dispatch is disabled in admin settings",
+          confirmation_sms: confirmationSms,
         });
-      }
-
-      if (!(await dispatchSecretOk(req, supabase))) {
-        const authorized = await bookingPartyAuthorized(
-          supabase, supabaseUrl, req, bookingId, body,
-        );
-        if (!authorized) return json({ error: "Unauthorized" }, 401);
       }
 
       const { data: existing } = await supabase
@@ -1054,7 +1125,13 @@ Deno.serve(async (req: Request) => {
             await processDispatchTick(supabase, full);
           }
         }
-        return json({ success: true, dispatch_id: existing.id, duplicate: true, retried: true });
+        return json({
+          success: true,
+          dispatch_id: existing.id,
+          duplicate: true,
+          retried: true,
+          confirmation_sms: confirmationSms,
+        });
       }
 
       let custLat = body.lat != null ? Number(body.lat) : null;
@@ -1115,6 +1192,7 @@ Deno.serve(async (req: Request) => {
         nearest_count: vendorsNotified.length,
         current_vendor_rank: tickResult.current_vendor_rank,
         offer_mode: tickResult.offer_mode,
+        confirmation_sms: confirmationSms,
         ...(tickResult.empty_diagnostics
           ? { empty_queue: tickResult.empty_diagnostics }
           : {}),

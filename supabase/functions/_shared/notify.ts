@@ -622,6 +622,29 @@ export function bookingAcceptMessage(
   );
 }
 
+/** Customer SMS after booking + payment confirmed */
+export function bookingConfirmationMessage(opts: {
+  firstName?: string | null;
+  serviceName: string;
+  date: string;
+  time?: string | null;
+  amountPaise: number;
+  txnId?: string | null;
+  bookingId: string;
+  appUrl?: string;
+}): string {
+  const base = (opts.appUrl || Deno.env.get("APP_URL") || "https://getscanv.com").replace(/\/$/, "");
+  const name = String(opts.firstName || "").trim() || "there";
+  const rs = (Math.max(0, Number(opts.amountPaise) || 0) / 100).toLocaleString("en-IN");
+  const when = opts.time ? `${opts.date} ${opts.time}` : opts.date;
+  const ref = String(opts.txnId || opts.bookingId).slice(0, 24);
+  const track = `${base}/#track?id=${encodeURIComponent(opts.bookingId)}`;
+  return (
+    `ScanV: Hi ${name}, booking confirmed! ${opts.serviceName} · ${when}. ` +
+    `Paid Rs.${rs}. Ref ${ref}. Track: ${track}`
+  ).slice(0, 480);
+}
+
 export function callFailedStatuses(): Set<string> {
   return new Set([
     "failed", "busy", "no-answer", "no_answer", "canceled", "cancelled",
