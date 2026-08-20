@@ -60,11 +60,20 @@ const UPI_APPS = [
   ['⚡', 'Any UPI'],
 ];
 
-const DEFAULT_PLATFORM_VENDORS = {
-  twofactor: true, msg91: true, twilio: true, whatsapp: true,
-  razorpay: true, vyapar_upi: true,
-  upi: { gpay: true, phonepe: true, paytm: true, navi: true, bhim: true, any: true },
-};
+/** Customer checkout: Razorpay only. UPI/Vyapar code stays in repo but is not shown. */
+const PAYMENTS_RAZORPAY_ONLY = true;
+
+const DEFAULT_PLATFORM_VENDORS = PAYMENTS_RAZORPAY_ONLY
+  ? {
+    twofactor: true, msg91: true, twilio: true, whatsapp: true,
+    razorpay: true, vyapar_upi: false,
+    upi: { gpay: false, phonepe: false, paytm: false, navi: false, bhim: false, any: false },
+  }
+  : {
+    twofactor: true, msg91: true, twilio: true, whatsapp: true,
+    razorpay: true, vyapar_upi: true,
+    upi: { gpay: true, phonepe: true, paytm: true, navi: true, bhim: true, any: true },
+  };
 const UPI_LABEL_TO_VENDOR_KEY = { GPay: 'gpay', PhonePe: 'phonepe', Paytm: 'paytm', Navi: 'navi', BHIM: 'bhim', 'Any UPI': 'any' };
 const PLATFORM_CONFIG_FN = `${SB_URL}/functions/v1/platform-config`;
 let platformVendors = null;
@@ -90,6 +99,17 @@ async function loadPlatformVendors() {
 }
 function getPlatformVendors() {
   return platformVendors || DEFAULT_PLATFORM_VENDORS;
+}
+/** Checkout UI vendors — forces UPI/Vyapar off when PAYMENTS_RAZORPAY_ONLY. */
+function getCheckoutVendors() {
+  const v = getPlatformVendors();
+  if (!PAYMENTS_RAZORPAY_ONLY) return v;
+  return {
+    ...v,
+    razorpay: v.razorpay !== false,
+    vyapar_upi: false,
+    upi: { gpay: false, phonepe: false, paytm: false, navi: false, bhim: false, any: false },
+  };
 }
 function filterUpiApps(vendors) {
   const v = vendors || getPlatformVendors();
@@ -222,18 +242,25 @@ function UpiPickerModal({ onPick, onClose, apps }) {
     </div>
   );
 }
-function RazorpayPayButton({ linkUrl, loading, onPay, amountPaise, error, onRetry }) {
+function RazorpayPayButton({ linkUrl, loading, onPay, amountPaise, error, onRetry, razorpayOnly = false }) {
   const amountRu = amountPaise ? (amountPaise / 100).toLocaleString('en-IN') : '0';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 10, textAlign: 'center' }}>Or pay via Razorpay</div>
+      {!razorpayOnly && (
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 10, textAlign: 'center' }}>Or pay via Razorpay</div>
+      )}
+      {razorpayOnly && (
+        <div style={{ fontSize: 12, color: C.dim, marginBottom: 12, textAlign: 'center', lineHeight: 1.5 }}>
+          Card, UPI, netbanking via Razorpay — we confirm automatically after payment.
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
         <Btn
           onClick={onPay}
           disabled={loading || !linkUrl}
-          style={{ minWidth: 220, textAlign: 'center', margin: '0 auto' }}
+          style={{ minWidth: 220, textAlign: 'center', margin: '0 auto', ...(razorpayOnly ? { boxShadow: '0 4px 16px rgba(214,58,86,0.35)' } : {}) }}
         >
-          {loading ? 'Loading Razorpay…' : linkUrl ? `Pay ₹${amountRu} with Razorpay →` : 'Razorpay unavailable — use UPI'}
+          {loading ? 'Loading Razorpay…' : linkUrl ? `Pay ₹${amountRu} with Razorpay →` : (razorpayOnly ? 'Razorpay unavailable — retry' : 'Razorpay unavailable — use UPI')}
         </Btn>
       </div>
       {error && !linkUrl && (
@@ -321,18 +348,20 @@ function VyaparQrSection({ amountPaise, txnId, onScannedPaid, paymentVerified, c
 function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
   const { paymentVerified, upiOpened, checkingPay, launchUpi, showUpiPicker, setShowUpiPicker, launchUpiDirect, setUpiOpened, setPaymentVerified, amountPaise, txnId } = pay;
   const [confirming, setConfirming] = useState(false);
-  const [vendors, setVendors] = useState(() => getPlatformVendors());
+  const [vendors, setVendors] = useState(() => getCheckoutVendors());
   const inApp = isInAppBrowser();
   const amountRu = amountPaise ? (amountPaise / 100).toLocaleString('en-IN') : '0';
-  useEffect(() => { loadPlatformVendors().then(setVendors); }, []);
+  const razorpayOnly = PAYMENTS_RAZORPAY_ONLY;
+  useEffect(() => { loadPlatformVendors().then(() => setVendors(getCheckoutVendors())); }, []);
   const upiApps = filterUpiApps(vendors);
-  const showVyapar = vendors.vyapar_upi !== false;
+  const showVyapar = !razorpayOnly && vendors.vyapar_upi !== false;
   const showRazorpay = vendors.razorpay !== false;
-  const showAnyUpi = vendors.upi?.any !== false;
+  const showAnyUpi = !razorpayOnly && vendors.upi?.any !== false;
+  const payMethodLabel = razorpayOnly ? 'Razorpay' : 'UPI or Razorpay';
   const handleContinue = async () => {
     if (loading || disabled || confirming) return;
     if (!paymentVerified) {
-      addToast?.('Payment not confirmed yet — complete payment in your UPI app', 'error');
+      addToast?.(razorpayOnly ? 'Payment not confirmed yet — complete payment in Razorpay' : 'Payment not confirmed yet — complete payment in your UPI app', 'error');
       return;
     }
     setConfirming(true);
@@ -399,22 +428,25 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
         amountPaise={amountPaise}
         error={pay.razorpayError}
         onRetry={pay.retryRazorpay}
+        razorpayOnly={razorpayOnly}
         onPay={() => pay.openRazorpay?.()}
       />
       )}
       {upiOpened && !paymentVerified && (
         <div style={{ background: '#fff8e6', border: `1.5px solid rgba(184,134,11,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.gold, fontWeight: 700 }}>
-          {checkingPay ? '⏳ Checking payment status…' : 'Complete payment in your UPI app — we confirm automatically (no manual “I\'ve paid” needed)'}
+          {checkingPay ? '⏳ Checking payment status…' : (razorpayOnly ? 'Complete payment in Razorpay — we confirm automatically' : 'Complete payment in your UPI app — we confirm automatically (no manual “I\'ve paid” needed)')}
         </div>
       )}
       {paymentVerified && (
         <div style={{ background: '#e6f4ee', border: `1.5px solid rgba(0,122,77,0.35)`, borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: C.grn, fontWeight: 700 }}>
-          ✅ Payment confirmed — you can continue
+          {loading || confirming ? '✅ Payment confirmed — proceeding…' : '✅ Payment confirmed — continuing…'}
         </div>
       )}
+      {!razorpayOnly && (
       <Btn full onClick={handleContinue} disabled={loading || disabled || confirming || !paymentVerified}>
-        {confirming ? <><Spin size={16} /> Verifying payment…</> : paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'Waiting for payment confirmation…' : 'Pay via UPI or Razorpay first'}
+        {confirming ? <><Spin size={16} /> Verifying payment…</> : paymentVerified ? '✅ Payment confirmed — continue →' : upiOpened ? 'Waiting for payment confirmation…' : `Pay via ${payMethodLabel} first`}
       </Btn>
+      )}
       {showUpiPicker && (
         <UpiPickerModal onPick={launchUpiDirect} onClose={() => setShowUpiPicker(false)} apps={upiApps} />
       )}
@@ -546,9 +578,9 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
   const [registerGen, setRegisterGen] = useState(0);
   const loadRazorpayLink = useCallback(async (cancelledRef) => {
     if (!txnId || !amountPaise) return;
-    if (getPlatformVendors().razorpay === false) {
+    if (getCheckoutVendors().razorpay === false) {
       setRazorpayLinkUrl(null);
-      setRazorpayError('Razorpay disabled — use UPI');
+      setRazorpayError(PAYMENTS_RAZORPAY_ONLY ? 'Razorpay unavailable — contact support' : 'Razorpay disabled — use UPI');
       setRazorpayLinkLoading(false);
       return;
     }
@@ -563,12 +595,12 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
       setPaymentVerified(true);
     } else {
       const msg = data?.razorpay_error
-        || (data?.razorpay_configured === false ? 'Razorpay not configured on server — use UPI' : null)
+        || (data?.razorpay_configured === false ? (PAYMENTS_RAZORPAY_ONLY ? 'Razorpay not configured on server' : 'Razorpay not configured on server — use UPI') : null)
         || data?.error
-        || 'Could not create Razorpay link — use UPI or retry';
+        || (PAYMENTS_RAZORPAY_ONLY ? 'Could not create Razorpay link — retry' : 'Could not create Razorpay link — use UPI or retry');
       setRazorpayError(msg);
       if (data?.razorpay_configured === false) {
-        addToast?.('Razorpay not configured — pay via UPI', 'error');
+        addToast?.(PAYMENTS_RAZORPAY_ONLY ? 'Razorpay not configured — contact support' : 'Razorpay not configured — pay via UPI', 'error');
       }
     }
     setRazorpayLinkLoading(false);
@@ -601,14 +633,16 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
       if (!cancelled) setCheckingPay(false);
     };
     poll();
-    const id = setInterval(poll, 3000);
+    const pollMs = PAYMENTS_RAZORPAY_ONLY ? 1500 : 3000;
+    const id = setInterval(poll, pollMs);
     const onVis = () => { if (document.visibilityState === 'visible') poll(); };
     document.addEventListener('visibilitychange', onVis);
-    return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+    window.addEventListener('focus', poll);
+    return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', poll); };
   }, [txnId, amountPaise, paymentVerified, addToast]);
   const openRazorpay = () => {
     if (!razorpayLinkUrl) {
-      addToast?.('Razorpay link not ready — use UPI or wait a moment', 'error');
+      addToast?.(PAYMENTS_RAZORPAY_ONLY ? 'Razorpay link not ready — wait a moment' : 'Razorpay link not ready — use UPI or wait a moment', 'error');
       return;
     }
     setUpiOpened(true);
@@ -2048,6 +2082,35 @@ function dedupeBookingsForDisplay(bookings) {
     if (canonical && canonical.id !== b.id) hiddenIds.add(b.id);
   }
   return (bookings || []).filter((b) => !hiddenIds.has(b.id));
+}
+
+async function findReusablePaidTxn(userId, serviceId, amountPaise, maxAgeMs = 24 * 3600 * 1000) {
+  if (!userId || !serviceId || !amountPaise) return null;
+  try {
+    let intents = [];
+    try {
+      const r = await sb().functions.invoke('razorpay-payment', {
+        body: { action: 'list_paid_for_user', user_id: userId },
+      });
+      intents = r.data?.intents || [];
+    } catch (_) {
+      const res = await fetch(RAZORPAY_FN, {
+        method: 'POST',
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_paid_for_user', user_id: userId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      intents = data?.intents || [];
+    }
+    const match = intents.find((i) =>
+      i.service_id === serviceId
+      && Number(i.amount_paise) === Number(amountPaise)
+      && i.paid_at
+      && (Date.now() - new Date(i.paid_at).getTime() < maxAgeMs));
+    return match ? { txnId: match.txn_id, paidAt: match.paid_at } : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 async function findOrphanPaidIntents(userId) {
@@ -5217,6 +5280,21 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   }, [activeSvc?.id]);
 
   useEffect(() => {
+    if (screen !== 'payment' || !userId || !activeSvc?.id || !browseTotal) return undefined;
+    let cancelled = false;
+    (async () => {
+      const reusable = await findReusablePaidTxn(userId, activeSvc.id, browseTotal);
+      if (cancelled || !reusable) return;
+      setTxnId(reusable.txnId);
+      setPaymentAmountPaise(browseTotal);
+      browsePay.setPaymentVerified(true);
+      addToast?.('Payment already confirmed — you can continue', 'success');
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, userId, activeSvc?.id, browseTotal]);
+
+  useEffect(() => {
     if (screen !== 'payment' || !browsePay.paymentVerified || !bookingDetail?.date || !txnId || !userId) return;
     if (autoPayContinueRef.current || creatingRef.current) return;
     autoPayContinueRef.current = true;
@@ -5678,7 +5756,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       if (!(bookingDetail.drop || '').trim()) return setErr('Enter drop address');
     } else if (!loc.trim()) return setErr('Enter service location');
     setErr('');
-    const newTxnId = 'TXN-' + Date.now();
+    const reusable = await findReusablePaidTxn(userId, activeSvc?.id, browseTotal);
+    const newTxnId = reusable?.txnId || (`TXN-${Date.now()}`);
     setPaymentAmountPaise(browseTotal);
     setTxnId(newTxnId);
     saveBookingDraft({
@@ -5702,10 +5781,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       scheduleOutsideOk,
     });
     browsePay.setUpiOpened(false);
-    browsePay.setPaymentVerified(false);
-    setPaymentMethod(null);
+    browsePay.setPaymentVerified(!!reusable);
+    setPaymentMethod(reusable ? 'Razorpay' : null);
     setScreen('payment');
-    addToast?.('Schedule saved — proceed to payment', 'success');
+    addToast?.(reusable ? 'Payment already confirmed — continuing' : 'Schedule saved — proceed to payment', 'success');
   };
 
   const confirmPayment = async (method) => {
@@ -6373,7 +6452,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             addToast={addToast}
             loading={loading}
             disabled={false}
-            onConfirm={() => confirmPayment('UPI')}
+            onConfirm={() => confirmPayment('Razorpay')}
           />
           {err&&<div style={{...S.err,marginTop:10}}>{err}</div>}
         </div>
@@ -7793,12 +7872,13 @@ function BookScreen() {
     finally{setLoading(false);}
   };
 
-  const proceedBookToPayment = () => {
+  const proceedBookToPayment = async () => {
     const sched = serviceSchedule || normalizeScheduleRow(null);
     const v = validateBookingSlot(date, time || '10:00', sched, { outsideOk: scheduleOutsideOk });
     if (!v.ok) return addToast(v.message, 'error');
     if (!loc.trim()) return addToast('Enter service location', 'error');
-    const newTxnId = 'TXN-' + Date.now();
+    const reusable = await findReusablePaidTxn(user?.id, svc?.id, total);
+    const newTxnId = reusable?.txnId || (`TXN-${Date.now()}`);
     setPaymentAmountPaise(total);
     setTxnId(newTxnId);
     saveBookingDraft({
@@ -7822,10 +7902,10 @@ function BookScreen() {
       scheduleOutsideOk,
     });
     bookPay.setUpiOpened(false);
-    bookPay.setPaymentVerified(false);
-    setPayMethod(null);
+    bookPay.setPaymentVerified(!!reusable);
+    setPayMethod(reusable ? 'Razorpay' : null);
     setStep(payStep);
-    addToast('Schedule saved — proceed to payment', 'success');
+    addToast(reusable ? 'Payment already confirmed — continuing' : 'Schedule saved — proceed to payment', 'success');
   };
 
   const create = async () => {
@@ -7833,7 +7913,7 @@ function BookScreen() {
     if (!guardBookStart(svc, addToast)) return;
     if (!date) return addToast('Select a date', 'error');
     if (!txnId) return addToast('Complete payment first', 'error');
-    if (!payMethod || !bookPay.paymentVerified) return addToast('Complete UPI payment first', 'error');
+    if (!payMethod || !bookPay.paymentVerified) return addToast('Complete Razorpay payment first', 'error');
     const sched = serviceSchedule || normalizeScheduleRow(null);
     const v = validateBookingSlot(date, time || '10:00', sched, { outsideOk: scheduleOutsideOk });
     if (!v.ok) {
@@ -8065,7 +8145,7 @@ function BookScreen() {
             addToast={addToast}
             loading={false}
             disabled={false}
-            onConfirm={() => confirmPaid('UPI')}
+            onConfirm={() => confirmPaid('Razorpay')}
           />
         </>}
       </div>

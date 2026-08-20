@@ -18,13 +18,13 @@ export const VENDOR_PROVIDER_DEFS: VendorProviderDef[] = [
   { key: "vendor_enable_twilio", label: "Twilio", functions: "send-otp · dispatch", description: "International SMS / voice fallback (last resort)", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_whatsapp", label: "WhatsApp", functions: "whatsapp-verify", description: "WhatsApp OTP backup (+91-9270194842)", defaultOn: true, production_recommendation: "on" },
   { key: "vendor_enable_razorpay", label: "Razorpay", functions: "razorpay-payment", description: "Payment links — card / UPI via Razorpay checkout", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_vyapar_upi", label: "HDFC Vyapar UPI", functions: "UPI QR · collect", description: "vyapar.172928067841@hdfcbank — static QR + dynamic amount QR", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_upi_gpay", label: "Google Pay", functions: "UPI deep link", description: "GPay button — Android intent / gpay:// on iOS", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_upi_phonepe", label: "PhonePe", functions: "UPI deep link", description: "PhonePe button — phonepe:// payment", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_upi_paytm", label: "Paytm", functions: "UPI deep link", description: "Paytm button — paytmmp:// payment", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_upi_navi", label: "Navi", functions: "UPI deep link", description: "Navi UPI payment button", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_upi_bhim", label: "BHIM", functions: "UPI deep link", description: "BHIM UPI payment button", defaultOn: true, production_recommendation: "on" },
-  { key: "vendor_enable_upi_any", label: "Any UPI", functions: "UPI deep link", description: "Generic “Pay via UPI” button (upi://)", defaultOn: true, production_recommendation: "on" },
+  { key: "vendor_enable_vyapar_upi", label: "HDFC Vyapar UPI", functions: "UPI QR · collect", description: "vyapar.172928067841@hdfcbank — static QR + dynamic amount QR", defaultOn: false, production_recommendation: "off" },
+  { key: "vendor_enable_upi_gpay", label: "Google Pay", functions: "UPI deep link", description: "GPay button — Android intent / gpay:// on iOS", defaultOn: false, production_recommendation: "off" },
+  { key: "vendor_enable_upi_phonepe", label: "PhonePe", functions: "UPI deep link", description: "PhonePe button — phonepe:// payment", defaultOn: false, production_recommendation: "off" },
+  { key: "vendor_enable_upi_paytm", label: "Paytm", functions: "UPI deep link", description: "Paytm button — paytmmp:// payment", defaultOn: false, production_recommendation: "off" },
+  { key: "vendor_enable_upi_navi", label: "Navi", functions: "UPI deep link", description: "Navi UPI payment button", defaultOn: false, production_recommendation: "off" },
+  { key: "vendor_enable_upi_bhim", label: "BHIM", functions: "UPI deep link", description: "BHIM UPI payment button", defaultOn: false, production_recommendation: "off" },
+  { key: "vendor_enable_upi_any", label: "Any UPI", functions: "UPI deep link", description: "Generic “Pay via UPI” button (upi://)", defaultOn: false, production_recommendation: "off" },
 ];
 
 export const VENDOR_PROVIDER_KEYS = VENDOR_PROVIDER_DEFS.map((d) => d.key);
