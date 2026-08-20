@@ -169,7 +169,7 @@ async function sendFast2Sms(
   return { ok: false, error: errMsg.slice(0, 200) || "Fast2SMS failed" };
 }
 
-/** OTP delivery — prefers 2Factor.in for India (+91), voice fallback if SMS fails */
+/** OTP delivery — try every SMS provider first (2Factor → MSG91 → Fast2SMS → Twilio), then 2Factor voice (+91). */
 export async function sendOtpDelivery(
   mobile: string,
   otpCode: string,
@@ -186,45 +186,29 @@ export async function sendOtpDelivery(
   const norm = normalizeMobile(mobile);
   if (!norm) return { ok: false, error: "Invalid mobile" };
 
-  const twoFactorKey = twoFactorApiKey();
-  let lastErr: string | undefined;
-  if (!opts?.skip2Factor && twoFactorKey && norm.startsWith("+91")) {
-    const sms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
-    if (sms.ok) return { ...sms, channel: "sms" };
-    lastErr = sms.error;
-    if (allowVoice) {
-      const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
-      if (voice.ok) return { ...voice, channel: "voice" };
-      lastErr = lastErr || voice.error;
-    }
-  }
-
   const sms = await sendSms(mobile, message, otpCode, {
+    skip2Factor: opts?.skip2Factor,
     skipMsg91: opts?.skipMsg91,
     skipFast2Sms: opts?.skipFast2Sms,
     skipTwilio: opts?.skipTwilio,
-    // +91 path already tried 2Factor above — avoid duplicate send
-    skip2Factor: opts?.skip2Factor || (!!twoFactorKey && norm.startsWith("+91")),
   });
   if (sms.ok) return { ...sms, channel: "sms" };
 
-  if (!opts?.skip2Factor && twoFactorKey && !norm.startsWith("+91")) {
-    const tfSms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
-    if (tfSms.ok) return { ...tfSms, channel: "sms" };
-    lastErr = lastErr || tfSms.error;
-    if (allowVoice) {
-      const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
-      if (voice.ok) return { ...voice, channel: "voice" };
-      lastErr = lastErr || voice.error;
-    }
+  const twoFactorKey = twoFactorApiKey();
+  if (allowVoice && twoFactorKey && norm.startsWith("+91")) {
+    console.warn("[OTP] SMS chain failed — trying 2Factor voice:", sms.error?.slice(0, 120));
+    const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
+    if (voice.ok) return { ...voice, channel: "voice" };
+    return {
+      ok: false,
+      error: voice.error || sms.error || "OTP delivery failed — try Resend or WhatsApp verify",
+    };
   }
 
-  if (lastErr) return { ok: false, error: `2Factor: ${lastErr}` };
-  if (!twoFactorKey && !msg91AuthKey() && !fast2SmsApiKey()
-    && !(Deno.env.get("TWILIO_ACCOUNT_SID") && Deno.env.get("TWILIO_AUTH_TOKEN"))) {
-    return { ok: false, error: "No SMS provider configured (2Factor/MSG91/Fast2SMS/Twilio)" };
-  }
-  return { ok: false, error: sms.error || "OTP delivery failed — try Resend or WhatsApp verify" };
+  return {
+    ok: false,
+    error: sms.error || "OTP delivery failed — try Resend or WhatsApp verify",
+  };
 }
 
 export async function sendSms(
