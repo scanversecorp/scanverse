@@ -1698,14 +1698,24 @@ function bookingTotalsForSvc(svc) {
 }
 
 /** Cloud sub-card: pay ScanV share (+ platform fee & GST on share); center share is pending. */
+function cloudSplitPercents(svc) {
+  const catalogScanv = Number(svc?.scanv_amount_paise) || 0;
+  const catalogPartner = Number(svc?.partner_amount_paise) || 0;
+  const catalogTotal = catalogScanv + catalogPartner;
+  if (catalogTotal > 0 && catalogScanv > 0) {
+    return {
+      scanvPct: catalogScanv / catalogTotal,
+      partnerPct: catalogPartner / catalogTotal,
+    };
+  }
+  return { scanvPct: 0.30, partnerPct: 0.70 };
+}
+
 function cloudSubCardPaymentTotals(svc) {
   const courseFee = Number(svc?.price) || 50000;
-  const scanvShare = Number(svc?.scanv_amount_paise) > 0
-    ? Number(svc.scanv_amount_paise)
-    : Math.round(courseFee * 0.30);
-  const centerPending = Number(svc?.partner_amount_paise) > 0
-    ? Number(svc.partner_amount_paise)
-    : Math.max(0, courseFee - scanvShare);
+  const { scanvPct } = cloudSplitPercents(svc);
+  const scanvShare = Math.round(courseFee * scanvPct);
+  const centerPending = Math.max(0, courseFee - scanvShare);
   const fee = Math.round(scanvShare * FEE_PCT);
   const gst = Math.round((scanvShare + fee) * GST_RATE);
   const payNow = scanvShare + fee + gst;
@@ -1715,6 +1725,7 @@ function cloudSubCardPaymentTotals(svc) {
     courseFee,
     scanvShare,
     centerPending,
+    scanvPct,
     fee,
     gst,
     payNow,
@@ -1734,6 +1745,7 @@ function paymentTotalsForSvc(svc) {
       centerPending: split.centerPending,
       fullTotal: split.fullTotal,
       cloudSplit: split,
+      scanvPct: split.scanvPct,
     };
   }
   const std = bookingTotalsForSvc(svc);
@@ -3853,9 +3865,17 @@ function cloudCourseBookReady(svc, feeView) {
   return cloudCourseMatchesEnrollment(svc, feeView) && Number(feeView?.course_fee_paise) > 0;
 }
 
+function effectiveCloudCatalogPrice(svc, feeView = null) {
+  const catalog = Number(svc?.price) || 0;
+  const enrolled = Number(feeView?.course_fee_paise) || 0;
+  // Live catalog (Pricing Admin → service_prices_public) wins over stale enrollment snapshot.
+  return catalog > 0 ? catalog : enrolled;
+}
+
 function withCloudCourseFee(svc, feeView) {
   if (!cloudCourseBookReady(svc, feeView)) return svc;
-  const feePaise = Number(feeView.course_fee_paise);
+  const feePaise = effectiveCloudCatalogPrice(svc, feeView);
+  if (!feePaise) return svc;
   return { ...svc, price: feePaise, mrp: Math.max(Number(svc.mrp) || feePaise, feePaise) };
 }
 
@@ -3883,14 +3903,14 @@ function CloudCoursePriceTag({ svc, sm, feeView, onFillSgr }) {
       </button>
     );
   }
-  if (!feeView?.course_fee_paise) {
+  const feePaise = effectiveCloudCatalogPrice(svc, feeView);
+  if (!feePaise) {
     return (
       <span style={{ color: C.gold, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em', fontFamily: FF }}>
         Awaiting payment
       </span>
     );
   }
-  const feePaise = Number(feeView.course_fee_paise) > 0 ? Number(feeView.course_fee_paise) : svc.price;
   const priced = { ...svc, price: feePaise, mrp: Math.max(Number(svc.mrp) || feePaise, feePaise) };
   return <PriceTag svc={priced} sm={sm} />;
 }
@@ -7980,11 +8000,15 @@ function BookScreen() {
   const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
   const [serviceSchedule, setServiceSchedule] = useState(null);
   const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
-  const svc=activeSvc;
+  const svcRaw=activeSvc;
+  const svc=svcRaw&&isCloudSubCardService(svcRaw)
+    ? { ...svcRaw, price: effectiveCloudCatalogPrice(svcRaw) || svcRaw.price }
+    : svcRaw;
   const isCloudBook = isCloudSubCardService(svc);
   const payTotals = paymentTotalsForSvc(svc);
   const price=payTotals.price,fee=payTotals.fee,gst=payTotals.gst,total=payTotals.total;
   const courseFee=payTotals.courseFee,centerPending=payTotals.centerPending,fullTotal=payTotals.fullTotal;
+  const scanvPctLabel = Math.round((payTotals.cloudSplit?.scanvPct ?? 0.30) * 100);
   const payStep = skipVerify ? 3 : 4;
   const scheduleStep = skipVerify ? 2 : 3;
   const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price,studentCloudCourse:isCloudBook});
@@ -8351,7 +8375,7 @@ function BookScreen() {
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
               {isCloudBook ? (
                 <>
-                  {[['Course fee', courseFee], ['ScanV share (pay now)', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===4?700:400,color:i===4?C.acc:C.txt,fontSize:i===4?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+                  {[['Course fee', courseFee], [`ScanV share (${scanvPctLabel}%)`, price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now (Razorpay)', total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===4?700:400,color:i===4?C.acc:C.txt,fontSize:i===4?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
                   <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:15}}>
                     <span>Pending center payment</span>
                     <span>₹{fmtRs(centerPending)}</span>
