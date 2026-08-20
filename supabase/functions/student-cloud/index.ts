@@ -486,12 +486,32 @@ Deno.serve(async (req) => {
       }
 
       if (Number(student.sgr_paid_paise || 0) >= expectedFee) {
+        const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
+        const catalog = catalogPricing[String(student.course_id || "")] ?? null;
+        const courseFee = effectiveCourseFee(student as Record<string, unknown>, catalog);
+        const refreshPatch: Record<string, unknown> = {};
+        if (String(student.status || "") === "sgr_pending" || String(student.status || "") === "sgr_paid") {
+          refreshPatch.status = "fee_due";
+        }
+        if (courseFee > 0 && !Number(student.course_fee_paise || 0)) {
+          refreshPatch.course_fee_paise = courseFee;
+        }
+        let current = student;
+        if (Object.keys(refreshPatch).length) {
+          const { data: refreshed, error: re } = await sb.from("student_cloud").update(refreshPatch).eq("id", studentId).select("*").single();
+          if (re) throw re;
+          current = refreshed;
+        }
         return json({
           success: true,
-          student: withPending(student),
+          student: withPending(current, catalog),
           message: "Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours",
         });
       }
+
+      const catalogPricing = await catalogPricingById(sb, [String(student.course_id || "")]);
+      const catalog = catalogPricing[String(student.course_id || "")] ?? null;
+      const courseFee = effectiveCourseFee(student as Record<string, unknown>, catalog);
 
       const { error: pe } = await sb.from("student_cloud_payments").insert({
         student_id: studentId,
@@ -504,20 +524,23 @@ Deno.serve(async (req) => {
       });
       if (pe && !/duplicate/i.test(pe.message || "")) throw pe;
 
-      const nextStatus = student.sgr_paid_paise >= expectedFee ? student.status : "sgr_paid";
-      const { data: updated, error } = await sb.from("student_cloud").update({
+      const updatePatch: Record<string, unknown> = {
         sgr_paid_paise: expectedFee,
         sgr_txn_id: txnId,
         sgr_paid_at: new Date().toISOString(),
-        status: student.status === "sgr_pending" ? "sgr_paid" : nextStatus,
-      }).eq("id", studentId).select("*").single();
+        status: "fee_due",
+      };
+      if (courseFee > 0 && !Number(student.course_fee_paise || 0)) {
+        updatePatch.course_fee_paise = courseFee;
+      }
+      const { data: updated, error } = await sb.from("student_cloud").update(updatePatch).eq("id", studentId).select("*").single();
       if (error) throw error;
 
       await notifyOwnerSgrPaid(updated as Record<string, unknown>, expectedFee);
 
       return json({
         success: true,
-        student: withPending(updated),
+        student: withPending(updated, catalog),
         message: "Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours",
       });
     }
@@ -622,8 +645,7 @@ Deno.serve(async (req) => {
       const effectiveCourse = storedCourse > 0 ? storedCourse : (catalogCourse ?? 0);
       const netCourse = Math.max(0, effectiveCourse - Number(student.discount_paise || 0));
       const coursePaid = Number(student.course_paid_paise || 0) > 0;
-      const status = String(student.status || "");
-      const mayShowCourseFee = sgrPaid && (coursePaid || status === "enrolled" || status === "fee_due" || status === "completed");
+      const mayShowCourseFee = sgrPaid && netCourse > 0;
       return json({
         student_id: student.id || null,
         sgr_paid: sgrPaid,
