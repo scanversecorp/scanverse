@@ -36,9 +36,9 @@ const APP_URL  = 'https://getscanv.com';
 const SCANV_SHARE_TAGLINE = 'ScanV — Professional Services Marketplace · PCMC Pune';
 /** Scan this URL — opens ScanV in the browser; no “Add to Home Screen” step. */
 const SCANV_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
-const UPI_PA   = 'dcoreglobalcorporati.82037575@hdfcbank';
+const UPI_PA   = 'vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
-const HDFC_VYAPAR_MERCHANT_ID = '82037575';
+const HDFC_VYAPAR_MERCHANT_ID = '172928067841';
 const ASSIST   = '+91-9270194842';
 const LOCAL_COMMUNITIES = 'Local Communities';
 const INCORPORATION_ORIGIN = 'Designed & Developed by Incorporation, San Francisco, California, USA';
@@ -17056,7 +17056,7 @@ function LegalPage({ page, catalogTick = 0 }) {
           {[
             ['Accepted Methods','UPI (GPay, PhonePe, Paytm, any UPI app) · Debit/Credit cards (Visa, Mastercard, RuPay) · Net banking (all major Indian banks)'],
             ['How It Works','Platform fee (10%) paid online at booking via UPI. GST added to total. Tax invoice auto-generated for every booking.'],
-            ['UPI Payment','Pay to: dcoreglobalcorporati.82037575@hdfcbank · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays'],
+            ['UPI Payment',`Pay to: ${UPI_PA} · Use your TXN-XXXXXXXX as payment reference · Confirmation SMS within 5 minutes · Always include TXN ID to avoid reconciliation delays`],
             ['Security','Razorpay PCI-DSS L1 · TLS 1.3 encryption · AES-256 at rest · No card/CVV/bank details stored by ScanV · RBI-mandated 2FA for card payments'],
             ['Failed Payments','No deduction on failure · Booking stays "Pending Payment" for 24 hours · Auto-refund in 5–7 days if deducted but booking not confirmed · Contact: payments@dcoreglobal.com'],
             ['Partner Payouts','Within 3 business days of service completion · Via UPI to Partner’s registered UPI ID · TDS deducted under Section 194-O Income Tax Act · Monthly payout statements issued'],
