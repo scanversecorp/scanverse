@@ -568,7 +568,7 @@ async function checkPaymentVerified(txnId, expectedAmountPaise) {
   return r.verified;
 }
 function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {}) {
-  const { serviceId = null, serviceName = null, servicePricePaise = null } = meta;
+  const { serviceId = null, serviceName = null, servicePricePaise = null, studentCloudCourse = false } = meta;
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [upiOpened, setUpiOpened] = useState(false);
   const [checkingPay, setCheckingPay] = useState(false);
@@ -587,7 +587,10 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
     }
     setRazorpayLinkLoading(true);
     setRazorpayError(null);
-    const data = await registerPaymentIntent(txnId, amountPaise, userId, { serviceId, serviceName, servicePricePaise });
+    const data = await registerPaymentIntent(txnId, amountPaise, userId, {
+      serviceId, serviceName, servicePricePaise,
+      ...(studentCloudCourse ? { studentCloudCourse: true } : {}),
+    });
     if (cancelledRef?.current) return;
     if (data?.payment_link_url) {
       setRazorpayLinkUrl(data.payment_link_url);
@@ -605,7 +608,7 @@ function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {})
       }
     }
     setRazorpayLinkLoading(false);
-  }, [txnId, amountPaise, userId, serviceId, serviceName, servicePricePaise, addToast]);
+  }, [txnId, amountPaise, userId, serviceId, serviceName, servicePricePaise, studentCloudCourse, addToast]);
   useEffect(() => {
     if (!txnId || !amountPaise) return;
     const cancelled = { current: false };
@@ -1694,14 +1697,70 @@ function bookingTotalsForSvc(svc) {
   return { price, fee, gst, total: price + fee + gst };
 }
 
+/** Cloud sub-card: pay ScanV share (+ platform fee & GST on share); center share is pending. */
+function cloudSubCardPaymentTotals(svc) {
+  const courseFee = Number(svc?.price) || 50000;
+  const scanvShare = Number(svc?.scanv_amount_paise) > 0
+    ? Number(svc.scanv_amount_paise)
+    : Math.round(courseFee * 0.30);
+  const centerPending = Number(svc?.partner_amount_paise) > 0
+    ? Number(svc.partner_amount_paise)
+    : Math.max(0, courseFee - scanvShare);
+  const fee = Math.round(scanvShare * FEE_PCT);
+  const gst = Math.round((scanvShare + fee) * GST_RATE);
+  const payNow = scanvShare + fee + gst;
+  const fullFee = Math.round(courseFee * FEE_PCT);
+  const fullGst = Math.round((courseFee + fullFee) * GST_RATE);
+  return {
+    courseFee,
+    scanvShare,
+    centerPending,
+    fee,
+    gst,
+    payNow,
+    fullTotal: courseFee + fullFee + fullGst,
+  };
+}
+
+function paymentTotalsForSvc(svc) {
+  if (isCloudSubCardService(svc)) {
+    const split = cloudSubCardPaymentTotals(svc);
+    return {
+      price: split.scanvShare,
+      fee: split.fee,
+      gst: split.gst,
+      total: split.payNow,
+      courseFee: split.courseFee,
+      centerPending: split.centerPending,
+      fullTotal: split.fullTotal,
+      cloudSplit: split,
+    };
+  }
+  const std = bookingTotalsForSvc(svc);
+  return { ...std, courseFee: std.price, centerPending: 0, fullTotal: std.total, cloudSplit: null };
+}
+
+function cloudBookingSplitFields(svc) {
+  if (!isCloudSubCardService(svc)) return {};
+  const split = cloudSubCardPaymentTotals(svc);
+  return {
+    course_fee_paise: split.courseFee,
+    scanv_share_paise: split.scanvShare,
+    center_pending_paise: split.centerPending,
+    center_paid_paise: 0,
+  };
+}
+
 function inferServiceFromTotalPaise(totalPaise, hints = {}) {
   const { serviceId = null, serviceName = null } = hints;
   const matches = [];
   for (const svc of getAllSubSvcs()) {
     if (bookingTotalsForSvc(svc).total === totalPaise) matches.push(svc);
+    if (isCloudSubCardService(svc) && cloudSubCardPaymentTotals(svc).payNow === totalPaise) matches.push(svc);
   }
   for (const svc of SVCS) {
     if (bookingTotalsForSvc(svc).total === totalPaise) matches.push(svc);
+    if (isCloudSubCardService(svc) && cloudSubCardPaymentTotals(svc).payNow === totalPaise) matches.push(svc);
   }
   if (!matches.length) return null;
   if (serviceId) {
@@ -1796,7 +1855,8 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     return { ok: true, bookingId: existingByTxn.id, existing: true };
   }
 
-  const { price, fee, gst, total } = bookingTotalsForSvc(svc);
+  const payTotals = paymentTotalsForSvc(svc);
+  const { price, fee, gst, total } = payTotals;
   const isCloud = isCloudSubCardService(svc);
   const bookingStatus = isCloud ? cloudBookingStatusFields() : standardBookingStatusFields();
   const isDeliveryShipment = svc.parent === 'delivery';
@@ -1864,6 +1924,7 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     platform_fee: fee,
     gst_amt: gst,
     total,
+    ...cloudBookingSplitFields(svc),
     ...bookingStatus,
     txn_id: intent.txn_id,
   }).select().single();
@@ -2361,6 +2422,8 @@ function dbRowToSvc(row) {
     icon: mergeCatalogIcon(existing, row.icon),
     mrp: Number(row.mrp_paise) || 0,
     price: Number(row.price_paise) || 0,
+    scanv_amount_paise: Number(row.scanv_amount_paise) || 0,
+    partner_amount_paise: Number(row.partner_amount_paise) || 0,
     cash: false,
     desc: row.sub_service_name || row.service_name || '',
     features: [],
@@ -2420,6 +2483,8 @@ function applyDbCatalog(rows) {
       svc.sub = resolveCatalogSvcSub(row, svc, displayName);
       if (row.price_paise != null) svc.price = row.price_paise;
       if (row.mrp_paise != null) svc.mrp = row.mrp_paise;
+      if (row.scanv_amount_paise != null) svc.scanv_amount_paise = row.scanv_amount_paise;
+      if (row.partner_amount_paise != null) svc.partner_amount_paise = row.partner_amount_paise;
       if (row.service_id === SGR_SERVICE_ID && svc === SGR_SVC) {
         if (row.service_name) SGR_SVC.name = row.service_name;
         if (row.sub_service_name) SGR_SVC.sub = row.sub_service_name;
@@ -5353,16 +5418,21 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   };
   const revokeTerms = () => { setTermsAccepted(false); setTermsAcceptedAt(null); };
 
-  const browsePrice = activeSvc?.price || 50000;
-  const browseFee = Math.round(browsePrice * FEE_PCT);
-  const browseGst = Math.round((browsePrice + browseFee) * GST_RATE);
-  const browseTotal = browsePrice + browseFee + browseGst;
+  const browsePayTotals = paymentTotalsForSvc(activeSvc);
+  const browsePrice = browsePayTotals.price;
+  const browseFee = browsePayTotals.fee;
+  const browseGst = browsePayTotals.gst;
+  const browseTotal = browsePayTotals.total;
+  const browseCourseFee = browsePayTotals.courseFee;
+  const browseCenterPending = browsePayTotals.centerPending;
+  const browseFullTotal = browsePayTotals.fullTotal;
+  const browseCloudBook = isCloudSubCardService(activeSvc);
   const browsePay = usePaymentVerification(
     screen === 'payment' ? txnId : null,
     screen === 'payment' ? (paymentAmountPaise ?? browseTotal) : 0,
     userId,
     addToast,
-    { serviceId: activeSvc?.id, serviceName: activeSvc?.name, servicePricePaise: browsePrice },
+    { serviceId: activeSvc?.id, serviceName: activeSvc?.name, servicePricePaise: browsePrice, studentCloudCourse: browseCloudBook },
   );
   const creatingRef = useRef(false);
   const autoPayContinueRef = useRef(false);
@@ -5964,10 +6034,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       const mobNorm = normalizeMobileE164(mobile);
       await ensureProfileAuthSession(mobNorm);
       const svc = activeSvc;
-      const price = svc.price||50000;
-      const fee   = Math.round(price*FEE_PCT);
-      const gst   = Math.round((price+fee)*GST_RATE);
-      const total = price+fee+gst;
+      const payTotals = paymentTotalsForSvc(svc);
+      const { price, fee, gst, total } = payTotals;
       const loc   = bookingDetail.loc||`${village}, ${city} ${pincode}`.trim();
       const isDeliveryShipment = svc.parent === 'delivery';
       const pickupText = (bookingDetail.pickup || loc).trim();
@@ -6017,6 +6085,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         drop_text: isDeliveryShipment ? dropText : null,
         customer_lat: custLat, customer_lng: custLng,
         price, platform_fee:fee, gst_amt:gst, total,
+        ...cloudBookingSplitFields(svc),
         ...bookingStatus,
         txn_id:txnId,
       }).select().single();
@@ -6581,7 +6650,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <>
         <div style={{background:C.surf,borderBottom:BDR,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
           <button onClick={()=>{setScreen('schedule');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Pay platform fee</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{browseCloudBook ? 'Pay ScanV share' : 'Pay platform fee'}</div>
         </div>
         <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           {bookingDetail?.date && (
@@ -6589,17 +6658,33 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               📅 Scheduled · {bookingDetail.date} · {bookingDetail.time || '10:00'}
             </div>
           )}
+          {browseCloudBook && (
+            <div style={{...S.card(),marginBottom:12,padding:14,fontSize:13}}>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>Course fee</span><span>₹{fmtRs(browseCourseFee)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>ScanV share + fees</span><span style={{fontWeight:700,color:C.acc}}>₹{fmtRs(total)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`1px solid ${C.bdr}`,color:C.gold,fontWeight:700}}><span>Pending center payment</span><span>₹{fmtRs(browseCenterPending)}</span></div>
+            </div>
+          )}
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
             <div style={{fontSize:15,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
+            {browseCloudBook && browseFullTotal > total && <div style={{fontSize:12,color:C.dim,marginBottom:4}}>Full program value ₹{(browseFullTotal/100).toLocaleString('en-IN')} · center share pending</div>}
             <div style={{fontSize:13,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
-            {[['Service (indicative)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Pay now',total]].map(([k,v],i)=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?800:500,color:i===3?C.acc:C.sub,fontSize:i===3?16:14}}>
+            {(browseCloudBook
+              ? [['Course fee', browseCourseFee], ['ScanV share', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]]
+              : [['Service (indicative)', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]]
+            ).map(([k,v],i)=>(
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i=== (browseCloudBook ? 4 : 3)?800:500,color:i=== (browseCloudBook ? 4 : 3)?C.acc:C.sub,fontSize:i=== (browseCloudBook ? 4 : 3)?16:14}}>
                 <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
               </div>
             ))}
+            {browseCloudBook && (
+              <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:14}}>
+                <span>Pending center payment</span><span>₹{fmtRs(browseCenterPending)}</span>
+              </div>
+            )}
           </div>
           <UpiPaymentPanel
             pay={browsePay}
@@ -7896,10 +7981,13 @@ function BookScreen() {
   const [serviceSchedule, setServiceSchedule] = useState(null);
   const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
   const svc=activeSvc;
-  const price=svc?.price||50000,fee=Math.round(price*FEE_PCT),gst=Math.round((price+fee)*GST_RATE),total=price+fee+gst;
+  const isCloudBook = isCloudSubCardService(svc);
+  const payTotals = paymentTotalsForSvc(svc);
+  const price=payTotals.price,fee=payTotals.fee,gst=payTotals.gst,total=payTotals.total;
+  const courseFee=payTotals.courseFee,centerPending=payTotals.centerPending,fullTotal=payTotals.fullTotal;
   const payStep = skipVerify ? 3 : 4;
   const scheduleStep = skipVerify ? 2 : 3;
-  const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price});
+  const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price,studentCloudCourse:isCloudBook});
   const creatingRef = useRef(false);
   const autoPayContinueRef = useRef(false);
 
@@ -8101,7 +8189,7 @@ function BookScreen() {
         setStep(payStep);
         return addToast('Payment not verified. Complete payment before booking.', 'error');
       }
-      const payCheck = await fetchPaymentVerification(txnId, total);
+      const payCheck = await fetchPaymentVerification(txnId, paymentAmountPaise ?? total);
       const mob = normalizeMobileE164(bookPhone || user?.phone || '');
       await ensureProfileAuthSession(mob);
       const custId = user?.id || await resolveCustomerProfileId(mob);
@@ -8152,6 +8240,7 @@ function BookScreen() {
         date, time, notes, location_text: loc,
         customer_lat: custLat, customer_lng: custLng,
         price, platform_fee: fee, gst_amt: gst, total,
+        ...cloudBookingSplitFields(svc),
         ...bookingStatus, txn_id: txnId,
       }).select().single();
       if (error) {
@@ -8260,7 +8349,18 @@ function BookScreen() {
               <div style={{color:C.txt,fontWeight:700,fontSize:18,textAlign:'center',marginBottom:4}}>{svc.name}</div>
               <div style={{color:C.sub,fontSize:14,textAlign:'center',marginBottom:12}}>{svc.sub}</div>
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
-              {[['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+              {isCloudBook ? (
+                <>
+                  {[['Course fee', courseFee], ['ScanV share (pay now)', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===4?700:400,color:i===4?C.acc:C.txt,fontSize:i===4?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+                  <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:15}}>
+                    <span>Pending center payment</span>
+                    <span>₹{fmtRs(centerPending)}</span>
+                  </div>
+                  <div style={{fontSize:11,color:C.dim,lineHeight:1.45,marginTop:4}}>Pay ScanV share now via Razorpay. The center share is due directly to your training/provider partner — see Profile for details.</div>
+                </>
+              ) : (
+                [['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)
+              )}
             </div>
           </div>
           {skipVerify&&<div style={{background:'#e6f4ee',border:`1.5px solid rgba(0,122,77,0.35)`,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:13,color:C.grn,fontWeight:700}}>✅ Signed in as {user.first_name} · skip OTP</div>}
@@ -8325,15 +8425,23 @@ function BookScreen() {
         </>}
 
         {step===payStep&&<>
-          <div style={{color:C.txt,fontSize:15,fontWeight:700,marginBottom:12}}>Pay platform fee</div>
+          <div style={{color:C.txt,fontSize:15,fontWeight:700,marginBottom:12}}>{isCloudBook ? 'Pay ScanV share' : 'Pay platform fee'}</div>
           {date && (
             <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:13,color:C.txt,fontWeight:600}}>
               📅 Scheduled · {date} · {time || '10:00'}
             </div>
           )}
+          {isCloudBook && (
+            <div style={{...S.card(),marginBottom:12,padding:14,fontSize:13}}>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>Course fee</span><span>₹{fmtRs(courseFee)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',color:C.sub}}><span>ScanV share + fees</span><span style={{fontWeight:700,color:C.acc}}>₹{fmtRs(total)}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',marginTop:4,borderTop:`1px solid ${C.bdr}`,color:C.gold,fontWeight:700}}><span>Pending center payment</span><span>₹{fmtRs(centerPending)}</span></div>
+            </div>
+          )}
           <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:20}}>
             <div style={{fontSize:14,color:C.sub,marginBottom:6}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
+            {isCloudBook && fullTotal > total && <div style={{fontSize:12,color:C.dim,marginBottom:4}}>Full program value ₹{(fullTotal/100).toLocaleString('en-IN')} · center share pending</div>}
             <div style={{fontSize:12,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <UpiPaymentPanel
@@ -9450,15 +9558,27 @@ function BookingsScreen() {
 
   const renderBookingCard=(b)=>{
     if (isCloudSubCardBooking(b)) {
+      const pendingCenter = Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0));
       return (
         <div key={b.id} style={{ ...S.card(), marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
             <div>
               <div style={{ color: C.txt, fontWeight: 600, fontSize: 16 }}>{b.service_name}</div>
               <div style={{ color: C.sub, fontSize: 13, marginTop: 2 }}>{b.date || '—'} {b.time || ''}</div>
+              {Number(b.course_fee_paise) > 0 && (
+                <div style={{ color: C.dim, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+                  Course ₹{fmtRs(b.course_fee_paise)} · ScanV paid ₹{fmtRs(b.total || 0)}
+                  {pendingCenter > 0 ? ` · Center pending ₹${fmtRs(pendingCenter)}` : ''}
+                </div>
+              )}
             </div>
             <Badge label="Complete" color={C.grn} />
           </div>
+          {pendingCenter > 0 && (
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: `${C.gold}14`, border: `1px solid ${C.gold}44`, fontSize: 12, color: C.gold, fontWeight: 600 }}>
+              Pending center payment · ₹{fmtRs(pendingCenter)}
+            </div>
+          )}
         </div>
       );
     }
@@ -9679,10 +9799,29 @@ function ProfileScreen() {
   const hasRealEmail=user?.email&&!user.email.endsWith('@scanv.app');
   const [frm,setFrm]=useState({firstName:user?.first_name||'',lastName:user?.last_name||'',phone:user?.phone||'',email:hasRealEmail?user.email:'',dateOfBirth:user?.date_of_birth||'',gender:user?.gender||'',upi_id:user?.upi_id||'',address:user?.address||'',village:user?.village||'',city:user?.city||'',pincode:user?.pincode||''});
   const [saving,setSaving]=useState(false);
+  const [centerPendingBookings,setCenterPendingBookings]=useState([]);
   const f=(k,v)=>setFrm(p=>({...p,[k]:v}));
   const readOnlyInp={...S.inp(),background:C.deep,color:C.sub,cursor:'not-allowed'};
   const verifiedNote=<div style={{fontSize:10,color:C.dim,marginTop:4}}>🔒 Verified — contact support to change</div>;
   const dobMissing = !profileHasDob(user);
+  useEffect(() => {
+    if (!user?.id) { setCenterPendingBookings([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await sb().from('bookings')
+        .select('id, service_name, date, time, course_fee_paise, scanv_share_paise, center_pending_paise, center_paid_paise, total, status')
+        .eq('customer_id', user.id)
+        .gt('center_pending_paise', 0)
+        .order('created_at', { ascending: false });
+      if (cancelled) return;
+      const rows = (data || []).filter((b) => {
+        const due = Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0));
+        return due > 0 && isCloudSubCardBooking(b);
+      });
+      setCenterPendingBookings(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
   const save=async()=>{
     setSaving(true);
     try{
@@ -9720,6 +9859,32 @@ function ProfileScreen() {
           <div style={{ ...S.card(), marginBottom: 16, padding: 12, border: `1.5px solid ${C.gold}55`, background: `${C.gold}12` }}>
             <div style={{ fontSize: 12, color: C.txt, fontWeight: 600, marginBottom: 4 }}>Add your date of birth</div>
             <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.5 }}>Required for bookings and account verification. You can add it below — name and mobile stay locked after OTP.</div>
+          </div>
+        )}
+        {centerPendingBookings.length > 0 && (
+          <div style={{ ...S.card(), marginBottom: 16, padding: 14, border: `1.5px solid ${C.gold}55`, background: `${C.gold}10` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Pending center payments</div>
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 10, lineHeight: 1.45 }}>ScanV share is paid. Pay the center/partner share directly to your training provider.</div>
+            {centerPendingBookings.map((b) => {
+              const due = Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0));
+              return (
+                <div key={b.id} style={{ padding: '10px 0', borderTop: `1px solid ${C.bdr}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.txt }}>{b.service_name}</div>
+                      <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{b.date || '—'} {b.time || ''}</div>
+                      <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+                        Course ₹{fmtRs(b.course_fee_paise)} · ScanV paid ₹{fmtRs(b.total || 0)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: C.gold }}>₹{fmtRs(due)}</div>
+                      <div style={{ fontSize: 10, color: C.dim }}>due to center</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         <div style={{...S.card(),marginBottom:16}}>
