@@ -60,7 +60,7 @@ type ManualCheckDef = {
 export const GO_LIVE_MANUAL_CHECKS: ManualCheckDef[] = [
   { key: "go_live_check_2factor_wallet", category: "A. SMS OTP · 2Factor.in", functions: "2factor.in", description: "Account active with sufficient wallet / credits", required: true },
   { key: "go_live_check_dlt_sender", category: "A. SMS OTP · 2Factor.in", functions: "TRAI DLT", description: "DLT sender ID registered (e.g. SCANV)", required: true },
-  { key: "go_live_check_dlt_template", category: "A. SMS OTP · 2Factor.in", functions: "TRAI DLT", description: "DLT OTP template approved — matches: ScanV OTP: {code}", required: true },
+  { key: "go_live_check_dlt_template", category: "A. SMS OTP · 2Factor.in", functions: "TRAI DLT", description: "DLT OTP templates approved — primary ScanV, fallback DCore (AUTOGEN)", required: true },
   { key: "go_live_check_2factor_callback_url", category: "A. SMS OTP · 2Factor.in", functions: "otp-delivery-report", description: "2Factor delivery callback URL pasted in 2Factor panel", required: true },
   { key: "go_live_check_otp_sms_test", category: "A. SMS OTP · 2Factor.in", functions: "send-otp", description: "Real +91 mobile received OTP SMS within ~30 seconds", required: true },
   { key: "go_live_check_otp_delivery_report", category: "A. SMS OTP · 2Factor.in", functions: "otp-delivery-report", description: "Admin OTP report shows delivered (not failed)", required: true },
@@ -104,7 +104,8 @@ const SECRET_CHECKS: Array<{
   check: () => boolean;
 }> = [
   { key: "TWOFACTOR_API_KEY", functions: "send-otp · vendor-onboard", description: "2Factor.in SMS OTP API key", required: true, check: () => envConfigured("TWOFACTOR_API_KEY") },
-  { key: "TWOFACTOR_OTP_TEMPLATE", functions: "send-otp", description: "2Factor DLT OTP template name (default: ScanV OTP)", required: false, check: () => envConfigured("TWOFACTOR_OTP_TEMPLATE") },
+  { key: "TWOFACTOR_OTP_TEMPLATE", functions: "send-otp", description: "2Factor primary DLT OTP template (default: ScanV, AUTOGEN)", required: false, check: () => envConfigured("TWOFACTOR_OTP_TEMPLATE") },
+  { key: "TWOFACTOR_OTP_TEMPLATE_FALLBACK", functions: "send-otp", description: "2Factor fallback DLT OTP template (default: DCore)", required: false, check: () => envConfigured("TWOFACTOR_OTP_TEMPLATE_FALLBACK") },
   { key: "TWOFACTOR_SMS_SENDER", functions: "send-otp", description: "2Factor DLT sender ID for TRANS_SMS fallback (e.g. SCANV)", required: false, check: () => envConfigured("TWOFACTOR_SMS_SENDER") },
   { key: "OTP_REPORT_SECRET", functions: "otp-delivery-report", description: "2Factor delivery callback ?key= (set in 2Factor panel + Supabase)", required: true, check: () => envConfigured("OTP_REPORT_SECRET") },
   { key: "RAZORPAY_KEY_ID", functions: "razorpay-payment", description: "Razorpay live API key ID", required: true, check: () => envConfigured("RAZORPAY_KEY_ID") },

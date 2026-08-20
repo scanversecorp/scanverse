@@ -10,6 +10,7 @@ import {
   sendOtpDelivery,
   hashOtp,
   generateOtp,
+  verify2FactorOtpSession,
 } from "../_shared/notify.ts";
 import { isPlatformFlagOn } from "../_shared/platform-settings.ts";
 import { otpDeliveryVendorOpts } from "../_shared/vendor-providers.ts";
@@ -137,7 +138,7 @@ async function verifyOtpStored(
   const otpHash = await hashOtp(otp);
   const { data: row } = await supabase
     .from("vendor_otp")
-    .select("id, verified, expires_at")
+    .select("id, verified, expires_at, session_id")
     .eq("mobile", mobile)
     .eq("otp_hash", otpHash)
     .eq("verified", false)
@@ -149,6 +150,28 @@ async function verifyOtpStored(
   if (row) {
     await supabase.from("vendor_otp").update({ verified: true }).eq("id", row.id);
     return true;
+  }
+
+  const { data: pending } = await supabase
+    .from("vendor_otp")
+    .select("id, session_id")
+    .eq("mobile", mobile)
+    .eq("verified", false)
+    .gt("expires_at", new Date().toISOString())
+    .not("session_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (pending?.session_id) {
+    const tf = await verify2FactorOtpSession(String(pending.session_id), otp);
+    if (tf.ok) {
+      await supabase.from("vendor_otp").update({
+        verified: true,
+        otp_hash: otpHash,
+      }).eq("id", pending.id);
+      return true;
+    }
   }
 
   const { data: custom } = await supabase

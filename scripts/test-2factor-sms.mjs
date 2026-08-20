@@ -4,13 +4,14 @@
  *
  * Usage:
  *   TWOFACTOR_API_KEY=xxx node scripts/test-2factor-sms.mjs 8484850288
- *   TWOFACTOR_OTP_TEMPLATE="ScanV OTP" TWOFACTOR_API_KEY=xxx node scripts/test-2factor-sms.mjs 8484850288
  */
 const key = process.env.TWOFACTOR_API_KEY || process.env.TWOFACTOR_KEY || "";
 const phone = (process.argv[2] || "").replace(/\D/g, "").slice(-10);
-const template = (process.env.TWOFACTOR_OTP_TEMPLATE || "ScanV OTP").trim();
+const primary = (process.env.TWOFACTOR_OTP_TEMPLATE || "ScanV").trim();
+const fallback = (process.env.TWOFACTOR_OTP_TEMPLATE_FALLBACK || "DCore").trim();
+const templates = [primary];
+if (fallback.toLowerCase() !== primary.toLowerCase()) templates.push(fallback);
 const otp = String(Math.floor(100000 + Math.random() * 900000));
-const sender = process.env.TWOFACTOR_SMS_SENDER || "SCANV";
 
 if (!key || phone.length !== 10) {
   console.error("Usage: TWOFACTOR_API_KEY=xxx node scripts/test-2factor-sms.mjs <10-digit-mobile>");
@@ -37,18 +38,13 @@ async function tryRoute(label, url) {
 }
 
 async function main() {
-  console.log(`Testing 2Factor SMS → +91${phone} (OTP ${otp}, template "${template}")`);
+  console.log(`Testing 2Factor SMS → +91${phone} (templates: ${templates.join(" → ")})`);
 
-  const routes = [
-    ["template", `https://2factor.in/API/V1/${key}/SMS/${phone}/${otp}/${encodeURIComponent(template)}`],
-    ["default", `https://2factor.in/API/V1/${key}/SMS/${phone}/${otp}`],
-    [
-      "trans_sms",
-      `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${encodeURIComponent(key)}` +
-        `&to=${phone}&from=${encodeURIComponent(sender)}` +
-        `&msg=${encodeURIComponent(`ScanV OTP: ${otp}. Valid 10 min. Do not share.`)}`,
-    ],
-  ];
+  const routes = [];
+  for (const template of templates) {
+    routes.push([`autogen/${template}`, `https://2factor.in/API/V1/${key}/SMS/${phone}/AUTOGEN/${encodeURIComponent(template)}`]);
+    routes.push([`manual/${template}`, `https://2factor.in/API/V1/${key}/SMS/${phone}/${otp}/${encodeURIComponent(template)}`]);
+  }
 
   let anyOk = false;
   for (const [label, url] of routes) {

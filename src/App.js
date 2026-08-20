@@ -4819,8 +4819,25 @@ function emptyOtpDigits() { return ['','','','','','']; }
 
 const OTP_RESEND_COOLDOWN_SEC = 30;
 
+function fillOtpDigits(raw, setDigits, idPrefix) {
+  const nums = String(raw || '').replace(/\D/g, '').slice(0, 6);
+  const nd = emptyOtpDigits();
+  for (let j = 0; j < nums.length; j++) nd[j] = nums[j];
+  setDigits(nd);
+  if (nums.length) {
+    requestAnimationFrame(() => {
+      document.getElementById(`${idPrefix}${Math.min(5, nums.length - 1)}`)?.focus();
+    });
+  }
+}
+
 function handleOtpInputChange(i, raw, digits, setDigits, idPrefix) {
-  const ch = raw.replace(/\D/g, '').slice(-1);
+  const nums = raw.replace(/\D/g, '');
+  if (nums.length > 1) {
+    fillOtpDigits(nums, setDigits, idPrefix);
+    return;
+  }
+  const ch = nums.slice(-1);
   const nd = [...digits];
   nd[i] = ch;
   setDigits(nd);
@@ -4831,6 +4848,37 @@ function handleOtpInputKeyDown(i, e, digits, idPrefix) {
   if (e.key === 'Backspace' && !digits[i] && i > 0) {
     document.getElementById(`${idPrefix}${i - 1}`)?.focus();
   }
+}
+
+function handleOtpPaste(e, setDigits, idPrefix) {
+  const text = e.clipboardData?.getData('text') || '';
+  if (/\d{2,}/.test(text)) {
+    e.preventDefault();
+    fillOtpDigits(text, setDigits, idPrefix);
+  }
+}
+
+/** Six OTP boxes with iOS SMS autofill (one-time-code on first cell + full-code paste). */
+function OtpSixBoxInput({ digits, setDigits, idPrefix, boxStyle, containerStyle }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', ...containerStyle }}
+      onPaste={(e) => handleOtpPaste(e, setDigits, idPrefix)}>
+      {digits.map((d, i) => (
+        <input
+          key={i}
+          maxLength={i === 0 ? 6 : 1}
+          value={d}
+          inputMode="numeric"
+          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+          id={`${idPrefix}${i}`}
+          onChange={(e) => handleOtpInputChange(i, e.target.value, digits, setDigits, idPrefix)}
+          onKeyDown={(e) => handleOtpInputKeyDown(i, e, digits, idPrefix)}
+          onPaste={(e) => handleOtpPaste(e, setDigits, idPrefix)}
+          style={typeof boxStyle === 'function' ? boxStyle(d, i) : boxStyle}
+        />
+      ))}
+    </div>
+  );
 }
 
 function OtpSentFooter({ mobile, onChangeNumber, onResend, loading, channel = 'sms' }) {
@@ -6807,14 +6855,18 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           {verifyMethod==='sms'&&otpSent&&(
             <>
               <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendOTP(true)} loading={loading} channel={otpChannel} />
-              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
-                {otpCode.map((d,i)=>(
-                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
-                    onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'votp-')}
-                    onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'votp-')}
-                    style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
-                ))}
-              </div>
+              <OtpSixBoxInput
+                digits={otpCode}
+                setDigits={setOtpCode}
+                idPrefix="votp-"
+                containerStyle={{ marginBottom: 14 }}
+                boxStyle={(d) => ({
+                  width: 46, height: 52, textAlign: 'center',
+                  background: d ? '#fff0f3' : C.surf,
+                  border: d ? `2px solid ${C.acc}` : BDR,
+                  borderRadius: 10, color: C.acc, fontFamily: FF, fontSize: 22, fontWeight: 800, outline: 'none',
+                })}
+              />
               <Btn full onClick={()=>verifyProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pick schedule →'}</Btn>
             </>
           )}
@@ -6872,14 +6924,18 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           {verifyMethod==='sms'&&otpSent&&(
             <>
               <OtpSentFooter mobile={otpTargetMobile||mobile} onChangeNumber={resetOtpFlow} onResend={()=>sendLoginOTP(true)} loading={loading} channel={otpChannel} />
-              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
-                {otpCode.map((d,i)=>(
-                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`lotp-${i}`}
-                    onChange={e=>handleOtpInputChange(i,e.target.value,otpCode,setOtpCode,'lotp-')}
-                    onKeyDown={e=>handleOtpInputKeyDown(i,e,otpCode,'lotp-')}
-                    style={{width:46,height:52,textAlign:'center',background:d?'#fff0f3':C.surf,border:d?`2px solid ${C.acc}`:BDR,borderRadius:10,color:C.acc,fontFamily:FF,fontSize:22,fontWeight:800,outline:'none'}}/>
-                ))}
-              </div>
+              <OtpSixBoxInput
+                digits={otpCode}
+                setDigits={setOtpCode}
+                idPrefix="lotp-"
+                containerStyle={{ marginBottom: 14 }}
+                boxStyle={(d) => ({
+                  width: 46, height: 52, textAlign: 'center',
+                  background: d ? '#fff0f3' : C.surf,
+                  border: d ? `2px solid ${C.acc}` : BDR,
+                  borderRadius: 10, color: C.acc, fontFamily: FF, fontSize: 22, fontWeight: 800, outline: 'none',
+                })}
+              />
               <Btn full onClick={()=>loginProfile(false)} disabled={loading||otpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying &amp; locating…</>:'Sign in →'}</Btn>
             </>
           )}
@@ -7455,14 +7511,18 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
         </div>
       )}
 
-      <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
-        {digits.map((d,i)=>(
-          <input key={i} maxLength={1} value={d} inputMode="numeric" id={`otp-${i}`}
-            onChange={e=>handleOtpInputChange(i,e.target.value,digits,setDigits,'otp-')}
-            onKeyDown={e=>handleOtpInputKeyDown(i,e,digits,'otp-')}
-            style={{width:44,height:52,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:10,color:C.acc,fontFamily:'monospace',fontSize:24,outline:'none'}}/>
-        ))}
-      </div>
+      <OtpSixBoxInput
+        digits={digits}
+        setDigits={setDigits}
+        idPrefix="otp-"
+        containerStyle={{ marginBottom: 14 }}
+        boxStyle={(d) => ({
+          width: 44, height: 52, textAlign: 'center',
+          background: d ? `${C.acc}20` : C.deep,
+          border: `1.5px solid ${d ? C.acc : C.bdr}`,
+          borderRadius: 10, color: C.acc, fontFamily: 'monospace', fontSize: 24, outline: 'none',
+        })}
+      />
 
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:16,fontSize:12}}>
         <span style={{color:C.sub,fontFamily:'monospace'}}>
@@ -8435,14 +8495,18 @@ function BookScreen() {
           {!bookOtpSent?<Btn full onClick={sendBookOTP} disabled={loading||!bookTermsAccepted}>{loading?<><Spin size={16}/>Sending…</>:'Send OTP →'}</Btn>:(
             <>
               <OtpSentFooter mobile={bookOtpTarget||bookPhone} onChangeNumber={resetBookOtp} onResend={()=>sendBookOTP(true)} loading={loading} channel={bookOtpChannel} />
-              <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
-                {bookOtpCode.map((d,i)=>(
-                  <input key={i} maxLength={1} value={d} inputMode="numeric" id={`botp-${i}`}
-                    onChange={e=>handleOtpInputChange(i,e.target.value,bookOtpCode,setBookOtpCode,'botp-')}
-                    onKeyDown={e=>handleOtpInputKeyDown(i,e,bookOtpCode,'botp-')}
-                    style={{width:40,height:48,textAlign:'center',background:d?`${C.acc}20`:C.deep,border:`1.5px solid ${d?C.acc:C.bdr}`,borderRadius:8,color:C.acc,fontFamily:'monospace',fontSize:22,outline:'none'}}/>
-                ))}
-              </div>
+              <OtpSixBoxInput
+                digits={bookOtpCode}
+                setDigits={setBookOtpCode}
+                idPrefix="botp-"
+                containerStyle={{ marginBottom: 12 }}
+                boxStyle={(d) => ({
+                  width: 40, height: 48, textAlign: 'center',
+                  background: d ? `${C.acc}20` : C.deep,
+                  border: `1.5px solid ${d ? C.acc : C.bdr}`,
+                  borderRadius: 8, color: C.acc, fontFamily: 'monospace', fontSize: 22, outline: 'none',
+                })}
+              />
               <Btn full onClick={verifyBookOTP} disabled={loading||bookOtpCode.join('').length<6}>{loading?<><Spin size={16}/>Verifying…</>:'Verify & pick schedule →'}</Btn>
             </>
           )}
@@ -11337,14 +11401,18 @@ function VendorOnboardPage() {
           <PartnerTermsAcceptanceField accepted={vendorTermsAccepted} onAccept={acceptVendorTerms} onRevoke={revokeVendorTerms} C={C} BDR={BDR} />
           {!otpSent ? <Btn full onClick={() => sendOtp()} disabled={loading || !vendorTermsAccepted}>{loading ? <><Spin size={16} /> Sending…</> : 'Send OTP →'}</Btn> : <>
             <OtpSentFooter mobile={phone} onChangeNumber={resetPhoneOtp} onResend={() => sendOtp(true)} loading={loading} />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
-              {otp.map((d, i) => (
-                <input key={i} maxLength={1} value={d} inputMode="numeric" id={`votp-${i}`}
-                  onChange={e => handleOtpInputChange(i, e.target.value, otp, setOtp, 'votp-')}
-                  onKeyDown={e => handleOtpInputKeyDown(i, e, otp, 'votp-')}
-                  style={{ width: 40, height: 48, textAlign: 'center', background: d ? `${C.acc}20` : C.deep, border: `1.5px solid ${d ? C.acc : C.bdr}`, borderRadius: 8, color: C.acc, fontFamily: 'monospace', fontSize: 22, outline: 'none' }} />
-              ))}
-            </div>
+            <OtpSixBoxInput
+              digits={otp}
+              setDigits={setOtp}
+              idPrefix="votp-"
+              containerStyle={{ marginBottom: 12 }}
+              boxStyle={(d) => ({
+                width: 40, height: 48, textAlign: 'center',
+                background: d ? `${C.acc}20` : C.deep,
+                border: `1.5px solid ${d ? C.acc : C.bdr}`,
+                borderRadius: 8, color: C.acc, fontFamily: 'monospace', fontSize: 22, outline: 'none',
+              })}
+            />
             <Btn full onClick={verifyOtp} disabled={loading || phoneVerified}>{loading ? <><Spin size={16} /> Verifying…</> : 'Verify OTP →'}</Btn>
           </>}
         </>}

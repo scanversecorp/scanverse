@@ -51,38 +51,67 @@ function parse2FactorResponse(bodyText: string): { ok: boolean; ref?: string; er
   }
 }
 
-function twoFactorOtpTemplate(): string {
-  return (Deno.env.get("TWOFACTOR_OTP_TEMPLATE") || "ScanV OTP").trim();
+function twoFactorOtpTemplates(): string[] {
+  const primary = (Deno.env.get("TWOFACTOR_OTP_TEMPLATE") || "ScanV").trim();
+  const fallback = (Deno.env.get("TWOFACTOR_OTP_TEMPLATE_FALLBACK") || "DCore").trim();
+  const out = [primary];
+  if (fallback && fallback.toLowerCase() !== primary.toLowerCase()) out.push(fallback);
+  return out;
+}
+
+/** Verify OTP entered by user against a 2Factor AUTOGEN/manual session id. */
+export async function verify2FactorOtpSession(
+  sessionId: string,
+  otp: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const twoFactorKey = twoFactorApiKey();
+  const sid = (sessionId || "").trim();
+  const code = (otp || "").trim();
+  if (!twoFactorKey || !sid || !code) {
+    return { ok: false, error: "Missing 2Factor session or OTP" };
+  }
+  const url =
+    `https://2factor.in/API/V1/${twoFactorKey}/SMS/VERIFY/${encodeURIComponent(sid)}/${encodeURIComponent(code)}`;
+  const res = await fetch(url);
+  const bodyText = await res.text().catch(() => "");
+  const parsed = parse2FactorResponse(bodyText);
+  if (parsed.ok) return { ok: true };
+  return { ok: false, error: parsed.error || bodyText || "2Factor OTP verify failed" };
 }
 
 async function send2FactorOtpSms(
   twoFactorKey: string,
   norm: string,
   otp: string,
-): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
+): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string; autogen?: boolean }> {
   const phone10 = mobileDigitsE164(norm).slice(-10);
-  const template = twoFactorOtpTemplate();
-  const attempts: Array<{ label: string; url: string; provider: string }> = [
-    {
-      label: "template",
-      provider: "2factor",
-      url: `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/${encodeURIComponent(template)}`,
-    },
-    {
-      label: "default",
-      provider: "2factor-default",
-      url: `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}`,
-    },
-  ];
-
+  const templates = twoFactorOtpTemplates();
   let lastErr: string | undefined;
-  for (const attempt of attempts) {
-    const res = await fetch(attempt.url);
+
+  // Primary + fallback: AUTOGEN/{template} (ScanV → DCore by default)
+  for (const template of templates) {
+    const url =
+      `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/AUTOGEN/${encodeURIComponent(template)}`;
+    const res = await fetch(url);
     const bodyText = await res.text().catch(() => "");
     const parsed = parse2FactorResponse(bodyText);
-    if (parsed.ok) return { ok: true, provider: attempt.provider, ref: parsed.ref };
+    if (parsed.ok) {
+      return { ok: true, provider: `2factor-autogen-${template}`, ref: parsed.ref, autogen: true };
+    }
+    lastErr = parsed.error || bodyText || "2Factor AUTOGEN failed";
+    console.warn(`[SMS] 2Factor AUTOGEN/${template} failed:`, lastErr.slice(0, 160));
+  }
+
+  // Manual OTP with same templates (uses our generated code)
+  for (const template of templates) {
+    const url =
+      `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/${encodeURIComponent(template)}`;
+    const res = await fetch(url);
+    const bodyText = await res.text().catch(() => "");
+    const parsed = parse2FactorResponse(bodyText);
+    if (parsed.ok) return { ok: true, provider: `2factor-${template}`, ref: parsed.ref };
     lastErr = parsed.error || bodyText || "2Factor SMS failed";
-    console.warn(`[SMS] 2Factor ${attempt.label} failed:`, lastErr.slice(0, 160));
+    console.warn(`[SMS] 2Factor manual/${template} failed:`, lastErr.slice(0, 160));
   }
 
   const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";
