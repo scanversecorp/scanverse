@@ -848,6 +848,47 @@ async function listPayments(sb: ReturnType<typeof adminSb>, body: Record<string,
   return json({ payment_intents: data || [] });
 }
 
+async function markPaymentPaid(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  const txnId = String(body.txn_id || "").trim();
+  if (!txnId) return json({ error: "txn_id required" }, 400);
+  const { data: row, error: fetchErr } = await sb
+    .from("payment_intents")
+    .select("amount_paise, status, verified_via")
+    .eq("txn_id", txnId)
+    .maybeSingle();
+  if (fetchErr || !row) return json({ error: "Payment intent not found" }, 404);
+  if (row.status === "paid") {
+    return json({ success: true, txn_id: txnId, already_paid: true });
+  }
+  const amountPaise = body.amount_paise != null
+    ? Math.round(Number(body.amount_paise))
+    : Number(row.amount_paise);
+  if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+    return json({ error: "Invalid amount" }, 400);
+  }
+  if (amountPaise < Number(row.amount_paise)) {
+    return json({ error: "Paid amount below registered intent" }, 400);
+  }
+  const payerVpa = typeof body.payer_vpa === "string" && body.payer_vpa.includes("@")
+    ? body.payer_vpa.trim().toLowerCase()
+    : null;
+  const { data, error } = await sb
+    .from("payment_intents")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      verified_via: "admin_confirm",
+      ...(payerVpa ? { payer_vpa: payerVpa } : {}),
+    })
+    .eq("txn_id", txnId)
+    .eq("status", "pending")
+    .select("txn_id, amount_paise, paid_at, verified_via")
+    .maybeSingle();
+  if (error) return json({ error: error.message }, 500);
+  if (!data) return json({ error: "Could not mark paid" }, 400);
+  return json({ success: true, payment: data });
+}
+
 async function otpDeliveryReports(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
   const todayOnly = !!body.today_only;
   const failedOnly = !!body.failed_only;
@@ -1358,6 +1399,10 @@ Deno.serve(async (req) => {
 
   if (action === "list_payments") {
     return listPayments(sb, body);
+  }
+
+  if (action === "mark_payment_paid") {
+    return markPaymentPaid(sb, body);
   }
 
   if (action === "list_pending_refunds") {

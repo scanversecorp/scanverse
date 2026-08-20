@@ -5,6 +5,7 @@
  *   register — { txn_id, amount_paise, user_id? } → { success, txn_id, payment_link_url? }
  *              user_id is profiles.id TEXT (e.g. cust_919270194842), not auth UUID
  *   check    — { txn_id, amount_paise? } → { verified, status, amount_ok?, paid_at?, mode? }
+ *   admin_mark_paid — admin PIN · { txn_id, amount_paise?, payer_vpa? } confirm Vyapar UPI manually
  *   cancel   — { booking_id } (auth required) → cancel booking, queue manual refund (refund_pending)
  *   webhook  — Razorpay webhook payload (no action field) OR manual test
  */
@@ -24,12 +25,12 @@ import {
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-razorpay-signature",
+    "authorization, x-client-info, apikey, content-type, x-razorpay-signature, x-admin-pin",
 };
 
 const INTENT_TTL_MS = 30 * 60 * 1000;
 const APP_URL = Deno.env.get("APP_URL") || "https://getscanv.com";
-const TRUSTED_VERIFIED_VIA = new Set(["webhook", "api", "vyapar_webhook"]);
+const TRUSTED_VERIFIED_VIA = new Set(["webhook", "api", "vyapar_webhook", "admin_confirm"]);
 
 function isTrustedVerifiedVia(via: unknown): boolean {
   return TRUSTED_VERIFIED_VIA.has(String(via || "").toLowerCase());
@@ -866,6 +867,47 @@ function parseVyaparAmountPaise(body: Record<string, unknown>): number | null {
   return null;
 }
 
+function adminPinOk(req: Request): boolean {
+  const pin = req.headers.get("x-admin-pin") || "";
+  if (!pin || pin.length < 6) return false;
+  for (const k of ["ADMIN_HUB_PIN", "SUPPORT_ADMIN_PIN", "PRICING_ADMIN_PIN", "VENDOR_ADMIN_PIN"]) {
+    const secret = Deno.env.get(k) || "";
+    if (secret.length >= 6 && pin === secret) return true;
+  }
+  return false;
+}
+
+async function handleAdminMarkPaid(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<Response> {
+  if (!adminPinOk(req)) return json({ error: "Admin PIN required" }, 401);
+  const txnId = String(body.txn_id || "").trim();
+  if (!txnId) return json({ error: "txn_id required" }, 400);
+  const { data: row, error: fetchErr } = await supabase
+    .from("payment_intents")
+    .select("amount_paise, status")
+    .eq("txn_id", txnId)
+    .maybeSingle();
+  if (fetchErr || !row) return json({ error: "Payment intent not found" }, 404);
+  if (row.status === "paid") {
+    return json({ success: true, verified: true, txn_id: txnId, already_paid: true });
+  }
+  const amountPaise = body.amount_paise != null
+    ? Math.round(Number(body.amount_paise))
+    : Number(row.amount_paise);
+  const payerVpa = typeof body.payer_vpa === "string" && body.payer_vpa.includes("@")
+    ? body.payer_vpa.trim().toLowerCase()
+    : null;
+  const marked = await markPaid(supabase, txnId, amountPaise, {
+    verified_via: "admin_confirm",
+    payer_vpa: payerVpa,
+  });
+  if (!marked) return json({ error: "Could not mark paid — check amount and status" }, 400);
+  return json({ success: true, verified: true, txn_id: txnId, amount_paise: amountPaise });
+}
+
 async function handleVyaparNotify(
   supabase: ReturnType<typeof createClient>,
   body: Record<string, unknown>,
@@ -976,6 +1018,9 @@ Deno.serve(async (req) => {
   if (action === "vyapar_notify") {
     return handleVyaparNotify(supabase, body);
   }
+  if (action === "admin_mark_paid") {
+    return handleAdminMarkPaid(supabase, body, req);
+  }
 
-  return json({ error: "Unknown action. Use register, check, cancel, webhook, or vyapar_notify." }, 400);
+  return json({ error: "Unknown action. Use register, check, cancel, webhook, vyapar_notify, or admin_mark_paid." }, 400);
 });

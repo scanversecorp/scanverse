@@ -283,7 +283,7 @@ async function paymentCaptured(sb: ReturnType<typeof adminSb>, txnId: string, mi
   const st = String(data.status || "").toLowerCase();
   if (st !== "paid") return false;
   const via = String(data.verified_via || "").toLowerCase();
-  if (!["webhook", "api", "vyapar_webhook"].includes(via)) return false;
+  if (!["webhook", "api", "vyapar_webhook", "admin_confirm"].includes(via)) return false;
   return Number(data.amount_paise || 0) >= minPaise;
 }
 

@@ -299,6 +299,7 @@ function VyaparQrSection({ amountPaise, txnId, onScannedPaid, paymentVerified, c
         <div style={{ fontSize: 12, color: C.txt, fontWeight: 700, marginBottom: 4 }}>Pay exactly ₹{amountRu}</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
           If your UPI app asks for a note or remarks, enter <strong style={{ color: C.acc, fontFamily: 'monospace' }}>{txnId}</strong>.
+          {' '}QR/UPI to Vyapar confirms automatically once the bank webhook is live — if stuck after paying, use <strong>Razorpay</strong> below or contact support with this ref.
         </div>
       </div>
       <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
