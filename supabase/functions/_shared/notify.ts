@@ -31,6 +31,11 @@ export function msg91AuthKey(): string | undefined {
   return Deno.env.get("MSG91_AUTH_KEY") || Deno.env.get("MSG91_WHATSAPP_AUTH_KEY");
 }
 
+export function twoFactorApiKey(): string | undefined {
+  const key = Deno.env.get("TWOFACTOR_API_KEY") || Deno.env.get("TWOFACTOR_KEY") || "";
+  return key.trim() || undefined;
+}
+
 function parse2FactorResponse(bodyText: string): { ok: boolean; ref?: string; error?: string } {
   try {
     const data = JSON.parse(bodyText);
@@ -181,13 +186,16 @@ export async function sendOtpDelivery(
   const norm = normalizeMobile(mobile);
   if (!norm) return { ok: false, error: "Invalid mobile" };
 
-  const twoFactorKey = Deno.env.get("TWOFACTOR_API_KEY");
+  const twoFactorKey = twoFactorApiKey();
+  let lastErr: string | undefined;
   if (!opts?.skip2Factor && twoFactorKey && norm.startsWith("+91")) {
     const sms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
     if (sms.ok) return { ...sms, channel: "sms" };
+    lastErr = sms.error;
     if (allowVoice) {
       const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
       if (voice.ok) return { ...voice, channel: "voice" };
+      lastErr = lastErr || voice.error;
     }
   }
 
@@ -203,12 +211,19 @@ export async function sendOtpDelivery(
   if (!opts?.skip2Factor && twoFactorKey && !norm.startsWith("+91")) {
     const tfSms = await send2FactorOtpSms(twoFactorKey, norm, otpCode);
     if (tfSms.ok) return { ...tfSms, channel: "sms" };
+    lastErr = lastErr || tfSms.error;
     if (allowVoice) {
       const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
       if (voice.ok) return { ...voice, channel: "voice" };
+      lastErr = lastErr || voice.error;
     }
   }
 
+  if (lastErr) return { ok: false, error: `2Factor: ${lastErr}` };
+  if (!twoFactorKey && !msg91AuthKey() && !fast2SmsApiKey()
+    && !(Deno.env.get("TWILIO_ACCOUNT_SID") && Deno.env.get("TWILIO_AUTH_TOKEN"))) {
+    return { ok: false, error: "No SMS provider configured (2Factor/MSG91/Fast2SMS/Twilio)" };
+  }
   return { ok: false, error: sms.error || "OTP delivery failed — try Resend or WhatsApp verify" };
 }
 
@@ -230,7 +245,8 @@ export async function sendSms(
   const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const twilioFrom = Deno.env.get("TWILIO_SMS_FROM") || Deno.env.get("TWILIO_PHONE_NUMBER");
-  const twoFactorKey = Deno.env.get("TWOFACTOR_API_KEY");
+  const twoFactorKey = twoFactorApiKey();
+  let lastErr: string | undefined;
 
   // 2Factor.in — primary for India (+91); cheapest DLT route; fall through on failure
   if (!opts?.skip2Factor && twoFactorKey && norm.startsWith("+91")) {
@@ -239,6 +255,7 @@ export async function sendSms(
     if (otp) {
       const tf = await send2FactorOtpSms(twoFactorKey, norm, otp);
       if (tf.ok) return tf;
+      lastErr = tf.error;
       console.warn("[SMS] 2Factor OTP failed:", tf.error);
     } else {
       const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";
@@ -251,7 +268,8 @@ export async function sendSms(
       if (transRes.ok) {
         return { ok: true, provider: "2factor-trans", ref: transBody.slice(0, 120) };
       }
-      console.warn("[SMS] 2Factor transactional failed:", transBody.slice(0, 120));
+      lastErr = transBody.slice(0, 120) || "2Factor transactional failed";
+      console.warn("[SMS] 2Factor transactional failed:", lastErr);
     }
   }
 
@@ -342,7 +360,10 @@ export async function sendSms(
     }
   }
 
-  return { ok: false, error: "No SMS provider configured (2Factor/MSG91/Fast2SMS/Twilio)" };
+  if (!twoFactorKey && !msg91Key && !fast2SmsApiKey() && !(twilioSid && twilioToken && twilioFrom)) {
+    return { ok: false, error: "No SMS provider configured (2Factor/MSG91/Fast2SMS/Twilio)" };
+  }
+  return { ok: false, error: lastErr ? `SMS failed: ${lastErr}` : "SMS delivery failed — try again or contact support" };
 }
 
 export async function makeOutboundCall(

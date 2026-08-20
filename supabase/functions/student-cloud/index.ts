@@ -276,6 +276,24 @@ async function verifyOtp(mobile: string, otp: string): Promise<boolean> {
   return data?.success === true;
 }
 
+async function verifyLoggedInMobile(
+  sb: ReturnType<typeof adminSb>,
+  profileId: string,
+  mobile: string,
+): Promise<boolean> {
+  if (!profileId || !mobile) return false;
+  const { data: prof } = await sb
+    .from("profiles")
+    .select("id, phone, mobile_verified, status")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!prof?.id) return false;
+  if (String(prof.status || "").toLowerCase() === "deleted") return false;
+  if (!prof.mobile_verified) return false;
+  const profMobile = normalizeMobile(String(prof.phone || ""));
+  return !!profMobile && profMobile === mobile;
+}
+
 async function paymentCaptured(sb: ReturnType<typeof adminSb>, txnId: string, minPaise: number) {
   if (!txnId) return false;
   const { data } = await sb.from("payment_intents").select("status, amount_paise, verified_via").eq("txn_id", txnId).maybeSingle();
@@ -370,8 +388,11 @@ Deno.serve(async (req) => {
       const mobile = normalizeMobile(String(body.mobile || "")) || "";
       const otp = String(body.otp || "");
       if (!mobile) return json({ error: "Valid mobile required" }, 400);
-      const ok = await verifyOtp(mobile, otp);
-      if (!ok) return json({ error: "Verify mobile OTP first" }, 401);
+      const verifiedProfileId = String(body.verified_profile_id || "").trim();
+      const mobileOk = verifiedProfileId
+        ? await verifyLoggedInMobile(sb, verifiedProfileId, mobile)
+        : await verifyOtp(mobile, otp);
+      if (!mobileOk) return json({ error: "Verify mobile OTP first" }, 401);
 
       const firstName = String(body.first_name || "").trim();
       const lastName = String(body.last_name || "").trim();

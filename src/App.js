@@ -6308,6 +6308,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         onBack={() => setScreen('cloud-list')}
         addToast={addToast}
         showCopyright
+        loggedInUser={browseAuthed && pendingProfile?.mobile_verified ? pendingProfile : null}
         kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
       />
     );
@@ -7722,6 +7723,7 @@ function ServicesScreen() {
         onBack={() => setCloudAdmit(false)}
         addToast={addToast}
         showCopyright={false}
+        loggedInUser={user?.role === 'customer' && user?.mobile_verified ? user : null}
         kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
       />
     );

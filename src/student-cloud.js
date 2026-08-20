@@ -260,7 +260,7 @@ function otpChange(i, raw, digits, setDigits, prefix) {
 }
 
 export function StudentCloudAdmitScreen({
-  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, showCopyright = true, kit,
+  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, showCopyright = true, loggedInUser = null, kit,
 }) {
   const {
     C, S, FF, Field, Btn, Spin, BDR, CopyrightLine,
@@ -312,6 +312,23 @@ export function StudentCloudAdmitScreen({
     () => courseList.find((c) => c.id === courseId)?.name || initialCourse?.name || 'Cloud & IT Training',
     [courseList, courseId, initialCourse],
   );
+
+  const loggedInMobile10 = useMemo(() => resolveUserMobile10(loggedInUser), [loggedInUser]);
+  const canSkipOtp = !!(loggedInUser?.mobile_verified && loggedInMobile10 && digits10(mobile) === loggedInMobile10);
+
+  useEffect(() => {
+    if (!loggedInUser) return;
+    const m10 = resolveUserMobile10(loggedInUser);
+    if (m10) setMobile(m10);
+    if (loggedInUser.first_name) setFirstName(loggedInUser.first_name);
+    if (loggedInUser.last_name) setLastName(loggedInUser.last_name);
+    const em = String(loggedInUser.contact_email || loggedInUser.email || '').trim();
+    if (em && !em.endsWith('@scanv.app')) setEmail(em);
+    if (loggedInUser.address) setAddress((a) => a || loggedInUser.address);
+    if (loggedInUser.city) setCity((c) => c || loggedInUser.city);
+    if (loggedInUser.state) setState((s) => s || loggedInUser.state);
+    if (loggedInUser.pincode) setPincode((p) => p || loggedInUser.pincode);
+  }, [loggedInUser]);
 
   const fillGps = async () => {
     setGpsBusy(true); setErr('');
@@ -436,16 +453,14 @@ export function StudentCloudAdmitScreen({
     return ok;
   }, [preparePayLink, addToast, courseId, courseName]);
 
-  const verifyAndSubmit = async () => {
-    const code = otpCode.join('');
-    if (code.length < 6) return setErr('Enter 6-digit OTP');
+  const submitEnrollment = async ({ skipOtp = false } = {}) => {
     const formErr = validateForm();
     if (formErr) return setErr(formErr);
+    if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
-      const r = await studentCloudFetch('submit', {
+      const payload = {
         mobile: `+91${digits10(mobile)}`,
-        otp: code,
         email: email.trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -464,7 +479,15 @@ export function StudentCloudAdmitScreen({
         bypass_pin: bypassPin.trim() || undefined,
         terms_accepted_at: termsAcceptedAt || null,
         terms_version: termsAcceptedAt ? '2026-08-20' : null,
-      }, { apikey: SB_KEY });
+      };
+      if (skipOtp && loggedInUser?.id) {
+        payload.verified_profile_id = loggedInUser.id;
+      } else {
+        const code = otpCode.join('');
+        if (code.length < 6) return setErr('Enter 6-digit OTP');
+        payload.otp = code;
+      }
+      const r = await studentCloudFetch('submit', payload, { apikey: SB_KEY });
       setOtpVerified(true);
       setStudent(r.student);
       if (r.student?.id) setStoredStudentCloudId(r.student.id);
@@ -478,11 +501,15 @@ export function StudentCloudAdmitScreen({
       setTxnId(tid);
       setPayUrl(null);
       const ok = await preparePayLink(tid, lockedFee);
-      if (ok && !paid) addToast?.('Mobile verified — continue to Razorpay', 'success');
+      if (ok && !paid) addToast?.(skipOtp ? 'Continue to Razorpay' : 'Mobile verified — continue to Razorpay', 'success');
     } catch (e) {
       setErr(e.message || 'Could not submit form');
     } finally { setLoading(false); }
   };
+
+  const verifyAndSubmit = async () => submitEnrollment({ skipOtp: false });
+
+  const continueLoggedIn = async () => submitEnrollment({ skipOtp: true });
 
   const openPay = () => {
     if (payMode === 'sgr' && !sgrFeeAck) { addToast?.('Please confirm SGR fee is non-refundable', 'error'); return; }
@@ -559,7 +586,7 @@ export function StudentCloudAdmitScreen({
         <Field label="Date of birth" req note={`Age ${SGR_MIN_AGE}–${SGR_MAX_AGE}`}>
           <input type="date" min={sgrMinDobInput()} max={sgrMaxDobInput()} value={dob} onChange={(e) => setDob(e.target.value)} style={S.inp()} disabled={otpVerified} />
         </Field>
-        <Field label="Mobile" req note="Verified by OTP">
+        <Field label="Mobile" req note={otpVerified ? 'Verified' : canSkipOtp ? 'Logged in — OTP not required' : 'We verify with OTP SMS'}>
           <div style={{ display: 'flex', alignItems: 'center', background: C.surf, border: BDR, borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ padding: '12px', background: C.deep, borderRight: BDR, color: C.sub, fontSize: 14, fontWeight: 700 }}>+91</div>
             <input type="tel" maxLength={10} value={mobile} onChange={(e) => { setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpSent(false); setOtpVerified(false); }} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={otpVerified} />
@@ -623,7 +650,10 @@ export function StudentCloudAdmitScreen({
           />
         )}
 
-        {!otpVerified && !otpSent && (
+        {!otpVerified && !otpSent && canSkipOtp && (
+          <Btn full onClick={continueLoggedIn} disabled={loading || !termsAccepted}>{loading ? <><Spin size={16} /> Saving…</> : 'Continue (logged in) →'}</Btn>
+        )}
+        {!otpVerified && !otpSent && !canSkipOtp && (
           <Btn full onClick={sendOtp} disabled={loading || !termsAccepted}>{loading ? <><Spin size={16} /> Sending OTP…</> : 'Send OTP →'}</Btn>
         )}
         {!otpVerified && otpSent && (
