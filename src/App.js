@@ -5285,10 +5285,22 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     (async () => {
       const reusable = await findReusablePaidTxn(userId, activeSvc.id, browseTotal);
       if (cancelled || !reusable) return;
+      const existing = await findBookingByTxn(reusable.txnId, { customerId: userId });
+      if (existing) {
+        const { data: profile } = await sb().from('profiles').select('*').eq('id', userId).maybeSingle();
+        if (profile) {
+          sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
+          clearBookingDraft();
+          onRegistered(profile, existing.id);
+          addToast?.('Booking already confirmed — opening track view', 'success');
+        }
+        return;
+      }
       setTxnId(reusable.txnId);
       setPaymentAmountPaise(browseTotal);
       browsePay.setPaymentVerified(true);
-      addToast?.('Payment already confirmed — you can continue', 'success');
+      setPaymentMethod('Razorpay');
+      addToast?.('Payment already confirmed — continuing', 'success');
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5298,7 +5310,20 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     if (screen !== 'payment' || !browsePay.paymentVerified || !bookingDetail?.date || !txnId || !userId) return;
     if (autoPayContinueRef.current || creatingRef.current) return;
     autoPayContinueRef.current = true;
-    confirmPayment(paymentMethod || 'Razorpay');
+    (async () => {
+      const existing = await findBookingByTxn(txnId, { customerId: userId });
+      if (existing) {
+        const { data: profile } = await sb().from('profiles').select('*').eq('id', userId).maybeSingle();
+        if (profile) {
+          sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
+          clearBookingDraft();
+          onRegistered(profile, existing.id);
+          addToast?.('Booking already confirmed — opening track view', 'success');
+          return;
+        }
+      }
+      await confirmPayment(paymentMethod || 'Razorpay');
+    })().catch(() => { autoPayContinueRef.current = false; });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, browsePay.paymentVerified, bookingDetail?.date, txnId, userId, paymentMethod]);
 
@@ -5483,6 +5508,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         email: profileAuthEmail(mob),
         contactEmail: contactEmail.trim(),
         silentGeo, dev,
+        allowRegistered: true,
       });
 
       setUserId(profile.id);
@@ -5789,17 +5815,20 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
 
   const confirmPayment = async (method) => {
     if (!browsePay.paymentVerified) {
+      autoPayContinueRef.current = false;
       addToast?.('Payment not confirmed yet — complete payment first', 'error');
       return;
     }
     const ok = await requirePaymentVerified(txnId, paymentAmountPaise ?? browseTotal, () => browsePay.setPaymentVerified(false));
     if (!ok) {
+      autoPayContinueRef.current = false;
       addToast?.('Payment not verified. Finish paying — we check automatically.', 'error');
       return;
     }
     const sched = serviceSchedule || normalizeScheduleRow(null);
     const v = validateBookingSlot(bookingDetail?.date, bookingDetail?.time || '10:00', sched, { outsideOk: scheduleOutsideOk });
     if (!v.ok) {
+      autoPayContinueRef.current = false;
       setErr(v.message);
       setScreen('schedule');
       return;
@@ -5866,6 +5895,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               silentGeo,
               lastLat: silentGeo?.lat || bookingDetail.lat || null,
               lastLng: silentGeo?.lng || bookingDetail.lng || null,
+              allowRegistered: true,
             });
             sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
             clearBookingDraft();
@@ -5898,6 +5928,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               silentGeo,
               lastLat: silentGeo?.lat || bookingDetail.lat || null,
               lastLng: silentGeo?.lng || bookingDetail.lng || null,
+              allowRegistered: true,
             });
             addToast?.('You already have this booking — opening track view', 'success');
             sessionStorage.setItem(TRACK_BOOKING_KEY, dupRetry.id);
@@ -5941,11 +5972,24 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         silentGeo,
         lastLat: silentGeo?.lat || bookingDetail.lat || null,
         lastLng: silentGeo?.lng || bookingDetail.lng || null,
+        allowRegistered: true,
       });
       sessionStorage.setItem(TRACK_BOOKING_KEY, bk.id);
       clearBookingDraft();
       onRegistered(profile, bk.id);
-    } catch(e) { setErr(e.message||'Booking failed.'); }
+    } catch(e) {
+      autoPayContinueRef.current = false;
+      if (e?.code === 'PHONE_EXISTS') {
+        sessionStorage.setItem('scanv_login_mobile', String(mobile).replace(/\D/g, '').slice(-10));
+        setLoginIntent('bookings');
+        addToast?.('Please log in to complete your booking', 'info');
+        setScreen('login');
+        return;
+      }
+      const msg = e.message || 'Booking failed.';
+      setErr(msg);
+      addToast?.(msg, 'error');
+    }
     finally { creatingRef.current = false; setLoading(false); }
   };
 
@@ -7752,7 +7796,17 @@ function BookScreen() {
     if (step !== payStep || !bookPay.paymentVerified || !date || !txnId) return;
     if (autoPayContinueRef.current || creatingRef.current) return;
     autoPayContinueRef.current = true;
-    confirmPaid(payMethod || 'Razorpay');
+    (async () => {
+      const custId = user?.id;
+      const existing = await findBookingByTxn(txnId, custId ? { customerId: custId } : {});
+      if (existing) {
+        addToast('Booking already confirmed — opening track view', 'success');
+        clearBookingDraft();
+        goToTrack(setTrackBookingId, setScreen, existing.id);
+        return;
+      }
+      await confirmPaid(payMethod || 'Razorpay');
+    })().catch(() => { autoPayContinueRef.current = false; });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, payStep, bookPay.paymentVerified, date, txnId, payMethod]);
 
@@ -7945,6 +7999,7 @@ function BookScreen() {
         city: bookCity || user?.city || '',
         pincode: bookPincode || user?.pincode || '',
         lastLat: user?.last_lat, lastLng: user?.last_lng,
+        allowRegistered: true,
       });
       setUser(profile);
       const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
@@ -8007,7 +8062,10 @@ function BookScreen() {
       clearBookingDraft();
       addToast('Booking confirmed! Track your partner live 📍', 'success');
       goToTrack(setTrackBookingId, setScreen, data.id);
-    } catch (e) { addToast(e.message || 'Booking failed', 'error'); }
+    } catch (e) {
+      autoPayContinueRef.current = false;
+      addToast(e.message || 'Booking failed', 'error');
+    }
     finally { creatingRef.current = false; setLoading(false); }
   };
   const confirmPaid = async (method) => {
