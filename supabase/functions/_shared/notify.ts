@@ -51,18 +51,54 @@ function parse2FactorResponse(bodyText: string): { ok: boolean; ref?: string; er
   }
 }
 
+function twoFactorOtpTemplate(): string {
+  return (Deno.env.get("TWOFACTOR_OTP_TEMPLATE") || "ScanV OTP").trim();
+}
+
 async function send2FactorOtpSms(
   twoFactorKey: string,
   norm: string,
   otp: string,
 ): Promise<{ ok: boolean; provider?: string; ref?: string; error?: string }> {
   const phone10 = mobileDigitsE164(norm).slice(-10);
-  const url = `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/ScanV%20OTP`;
-  const res = await fetch(url);
-  const bodyText = await res.text().catch(() => "");
-  const parsed = parse2FactorResponse(bodyText);
-  if (parsed.ok) return { ok: true, provider: "2factor", ref: parsed.ref };
-  return { ok: false, error: parsed.error || bodyText || "2Factor SMS failed" };
+  const template = twoFactorOtpTemplate();
+  const attempts: Array<{ label: string; url: string; provider: string }> = [
+    {
+      label: "template",
+      provider: "2factor",
+      url: `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}/${encodeURIComponent(template)}`,
+    },
+    {
+      label: "default",
+      provider: "2factor-default",
+      url: `https://2factor.in/API/V1/${twoFactorKey}/SMS/${phone10}/${otp}`,
+    },
+  ];
+
+  let lastErr: string | undefined;
+  for (const attempt of attempts) {
+    const res = await fetch(attempt.url);
+    const bodyText = await res.text().catch(() => "");
+    const parsed = parse2FactorResponse(bodyText);
+    if (parsed.ok) return { ok: true, provider: attempt.provider, ref: parsed.ref };
+    lastErr = parsed.error || bodyText || "2Factor SMS failed";
+    console.warn(`[SMS] 2Factor ${attempt.label} failed:`, lastErr.slice(0, 160));
+  }
+
+  const sender = Deno.env.get("TWOFACTOR_SMS_SENDER") || "SCANV";
+  const message = `ScanV OTP: ${otp}. Valid 10 min. Do not share.`;
+  const transUrl =
+    `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${encodeURIComponent(twoFactorKey)}` +
+    `&to=${encodeURIComponent(phone10)}&from=${encodeURIComponent(sender)}` +
+    `&msg=${encodeURIComponent(message.slice(0, 480))}`;
+  const transRes = await fetch(transUrl);
+  const transBody = await transRes.text().catch(() => "");
+  const transParsed = parse2FactorResponse(transBody);
+  if (transParsed.ok) return { ok: true, provider: "2factor-trans", ref: transParsed.ref };
+  lastErr = transParsed.error || transBody.slice(0, 160) || lastErr;
+  console.warn("[SMS] 2Factor TRANS_SMS failed:", lastErr?.slice(0, 160));
+
+  return { ok: false, error: lastErr || "2Factor SMS failed" };
 }
 
 async function send2FactorOtpVoice(
@@ -196,7 +232,7 @@ export async function sendOtpDelivery(
 
   const twoFactorKey = twoFactorApiKey();
   if (allowVoice && twoFactorKey && norm.startsWith("+91")) {
-    console.warn("[OTP] SMS chain failed — trying 2Factor voice:", sms.error?.slice(0, 120));
+    console.warn("[OTP] All SMS providers failed — trying 2Factor voice. Last SMS error:", sms.error?.slice(0, 200));
     const voice = await send2FactorOtpVoice(twoFactorKey, norm, otpCode);
     if (voice.ok) return { ...voice, channel: "voice" };
     return {

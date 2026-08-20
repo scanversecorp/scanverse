@@ -104,6 +104,8 @@ const SECRET_CHECKS: Array<{
   check: () => boolean;
 }> = [
   { key: "TWOFACTOR_API_KEY", functions: "send-otp · vendor-onboard", description: "2Factor.in SMS OTP API key", required: true, check: () => envConfigured("TWOFACTOR_API_KEY") },
+  { key: "TWOFACTOR_OTP_TEMPLATE", functions: "send-otp", description: "2Factor DLT OTP template name (default: ScanV OTP)", required: false, check: () => envConfigured("TWOFACTOR_OTP_TEMPLATE") },
+  { key: "TWOFACTOR_SMS_SENDER", functions: "send-otp", description: "2Factor DLT sender ID for TRANS_SMS fallback (e.g. SCANV)", required: false, check: () => envConfigured("TWOFACTOR_SMS_SENDER") },
   { key: "OTP_REPORT_SECRET", functions: "otp-delivery-report", description: "2Factor delivery callback ?key= (set in 2Factor panel + Supabase)", required: true, check: () => envConfigured("OTP_REPORT_SECRET") },
   { key: "RAZORPAY_KEY_ID", functions: "razorpay-payment", description: "Razorpay live API key ID", required: true, check: () => envConfigured("RAZORPAY_KEY_ID") },
   { key: "RAZORPAY_KEY_SECRET", functions: "razorpay-payment", description: "Razorpay live API secret", required: true, check: () => envConfigured("RAZORPAY_KEY_SECRET") },
