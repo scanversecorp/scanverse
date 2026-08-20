@@ -8356,7 +8356,7 @@ function BookScreen() {
                     <span>Pending center payment</span>
                     <span>₹{fmtRs(centerPending)}</span>
                   </div>
-                  <div style={{fontSize:11,color:C.dim,lineHeight:1.45,marginTop:4}}>Pay ScanV share now via Razorpay. The center share is due directly to your training/provider partner — see Profile for details.</div>
+                  <div style={{fontSize:11,color:C.dim,lineHeight:1.45,marginTop:4}}>The center share is due directly to your training/provider partner within a month — see Profile for details.</div>
                 </>
               ) : (
                 [['Service fee (25% off)',price],['Platform fee (10%)',fee],['GST (18%)',gst],['Total',total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===3?700:400,color:i===3?C.acc:C.txt,fontSize:i===3?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)
@@ -9808,15 +9808,20 @@ function ProfileScreen() {
     if (!user?.id) { setCenterPendingBookings([]); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await sb().from('bookings')
-        .select('id, service_name, date, time, course_fee_paise, scanv_share_paise, center_pending_paise, center_paid_paise, total, status')
+      const { data, error } = await sb().from('bookings')
+        .select('id, service_id, service_name, date, time, course_fee_paise, scanv_share_paise, center_pending_paise, center_paid_paise, total, status')
         .eq('customer_id', user.id)
         .gt('center_pending_paise', 0)
         .order('created_at', { ascending: false });
       if (cancelled) return;
+      if (error) {
+        console.warn('Profile center pending load failed', error.message);
+        setCenterPendingBookings([]);
+        return;
+      }
       const rows = (data || []).filter((b) => {
         const due = Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0));
-        return due > 0 && isCloudSubCardBooking(b);
+        return due > 0;
       });
       setCenterPendingBookings(rows);
     })();
