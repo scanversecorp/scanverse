@@ -20,6 +20,8 @@ import {
   generateAcceptCode,
   bookingAcceptMessage,
   bookingConfirmationMessage,
+  cloudBookingConfirmationEmail,
+  sendEmailToCustomerWithSupportCc,
   callFailedStatuses,
   geocodeAddress,
 } from "../_shared/notify.ts";
@@ -97,6 +99,85 @@ async function maybeSendBookingConfirmationSms(
 
   if (!marked) return { sent: false, skipped: "race_or_already_sent" };
   return { sent: true, provider: sms.provider };
+}
+
+function isCloudSubCardServiceId(serviceId: string | null | undefined): boolean {
+  const id = String(serviceId || "").trim();
+  if (!id || id === "cloud") return false;
+  if (id === "cl-sgr") return false;
+  return id.startsWith("cl-");
+}
+
+function resolveCustomerEmail(
+  profile: { contact_email?: string | null; email?: string | null } | null,
+  booking: { customer_email?: string | null },
+): string | null {
+  for (const raw of [profile?.contact_email, profile?.email, booking.customer_email]) {
+    const e = String(raw || "").trim();
+    if (e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && !/@scanv\.app$/i.test(e)) return e;
+  }
+  return null;
+}
+
+/** Email + optional SMS for AI/Cloud/Data Center sub-cards — no dispatch. */
+async function maybeSendCloudBookingConfirmation(
+  supabase: ReturnType<typeof createClient>,
+  bookingId: string,
+): Promise<{ email?: { sent: boolean; error?: string }; sms?: { sent: boolean; error?: string } }> {
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select(
+      "id, service_id, service_name, date, time, total, txn_id, customer_id, customer_email, customer_name, status, confirmation_email_sent_at",
+    )
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking || !isCloudSubCardServiceId(booking.service_id)) {
+    return { email: { sent: false, error: "not_cloud_booking" } };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, contact_email, email, phone")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  const out: { email?: { sent: boolean; error?: string }; sms?: { sent: boolean; error?: string } } = {};
+
+  if (!booking.confirmation_email_sent_at) {
+    const customerEmail = resolveCustomerEmail(profile, booking);
+    if (!customerEmail) {
+      out.email = { sent: false, error: "no_customer_email" };
+    } else {
+      const { subject, body } = cloudBookingConfirmationEmail({
+        customerName: profile?.first_name || booking.customer_name,
+        serviceName: String(booking.service_name || "Cloud service"),
+        date: String(booking.date || ""),
+        time: booking.time ? String(booking.time) : null,
+        amountPaise: Number(booking.total) || 0,
+        txnId: booking.txn_id,
+        bookingId: String(booking.id),
+      });
+      const mail = await sendEmailToCustomerWithSupportCc(customerEmail, subject, body);
+      if (mail.ok) {
+        await supabase
+          .from("bookings")
+          .update({ confirmation_email_sent_at: new Date().toISOString() })
+          .eq("id", bookingId)
+          .is("confirmation_email_sent_at", null);
+        out.email = { sent: true };
+      } else {
+        console.warn("[booking-dispatch] cloud confirmation email failed:", mail.error);
+        out.email = { sent: false, error: mail.error };
+      }
+    }
+  } else {
+    out.email = { sent: false, error: "already_sent" };
+  }
+
+  const sms = await maybeSendBookingConfirmationSms(supabase, bookingId);
+  out.sms = { sent: sms.sent, error: sms.error };
+
+  return out;
 }
 
 type DispatchMode = "both" | "in_app" | "external" | "disabled";
@@ -1085,6 +1166,15 @@ Deno.serve(async (req: Request) => {
       const serviceName = String(body.service_name || "Service");
       if (!bookingId) return json({ error: "booking_id required" }, 400);
 
+      if (isCloudSubCardServiceId(serviceId)) {
+        return json({
+          success: true,
+          dispatch_skipped: true,
+          reason: "cloud_digital_service",
+          message: "Cloud / digital bookings do not use partner dispatch",
+        });
+      }
+
       if (!(await dispatchSecretOk(req, supabase))) {
         const authorized = await bookingPartyAuthorized(
           supabase, supabaseUrl, req, bookingId, body,
@@ -1199,6 +1289,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (action === "cloud_complete") {
+      const bookingId = String(body.booking_id || "");
+      if (!bookingId) return json({ error: "booking_id required" }, 400);
+
+      if (!(await dispatchSecretOk(req, supabase))) {
+        const authorized = await bookingPartyAuthorized(
+          supabase, supabaseUrl, req, bookingId, body,
+        );
+        if (!authorized) return json({ error: "Unauthorized" }, 401);
+      }
+
+      const notifications = await maybeSendCloudBookingConfirmation(supabase, bookingId);
+      return json({ success: true, notifications });
+    }
+
     if (action === "tick") {
       if (!(await tickAuthOk(req, supabase))) return json({ error: "Unauthorized" }, 401);
 
@@ -1236,7 +1341,7 @@ Deno.serve(async (req: Request) => {
       return json({ dispatch: data });
     }
 
-    return json({ error: "Unknown action. Use start, tick, respond, twiml, call-status, inbound-sms." }, 400);
+    return json({ error: "Unknown action. Use start, cloud_complete, tick, respond, twiml, call-status, inbound-sms." }, 400);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Internal error";
     return json({ error: msg }, 500);

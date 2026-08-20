@@ -645,6 +645,132 @@ export function bookingConfirmationMessage(opts: {
   ).slice(0, 480);
 }
 
+const SUPPORT_EMAIL_DEFAULT = "support@getscanv.com";
+
+function isRealEmail(email: string): boolean {
+  const e = (email || "").trim();
+  return !!e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && !/@scanv\.app$/i.test(e);
+}
+
+/** Customer booking confirmation email with support CC. */
+export function cloudBookingConfirmationEmail(opts: {
+  customerName?: string | null;
+  serviceName: string;
+  date: string;
+  time?: string | null;
+  amountPaise: number;
+  txnId?: string | null;
+  bookingId: string;
+  appUrl?: string;
+}): { subject: string; body: string } {
+  const base = (opts.appUrl || Deno.env.get("APP_URL") || "https://getscanv.com").replace(/\/$/, "");
+  const name = String(opts.customerName || "").trim() || "Customer";
+  const rs = (Math.max(0, Number(opts.amountPaise) || 0) / 100).toLocaleString("en-IN");
+  const when = opts.time ? `${opts.date} at ${opts.time}` : opts.date;
+  const ref = String(opts.txnId || opts.bookingId).slice(0, 32);
+  const bookingsUrl = `${base}/#bookings`;
+  const subject = `ScanV booking confirmed — ${opts.serviceName}`;
+  const body = [
+    `Hi ${name},`,
+    "",
+    "Your AI, Cloud & Data Center booking is confirmed and payment received.",
+    "",
+    `Service: ${opts.serviceName}`,
+    `Scheduled: ${when}`,
+    `Amount paid: Rs.${rs}`,
+    `Reference: ${ref}`,
+    `Booking ID: ${opts.bookingId}`,
+    "",
+    "This is a digital / consulting service — no partner dispatch or live tracking applies.",
+    "Our team will reach out if any onboarding steps are needed.",
+    "",
+    `View your bookings: ${bookingsUrl}`,
+    "",
+    "Questions? Reply to this email or contact support@getscanv.com",
+    "",
+    "— ScanV · getscanv.com",
+  ].join("\n");
+  return { subject, body };
+}
+
+export async function sendEmailToCustomerWithSupportCc(
+  customerEmail: string,
+  subject: string,
+  body: string,
+  supportEmail = Deno.env.get("SUPPORT_EMAIL_CC") || SUPPORT_EMAIL_DEFAULT,
+): Promise<{ ok: boolean; provider?: string; error?: string; sent?: number }> {
+  const to = (customerEmail || "").trim();
+  if (!isRealEmail(to)) return { ok: false, error: "Invalid customer email" };
+  const cc = isRealEmail(supportEmail) ? [supportEmail] : [];
+
+  const resendKey = Deno.env.get("RESEND_API_KEY");
+  const cfToken = Deno.env.get("CLOUDFLARE_API_TOKEN") || Deno.env.get("CF_API_TOKEN") || "";
+  const cfAccount = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") || "7f8fbca1a540bef510c9c39cf15aa0a8";
+  const from = Deno.env.get("SUPPORT_EMAIL_FROM")
+    || Deno.env.get("HEALTH_REPORT_FROM")
+    || "support@getscanv.com";
+
+  if (resendKey) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        ...(cc.length ? { cc } : {}),
+        subject,
+        text: body,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return { ok: true, provider: "resend", sent: 1 + cc.length };
+    return {
+      ok: false,
+      error: typeof data === "object" && data !== null && "message" in data
+        ? String((data as { message: string }).message)
+        : res.statusText,
+    };
+  }
+
+  if (cfToken) {
+    const recipients = cc.length ? [to, ...cc] : [to];
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccount}/email/sending/send`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cfToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: recipients.length === 1 ? recipients[0] : recipients,
+          from: { address: from, name: "ScanV" },
+          subject,
+          text: body,
+        }),
+      },
+    );
+    const data = await res.json().catch(() => ({})) as {
+      success?: boolean;
+      errors?: Array<{ message?: string }>;
+      result?: { delivered?: string[]; queued?: string[] };
+    };
+    if (res.ok && data.success) {
+      const delivered = data.result?.delivered?.length || 0;
+      const queued = data.result?.queued?.length || 0;
+      if (delivered + queued > 0) return { ok: true, provider: "cloudflare-email", sent: recipients.length };
+    }
+    const err = data.errors?.[0]?.message || res.statusText;
+    return { ok: false, error: err || "Cloudflare Email Sending failed" };
+  }
+
+  console.log(`[ScanV email] To: ${to} CC: ${cc.join(", ")} | ${subject}\n${body.slice(0, 500)}`);
+  return { ok: false, error: "Email not configured — set RESEND_API_KEY or CLOUDFLARE_API_TOKEN" };
+}
+
 export function callFailedStatuses(): Set<string> {
   return new Set([
     "failed", "busy", "no-answer", "no_answer", "canceled", "cancelled",

@@ -1458,6 +1458,59 @@ function svcSupportsLiveTrack(svc) {
   return LIVE_TRACK_PARENTS.has(subCatId(svc) || svc.id || '');
 }
 
+/** AI, Cloud & Data Center sub-cards — digital/consulting; no dispatch or live tracking. */
+function isCloudSubCardService(svc) {
+  if (!svc) return false;
+  const id = svc.id || '';
+  if (id === SGR_SERVICE_ID) return false;
+  const parent = svc.parent || svcParentId(svc);
+  return parent === 'cloud' || (id.startsWith('cl-') && id !== SGR_SERVICE_ID);
+}
+
+function isCloudSubCardBooking(booking) {
+  if (!booking) return false;
+  const sid = booking.service_id || '';
+  if (sid === SGR_SERVICE_ID) return false;
+  const svc = findSvcById(sid) || (sid.startsWith('cl-') ? { id: sid, parent: 'cloud' } : null);
+  return isCloudSubCardService(svc);
+}
+
+function cloudBookingStatusFields() {
+  const now = new Date().toISOString();
+  return { status: 'completed', paid_at: now, completed_at: now };
+}
+
+function standardBookingStatusFields() {
+  return { status: 'confirmed', paid_at: new Date().toISOString() };
+}
+
+function openExistingBookingAfterPay(booking, profile, onRegistered, addToast) {
+  clearBookingDraft();
+  if (isCloudSubCardBooking(booking)) {
+    sessionStorage.removeItem(TRACK_BOOKING_KEY);
+    addToast?.('Booking already confirmed — see Bookings', 'success');
+    onRegistered?.(profile, null, 'home');
+    return;
+  }
+  sessionStorage.setItem(TRACK_BOOKING_KEY, booking.id);
+  onRegistered(profile, booking.id);
+}
+
+function navigateAfterPaidBookingFinalized(finalized, addToast, { setTrackBookingId, setScreen, onRegistered, profile } = {}) {
+  if (!finalized?.ok || !finalized.bookingId) return;
+  if (finalized.cloud) {
+    sessionStorage.removeItem(TRACK_BOOKING_KEY);
+    addToast?.('Booking confirmed — check your email', 'success');
+    if (onRegistered && profile) onRegistered(profile, null, 'home');
+    else setScreen?.('services');
+    return;
+  }
+  const msg = finalized.existing ? 'Opening your booking' : 'Booking confirmed — finding your partner 📍';
+  addToast?.(msg, 'success');
+  if (onRegistered && profile) onRegistered(profile, finalized.bookingId);
+  else goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+}
+
 function findSvcByName(name) {
   if (!name) return null;
   return getAllSubSvcs().find(s => s.name === name) || SVCS.find(s => s.name === name) || null;
@@ -1730,6 +1783,8 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
   }
 
   const { price, fee, gst, total } = bookingTotalsForSvc(svc);
+  const isCloud = isCloudSubCardService(svc);
+  const bookingStatus = isCloud ? cloudBookingStatusFields() : standardBookingStatusFields();
   const isDeliveryShipment = svc.parent === 'delivery';
   const locFromDraft = draft?.loc
     || draft?.bookingDetail?.loc
@@ -1762,7 +1817,14 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
       onUseExisting: (existing) => {
         clearBookingDraft();
         clearPaymentReturnUrl();
-        if (nav.setTrackBookingId && nav.setScreen) goToTrack(nav.setTrackBookingId, nav.setScreen, existing.id);
+        if (nav.setTrackBookingId && nav.setScreen) {
+          if (isCloudSubCardBooking(existing)) {
+            sessionStorage.removeItem(TRACK_BOOKING_KEY);
+            nav.setScreen('services');
+          } else {
+            goToTrack(nav.setTrackBookingId, nav.setScreen, existing.id);
+          }
+        }
       },
     });
     if (!dupAction.proceed) {
@@ -1788,9 +1850,8 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     platform_fee: fee,
     gst_amt: gst,
     total,
-    status: 'confirmed',
+    ...bookingStatus,
     txn_id: intent.txn_id,
-    paid_at: intent.paid_at || new Date().toISOString(),
   }).select().single();
 
   if (error) {
@@ -1819,7 +1880,7 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     platform_fee: fee,
     gst_amount: gst,
     total,
-    status: 'new',
+    status: isCloud ? 'completed' : 'new',
     txn_id: intent.txn_id,
     added_by: user.id,
   });
@@ -1834,6 +1895,13 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     gateway: 'Razorpay',
     payer_vpa: payCheck.payer_vpa || null,
   }));
+
+  if (isCloud) {
+    await invokeCloudBookingComplete({ bookingId: bk.id, customerId: user.id }, addToast);
+    clearBookingDraft();
+    clearPaymentReturnUrl();
+    return { ok: true, bookingId: bk.id, booking: bk, cloud: true };
+  }
 
   await invokeBookingDispatch({
     bookingId: bk.id,
@@ -1850,7 +1918,7 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
 
   clearBookingDraft();
   clearPaymentReturnUrl();
-  return { ok: true, bookingId: bk.id, booking: bk };
+  return { ok: true, bookingId: bk.id, booking: bk, cloud: false };
 }
 
 const ACTIVE_BOOKING_STATUSES = ['confirmed', 'in_progress', 'in-progress'];
@@ -3124,6 +3192,9 @@ async function resolveDispatchCoords({ lat, lng, location }) {
 }
 
 async function invokeBookingDispatch(opts, addToast) {
+  if (isCloudSubCardService({ id: opts.serviceId, parent: opts.categoryId })) {
+    return { success: true, dispatch_skipped: true, reason: 'cloud_digital_service' };
+  }
   try {
     const coords = await resolveDispatchCoords(opts);
     const r = await sb().functions.invoke('booking-dispatch', {
@@ -3168,6 +3239,35 @@ async function invokeBookingDispatch(opts, addToast) {
     return r.data;
   } catch (e) {
     addToast?.(e.message || 'Partner alerts failed', 'error');
+    return { error: e.message };
+  }
+}
+
+async function invokeCloudBookingComplete(opts, addToast) {
+  try {
+    const r = await sb().functions.invoke('booking-dispatch', {
+      body: {
+        action: 'cloud_complete',
+        booking_id: opts.bookingId,
+        customer_id: opts.customerId || null,
+      },
+    });
+    if (r.error) {
+      addToast?.(r.error.message || 'Confirmation email could not be sent', 'error');
+      return { error: r.error.message };
+    }
+    if (r.data?.error) {
+      addToast?.(r.data.error, 'error');
+      return r.data;
+    }
+    if (r.data?.notifications?.email?.sent) {
+      addToast?.('Confirmation email sent', 'success');
+    } else if (r.data?.notifications?.email?.error === 'no_customer_email') {
+      addToast?.('Booking saved — add your email in Profile for confirmations', 'info');
+    }
+    return r.data;
+  } catch (e) {
+    addToast?.(e.message || 'Confirmation email failed', 'error');
     return { error: e.message };
   }
 }
@@ -5288,12 +5388,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       const existing = await findBookingByTxn(reusable.txnId, { customerId: userId });
       if (existing) {
         const { data: profile } = await sb().from('profiles').select('*').eq('id', userId).maybeSingle();
-        if (profile) {
-          sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
-          clearBookingDraft();
-          onRegistered(profile, existing.id);
-          addToast?.('Booking already confirmed — opening track view', 'success');
-        }
+        if (profile) openExistingBookingAfterPay(existing, profile, onRegistered, addToast);
         return;
       }
       setTxnId(reusable.txnId);
@@ -5314,13 +5409,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       const existing = await findBookingByTxn(txnId, { customerId: userId });
       if (existing) {
         const { data: profile } = await sb().from('profiles').select('*').eq('id', userId).maybeSingle();
-        if (profile) {
-          sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
-          clearBookingDraft();
-          onRegistered(profile, existing.id);
-          addToast?.('Booking already confirmed — opening track view', 'success');
-          return;
-        }
+        if (profile) openExistingBookingAfterPay(existing, profile, onRegistered, addToast);
+        return;
       }
       await confirmPayment(paymentMethod || 'Razorpay');
     })().catch(() => { autoPayContinueRef.current = false; });
@@ -5396,8 +5486,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           try {
             const finalized = await finalizePaidIntentBooking(prof, intent, addToast, {});
             if (finalized.ok && finalized.bookingId) {
-              addToast?.('Booking confirmed — finding your partner 📍', 'success');
-              onRegistered(prof, finalized.bookingId);
+              navigateAfterPaidBookingFinalized(finalized, addToast, { onRegistered, profile: prof });
               return;
             }
           } catch (e) {
@@ -5878,6 +5967,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       const custLat = silentGeo?.lat || bookingDetail.lat || null;
       const custLng = silentGeo?.lng || bookingDetail.lng || null;
       const svcId = svc.id || svc.parent || null;
+      const isCloud = isCloudSubCardService(svc);
+      const bookingStatus = isCloud ? cloudBookingStatusFields() : standardBookingStatusFields();
       const dup = await findDuplicateBooking({
         customerId: userId, serviceId: svcId,
         date: bookingDetail.date, time: bookingDetail.time || '10:00', txnId,
@@ -5897,9 +5988,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               lastLng: silentGeo?.lng || bookingDetail.lng || null,
               allowRegistered: true,
             });
-            sessionStorage.setItem(TRACK_BOOKING_KEY, existing.id);
-            clearBookingDraft();
-            onRegistered(profile, existing.id);
+            openExistingBookingAfterPay(existing, profile, onRegistered, addToast);
           },
         });
         if (!dupAction.proceed) return;
@@ -5914,8 +6003,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         drop_text: isDeliveryShipment ? dropText : null,
         customer_lat: custLat, customer_lng: custLng,
         price, platform_fee:fee, gst_amt:gst, total,
-        status:'confirmed', txn_id:txnId,
-        paid_at:new Date().toISOString(),
+        ...bookingStatus,
+        txn_id:txnId,
       }).select().single();
       if (error) {
         if (isUniqueViolation(error)) {
@@ -5930,10 +6019,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               lastLng: silentGeo?.lng || bookingDetail.lng || null,
               allowRegistered: true,
             });
-            addToast?.('You already have this booking — opening track view', 'success');
-            sessionStorage.setItem(TRACK_BOOKING_KEY, dupRetry.id);
-            clearBookingDraft();
-            onRegistered(profile, dupRetry.id);
+            openExistingBookingAfterPay(dupRetry, profile, onRegistered, addToast);
             return;
           }
         }
@@ -5946,13 +6032,31 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         pickup_text: isDeliveryShipment ? pickupText : null,
         drop_text: isDeliveryShipment ? dropText : null,
         price, platform_fee:fee, gst_amount:gst, total,
-        status:'new', txn_id:txnId, added_by:userId,
+        status: isCloud ? 'completed' : 'new', txn_id:txnId, added_by:userId,
       });
       await sbIgnore(sb().from('payments').insert({
         booking_id:bk.id, user_id:userId, amount:total,
-        method:payM||'UPI', status:'success', txn_id:txnId, gateway:'Razorpay',
+        method:payM||'Razorpay', status:'success', txn_id:txnId, gateway:'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
       }));
+      const profile = await upsertCustomerProfile({
+        id: userId,
+        mob: normalizeMobileE164(mobile),
+        firstName, lastName, address, village, city, pincode,
+        contactEmail: contactEmail.trim() || undefined,
+        silentGeo,
+        lastLat: silentGeo?.lat || bookingDetail.lat || null,
+        lastLng: silentGeo?.lng || bookingDetail.lng || null,
+        allowRegistered: true,
+      });
+      if (isCloud) {
+        await invokeCloudBookingComplete({ bookingId: bk.id, customerId: userId }, addToast);
+        clearBookingDraft();
+        sessionStorage.removeItem(TRACK_BOOKING_KEY);
+        addToast?.('Booking confirmed — check your email', 'success');
+        onRegistered(profile, null, 'home');
+        return;
+      }
       await invokeBookingDispatch({
         bookingId: bk.id,
         serviceId: svc.id || svc.parent || activeSvc?.id || '',
@@ -5965,15 +6069,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         date: bookingDetail.date,
         time: bookingDetail.time || '10:00',
       }, addToast);
-      const profile = await upsertCustomerProfile({
-        id: userId,
-        mob: normalizeMobileE164(mobile),
-        firstName, lastName, address, village, city, pincode,
-        silentGeo,
-        lastLat: silentGeo?.lat || bookingDetail.lat || null,
-        lastLng: silentGeo?.lng || bookingDetail.lng || null,
-        allowRegistered: true,
-      });
       sessionStorage.setItem(TRACK_BOOKING_KEY, bk.id);
       clearBookingDraft();
       onRegistered(profile, bk.id);
@@ -7800,9 +7895,15 @@ function BookScreen() {
       const custId = user?.id;
       const existing = await findBookingByTxn(txnId, custId ? { customerId: custId } : {});
       if (existing) {
-        addToast('Booking already confirmed — opening track view', 'success');
-        clearBookingDraft();
-        goToTrack(setTrackBookingId, setScreen, existing.id);
+        if (isCloudSubCardBooking(existing)) {
+          addToast('Booking already confirmed — see Bookings', 'success');
+          clearBookingDraft();
+          setScreen('services');
+        } else {
+          addToast('Booking already confirmed — opening track view', 'success');
+          clearBookingDraft();
+          goToTrack(setTrackBookingId, setScreen, existing.id);
+        }
         return;
       }
       await confirmPaid(payMethod || 'Razorpay');
@@ -7847,8 +7948,7 @@ function BookScreen() {
         try {
           const finalized = await finalizePaidIntentBooking(user, intent, addToast, { setTrackBookingId, setScreen });
           if (finalized.ok && finalized.bookingId) {
-            addToast('Booking confirmed — finding your partner 📍', 'success');
-            goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+            navigateAfterPaidBookingFinalized(finalized, addToast, { setTrackBookingId, setScreen });
             return;
           }
         } catch (e) {
@@ -8006,6 +8106,8 @@ function BookScreen() {
       const custLat = bookLat ?? profile.last_lat ?? silentGeo?.lat ?? null;
       const custLng = bookLng ?? profile.last_lng ?? silentGeo?.lng ?? null;
       const svcId = svc.id || svc.parent || null;
+      const isCloud = isCloudSubCardService(svc);
+      const bookingStatus = isCloud ? cloudBookingStatusFields() : standardBookingStatusFields();
       const dup = await findDuplicateBooking({
         customerId: profile.id, serviceId: svcId,
         date, time, txnId,
@@ -8017,7 +8119,13 @@ function BookScreen() {
           allowOverride: dup.txn_id !== txnId,
           onUseExisting: (existing) => {
             clearBookingDraft();
-            goToTrack(setTrackBookingId, setScreen, existing.id);
+            if (isCloudSubCardBooking(existing)) {
+              sessionStorage.removeItem(TRACK_BOOKING_KEY);
+              addToast('Booking already confirmed — see Bookings', 'success');
+              setScreen('services');
+            } else {
+              goToTrack(setTrackBookingId, setScreen, existing.id);
+            }
           },
         });
         if (!dupAction.proceed) return;
@@ -8028,15 +8136,20 @@ function BookScreen() {
         date, time, notes, location_text: loc,
         customer_lat: custLat, customer_lng: custLng,
         price, platform_fee: fee, gst_amt: gst, total,
-        status: 'confirmed', txn_id: txnId, paid_at: new Date().toISOString(),
+        ...bookingStatus, txn_id: txnId,
       }).select().single();
       if (error) {
         if (isUniqueViolation(error)) {
           const dupRetry = await findBookingByTxn(txnId, { customerId: profile.id });
           if (dupRetry) {
-            addToast('You already have this booking — opening track view', 'success');
             clearBookingDraft();
-            goToTrack(setTrackBookingId, setScreen, dupRetry.id);
+            if (isCloudSubCardBooking(dupRetry)) {
+              addToast('Booking already confirmed — see Bookings', 'success');
+              setScreen('services');
+            } else {
+              addToast('You already have this booking — opening track view', 'success');
+              goToTrack(setTrackBookingId, setScreen, dupRetry.id);
+            }
             return;
           }
         }
@@ -8046,13 +8159,22 @@ function BookScreen() {
         customer_id: profile.id, service_name: svc.name, service_type: svc.cat,
         preferred_date: date, preferred_time: time, notes, location_text: loc,
         price, platform_fee: fee, gst_amount: gst, total,
-        status: 'new', txn_id: txnId, added_by: profile.id,
+        status: isCloud ? 'completed' : 'new', txn_id: txnId, added_by: profile.id,
       });
       await sbIgnore(sb().from('payments').insert({
         booking_id: data.id, user_id: profile.id, amount: total,
-        method: payMethod || 'UPI', status: 'success', txn_id: txnId, gateway: 'Razorpay',
+        method: payMethod || 'Razorpay', status: 'success', txn_id: txnId, gateway: 'Razorpay',
         payer_vpa: payCheck.payer_vpa || null,
       }));
+      if (isCloud) {
+        await invokeCloudBookingComplete({ bookingId: data.id, customerId: profile.id }, addToast);
+        setBooking(data);
+        clearBookingDraft();
+        sessionStorage.removeItem(TRACK_BOOKING_KEY);
+        addToast('Booking confirmed — check your email', 'success');
+        setScreen('services');
+        return;
+      }
       await invokeBookingDispatch({
         bookingId: data.id, serviceId: svc.id || svc.parent || '', categoryId: svc.parent || '',
         customerId: profile.id, serviceName: svc.name,
@@ -8574,6 +8696,17 @@ function TrackServiceScreen() {
   }, [bookingId]);
 
   useEffect(() => {
+    if (!booking || loading) return;
+    if (isCloudSubCardBooking(booking)) {
+      sessionStorage.removeItem(TRACK_BOOKING_KEY);
+      setTrackBookingId?.(null);
+      window.location.hash = '';
+      addToast?.('Cloud service booked — see Bookings', 'success');
+      setScreen('services');
+    }
+  }, [booking, loading, addToast, setTrackBookingId, setScreen]);
+
+  useEffect(() => {
     if (booking?.status === 'completed') {
       addToast?.('Service completed ✅', 'success');
       sessionStorage.removeItem(TRACK_BOOKING_KEY);
@@ -9089,8 +9222,7 @@ function BookingsScreen() {
           try {
             const finalized = await finalizePaidIntentBooking(user, autoIntent, addToast, { setTrackBookingId, setScreen });
             if (finalized.ok && finalized.bookingId) {
-              addToast(finalized.existing ? 'Opening your booking' : 'Booking confirmed — finding your partner 📍', 'success');
-              goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+              navigateAfterPaidBookingFinalized(finalized, addToast, { setTrackBookingId, setScreen });
               pending = pending.filter((i) => i.txn_id !== autoIntent.txn_id);
             }
           } catch (e) {
@@ -9185,8 +9317,7 @@ function BookingsScreen() {
           const finalized = await finalizePaidIntentBooking(user, intent, addToast, { setTrackBookingId, setScreen });
           if (cancelled) return;
           if (finalized.ok && finalized.bookingId) {
-            addToast('Booking confirmed — finding your partner 📍', 'success');
-            goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+            navigateAfterPaidBookingFinalized(finalized, addToast, { setTrackBookingId, setScreen });
             setOrphans((prev) => prev.filter((i) => i.txn_id !== returnTxn));
             load();
           }
@@ -9357,8 +9488,7 @@ function BookingsScreen() {
       );
       if (!finalized.ok) throw new Error(finalized.error || 'Could not complete booking');
       setRecovering(null);
-      addToast(finalized.existing ? 'Opening your booking' : 'Booking confirmed — finding your partner 📍', 'success');
-      goToTrack(setTrackBookingId, setScreen, finalized.bookingId);
+      navigateAfterPaidBookingFinalized(finalized, addToast, { setTrackBookingId, setScreen });
       load();
     } catch (e) {
       addToast(e.message || 'Could not complete booking', 'error');
@@ -17403,9 +17533,15 @@ export default function App() {
               if (finalized.ok && finalized.bookingId) {
                 setUser(profile);
                 setState('app');
-                setTrackBookingId(finalized.bookingId);
-                sessionStorage.setItem(TRACK_BOOKING_KEY, finalized.bookingId);
-                setScreen('track');
+                if (finalized.cloud) {
+                  sessionStorage.removeItem(TRACK_BOOKING_KEY);
+                  setTrackBookingId(null);
+                  setScreen('services');
+                } else {
+                  setTrackBookingId(finalized.bookingId);
+                  sessionStorage.setItem(TRACK_BOOKING_KEY, finalized.bookingId);
+                  setScreen('track');
+                }
                 return;
               }
             } catch (e) {
