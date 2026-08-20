@@ -669,7 +669,7 @@ export function cloudBookingConfirmationEmail(opts: {
   const when = opts.time ? `${opts.date} at ${opts.time}` : opts.date;
   const ref = String(opts.txnId || opts.bookingId).slice(0, 32);
   const bookingsUrl = `${base}/#bookings`;
-  const subject = `ScanV booking confirmed — ${opts.serviceName}`;
+  const subject = "SGR Booking Confirmation";
   const body = [
     `Hi ${name},`,
     "",
