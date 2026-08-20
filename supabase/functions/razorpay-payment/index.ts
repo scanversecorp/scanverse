@@ -50,6 +50,25 @@ async function resolveCatalogPricePaise(
   return price != null && Number.isFinite(Number(price)) ? Number(price) : null;
 }
 
+/** ScanV share for Student Cloud course fee (typically 30% of catalog course fee). */
+async function resolveScanvSharePaise(
+  supabase: ReturnType<typeof createClient>,
+  serviceId: string | null,
+): Promise<number | null> {
+  if (!serviceId) return null;
+  const { data } = await supabase
+    .from("service_pricing")
+    .select("scanv_amount_paise, new_amount_paise, scanv_pct")
+    .eq("service_id", serviceId)
+    .maybeSingle();
+  if (!data) return null;
+  const scanv = Number(data.scanv_amount_paise);
+  if (Number.isFinite(scanv) && scanv > 0) return scanv;
+  const course = Number(data.new_amount_paise);
+  const pct = Number(data.scanv_pct) || 30;
+  return course > 0 ? Math.round(course * pct / 100) : null;
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -460,18 +479,34 @@ async function handleRegister(
   }
 
   const catalogPricePaise = await resolveCatalogPricePaise(supabase, serviceId);
-  if (catalogPricePaise != null && amountPaise < catalogPricePaise) {
+  const scanvSharePaise = await resolveScanvSharePaise(supabase, serviceId);
+  let isStudentCloudCourse = body.student_cloud_course === true;
+  if (!isStudentCloudCourse && catalogPricePaise != null && scanvSharePaise != null
+    && amountPaise < catalogPricePaise && amountPaise >= scanvSharePaise) {
+    isStudentCloudCourse = true;
+  }
+
+  if (isStudentCloudCourse && scanvSharePaise != null) {
+    if (amountPaise < scanvSharePaise) {
+      return json({
+        error: "Amount below ScanV course share",
+        expected_paise: scanvSharePaise,
+      }, 400);
+    }
+  } else if (catalogPricePaise != null && amountPaise < catalogPricePaise) {
     return json({
       error: "Amount below catalog price",
       expected_paise: catalogPricePaise,
     }, 400);
   }
 
-  const servicePricePaise = catalogPricePaise != null
-    ? catalogPricePaise
-    : body.service_price_paise != null
-      ? Math.round(Number(body.service_price_paise))
-      : inferServicePriceFromTotal(amountPaise);
+  const servicePricePaise = isStudentCloudCourse && scanvSharePaise != null
+    ? scanvSharePaise
+    : catalogPricePaise != null
+      ? catalogPricePaise
+      : body.service_price_paise != null
+        ? Math.round(Number(body.service_price_paise))
+        : inferServicePriceFromTotal(amountPaise);
   const split = calcRouteSplit(servicePricePaise);
 
   const razorpayEnabled = await isVendorEnabled(supabase, "vendor_enable_razorpay");

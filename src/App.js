@@ -485,6 +485,7 @@ async function registerPaymentIntent(txnId, amountPaise, userId, meta = {}) {
     ...(meta.serviceId ? { service_id: meta.serviceId } : {}),
     ...(meta.serviceName ? { service_name: meta.serviceName } : {}),
     ...(meta.servicePricePaise ? { service_price_paise: meta.servicePricePaise } : {}),
+    ...(meta.studentCloudCourse ? { student_cloud_course: true } : {}),
   };
   try {
     if (!(await waitForSupabase())) {

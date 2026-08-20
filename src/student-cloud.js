@@ -421,6 +421,7 @@ export function StudentCloudAdmitScreen({
       serviceId: meta.serviceId || (isCourse ? courseId : 'cl-sgr'),
       serviceName: meta.serviceName || (isCourse ? courseName : 'Skill Gap Review (SGR)'),
       servicePricePaise: feePaise,
+      ...(isCourse ? { studentCloudCourse: true } : {}),
     });
     if (pay?.txn_id && pay.txn_id !== tid) setTxnId(pay.txn_id);
     if (pay?.payment_link_url) {
