@@ -6693,10 +6693,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           </div>
           <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
             {(browseCloudBook
-              ? [['Course fee', browseCourseFee], ['ScanV share', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]]
+              ? [['Course fee', browseCourseFee], ['Pay now', total]]
               : [['Service (indicative)', price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now', total]]
             ).map(([k,v],i)=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i=== (browseCloudBook ? 4 : 3)?800:500,color:i=== (browseCloudBook ? 4 : 3)?C.acc:C.sub,fontSize:i=== (browseCloudBook ? 4 : 3)?16:14}}>
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i=== (browseCloudBook ? 1 : 3)?800:500,color:i=== (browseCloudBook ? 1 : 3)?C.acc:C.sub,fontSize:i=== (browseCloudBook ? 1 : 3)?16:14}}>
                 <span>{k}</span><span>₹{(v/100).toLocaleString('en-IN')}</span>
               </div>
             ))}
@@ -8008,7 +8008,6 @@ function BookScreen() {
   const payTotals = paymentTotalsForSvc(svc);
   const price=payTotals.price,fee=payTotals.fee,gst=payTotals.gst,total=payTotals.total;
   const courseFee=payTotals.courseFee,centerPending=payTotals.centerPending,fullTotal=payTotals.fullTotal;
-  const scanvPctLabel = Math.round((payTotals.cloudSplit?.scanvPct ?? 0.30) * 100);
   const payStep = skipVerify ? 3 : 4;
   const scheduleStep = skipVerify ? 2 : 3;
   const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price,studentCloudCourse:isCloudBook});
@@ -8375,7 +8374,7 @@ function BookScreen() {
               <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><PriceTag svc={svc} /></div>
               {isCloudBook ? (
                 <>
-                  {[['Course fee', courseFee], [`ScanV share (${scanvPctLabel}%)`, price], ['Platform fee (10%)', fee], ['GST (18%)', gst], ['Pay now (Razorpay)', total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===4?700:400,color:i===4?C.acc:C.txt,fontSize:i===4?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
+                  {[['Course fee', courseFee], ['Pay now (Razorpay)', total]].map(([k,v],i)=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:i?`1px solid ${C.bdr}`:'none',fontWeight:i===1?700:400,color:i===1?C.acc:C.txt,fontSize:i===1?17:15}}><span>{k}</span><span>₹{fmtRs(v)}</span></div>)}
                   <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',marginTop:4,borderTop:`2px solid ${C.gold}44`,fontWeight:700,color:C.gold,fontSize:15}}>
                     <span>Pending center payment</span>
                     <span>₹{fmtRs(centerPending)}</span>
