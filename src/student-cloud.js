@@ -293,6 +293,8 @@ export function StudentCloudAdmitScreen({
   const [payUrl, setPayUrl] = useState(null);
   const [paid, setPaid] = useState(false);
   const [sgrFeeLocked, setSgrFeeLocked] = useState(null);
+  const [payMode, setPayMode] = useState('sgr');
+  const [coursePayPaise, setCoursePayPaise] = useState(null);
   const effectiveSgrFee = sgrFeeLocked ?? sgrFeePaise;
   const sgrFeeLabel = useMemo(() => fmtRs(effectiveSgrFee), [effectiveSgrFee]);
   const activePayPaise = payMode === 'course' ? coursePayPaise : effectiveSgrFee;
@@ -303,8 +305,6 @@ export function StudentCloudAdmitScreen({
   const [gpsBusy, setGpsBusy] = useState(false);
   const [sgrFeeAck, setSgrFeeAck] = useState(false);
   const [bypassPin, setBypassPin] = useState('');
-  const [payMode, setPayMode] = useState('sgr');
-  const [coursePayPaise, setCoursePayPaise] = useState(null);
   const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
   const [err, setErr] = useState('');
 

@@ -3606,6 +3606,16 @@ function cloudCourseMatchesEnrollment(svc, feeView) {
   return enrolled && name && enrolled === name;
 }
 
+function cloudCourseBookReady(svc, feeView) {
+  return cloudCourseMatchesEnrollment(svc, feeView) && Number(feeView?.course_fee_paise) > 0;
+}
+
+function withCloudCourseFee(svc, feeView) {
+  if (!cloudCourseBookReady(svc, feeView)) return svc;
+  const feePaise = Number(feeView.course_fee_paise);
+  return { ...svc, price: feePaise, mrp: Math.max(Number(svc.mrp) || feePaise, feePaise) };
+}
+
 function CloudCoursePriceTag({ svc, sm, feeView, onFillSgr }) {
   const isEnrolledCourse = cloudCourseMatchesEnrollment(svc, feeView);
   if (!isEnrolledCourse) {
@@ -6001,9 +6011,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
 
   const startBrowseBook = async () => {
     if (!guardBookStart(activeSvc, addToast)) return;
-    if (activeSvc?.parent === 'cloud' || activeSvc?.id === 'cloud') {
+    const isCloud = activeSvc?.parent === 'cloud' || activeSvc?.id === 'cloud';
+    if (isCloud && !cloudCourseBookReady(activeSvc, cloudFeeView)) {
       setScreen('cloud-admit');
       return;
+    }
+    if (isCloud && cloudCourseBookReady(activeSvc, cloudFeeView)) {
+      setActiveSvc(withCloudCourseFee(activeSvc, cloudFeeView));
     }
     const uid = localStorage.getItem('scanv_uid');
     if (uid) {
@@ -7552,8 +7566,13 @@ function ServicesScreen() {
             if (!guardBookStart(detail, addToast)) return;
             const cfg = SUB_CATEGORIES[detail.parent];
             const payload = isSubSvc ? {...detail, cat: cfg?.cat || detail.cat, cash:false} : detail;
-            setActiveSvc(payload);
-            if (payload.parent === 'cloud' || payload.id === 'cloud') { setCloudAdmit(true); return; }
+            const isCloud = payload.parent === 'cloud' || payload.id === 'cloud';
+            if (isCloud && !cloudCourseBookReady(payload, cloudFeeView)) {
+              setActiveSvc(payload);
+              setCloudAdmit(true);
+              return;
+            }
+            setActiveSvc(isCloud ? withCloudCourseFee(payload, cloudFeeView) : payload);
             setScreen('book');
           }}>Book now →</Btn>
         </div>
