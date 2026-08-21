@@ -1530,6 +1530,16 @@ function resolveSvcImage(svc) {
   return svc?.img || null;
 }
 
+/** Scene-led VIP thumbs — center crop reads better than face crop on small cards. */
+const VIP_THUMB_OBJECT_POSITION = {
+  'vip-concierge': 'center 45%',
+  'vip-assistant': 'center 40%',
+  'vip-priority': 'center 50%',
+  'vip-dining': 'center 55%',
+  'vip-airport': 'center 45%',
+  'vip-event': 'center 40%',
+};
+
 function effectiveSvcPrices(svc) {
   let mrp = Number(svc?.mrp) || 0;
   let price = Number(svc?.price) || 0;
@@ -4024,11 +4034,12 @@ function ServicePriceTag({ svc, sm, categoryId, cloudFeeView, onFillSgr }) {
 function ServiceThumb({ svc, height = 100, fullBleed = false, categoryId }) {
   const src = resolveSvcImage(svc);
   if (src) {
+    const objectPosition = VIP_THUMB_OBJECT_POSITION[svc?.id] || 'center 15%';
     return (
       <ServiceImg
         src={src}
-        alt=""
-        style={{ width: '100%', height, objectFit: 'cover', objectPosition: 'center 15%', borderRadius: fullBleed ? 0 : 10, filter: IG_TILE.imgFilter }}
+        alt={svc?.name || ''}
+        style={{ width: '100%', height, objectFit: 'cover', objectPosition, borderRadius: fullBleed ? 0 : 10, filter: IG_TILE.imgFilter }}
       />
     );
   }
