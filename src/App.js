@@ -387,8 +387,8 @@ function UpiPaymentPanel({ pay, addToast, onConfirm, loading, disabled }) {
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 13, color: C.dim, marginBottom: 4 }}>Pay now</div>
         <div style={{ fontSize: 36, fontWeight: 900, color: C.acc, fontFamily: FF }}>₹{amountRu}</div>
-        {txnId && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Ref: {txnId}</div>}
       </div>
+      <PaymentRefCard txnId={txnId} addToast={addToast} />
       {showVyapar && (
       <VyaparQrSection
         amountPaise={amountPaise}
@@ -473,6 +473,68 @@ function UpiVpaCopy({ addToast }) {
       <button type="button" onClick={copy} style={{ marginLeft: 8, background: 'none', border: `1px solid ${C.bdr}`, borderRadius: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: C.cyan, cursor: 'pointer' }}>
         {copied ? 'Copied ✓' : 'Copy'}
       </button>
+    </div>
+  );
+}
+function PaymentRefCard({ txnId, addToast, compact = false, style = {} }) {
+  const [copied, setCopied] = useState(false);
+  if (!txnId) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(txnId);
+      setCopied(true);
+      addToast?.('Payment reference copied', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {
+      addToast?.('Copy failed — note the reference manually', 'error');
+    }
+  };
+  const copyBtn = (
+    <button type="button" onClick={copy} style={{ background: 'none', border: `1px solid ${C.bdr}`, borderRadius: 6, padding: compact ? '2px 8px' : '4px 10px', fontSize: compact ? 10 : 11, fontWeight: 700, color: C.cyan, cursor: 'pointer', flexShrink: 0 }}>
+      {copied ? 'Copied ✓' : 'Copy'}
+    </button>
+  );
+  if (compact) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11, ...style }}>
+        <span style={{ color: C.dim }}>Payment ref:</span>
+        <span style={{ fontWeight: 700, color: C.acc, fontFamily: 'ui-monospace, monospace' }}>{txnId}</span>
+        {copyBtn}
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...S.card(), padding: '12px 14px', marginBottom: 14, background: `${C.acc}08`, border: `1.5px solid ${C.acc}33`, ...style }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: C.sub, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>Payment reference</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: C.acc, fontFamily: 'ui-monospace, monospace' }}>{txnId}</span>
+        {copyBtn}
+      </div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8, lineHeight: 1.45 }}>
+        Save this TXN number before you pay. If payment fails or you need help, quote this reference when you call or WhatsApp ScanV support.
+      </div>
+    </div>
+  );
+}
+function CustomerBookingDetailsPanel({ booking, addToast }) {
+  if (!booking) return null;
+  const bookedOn = booking.created_at ? fmtDt(booking.created_at) : null;
+  const amountPaise = Number(booking.total || 0);
+  const isCloud = isCloudSubCardBooking(booking);
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: BDR }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Booking details</div>
+      <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.65, marginBottom: booking.txn_id ? 10 : 0 }}>
+        {bookedOn ? <div><strong style={{ color: C.txt }}>Booked:</strong> {bookedOn}</div> : null}
+        {amountPaise > 0 ? (
+          <div><strong style={{ color: C.txt }}>{isCloud ? 'ScanV share paid:' : 'Amount paid:'}</strong> ₹{fmtRs(amountPaise)}</div>
+        ) : null}
+        {booking.date ? (
+          <div><strong style={{ color: C.txt }}>Scheduled:</strong> {booking.date}{booking.time ? ` · ${booking.time}` : ''}</div>
+        ) : null}
+        {booking.location_text ? <div><strong style={{ color: C.txt }}>Location:</strong> {booking.location_text}</div> : null}
+      </div>
+      {booking.txn_id ? <PaymentRefCard txnId={booking.txn_id} addToast={addToast} style={{ marginBottom: 0 }} /> : null}
     </div>
   );
 }
@@ -7358,7 +7420,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <div style={{fontSize:15,color:C.sub,marginBottom:6,fontWeight:600}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
             {browseCloudBook && browseFullTotal > total && <div style={{fontSize:12,color:C.dim,marginBottom:4}}>Full program value ₹{(browseFullTotal/100).toLocaleString('en-IN')} · center share pending</div>}
-            <div style={{fontSize:13,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <div style={S.card({marginBottom:14,padding:'12px 14px'})}>
             {browseCloudBook ? (
@@ -9264,7 +9325,6 @@ function BookScreen() {
             <div style={{fontSize:14,color:C.sub,marginBottom:6}}>Amount due now</div>
             <div style={{fontSize:36,fontWeight:800,color:C.acc,marginBottom:4}}>₹{(total/100).toLocaleString('en-IN')}</div>
             {isCloudBook && fullTotal > total && <div style={{fontSize:12,color:C.dim,marginBottom:4}}>Full program value ₹{(fullTotal/100).toLocaleString('en-IN')} · center share pending</div>}
-            <div style={{fontSize:12,color:C.dim}}>Ref: {txnId}</div>
           </div>
           <UpiPaymentPanel
             pay={bookPay}
@@ -9697,6 +9757,10 @@ function TrackServiceScreen() {
             </div>
             <div style={{ fontSize: 11, color: C.dim, textAlign: 'center' }}>{steps[status.step] || status.label}</div>
           </div>
+
+          {user?.role === 'customer' && booking?.txn_id ? (
+            <CustomerBookingDetailsPanel booking={booking} addToast={addToast} />
+          ) : null}
 
           {!booking?.partner_id && booking?.status === 'confirmed' && (
             <div style={{ background: '#eef6ff', border: `1.5px solid ${C.cyan}44`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 13, color: C.sub, lineHeight: 1.5 }}>
@@ -10434,6 +10498,7 @@ function BookingsScreen() {
                     Please arrive 15 minutes before the scheduled time.<br />
                     SGR rescheduling requires a separate enrollment.
                   </div>
+                  <CustomerBookingDetailsPanel booking={b} addToast={addToast} />
                 </>
               ) : (
                 <>
@@ -10482,6 +10547,7 @@ function BookingsScreen() {
           {refundRec.refund_status !== 'completed' && refundRec.refund_due_by ? ` · due ${fmtDt(refundRec.refund_due_by)}` : ''}
         </div>
       )}
+      {user.role === 'customer' && b.txn_id ? <CustomerBookingDetailsPanel booking={b} addToast={addToast} /> : null}
       {showTrackMap(b) && (
         <LiveVendorMap
           live={liveLocs[b.id]}
@@ -10591,7 +10657,8 @@ function BookingsScreen() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontSize: 13, color: C.txt }}>
                     <div style={{ fontWeight: 700 }}>{resolveServiceForPaidIntent(intent, bookingDraftForIntent(intent))?.name || intent.service_name || 'Service'}</div>
-                    <div style={{ color: C.dim }}>{intent.txn_id} · ₹{((intent.amount_paise || 0) / 100).toLocaleString('en-IN')}</div>
+                    <div style={{ color: C.dim }}>₹{((intent.amount_paise || 0) / 100).toLocaleString('en-IN')}</div>
+                    <PaymentRefCard txnId={intent.txn_id} addToast={addToast} compact style={{ marginTop: 6 }} />
                   </div>
                   <Btn sm onClick={() => { setRecovering(intent.txn_id); setRecoverDate(''); setRecoverTime('10:00'); }}>
                     Complete →
