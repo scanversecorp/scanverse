@@ -523,6 +523,18 @@ async function handleRegister(
     return json({ success: true, txn_id: txnId, already_paid: true });
   }
 
+  if (
+    existing?.status === "pending" &&
+    existing.amount_paise != null &&
+    Number(existing.amount_paise) !== amountPaise
+  ) {
+    return json({
+      error: "Payment amount cannot change for an existing checkout reference",
+      txn_id: txnId,
+      expected_paise: Number(existing.amount_paise),
+    }, 400);
+  }
+
   const { error } = await supabase.from("payment_intents").upsert(
     {
       txn_id: txnId,
@@ -691,10 +703,24 @@ async function handleCheck(
 
 async function handleListPaidForUser(
   supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
   const userId = String(body.user_id || "").trim();
   if (!userId) return json({ error: "user_id required" }, 400);
+
+  const authHeader = req.headers.get("Authorization") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!bearer || bearer === anonKey || (serviceKey && bearer === serviceKey)) {
+    return json({ error: "Authentication required" }, 401);
+  }
+
+  const profileId = await resolveCustomerProfileId(supabase, supabaseUrl, req);
+  if (!profileId) return json({ error: "Authentication required" }, 401);
+  if (profileId !== userId) return json({ error: "Forbidden" }, 403);
 
   const { data, error } = await supabase
     .from("payment_intents")
@@ -735,6 +761,9 @@ async function resolveCustomerProfileId(
       .maybeSingle();
     if (byUid?.id) return String(byUid.id);
   }
+  const { data: profileId, error: rpcErr } = await userClient.rpc("current_profile_id");
+  if (!rpcErr && profileId) return String(profileId);
+
   const email = authData?.user?.email;
   if (!email) return null;
   const { data: prof } = await supabase
@@ -1048,7 +1077,7 @@ Deno.serve(async (req) => {
   if (action === "register") return handleRegister(supabase, body);
   if (action === "check") return handleCheck(supabase, body);
   if (action === "list_paid_for_user") {
-    return handleListPaidForUser(supabase, body);
+    return handleListPaidForUser(supabase, supabaseUrl, req, body);
   }
   if (action === "cancel") {
     return handleCancel(supabase, supabaseUrl, req, body);

@@ -1934,6 +1934,38 @@ const SUPPORT_TICKETS_FN = `${SB_URL}/functions/v1/support-tickets`;
 const DISPATCH_FN = `${SB_URL}/functions/v1/booking-dispatch`;
 const RAZORPAY_FN = `${SB_URL}/functions/v1/razorpay-payment`;
 
+async function razorpayAuthHeaders() {
+  let token = SB_KEY;
+  try {
+    const { data: { session } } = await sb().auth.getSession();
+    if (session?.access_token) token = session.access_token;
+  } catch (_) { /* use anon fallback */ }
+  return { apikey: SB_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+async function invokeListPaidForUser(userId) {
+  if (!userId) return [];
+  try {
+    const r = await sb().functions.invoke('razorpay-payment', {
+      body: { action: 'list_paid_for_user', user_id: userId },
+    });
+    if (r.data?.intents) return r.data.intents;
+    if (r.data?.error) return [];
+  } catch (_) { /* fallback */ }
+  try {
+    const headers = await razorpayAuthHeaders();
+    const res = await fetch(RAZORPAY_FN, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'list_paid_for_user', user_id: userId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return data?.intents || [];
+  } catch (_) {
+    return [];
+  }
+}
+
 const SGR_SERVICE_ID = 'cl-sgr';
 const SGR_FEE_FALLBACK_PAISE = 50000;
 const SGR_SVC = {
@@ -2530,21 +2562,7 @@ function dedupeBookingsForDisplay(bookings) {
 async function findReusablePaidTxn(userId, serviceId, amountPaise, maxAgeMs = 24 * 3600 * 1000) {
   if (!userId || !serviceId || !amountPaise) return null;
   try {
-    let intents = [];
-    try {
-      const r = await sb().functions.invoke('razorpay-payment', {
-        body: { action: 'list_paid_for_user', user_id: userId },
-      });
-      intents = r.data?.intents || [];
-    } catch (_) {
-      const res = await fetch(RAZORPAY_FN, {
-        method: 'POST',
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list_paid_for_user', user_id: userId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      intents = data?.intents || [];
-    }
+    const intents = await invokeListPaidForUser(userId);
     const match = intents.find((i) =>
       i.service_id === serviceId
       && Number(i.amount_paise) === Number(amountPaise)
@@ -2560,21 +2578,7 @@ async function findOrphanPaidIntents(userId) {
   if (!userId) return [];
   try {
     const returnTxn = parsePaymentReturnTxn();
-    let intents = [];
-    try {
-      const r = await sb().functions.invoke('razorpay-payment', {
-        body: { action: 'list_paid_for_user', user_id: userId },
-      });
-      intents = r.data?.intents || [];
-    } catch (_) {
-      const res = await fetch(RAZORPAY_FN, {
-        method: 'POST',
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list_paid_for_user', user_id: userId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      intents = data?.intents || [];
-    }
+    const intents = await invokeListPaidForUser(userId);
     if (!intents.length) return [];
     const pending = [];
     for (const intent of intents) {
