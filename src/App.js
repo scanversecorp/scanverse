@@ -1012,7 +1012,15 @@ function ScanVLogoMark({ size = LOGO_SIZE.sm, center = false, linkToApp = false,
   );
 }
 
-function ScanVBrandHeader({ right, padX = 12, padY = 6, bare = false, sticky = false }) {
+function ScanVGeoChip({ geo }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, background: '#dce8f7', padding: '5px 10px', borderRadius: 99, border: BDR, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+      📍 {formatGeoBadge(geo)}
+    </div>
+  );
+}
+
+function ScanVBrandHeader({ geo, padX = 12, padY = 6, bare = false, sticky = false }) {
   return (
     <div style={{
       background: bare ? 'transparent' : C.surf,
@@ -1020,19 +1028,21 @@ function ScanVBrandHeader({ right, padX = 12, padY = 6, bare = false, sticky = f
       padding: `${padY}px ${padX}px`,
       paddingTop: bare ? padY : BROWSE_HDR_PAD,
       display: 'grid',
-      gridTemplateColumns: '1fr auto 1fr',
+      gridTemplateColumns: 'minmax(0, 1fr) auto max-content',
       alignItems: 'center',
       columnGap: 8,
       flexShrink: 0,
       margin: 0,
+      width: '100%',
+      boxSizing: 'border-box',
       ...(sticky ? { position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)' } : null),
     }}>
       <div style={{ justifySelf: 'start', minWidth: 0, overflow: 'hidden' }}>
         <ScanVLogoMark part="wordmark" size={LOGO_SIZE.sm} />
       </div>
-      <ScanVLogoMark part="mark" size={52} />
-      <div style={{ justifySelf: 'end', minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
-        {right || null}
+      <ScanVLogoMark part="mark" size={44} />
+      <div style={{ justifySelf: 'end', flexShrink: 0 }}>
+        <ScanVGeoChip geo={geo} />
       </div>
     </div>
   );
@@ -7035,6 +7045,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     <div className="scanv-shell" style={BROWSE_WRAP_SHELL}>
       <div className="scanv-mobile-zoom" style={APP_MAIN}>
         <div style={BROWSE_MAIN_INNER}>
+          <ScanVBrandHeader geo={silentGeo} />
           {content}
         </div>
         {sticky}
@@ -7190,13 +7201,6 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <ScanVBrandHeader
-        right={(
-          <div style={{fontSize:11,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-            📍 {formatGeoBadge(silentGeo)}
-          </div>
-        )}
-      />
       <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
         <div style={BROWSE_PROMO_BANNER}>
           <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
@@ -7760,7 +7764,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
 /* ================================================================
    REGISTRATION FLOW
 ================================================================ */
-function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
+function RegistrationFlow({ onComplete, prefill, onGoToLogin, silentGeo = null }) {
   const [phase, setPhase]   = useState('consent');
   const [dev, setDev]       = useState(prefill?.dev||null);
   const [ip, setIp]         = useState(prefill?.ip||'');
@@ -8121,6 +8125,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   const wrap=content=>(
     <div className="scanv-root">
     <div className="scanv-shell" style={APP_SHELL}>
+    <ScanVBrandHeader geo={silentGeo || prefill?.geo} />
     <div style={{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{width:'100%',maxWidth:420}}>
         {logo}{stepBar}
@@ -8448,13 +8453,10 @@ function BottomNav() {
 
 function TopBar({title,back}) {
   const {setScreen}=useApp();
-  if (!back && !title) {
-    return <ScanVBrandHeader padX={20} />;
-  }
+  if (!back && !title) return null;
   return (
-    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'6px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
-      {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-           :<ScanVLogoMark part="wordmark" size={LOGO_SIZE.sm} />}
+    <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'6px 20px',display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
+      {back ? <button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button> : null}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
     </div>
   );
@@ -11939,7 +11941,7 @@ function VendorAdminTable({ rows, pin, loading, onAction, svcNameMap, canEdit, o
   );
 }
 
-function VendorOnboardPage() {
+function VendorOnboardPage({ silentGeo = null }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -12278,7 +12280,7 @@ function VendorOnboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
-        <ScanVBrandHeader padX={0} padY={0} bare />
+        <ScanVBrandHeader padX={0} padY={0} bare geo={silentGeo} />
         <div style={{ fontSize: 10, color: C.cyan, fontWeight: 700, letterSpacing: 1, marginTop: 10 }}>PARTNER ONBOARDING</div>
         <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>Become a ScanV Partner</div>
         <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
@@ -13029,7 +13031,7 @@ function TicketActivityFeed({ comments, agentMode = false }) {
   );
 }
 
-function FaqPage() {
+function FaqPage({ silentGeo = null }) {
   const faqs = [
     ['How do I book a service on ScanV?', 'Browse services on the home page, verify your mobile via OTP, pay the platform fee, and schedule date/time/location. You receive a TXN ID for tracking.'],
     ['What areas does ScanV cover?', 'ScanV operates across Local Communities worldwide. GPS is used to match you with nearby service partners in your area.'],
@@ -13049,12 +13051,10 @@ function FaqPage() {
   ];
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
-      <ScanVBrandHeader
-        padX={20}
-        padY={14}
-        sticky
-        right={<a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 13, textDecoration: 'none' }}>← Back</a>}
-      />
+      <ScanVBrandHeader padX={20} padY={14} sticky geo={silentGeo} />
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '8px 20px' }}>
+        <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 13, textDecoration: 'none' }}>← Back</a>
+      </div>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div style={{ background: `linear-gradient(135deg,${C.surf},${C.card})`, border: `1px solid ${C.bdr}`, borderRadius: 16, padding: '28px 24px', marginBottom: 28 }}>
           <div style={{ display: 'inline-block', background: C.cyan, color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: 1, marginBottom: 10 }}>FAQ</div>
@@ -13083,7 +13083,7 @@ function FaqPage() {
   );
 }
 
-function ReportPage() {
+function ReportPage({ silentGeo = null }) {
   const [form, setForm] = useState({ reporter_name: '', reporter_mobile: '', reporter_email: '', category: 'other', subject: '', description: '', txn_id: '' });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -13160,7 +13160,8 @@ function ReportPage() {
   const reportChrome = (title, body) => (
     <div className="scanv-root">
       <div className="scanv-shell" style={APP_SHELL}>
-        <div style={{ flexShrink: 0, background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <ScanVBrandHeader geo={silentGeo} />
+        <div style={{ flexShrink: 0, background: C.surf, borderBottom: BDR, padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
           <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>{title}</div>
         </div>
@@ -13226,7 +13227,7 @@ function ReportPage() {
   ));
 }
 
-function TrackTicketPage() {
+function TrackTicketPage({ silentGeo = null }) {
   const [ticketNum, setTicketNum] = useState(() => trackTicketIdFromHash() || '');
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13251,7 +13252,8 @@ function TrackTicketPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
-      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <ScanVBrandHeader sticky padX={20} padY={14} geo={silentGeo} />
+      <div style={{ background: C.surf, borderBottom: BDR, padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Track support ticket</div>
       </div>
@@ -18608,7 +18610,7 @@ npx supabase db push`}</pre>
 /* ================================================================
    LEGAL PAGES -- Served at /privacy /terms /dpdp /refund /payment
 ================================================================ */
-function LegalPage({ page, catalogTick = 0 }) {
+function LegalPage({ page, catalogTick = 0, silentGeo = null }) {
   const termsLiabilityDisclaimer = SCANV_LIABILITY_DISCLAIMER.replace(
     'Cloud candidates,',
     'Candidates, any human, any business or anything,'
@@ -18842,11 +18844,10 @@ function LegalPage({ page, catalogTick = 0 }) {
     <div className="scanv-root">
     <div className="scanv-shell" style={APP_SHELL}>
       {/* Header */}
-      <ScanVBrandHeader
-        padX={20}
-        padY={14}
-        right={<button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>}
-      />
+      <ScanVBrandHeader padX={20} padY={14} geo={silentGeo} />
+      <div style={{ flexShrink: 0, background: C.surf, borderBottom: BDR, padding: '8px 20px' }}>
+        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>
+      </div>
       <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY}}>
       <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
         {/* Hero */}
@@ -19153,19 +19154,19 @@ export default function App() {
 
   const legalPath = legalSegment();
   if (isLegalRoute()) {
-    return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath} catalogTick={catalogTick}/></Boundary>;
+    return <Boundary><style>{APP_CSS}</style><LegalPage page={legalPath} catalogTick={catalogTick} silentGeo={silentGeo}/></Boundary>;
   }
 
   if (isFaqRoute()) {
-    return <Boundary><style>{APP_CSS}</style><FaqPage/></Boundary>;
+    return <Boundary><style>{APP_CSS}</style><FaqPage silentGeo={silentGeo}/></Boundary>;
   }
 
   if (isReportRoute()) {
-    return <Boundary><style>{APP_CSS}</style><ReportPage/></Boundary>;
+    return <Boundary><style>{APP_CSS}</style><ReportPage silentGeo={silentGeo}/></Boundary>;
   }
 
   if (isTrackTicketRoute()) {
-    return <Boundary><style>{APP_CSS}</style><TrackTicketPage/></Boundary>;
+    return <Boundary><style>{APP_CSS}</style><TrackTicketPage silentGeo={silentGeo}/></Boundary>;
   }
 
   if (isAdminHubRoute()) {
@@ -19220,7 +19221,7 @@ export default function App() {
     return (
       <Boundary>
         <style>{APP_CSS}</style>
-        <VendorOnboardPage/>
+        <VendorOnboardPage silentGeo={silentGeo}/>
       </Boundary>
     );
   }
@@ -19280,6 +19281,7 @@ export default function App() {
     <Boundary><CustomerShell toasts={toasts}>
     <RegistrationFlow
       prefill={qrPrefill}
+      silentGeo={silentGeo}
       onComplete={p=>{setUser(p);setState('app');}}
       onGoToLogin={()=>setState('browse')}
     />
@@ -19312,6 +19314,7 @@ export default function App() {
         <div className="scanv-shell" style={APP_SHELL}>
           <div className="scanv-mobile-zoom" style={APP_MAIN}>
             <div style={BROWSE_MAIN_INNER}>
+              <ScanVBrandHeader geo={silentGeo} />
               <div className="scanv-scroll-body" style={APP_SCROLL_BODY}>
                 <Boundary>{renderScreen()}</Boundary>
                 {screen !== 'bookings' && (
