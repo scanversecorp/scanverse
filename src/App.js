@@ -1843,7 +1843,26 @@ function stripOpenServiceParamFromUrl() {
 }
 
 const ACTIVE_SESSION_KEY = 'scanv_active_session_key';
+const ACTIVE_SESSION_KILLED_KEY = 'scanv_session_killed';
 const ACTIVE_SESSION_PING_MS = 30000;
+
+function isActiveSessionKilled() {
+  try { return sessionStorage.getItem(ACTIVE_SESSION_KILLED_KEY) === '1'; } catch { return false; }
+}
+
+function markActiveSessionKilled() {
+  try { sessionStorage.setItem(ACTIVE_SESSION_KILLED_KEY, '1'); } catch { /* private mode */ }
+}
+
+function handleKilledActiveSession() {
+  markActiveSessionKilled();
+  try { localStorage.removeItem('scanv_uid'); } catch { /* private mode */ }
+  sb().auth.signOut().catch(() => {});
+  if (typeof window !== 'undefined') {
+    window.location.hash = '';
+    window.location.reload();
+  }
+}
 
 function getActiveSessionKey() {
   try {
@@ -1914,9 +1933,14 @@ function pingActiveSession({ screen, activeSvc, silentGeo, profile, mobile, firs
     } catch (_) { /* private mode */ }
     if (firstName || lastName) userName = [firstName, lastName].filter(Boolean).join(' ');
   }
-  const locCity = city || profile?.city || silentGeo?.city || '';
-  const locState = state || profile?.state || silentGeo?.state || '';
-  sb().rpc('upsert_active_session', {
+  const locCity = silentGeo?.city || city || profile?.city || '';
+  const locState = silentGeo?.state || state || profile?.state || '';
+  const locVillage = silentGeo?.village || profile?.village || '';
+  const locPin = silentGeo?.pincode || profile?.pincode || '';
+  const locAddress = silentGeo?.address || profile?.address || '';
+  const lat = silentGeo?.lat ?? profile?.last_lat ?? profile?.gps_lat ?? null;
+  const lng = silentGeo?.lng ?? profile?.last_lng ?? profile?.gps_lng ?? null;
+  const payload = {
     p_session_key: getActiveSessionKey(),
     p_profile_id: profileId,
     p_user_name: userName,
@@ -1929,7 +1953,19 @@ function pingActiveSession({ screen, activeSvc, silentGeo, profile, mobile, firs
     p_sub_card_label: placement.sub_card_label,
     p_screen: screen,
     p_device_type: dev?.deviceType || null,
-  }).then(() => {}).catch(() => {});
+  };
+  const withGeo = {
+    ...payload,
+    p_village: locVillage || null,
+    p_pincode: locPin || null,
+    p_address: locAddress || null,
+    p_lat: lat != null && Number.isFinite(Number(lat)) ? Number(lat) : null,
+    p_lng: lng != null && Number.isFinite(Number(lng)) ? Number(lng) : null,
+  };
+  sb().rpc('upsert_active_session', withGeo).then(({ data, error }) => {
+    if (error) return sb().rpc('upsert_active_session', payload).then(() => {}).catch(() => {});
+    if (data?.killed) handleKilledActiveSession();
+  }).catch(() => {});
 }
 
 function useActiveSessionPing(opts) {
@@ -1946,7 +1982,7 @@ function useActiveSessionPing(opts) {
     state,
   } = opts;
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled || isActiveSessionKilled()) return undefined;
     const ping = () => pingActiveSession({ screen, activeSvc, silentGeo, profile, mobile, firstName, lastName, city, state });
     ping();
     const id = setInterval(ping, ACTIVE_SESSION_PING_MS);
@@ -1959,6 +1995,10 @@ function useActiveSessionPing(opts) {
     activeSvc?.name,
     silentGeo?.city,
     silentGeo?.state,
+    silentGeo?.village,
+    silentGeo?.pincode,
+    silentGeo?.lat,
+    silentGeo?.lng,
     profile?.id,
     profile?.first_name,
     profile?.last_name,
@@ -15837,11 +15877,24 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
   );
 }
 
+function sessionLocationLines(r) {
+  const place = [r.village, r.pincode].filter(Boolean).join(' ')
+    || [r.city, r.pincode].filter(Boolean).join(' ')
+    || r.city
+    || '';
+  const region = [r.city && r.city !== r.village ? r.city : null, r.state].filter(Boolean).join(', ');
+  const gps = (r.lat != null && r.lng != null && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng)))
+    ? `${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`
+    : '';
+  return { place: place || region || 'Locating…', region: place && region && region !== place ? region : '', gps, address: r.address || '' };
+}
+
 function AdminActiveSessionsTab({ pin }) {
   const [minutes, setMinutes] = useState(5);
   const [rows, setRows] = useState([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [killing, setKilling] = useState('');
   const [err, setErr] = useState('');
 
   const load = useCallback(async () => {
@@ -15868,6 +15921,22 @@ function AdminActiveSessionsTab({ pin }) {
     return () => clearInterval(id);
   }, [pin, load]);
 
+  const kill = async (sessionKey) => {
+    if (!sessionKey || !pin) return;
+    if (!window.confirm('Kill this session? That browser tab drops off live list and is signed out on next heartbeat.')) return;
+    setKilling(sessionKey);
+    setErr('');
+    try {
+      await adminHubFetch('kill_active_session', { session_key: sessionKey }, pin);
+      setRows((prev) => prev.filter((r) => r.session_key !== sessionKey));
+      setCount((c) => Math.max(0, c - 1));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setKilling('');
+    }
+  };
+
   const ago = (iso) => {
     if (!iso) return '—';
     const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
@@ -15880,8 +15949,9 @@ function AdminActiveSessionsTab({ pin }) {
       <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.grn}44` }}>
         <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>Active sessions</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
-          Live users on getscanv.com — name, mobile, city/state, and the home card or sub-card they are viewing.
-          Rows refresh every 15s; heartbeats arrive about every 30s per browser tab.
+          Live users on getscanv.com — name, mobile, GPS city/PIN, and the card they are viewing.
+          Kill ends that browser tab’s presence; they are signed out on the next heartbeat.
+          Rows refresh every 15s.
         </div>
       </div>
 
@@ -15909,27 +15979,52 @@ function AdminActiveSessionsTab({ pin }) {
 
       {rows.length > 0 && (
         <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto', gap: 8, padding: '10px 14px', borderBottom: BDR, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,0.8fr) minmax(0,1.3fr) minmax(0,0.9fr) minmax(0,0.9fr) auto auto', gap: 8, padding: '10px 14px', borderBottom: BDR, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase' }}>
             <span>User</span>
             <span>Mobile</span>
-            <span>City / State</span>
+            <span>GPS / city</span>
             <span>Card</span>
             <span>Sub-card</span>
             <span>Seen</span>
+            <span></span>
           </div>
-          {rows.map((r) => (
-            <div key={r.session_key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto', gap: 8, padding: '12px 14px', borderBottom: BDR, alignItems: 'start', fontSize: 12 }}>
-              <div>
-                <div style={{ fontWeight: 700, color: C.txt }}>{r.user_name || 'Guest'}</div>
-                {r.device_type ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{r.device_type}</div> : null}
+          {rows.map((r) => {
+            const loc = sessionLocationLines(r);
+            const maps = loc.gps ? `https://maps.google.com/?q=${encodeURIComponent(loc.gps)}` : '';
+            return (
+              <div key={r.session_key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,0.8fr) minmax(0,1.3fr) minmax(0,0.9fr) minmax(0,0.9fr) auto auto', gap: 8, padding: '12px 14px', borderBottom: BDR, alignItems: 'start', fontSize: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.txt }}>{r.user_name || 'Guest'}</div>
+                  {r.device_type ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{r.device_type}</div> : null}
+                </div>
+                <div style={{ color: C.txt, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}>{r.mobile || '—'}</div>
+                <div style={{ color: C.sub, fontSize: 11, lineHeight: 1.45 }}>
+                  <div style={{ fontWeight: 700, color: C.txt }}>{loc.place}</div>
+                  {loc.region ? <div>{loc.region}</div> : null}
+                  {loc.gps ? (
+                    <a href={maps} target="_blank" rel="noreferrer" style={{ color: C.cyan, fontSize: 10, fontFamily: 'ui-monospace, monospace' }}>{loc.gps}</a>
+                  ) : <div style={{ fontSize: 10, color: C.dim }}>No GPS coords</div>}
+                </div>
+                <div style={{ color: C.acc, fontWeight: 600, fontSize: 11 }}>{r.card_label || '—'}</div>
+                <div style={{ color: C.txt, fontSize: 11 }}>{r.sub_card_label || '—'}</div>
+                <div style={{ color: C.dim, fontSize: 10, whiteSpace: 'nowrap' }}>{ago(r.last_seen_at)}</div>
+                <div>
+                  <button
+                    type="button"
+                    disabled={killing === r.session_key}
+                    onClick={() => kill(r.session_key)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${C.red}66`,
+                      background: `${C.red}12`, color: C.red, fontSize: 11, fontWeight: 800,
+                      cursor: killing === r.session_key ? 'wait' : 'pointer', fontFamily: FF, whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {killing === r.session_key ? 'Killing…' : 'Kill'}
+                  </button>
+                </div>
               </div>
-              <div style={{ color: C.txt, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}>{r.mobile || '—'}</div>
-              <div style={{ color: C.sub, fontSize: 11 }}>{[r.city, r.state].filter(Boolean).join(', ') || '—'}</div>
-              <div style={{ color: C.acc, fontWeight: 600, fontSize: 11 }}>{r.card_label || '—'}</div>
-              <div style={{ color: C.txt, fontSize: 11 }}>{r.sub_card_label || '—'}</div>
-              <div style={{ color: C.dim, fontSize: 10, whiteSpace: 'nowrap' }}>{ago(r.last_seen_at)}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

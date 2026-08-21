@@ -4,7 +4,8 @@
  * Actions (POST body):
  *   whoami           — verify PIN, return role
  *   stats            — dashboard counts
- *   list_active_sessions — live user presence (card / sub-card), default last 5 min
+ *   list_active_sessions — live user presence (card / sub-card / GPS), default last 5 min
+ *   kill_active_session  — { session_key } drop a tab from live list and block its heartbeat
  *   list_agents      — all support_agents (admin only)
  *   create_agent     — { name, email?, phone?, role?, notes? }
  *   update_agent     — { id, name?, email?, phone?, role?, notes?, active? }
@@ -733,13 +734,33 @@ async function listActiveSessions(sb: ReturnType<typeof adminSb>, body: Record<s
   const { data, error } = await sb
     .from("active_sessions")
     .select(
-      "session_key,profile_id,user_name,mobile,city,state,card_id,card_label,sub_card_id,sub_card_label,screen,device_type,last_seen_at,created_at",
+      "session_key,profile_id,user_name,mobile,city,state,village,pincode,address,lat,lng,card_id,card_label,sub_card_id,sub_card_label,screen,device_type,last_seen_at,created_at",
     )
     .gte("last_seen_at", since)
     .order("last_seen_at", { ascending: false })
     .limit(200);
-  if (error) return json({ error: error.message }, 500);
+  if (error) {
+    const { data: fallback, error: fbErr } = await sb
+      .from("active_sessions")
+      .select(
+        "session_key,profile_id,user_name,mobile,city,state,card_id,card_label,sub_card_id,sub_card_label,screen,device_type,last_seen_at,created_at",
+      )
+      .gte("last_seen_at", since)
+      .order("last_seen_at", { ascending: false })
+      .limit(200);
+    if (fbErr) return json({ error: fbErr.message }, 500);
+    return json({ sessions: fallback || [], count: (fallback || []).length, window_minutes: minutes });
+  }
   return json({ sessions: data || [], count: (data || []).length, window_minutes: minutes });
+}
+
+async function killActiveSession(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  const key = String(body.session_key || "").trim();
+  if (key.length < 8) return json({ error: "session_key required" }, 400);
+  await sb.from("active_session_kills").upsert({ session_key: key, killed_at: new Date().toISOString() });
+  const { error } = await sb.from("active_sessions").delete().eq("session_key", key);
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, session_key: key });
 }
 
 async function listAgents(sb: ReturnType<typeof adminSb>) {
@@ -1402,6 +1423,10 @@ Deno.serve(async (req) => {
 
   if (action === "list_active_sessions") {
     return listActiveSessions(sb, body);
+  }
+
+  if (action === "kill_active_session") {
+    return killActiveSession(sb, body);
   }
 
   if (action === "list_agents") {

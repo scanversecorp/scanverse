@@ -104,6 +104,7 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   run_api_monitoring: "hub.stats",
   ops_dashboard_stats: "hub.stats",
   list_active_sessions: "hub.stats",
+  kill_active_session: "hub.stats",
   update_social_content: "hub.settings",
   add_social_content: "hub.settings",
   update_social_config: "hub.settings",
