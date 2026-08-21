@@ -49,6 +49,7 @@
  *   upsert_staff_user — { email, display_name, role_ids?, support_agent_id?, notes? }
  *   mark_social_everywhere — mark daily post platform done
  *   purge_test_data      — { dry_run?, confirm_execute?, confirm? } pre-launch wipe (owner only)
+ *   archive_all_except   — { dry_run?, confirm_execute?, confirm?, keep_mobile? } soft-archive users/vendors
  *   run_app_health_check — API security + public endpoint checks
  *   run_infra_health_check — DB, deploy bundle, go-live, catalog checks
  *   run_security_health_check — RLS, auth gates, exposure & production safety
@@ -74,6 +75,7 @@ import {
   updateDispatchAdmin,
 } from "../_shared/dispatch-admin.ts";
 import {
+  archiveAllExceptAdmin,
   deleteProfileAdmin,
   directoryDetailAdmin,
   listVendorsBriefAdmin,
@@ -1882,6 +1884,20 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Purge failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "archive_all_except") {
+    const gate = requireHubPermission(ctx, "purge_test_data");
+    const ownerOk = hasRole(ctx, "scanv_owner") || hasPermission(ctx, "hub.purge_test");
+    if (gate && !ownerOk) return json({ error: `Missing permission: ${gate}` }, 403);
+    try {
+      const result = await archiveAllExceptAdmin(sb, body);
+      if (result.error) return json(result, 400);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Archive failed";
       return json({ error: msg }, 500);
     }
   }

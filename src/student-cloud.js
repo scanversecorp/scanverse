@@ -259,7 +259,44 @@ function otpChange(i, raw, digits, setDigits, prefix) {
   if (ch && i < 5) document.getElementById(`${prefix}${i + 1}`)?.focus();
 }
 
-function auditSgrForm(values) {
+function autoFlagsFromValues(values) {
+  const flags = {};
+  Object.entries(values).forEach(([k, v]) => {
+    if (v != null && String(v).trim() !== '') flags[k] = true;
+  });
+  return flags;
+}
+
+function geoValueForField(field, geo) {
+  if (!geo) return '';
+  const map = {
+    address: geo.address,
+    village: geo.village,
+    city: geo.city,
+    state: geo.state,
+    pincode: geo.pincode,
+  };
+  return String(map[field] ?? '').trim();
+}
+
+function resolvedFormField(field, stateValue, { auto, touched, geo } = {}) {
+  const direct = String(stateValue ?? '').trim();
+  if (direct) return direct;
+  if (auto?.[field] && !touched?.[field]) return geoValueForField(field, geo);
+  return '';
+}
+
+function resolvedAddressFields(values, ctx) {
+  return {
+    address: resolvedFormField('address', values.address, ctx),
+    village: resolvedFormField('village', values.village, ctx),
+    city: resolvedFormField('city', values.city, ctx),
+    state: resolvedFormField('state', values.state, ctx),
+    pincode: resolvedFormField('pincode', values.pincode, ctx).replace(/\D/g, '').slice(0, 6),
+  };
+}
+
+function auditSgrForm(values, ctx) {
   const fields = {};
   let message = '';
   const mark = (key, msg) => { fields[key] = true; if (!message) message = msg; };
@@ -272,9 +309,12 @@ function auditSgrForm(values) {
   const emailTrim = String(values.email || '').trim();
   if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) mark('email', 'Enter a valid email address');
   else if (emailTrim.endsWith('@scanv.app')) mark('email', 'Use your personal or business email');
-  if (!values.address.trim()) mark('address', 'Enter address');
-  if (!values.city.trim()) mark('city', 'Enter city');
-  if (!values.state.trim()) mark('state', 'Enter state');
+  const addr = resolvedFormField('address', values.address, ctx);
+  const cityVal = resolvedFormField('city', values.city, ctx);
+  const stateVal = resolvedFormField('state', values.state, ctx);
+  if (!addr) mark('address', 'Enter address');
+  if (!cityVal) mark('city', 'Enter city');
+  if (!stateVal) mark('state', 'Enter state');
   const schedErr = validateSgrSchedule(values.scheduleDate, values.scheduleTime);
   if (schedErr) {
     if (/date/i.test(schedErr)) mark('scheduleDate', schedErr);
@@ -350,6 +390,22 @@ export function StudentCloudAdmitScreen({
   const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
   const [err, setErr] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [gpsAuto, setGpsAuto] = useState(() => autoFlagsFromValues({
+    address: silentGeo?.address,
+    village: silentGeo?.village,
+    city: silentGeo?.city,
+    state: silentGeo?.state,
+    pincode: silentGeo?.pincode,
+  }));
+  const [gpsTouched, setGpsTouched] = useState({});
+  const gpsCtx = () => ({ auto: gpsAuto, touched: gpsTouched, geo: silentGeo });
+  const bindGpsField = (field, onChange) => ({
+    onFocus: () => setGpsTouched((p) => (p[field] ? p : { ...p, [field]: true })),
+    onChange: (e) => { setGpsTouched((p) => ({ ...p, [field]: true })); onChange(e); },
+  });
+  const markGpsAuto = (patch) => {
+    setGpsAuto((p) => ({ ...p, ...autoFlagsFromValues(typeof patch === 'object' ? patch : {}) }));
+  };
   const inpErr = (invalid, extra = {}) => (invalidFieldStyle ? invalidFieldStyle(invalid, extra) : extra);
 
   const courseName = useMemo(
@@ -394,6 +450,7 @@ export function StudentCloudAdmitScreen({
       applyGeoToAddressFields(g, {
         setAddress, setVillage, setCity, setState, setPincode, setLat, setLng,
       }, { force: true });
+      markGpsAuto(g);
       setGpsHint('Address filled from GPS — edit if needed');
       window.setTimeout(() => setGpsHint(''), 4000);
     } catch (e) {
@@ -406,6 +463,7 @@ export function StudentCloudAdmitScreen({
     applyGeoToAddressFields(silentGeo, {
       setAddress, setVillage, setCity, setState, setPincode, setLat, setLng,
     });
+    if (silentGeo) markGpsAuto(silentGeo);
   }, [silentGeo]);
 
   // Coords often arrive before village/address on iOS — reverse-geocode when locality still empty
@@ -416,9 +474,11 @@ export function StudentCloudAdmitScreen({
     let cancelled = false;
     reverseGeo(silentGeo.lat, silentGeo.lng).then((g) => {
       if (cancelled) return;
-      applyGeoToAddressFields({ ...silentGeo, ...g }, {
+      const merged = { ...silentGeo, ...g };
+      applyGeoToAddressFields(merged, {
         setAddress, setVillage, setCity, setState, setPincode, setLat, setLng,
       });
+      markGpsAuto(merged);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [silentGeo, reverseGeo]);
@@ -427,7 +487,7 @@ export function StudentCloudAdmitScreen({
 
   const formValues = () => ({
     firstName, lastName, experience, dob, mobile, email,
-    address, city, state, scheduleDate, scheduleTime,
+    address, village, city, state, pincode, scheduleDate, scheduleTime,
   });
 
   const clearFieldErr = (key) => {
@@ -447,7 +507,7 @@ export function StudentCloudAdmitScreen({
   };
 
   const validateForm = () => {
-    const audit = auditSgrForm(formValues());
+    const audit = auditSgrForm(formValues(), gpsCtx());
     if (!audit.ok) {
       failFormAudit(audit);
       return audit.message;
@@ -515,6 +575,7 @@ export function StudentCloudAdmitScreen({
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
+      const resolved = resolvedAddressFields(formValues(), gpsCtx());
       const payload = {
         mobile: `+91${digits10(mobile)}`,
         email: email.trim(),
@@ -522,11 +583,11 @@ export function StudentCloudAdmitScreen({
         last_name: lastName.trim(),
         experience: experience.trim(),
         dob,
-        address: address.trim(),
-        village: village.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode,
+        address: resolved.address,
+        village: resolved.village,
+        city: resolved.city,
+        state: resolved.state,
+        pincode: resolved.pincode,
         lat, lng,
         course_id: courseId,
         course_name: courseName,
@@ -662,19 +723,19 @@ export function StudentCloudAdmitScreen({
         </div>
         {gpsHint && <div style={{ fontSize: 12, color: C.grn, fontWeight: 600, textAlign: 'right', marginBottom: 8, lineHeight: 1.4 }}>{gpsHint}</div>}
         <Field label="Address" req invalid={fieldErrors.address} fieldKey="address">
-          <input value={address} onChange={(e) => { clearFieldErr('address'); setAddress(e.target.value); }} placeholder="House, street, area" style={S.inp(inpErr(fieldErrors.address))} disabled={otpVerified} />
+          <input value={address} {...bindGpsField('address', (e) => { clearFieldErr('address'); setAddress(e.target.value); })} placeholder="House, street, area" style={S.inp(inpErr(fieldErrors.address))} disabled={otpVerified} />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Field label="Village"><input value={village} onChange={(e) => setVillage(e.target.value)} placeholder="Village" style={S.inp()} disabled={otpVerified} /></Field>
+          <Field label="Village"><input value={village} {...bindGpsField('village', (e) => setVillage(e.target.value))} placeholder="Village" style={S.inp()} disabled={otpVerified} /></Field>
           <Field label="City" req invalid={fieldErrors.city} fieldKey="city">
-            <input value={city} onChange={(e) => { clearFieldErr('city'); setCity(e.target.value); }} placeholder="Pune" style={S.inp(inpErr(fieldErrors.city))} disabled={otpVerified} />
+            <input value={city} {...bindGpsField('city', (e) => { clearFieldErr('city'); setCity(e.target.value); })} placeholder="Pune" style={S.inp(inpErr(fieldErrors.city))} disabled={otpVerified} />
           </Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <Field label="State" req invalid={fieldErrors.state} fieldKey="state">
-            <input value={state} onChange={(e) => { clearFieldErr('state'); setState(e.target.value); }} placeholder="Maharashtra" style={S.inp(inpErr(fieldErrors.state))} disabled={otpVerified} />
+            <input value={state} {...bindGpsField('state', (e) => { clearFieldErr('state'); setState(e.target.value); })} placeholder="Maharashtra" style={S.inp(inpErr(fieldErrors.state))} disabled={otpVerified} />
           </Field>
-          <Field label="PIN"><input value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="411057" style={S.inp()} disabled={otpVerified} /></Field>
+          <Field label="PIN"><input value={pincode} {...bindGpsField('pincode', (e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6)))} placeholder="411057" style={S.inp()} disabled={otpVerified} /></Field>
         </div>
 
         <Field label="Course" req>

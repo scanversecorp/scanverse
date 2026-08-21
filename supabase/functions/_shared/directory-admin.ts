@@ -414,6 +414,117 @@ export async function deleteProfileAdmin(
   return { revoked: true, profile_id: profileId, profile: data, auth_deleted: authDeleted.length };
 }
 
+const ARCHIVE_ALL_EXCEPT_CONFIRM = "ARCHIVE_ALL_EXCEPT";
+
+function profileMobile10(profile: Record<string, unknown>): string {
+  const fromPhone = digits10(String(profile.phone || ""));
+  if (fromPhone.length === 10) return fromPhone;
+  const id = String(profile.id || "");
+  if (id.startsWith("cust_") || id.startsWith("part_")) {
+    return digits10(id.slice(5));
+  }
+  return "";
+}
+
+function shouldKeepProfile(profile: Record<string, unknown>, keepMobile10: string): boolean {
+  if (String(profile.role || "") === "admin") return true;
+  if (String(profile.id || "") === `cust_${keepMobile10}`) return true;
+  if (String(profile.id || "") === `part_${keepMobile10}`) return true;
+  return profileMobile10(profile) === keepMobile10;
+}
+
+/** Archive (soft-delete) all profiles/vendors except keep_mobile and admins. */
+export async function archiveAllExceptAdmin(
+  sb: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+) {
+  const dryRun = body.dry_run !== false;
+  const confirmExecute = body.confirm_execute === true;
+  const confirm = String(body.confirm || "");
+  const keepMobile10 = String(body.keep_mobile || "8484850288").replace(/\D/g, "").slice(-10);
+  if (keepMobile10.length !== 10) throw new Error("keep_mobile must be 10 digits");
+
+  if (!dryRun) {
+    if (!confirmExecute || confirm !== ARCHIVE_ALL_EXCEPT_CONFIRM) {
+      return {
+        error: `Pass confirm_execute: true and confirm: "${ARCHIVE_ALL_EXCEPT_CONFIRM}"`,
+      };
+    }
+  }
+
+  const { data: allProfiles, error: pErr } = await sb
+    .from("profiles")
+    .select("id, role, phone, email, status, first_name, name");
+  if (pErr) throw new Error(pErr.message);
+
+  const profiles = (allProfiles || []) as Array<Record<string, unknown>>;
+  const kept = profiles.filter((p) => shouldKeepProfile(p, keepMobile10));
+  const keepIds = new Set(kept.map((p) => String(p.id)));
+  const toArchive = profiles.filter((p) => {
+    if (keepIds.has(String(p.id))) return false;
+    return String(p.status || "").toLowerCase() !== "deleted";
+  });
+
+  const { data: allVendors, error: vErr } = await sb
+    .from("vendor_partners")
+    .select("id, profile_id, phone, business_name, status");
+  if (vErr) throw new Error(vErr.message);
+
+  const vendors = (allVendors || []) as Array<Record<string, unknown>>;
+  const vendorsToOffboard = vendors.filter((v) => {
+    if (String(v.status || "").toLowerCase() === "offboarded") return false;
+    if (v.profile_id && keepIds.has(String(v.profile_id))) return false;
+    if (digits10(String(v.phone || "")) === keepMobile10) return false;
+    return true;
+  });
+
+  const preview = {
+    profiles_archived: toArchive.length,
+    vendors_offboarded: vendorsToOffboard.length,
+    kept_profile_ids: [...keepIds],
+    keep_mobile: keepMobile10,
+  };
+
+  if (dryRun) {
+    return {
+      dry_run: true,
+      preview,
+      sample_profile_ids: toArchive.slice(0, 15).map((p) => p.id),
+      sample_vendor_ids: vendorsToOffboard.slice(0, 15).map((v) => v.id),
+      message: `Dry run — would archive ${toArchive.length} profiles and offboard ${vendorsToOffboard.length} vendors.`,
+    };
+  }
+
+  let authDeleted = 0;
+  for (const profile of toArchive) {
+    authDeleted += (await deleteAuthUsersByEmail(sb, profileAuthEmailsFor(profile))).length;
+    const { error } = await sb
+      .from("profiles")
+      .update({
+        status: "deleted",
+        mobile_verified: false,
+        mobile_verified_at: null,
+      })
+      .eq("id", profile.id);
+    if (error) throw new Error(`profile ${profile.id}: ${error.message}`);
+  }
+
+  for (const vendor of vendorsToOffboard) {
+    const { error } = await sb
+      .from("vendor_partners")
+      .update({ status: "offboarded", offboarded_at: new Date().toISOString() })
+      .eq("id", vendor.id);
+    if (error) throw new Error(`vendor ${vendor.id}: ${error.message}`);
+  }
+
+  return {
+    success: true,
+    ...preview,
+    auth_deleted: authDeleted,
+    message: `Archived ${toArchive.length} profiles and offboarded ${vendorsToOffboard.length} vendors. Kept cust_${keepMobile10} and admin accounts.`,
+  };
+}
+
 export async function listVendorsBriefAdmin(
   sb: ReturnType<typeof createClient>,
   body: Record<string, unknown>,

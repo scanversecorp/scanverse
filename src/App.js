@@ -3682,6 +3682,37 @@ function autoFlagsFromValues(values) {
   return flags;
 }
 
+function geoValueForField(field, geo) {
+  if (!geo) return '';
+  const map = {
+    address: geo.address,
+    village: geo.village,
+    city: geo.city,
+    state: geo.state,
+    pincode: geo.pincode,
+  };
+  return String(map[field] ?? '').trim();
+}
+
+/** State value, or GPS pre-fill when the user has not edited that field */
+function resolvedFormField(field, stateValue, { auto, touched, geo } = {}) {
+  const direct = String(stateValue ?? '').trim();
+  if (direct) return direct;
+  if (auto?.[field] && !touched?.[field]) return geoValueForField(field, geo);
+  return '';
+}
+
+function resolvedAddressBundle({ address, village, city, state, pincode }, ctx) {
+  const pin = resolvedFormField('pincode', pincode, ctx).replace(/\D/g, '').slice(0, 6);
+  return {
+    address: resolvedFormField('address', address, ctx),
+    village: resolvedFormField('village', village, ctx),
+    city: resolvedFormField('city', city, ctx),
+    state: resolvedFormField('state', state, ctx),
+    pincode: pin,
+  };
+}
+
 /** Track GPS / silentGeo / IP pre-fills — light text until focus or edit */
 function useAutoFillFields(initialAuto = {}) {
   const [auto, setAuto] = useState(initialAuto);
@@ -3706,7 +3737,7 @@ function useAutoFillFields(initialAuto = {}) {
     onChange: (e) => { markTouched(field); onChange(e); },
   }), [markTouched]);
 
-  return { auto, markAuto, markTouched, inpStyle, bind };
+  return { auto, touched, markAuto, markTouched, inpStyle, bind };
 }
 
 function Badge({label,color}) {
@@ -3969,6 +4000,13 @@ function CloudCoursePriceTag({ svc, sm, feeView, onFillSgr }) {
     return (
       <span style={{ color: C.gold, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em', fontFamily: FF }}>
         Awaiting payment
+      </span>
+    );
+  }
+  if (Number(feeView?.course_paid_paise) > 0 || feeView?.status === 'enrolled' || feeView?.status === 'completed') {
+    return (
+      <span style={{ color: C.grn, fontSize: sm ? 11 : 12, fontWeight: 800, letterSpacing: '0.02em', fontFamily: FF }}>
+        Enrolled
       </span>
     );
   }
@@ -5630,7 +5668,8 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     return resolveUserMobile10({ id: uid, phone: pendingProfile?.phone });
   }, [mobile, userId, pendingProfile?.phone]);
   const { feeView: cloudFeeView } = useStudentCloudFeeView(SB_KEY, browseCloudMobile);
-  const { markAuto, inpStyle, bind: browseBind } = browseAuto;
+  const { auto: browseAutoFlags, touched: browseTouched, markAuto, inpStyle, bind: browseBind } = browseAuto;
+  const browseGpsCtx = () => ({ auto: browseAutoFlags, touched: browseTouched, geo: silentGeo });
   const [otpSent, setOtpSent]     = useState(false);
   const [otpChannel, setOtpChannel] = useState('sms');
   const [otpCode, setOtpCode]     = useState(['','','','','','']);
@@ -5895,6 +5934,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   };
 
   const auditBrowseVerifyForm = () => {
+    const ctx = browseGpsCtx();
     const fields = {};
     let message = '';
     const mark = (key, msg) => {
@@ -5904,9 +5944,12 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     if (!firstName.trim()) mark('firstName', 'Enter your first name');
     if (!mobile || mobile.length !== 10) mark('mobile', 'Enter valid 10-digit mobile');
     if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) mark('email', 'Enter a valid email address');
-    if (!address.trim()) mark('address', 'Enter your address');
-    if (!city.trim()) mark('city', 'Enter your city');
-    if (!pincode.trim() || pincode.length < 6) mark('pincode', 'Enter valid 6-digit PIN code');
+    const addr = resolvedFormField('address', address, ctx);
+    const cityVal = resolvedFormField('city', city, ctx);
+    const pin = resolvedFormField('pincode', pincode, ctx).replace(/\D/g, '');
+    if (!addr) mark('address', 'Enter your address');
+    if (!cityVal) mark('city', 'Enter your city');
+    if (!pin || pin.length < 6) mark('pincode', 'Enter valid 6-digit PIN code');
     return { ok: !Object.keys(fields).length, message, fields };
   };
 
@@ -5999,8 +6042,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       await ensureProfileAuthSession(mob, waVerified ? { waToken } : { otp: code });
       const uid = await resolveCustomerProfileId(mob);
       const dev = detectDevice();
+      const resolvedAddr = resolvedAddressBundle({ address, village, city, state: '', pincode }, browseGpsCtx());
       const profile = await upsertCustomerProfile({
-        id: uid, mob, firstName, lastName, address, village, city, pincode,
+        id: uid, mob, firstName, lastName,
+        address: resolvedAddr.address,
+        village: resolvedAddr.village,
+        city: resolvedAddr.city,
+        pincode: resolvedAddr.pincode,
         email: profileAuthEmail(mob),
         contactEmail: contactEmail.trim(),
         silentGeo, dev,
@@ -6139,13 +6187,15 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const completeLoginProfile = async () => {
     if (!pendingLoginProfile?.id) return setErr('Session expired — sign in again');
     const missing = missingProfileFields(pendingLoginProfile);
+    const addrCtx = browseGpsCtx();
+    const resolvedAddr = resolvedAddressBundle({ address, village, city, state: '', pincode }, addrCtx);
     const saveFirst = missing.includes('name') ? firstName.trim() : (pendingLoginProfile.first_name || firstName || '').trim();
     const saveLast = missing.includes('name') ? lastName.trim() : (pendingLoginProfile.last_name || lastName || '').trim();
     const saveDob = missing.includes('dob') ? dateOfBirth : (pendingLoginProfile.date_of_birth || dateOfBirth || '');
-    const saveAddress = missing.includes('address') ? address.trim() : (pendingLoginProfile.address || address || '').trim();
-    const saveVillage = missing.includes('address') ? village.trim() : (pendingLoginProfile.village || village || '').trim();
-    const saveCity = missing.includes('address') ? city.trim() : (pendingLoginProfile.city || city || '').trim();
-    const savePin = missing.includes('address') ? pincode.trim() : (pendingLoginProfile.pincode || pincode || '').trim();
+    const saveAddress = missing.includes('address') ? resolvedAddr.address : (pendingLoginProfile.address || resolvedAddr.address || address || '').trim();
+    const saveVillage = missing.includes('address') ? resolvedAddr.village : (pendingLoginProfile.village || resolvedAddr.village || village || '').trim();
+    const saveCity = missing.includes('address') ? resolvedAddr.city : (pendingLoginProfile.city || resolvedAddr.city || city || '').trim();
+    const savePin = missing.includes('address') ? resolvedAddr.pincode : (pendingLoginProfile.pincode || resolvedAddr.pincode || pincode || '').trim();
     if (missing.includes('name')) {
       if (!saveFirst) return setErr('Enter your first name');
       if (!saveLast) return setErr('Enter your last name');
@@ -7324,7 +7374,7 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
     state: prefill?.geo?.state,
     pincode: prefill?.geo?.pincode,
   }));
-  const { markAuto: markRegAuto, inpStyle: regInpStyle, bind: regBind } = regAuto;
+  const { markAuto: markRegAuto, inpStyle: regInpStyle, bind: regBind, auto: regAutoFlags, touched: regTouched } = regAuto;
   const [digits, setDigits] = useState(['','','','','','']);
   const [cd, setCd]         = useState(0);
   const [loading, setLoading] = useState(false);
@@ -7412,13 +7462,14 @@ function RegistrationFlow({ onComplete, prefill, onGoToLogin }) {
   }, [phase]);
 
   const sendOTP = async () => {
+    const regCtx = { auto: regAutoFlags, touched: regTouched, geo };
     if (!form.firstName.trim()) return setErr('Enter your first name');
     if (!form.lastName.trim())  return setErr('Enter your last name');
     if (!form.dateOfBirth || !ageFromDob(form.dateOfBirth)) return setErr('Enter a valid date of birth (age 5–120)');
     if (!form.mobile)           return setErr('Enter your mobile number');
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setErr('Enter a valid email address');
-    if (!form.city.trim())      return setErr('Enter your city');
-    if (!form.pincode.trim())   return setErr('Enter PIN code');
+    if (!resolvedFormField('city', form.city, regCtx)) return setErr('Enter your city');
+    if (!resolvedFormField('pincode', form.pincode, regCtx)) return setErr('Enter PIN code');
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr(''); setLoginPrompt(false);
     try {
@@ -8358,7 +8409,17 @@ function BookScreen() {
     pincode: user?.pincode,
     loc: initialLoc,
   }));
-  const { markAuto: markBookAuto, inpStyle: bookInpStyle, bind: bookBind } = bookAuto;
+  const { markAuto: markBookAuto, inpStyle: bookInpStyle, bind: bookBind, auto: bookAutoFlags, touched: bookTouched } = bookAuto;
+  const bookGpsCtx = () => ({
+    auto: bookAutoFlags,
+    touched: bookTouched,
+    geo: {
+      address: bookAddress || user?.address || silentGeo?.address,
+      village: user?.village || silentGeo?.village,
+      city: bookCity || user?.city || silentGeo?.city,
+      pincode: bookPincode || user?.pincode || silentGeo?.pincode,
+    },
+  });
   const [bookLat,setBookLat]=useState(user?.last_lat||silentGeo?.lat||null);
   const [bookLng,setBookLng]=useState(user?.last_lng||silentGeo?.lng||null);
   const [serviceSchedule, setServiceSchedule] = useState(null);
@@ -8376,6 +8437,21 @@ function BookScreen() {
   const bookPay=usePaymentVerification(step===payStep?txnId:null,step===payStep?(paymentAmountPaise??total):0,user?.id,addToast,{serviceId:svc?.id,serviceName:svc?.name,servicePricePaise:price,studentCloudCourse:isCloudBook});
   const creatingRef = useRef(false);
   const autoPayContinueRef = useRef(false);
+
+  useEffect(() => {
+    if (!silentGeo) return;
+    applyGeoToAddressState(silentGeo, {
+      setAddress: setBookAddress,
+      setCity: setBookCity,
+      setPincode: setBookPincode,
+    });
+    markBookAuto(autoFlagsFromValues({
+      address: silentGeo.address,
+      city: silentGeo.city,
+      pincode: silentGeo.pincode,
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [silentGeo?.address, silentGeo?.city, silentGeo?.pincode, silentGeo?.lat, silentGeo?.lng]);
 
   useEffect(() => {
     if (step !== payStep || !bookPay.paymentVerified || !date || !txnId) return;
@@ -8493,11 +8569,15 @@ function BookScreen() {
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpChannel('sms');setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
   const sendBookOTP=async(resend=false)=>{
+    const ctx = bookGpsCtx();
+    const addr = resolvedFormField('address', bookAddress, ctx);
+    const cityVal = resolvedFormField('city', bookCity, ctx);
+    const pin = resolvedFormField('pincode', bookPincode, ctx).replace(/\D/g, '');
     if(!bookPhone||bookPhone.replace(/\D/g,'').length!==10) return addToast('Enter valid 10-digit mobile','error');
     if(!bookFirstName.trim()) return addToast('Enter first name','error');
-    if(!bookAddress.trim()) return addToast('Enter your address','error');
-    if(!bookCity.trim()) return addToast('Enter your city','error');
-    if(!bookPincode.trim()||bookPincode.length<6) return addToast('Enter valid PIN code','error');
+    if(!addr) return addToast('Enter your address','error');
+    if(!cityVal) return addToast('Enter your city','error');
+    if(!pin||pin.length<6) return addToast('Enter valid PIN code','error');
     if(!bookTermsAccepted) return addToast(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`,'error');
     setLoading(true);
     try{
@@ -8522,16 +8602,19 @@ function BookScreen() {
       if(code.length<6) throw new Error('Enter 6-digit OTP');
       await ensureProfileAuthSession(mob, { otp: code });
       const uid=await resolveCustomerProfileId(mob);
+      const resolvedAddr = resolvedAddressBundle({
+        address: bookAddress, village: user?.village || '', city: bookCity, state: '', pincode: bookPincode,
+      }, bookGpsCtx());
       const profile=await upsertCustomerProfile({
         id:uid, mob,
         email: profileAuthEmail(mob),
         firstName:bookFirstName, lastName:bookLastName,
-        address:bookAddress, village:user?.village||'', city:bookCity, pincode:bookPincode,
+        address:resolvedAddr.address, village:resolvedAddr.village || user?.village || '', city:resolvedAddr.city, pincode:resolvedAddr.pincode,
         lastLat:user?.last_lat, lastLng:user?.last_lng,
       });
       setUser(profile);
       setBookOtpVerified(true);
-      setLoc([bookAddress,bookCity,bookPincode].filter(Boolean).join(', '));
+      setLoc([resolvedAddr.address, resolvedAddr.city, resolvedAddr.pincode].filter(Boolean).join(', '));
       setScheduleOutsideOk(false);
       const sched = serviceSchedule || normalizeScheduleRow(null);
       if (!date) {
@@ -10017,25 +10100,45 @@ function BookingsScreen() {
 
   const renderBookingCard=(b)=>{
     if (isCloudSubCardBooking(b)) {
-      const pendingCenter = Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0));
+      const schedLabel = [b.date, b.time].filter(Boolean).join(' · ');
+      const statusLabel = String(b.status || 'confirmed').replace(/_/g, ' ');
       return (
         <div key={b.id} style={{ ...S.card(), marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
             <div>
               <div style={{ color: C.txt, fontWeight: 600, fontSize: 16 }}>{b.service_name}</div>
-              <div style={{ color: C.sub, fontSize: 13, marginTop: 2 }}>{b.date || '—'} {b.time || ''}</div>
-              {Number(b.course_fee_paise) > 0 && (
-                <div style={{ color: C.dim, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
-                  Course ₹{fmtRs(b.course_fee_paise)} · ScanV paid ₹{fmtRs(b.total || 0)}
-                  {pendingCenter > 0 ? ` · Center pending ₹${fmtRs(pendingCenter)}` : ''}
-                </div>
+              {user.role === 'customer' ? (
+                <>
+                  <div style={{ color: C.sub, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+                    <strong>Status:</strong> {statusLabel}
+                  </div>
+                  <div style={{ color: C.sub, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
+                    <strong>Schedule:</strong> {schedLabel || '—'}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.grn, lineHeight: 1.55, marginTop: 10, fontWeight: 500 }}>
+                    Please arrive 15 minutes before the scheduled time.<br />
+                    SGR rescheduling requires a separate enrollment.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ color: C.sub, fontSize: 13, marginTop: 2 }}>{schedLabel || '—'}</div>
+                  {Number(b.course_fee_paise) > 0 && (
+                    <div style={{ color: C.dim, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+                      Course ₹{fmtRs(b.course_fee_paise)} · ScanV paid ₹{fmtRs(b.total || 0)}
+                      {Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0)) > 0
+                        ? ` · Center pending ₹${fmtRs(Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0)))}`
+                        : ''}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <Badge label="Complete" color={C.grn} />
+            <Badge label={user.role === 'customer' ? statusLabel : 'Complete'} color={C.grn} />
           </div>
-          {pendingCenter > 0 && (
+          {user.role !== 'customer' && Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0)) > 0 && (
             <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: `${C.gold}14`, border: `1px solid ${C.gold}44`, fontSize: 12, color: C.gold, fontWeight: 600 }}>
-              Pending center payment · ₹{fmtRs(pendingCenter)}
+              Pending center payment · ₹{fmtRs(Math.max(0, Number(b.center_pending_paise || 0) - Number(b.center_paid_paise || 0)))}
             </div>
           )}
         </div>
@@ -10264,7 +10367,7 @@ function ProfileScreen() {
   const verifiedNote=<div style={{fontSize:10,color:C.dim,marginTop:4}}>🔒 Verified — contact support to change</div>;
   const dobMissing = !profileHasDob(user);
   useEffect(() => {
-    if (!user?.id) { setCenterPendingBookings([]); return; }
+    if (!user?.id || user.role !== 'admin') { setCenterPendingBookings([]); return; }
     let cancelled = false;
     (async () => {
       const { data, error } = await sb().from('bookings')
