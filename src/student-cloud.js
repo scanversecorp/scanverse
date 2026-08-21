@@ -303,6 +303,7 @@ export function StudentCloudAdmitScreen({
   const [doneMsg, setDoneMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [gpsHint, setGpsHint] = useState('');
   const [sgrFeeAck, setSgrFeeAck] = useState(false);
   const [bypassPin, setBypassPin] = useState('');
   const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
@@ -363,8 +364,10 @@ export function StudentCloudAdmitScreen({
         if (geo.state) setState(geo.state);
         if (geo.pincode) setPincode(geo.pincode);
       }
-      addToast?.('Address filled from GPS — edit if needed', 'success');
+      setGpsHint('Address filled from GPS — edit if needed');
+      window.setTimeout(() => setGpsHint(''), 4000);
     } catch (e) {
+      setGpsHint('');
       setErr(e.message || 'GPS failed — enter address manually');
     } finally { setGpsBusy(false); }
   };
@@ -600,6 +603,7 @@ export function StudentCloudAdmitScreen({
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
           <button type="button" onClick={fillGps} disabled={gpsBusy || otpVerified} style={{ background: 'none', border: `1.5px solid ${C.acc}`, color: C.acc, borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>{gpsBusy ? 'Locating…' : '📍 Use GPS'}</button>
         </div>
+        {gpsHint && <div style={{ fontSize: 12, color: C.grn, fontWeight: 600, textAlign: 'right', marginBottom: 8, lineHeight: 1.4 }}>{gpsHint}</div>}
         <Field label="Address" req><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House, street, area" style={S.inp()} disabled={otpVerified} /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <Field label="Village"><input value={village} onChange={(e) => setVillage(e.target.value)} placeholder="Village" style={S.inp()} disabled={otpVerified} /></Field>

@@ -3523,6 +3523,28 @@ const APP_CSS = `
   body{background:#e8e6e1;color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
   .scanv-scroll-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .scanv-toast-stack{
+    position:fixed;
+    left:50%;
+    transform:translateX(-50%);
+    bottom:calc(72px + env(safe-area-inset-bottom,0px));
+    z-index:9999;
+    display:flex;
+    flex-direction:column-reverse;
+    gap:8px;
+    max-width:min(340px,calc(100vw - 32px));
+    width:calc(100vw - 32px);
+    pointer-events:none;
+  }
+  .scanv-toast-item{
+    pointer-events:auto;
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:13px;
+    line-height:1.4;
+    box-shadow:0 6px 24px rgba(18,18,18,0.14);
+    word-break:break-word;
+  }
   #root{align-items:center;justify-content:flex-start;background:#e8e6e1}
   .scanv-root{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .scanv-shell{
@@ -4074,10 +4096,11 @@ function ServiceSearchResults({ query, categories, onCategory, onSubSvc, renderC
 }
 
 function Toast({toasts}) {
+  if (!toasts.length) return null;
   return (
-    <div style={{position:'fixed',top:16,right:16,zIndex:9999,display:'flex',flexDirection:'column',gap:8,maxWidth:300,width:'90vw'}}>
+    <div className="scanv-toast-stack" aria-live="polite">
       {toasts.map(t=>(
-        <div key={t.id} style={{background:t.type==='error'?`${C.red}22`:t.type==='success'?`${C.grn}22`:`${C.cyan}22`,border:`1px solid ${t.type==='error'?C.red:t.type==='success'?C.grn:C.cyan}`,borderRadius:10,padding:'12px 16px',fontSize:13,color:C.txt}}>
+        <div key={t.id} className="scanv-toast-item" style={{background:t.type==='error'?`${C.red}22`:t.type==='success'?`${C.grn}22`:`${C.cyan}22`,border:`1px solid ${t.type==='error'?C.red:t.type==='success'?C.grn:C.cyan}`,color:C.txt}}>
           {t.msg}
         </div>
       ))}
@@ -5528,6 +5551,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const [err, setErr]             = useState('');
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
   const [verifyGpsBusy, setVerifyGpsBusy] = useState(false);
+  const [verifyGpsHint, setVerifyGpsHint] = useState('');
   const [serviceSchedule, setServiceSchedule] = useState(null);
   const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
   const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
@@ -5779,8 +5803,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         city: g.city,
         pincode: g.pincode,
       }));
-      addToast?.('Address filled from GPS — edit if needed', 'success');
+      setVerifyGpsHint('Address filled from GPS — edit if needed');
+      window.setTimeout(() => setVerifyGpsHint(''), 4000);
     } catch (e) {
+      setVerifyGpsHint('');
       const msg = e.message || 'GPS failed — enter address manually';
       setErr(msg);
       addToast?.(msg, 'error');
@@ -6955,6 +6981,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
               {verifyGpsBusy ? 'Locating…' : '📍 Use my location'}
             </button>
           </div>
+          {verifyGpsHint && <div style={{ fontSize: 12, color: C.grn, fontWeight: 600, textAlign: 'right', marginBottom: 8, lineHeight: 1.4 }}>{verifyGpsHint}</div>}
           <Field label="Address" req note="House no, street, area">
             <input value={address} {...browseBind('address', e=>setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')}/>
           </Field>
@@ -7113,6 +7140,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
                   {verifyGpsBusy ? 'Locating…' : '📍 Use my location'}
                 </button>
               </div>
+              {verifyGpsHint && <div style={{ fontSize: 12, color: C.grn, fontWeight: 600, textAlign: 'right', marginBottom: 8, lineHeight: 1.4 }}>{verifyGpsHint}</div>}
               <Field label="Address" req note="House no, street, area">
                 <input value={address} {...browseBind('address', e => setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')} />
               </Field>
