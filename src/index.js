@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { useAppUpdateCheck } from './app-update';
+
+if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual';
+}
 
 function Root() {
   useAppUpdateCheck();
@@ -11,6 +15,10 @@ function Root() {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<React.StrictMode><Root /></React.StrictMode>);
 
-/* Remove the pre-React loader spinner */
 const loader = document.getElementById('root-loader');
-if (loader) setTimeout(() => loader.remove(), 100);
+if (loader) {
+  requestAnimationFrame(() => {
+    loader.remove();
+    window.scrollTo(0, 0);
+  });
+}

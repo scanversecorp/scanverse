@@ -72,8 +72,16 @@ function scheduleReload(reason, { showBanner = false } = {}) {
 function listenForServiceWorkerUpdates() {
   if (!('serviceWorker' in navigator)) return undefined;
 
+  if (navigator.serviceWorker.controller) {
+    sessionStorage.setItem('scanv_had_sw_controller', '1');
+  }
+
   const onControllerChange = () => {
-    scheduleReload('service-worker');
+    if (sessionStorage.getItem('scanv_had_sw_controller') === '1') {
+      scheduleReload('service-worker');
+      return;
+    }
+    sessionStorage.setItem('scanv_had_sw_controller', '1');
   };
   navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 

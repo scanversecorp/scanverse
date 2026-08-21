@@ -3522,8 +3522,9 @@ const APP_CSS = `
   html{background:#e8e6e1;height:100%}
   body{background:#e8e6e1;color:${C.txt};font-family:${FF};overscroll-behavior:none;-webkit-font-smoothing:antialiased;font-size:15px;height:100%;min-height:100dvh;overflow-x:hidden}
   @supports (height:100dvh){html,body{height:100dvh;max-height:100dvh}}
-  #root{align-items:center;justify-content:center;background:#e8e6e1}
-  .scanv-root{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
+  .scanv-scroll-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  #root{align-items:center;justify-content:flex-start;background:#e8e6e1}
+  .scanv-root{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100%;min-height:100dvh;min-height:-webkit-fill-available}
   .scanv-shell{
     width:calc(100% - 24px) !important;
     max-width:calc(100% - 24px) !important;
@@ -4462,6 +4463,12 @@ function scrollBrowseTop(el) {
   requestAnimationFrame(run);
 }
 
+/** Scroll window + in-app shell containers (Safari hash routes). */
+function scrollAppToTop() {
+  scrollBrowseTop(document.querySelector('.scanv-shell .scanv-mobile-zoom'));
+  document.querySelectorAll('.scanv-scroll-body').forEach((node) => scrollBrowseTop(node));
+}
+
 function scrollBrowseToId(container, id) {
   if (!container || !id) return;
   const target = container.querySelector(`#${id}`);
@@ -4503,6 +4510,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
       </div>
       <div
         ref={scrollRef}
+        className="scanv-scroll-body"
         style={bodyStyle}
       >
         {children}
@@ -5528,7 +5536,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   }, [screen]);
 
   useEffect(() => {
-    if (screen.endsWith('-list') || screen === 'detail') scrollBrowseTop(browseScrollRef.current);
+    requestAnimationFrame(() => {
+      scrollBrowseTop(browseHomeScrollRef.current);
+      scrollBrowseTop(browseScrollRef.current);
+      scrollAppToTop();
+    });
   }, [screen]);
 
   useEffect(() => {
@@ -6505,7 +6517,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <TrustPillsRow onSelect={goBrowseTrustPill} />
         </div>
       </div>
-      <div ref={browseHomeScrollRef} style={{...BROWSE_SCROLL_BODY,padding:`8px ${BROWSE_HOME_INSET}px 24px`,overflowX:'hidden'}}>
+      <div ref={browseHomeScrollRef} className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY,padding:`8px ${BROWSE_HOME_INSET}px 24px`,overflowX:'hidden'}}>
         {searching ? (
           <ServiceSearchResults
             query={search}
@@ -6548,7 +6560,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             <button type="button" aria-label="Go back" onClick={goBrowseHome} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0, minWidth: 44, minHeight: 44, lineHeight: 1 }}>←</button>
             <div style={{ fontSize: 15, fontWeight: 800, color: C.txt, flex: 1 }}>{pg.title}</div>
           </div>
-          <div style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
+          <div className="scanv-scroll-body" style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
             <TrustCommitmentBody
               pageKey={pageKey}
               onAction={(action) => runTrustCommitmentAction(action, { setScreen, goBrowseHome })}
@@ -6566,7 +6578,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         <button type="button" aria-label="Go back" onClick={goBrowseHome} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0, minWidth: 44, minHeight: 44, lineHeight: 1 }}>←</button>
         <div style={{ fontWeight: 800, fontSize: 20, fontFamily: FF, color: C.txt, flex: 1 }}>⭐ Top Rated</div>
       </div>
-      <div style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
+      <div className="scanv-scroll-body" style={{ ...BROWSE_SCROLL_BODY, padding: '14px 16px 24px' }}>
         {topRatedItems.length ? (
           <>
             <div style={{ ...S.card(), padding: 16, marginBottom: 16, background: '#fffbeb', border: '2px solid rgba(251,191,36,0.45)' }}>
@@ -6661,7 +6673,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <button onClick={()=>setScreen('verify')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{isDeliveryShipment ? 'Schedule pickup' : 'Pick date & time'}</div>
         </div>
-        <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
+        <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 2 of 3 · Choose schedule before payment</div>
           <ScheduleBookingPanel
             serviceId={activeSvc.id}
@@ -6729,7 +6741,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <button onClick={()=>{setScreen('schedule');setUpiOpened(false);setPaymentVerified(false);}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{browseCloudBook ? 'Pay ScanV share' : 'Pay platform fee'}</div>
         </div>
-        <div style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
+        <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY,padding:'14px 16px 24px'}}>
           {bookingDetail?.date && (
             <div style={{background:C.deep,border:BDR,borderRadius:10,padding:'10px 12px',marginBottom:14,fontSize:14,color:C.txt,fontWeight:600}}>
               📅 Scheduled · {bookingDetail.date} · {bookingDetail.time || '10:00'}
@@ -6818,7 +6830,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <button onClick={()=>setScreen('detail')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
           <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
         </div>
-        <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
+        <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, email, address & one-time mobile OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
@@ -6898,7 +6910,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <button type="button" aria-label="Go back" onClick={()=>{goBrowseHome();resetOtpFlow();setErr('');}} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22,flexShrink:0}}>←</button>
           <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>{loginTitle}</div>
         </BrowseFixedHeader>
-        <div style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
+        <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
           {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>{loginHint}</div>
           {(silentGeo?.village || silentGeo?.city) && (
@@ -6969,7 +6981,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <button type="button" aria-label="Go back" onClick={() => { setPendingLoginProfile(null); setScreen(completeProfileMode === 'booking' ? 'verify' : 'login'); setErr(''); }} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22, flexShrink: 0 }}>←</button>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Complete your profile</div>
         </BrowseFixedHeader>
-        <div style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
+        <div className="scanv-scroll-body" style={{ ...BROWSE_SCROLL_BODY, padding: '16px 16px 24px' }}>
           {err && <div style={S.err}>{err}</div>}
           <div style={{ color: C.sub, fontSize: 13, marginBottom: 14, lineHeight: 1.6, fontWeight: 500 }}>
             Mobile +91 {mob10 || '—'} verified. {hint}
@@ -17713,7 +17725,7 @@ function LegalPage({ page, catalogTick = 0 }) {
         <ScanVLogoMark size={LOGO_SIZE.sm} />
         <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>
       </div>
-      <div style={{...BROWSE_SCROLL_BODY}}>
+      <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY}}>
       <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
         {/* Hero */}
         <div style={{background:`linear-gradient(135deg,${C.surf},${C.card})`,border:`1px solid ${C.bdr}`,borderRadius:16,padding:'28px 24px',marginBottom:28}}>
@@ -17777,6 +17789,17 @@ export default function App() {
     localStorage.removeItem('scanv_uid');
     setUser(null); setState('browse'); setScreen('services');
   },[]);
+
+  useEffect(() => {
+    if (state === 'boot') return;
+    requestAnimationFrame(() => scrollAppToTop());
+  }, [state, screen]);
+
+  useEffect(() => {
+    const onHash = () => requestAnimationFrame(() => scrollAppToTop());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   // GPS immediately on app open; IP estimate runs in parallel as fallback only
   useEffect(() => {
@@ -18167,7 +18190,7 @@ export default function App() {
         <PartnerGpsTracker />
         <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>
-          <div className="scanv-mobile-zoom" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
+          <div className="scanv-mobile-zoom scanv-scroll-body" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
             <Boundary>{renderScreen()}</Boundary>
             {screen !== 'bookings' && (
               <CustomerFooterBar
