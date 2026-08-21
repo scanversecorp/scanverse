@@ -1659,6 +1659,55 @@ function clearPaymentReturnUrl() {
   const next = url.pathname + (url.search || '') + url.hash;
   window.history.replaceState({}, '', next);
 }
+
+/** Deep-link a category or service: ?open=cloud (category list) or ?open=cl-iaas (service detail). */
+function parseOpenServiceParam() {
+  const id = new URLSearchParams(window.location.search).get('open')?.trim();
+  return id || null;
+}
+
+function buildServiceOpenUrl(id) {
+  const u = new URL(APP_URL);
+  u.searchParams.set('open', id);
+  return u.toString();
+}
+
+function resolveOpenServiceTarget(id) {
+  if (!id) return null;
+  const top = SVCS.find((s) => s.id === id);
+  if (top && SUB_CATEGORIES[id]) {
+    return { svc: top, screen: `${id}-list` };
+  }
+  const svc = findSvcById(id);
+  if (!svc) return null;
+  if (SUB_CATEGORIES[svc.id]) {
+    const topSvc = SVCS.find((s) => s.id === svc.id) || svc;
+    return { svc: topSvc, screen: `${svc.id}-list` };
+  }
+  const parent = svc.parent || subCatId(svc);
+  const cfg = parent ? SUB_CATEGORIES[parent] : null;
+  const enriched = cfg
+    ? { ...svc, parent, cat: cfg.cat || svc.cat, cash: false }
+    : svc;
+  return { svc: enriched, screen: 'detail' };
+}
+
+function browseInitialFromOpen() {
+  const openId = parseOpenServiceParam();
+  if (!openId) return { screen: 'services', activeSvc: null };
+  const target = resolveOpenServiceTarget(openId);
+  if (!target) return { screen: 'services', activeSvc: null };
+  return { screen: target.screen, activeSvc: target.svc };
+}
+
+function stripOpenServiceParamFromUrl() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('open')) return;
+  url.searchParams.delete('open');
+  const qs = url.searchParams.toString();
+  const next = url.pathname + (qs ? `?${qs}` : '') + url.hash;
+  window.history.replaceState({}, '', next);
+}
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const PRICING_IDLE_MS = 5 * 60 * 1000;
@@ -2872,6 +2921,52 @@ function FooterSocialLinks({ small }) {
         </a>
       ))}
     </div>
+  );
+}
+
+function ShareServiceLinkButton({ serviceId, label, addToast, compact = false }) {
+  const [copied, setCopied] = useState(false);
+  const share = async () => {
+    const url = buildServiceOpenUrl(serviceId);
+    const title = label || 'ScanV service';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'ScanV', text: `Book ${title} on ScanV`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      addToast?.('Link copied — opens this service directly', 'success');
+      setTimeout(() => setCopied(false), 2500);
+    } catch (e) {
+      if (e?.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        addToast?.('Link copied', 'success');
+      } catch (_) { /* non-blocking */ }
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={share}
+      aria-label={`Share link to ${label || serviceId}`}
+      style={{
+        flexShrink: 0,
+        background: copied ? `${C.grn}18` : C.deep,
+        border: copied ? `1.5px solid ${C.grn}55` : BDR,
+        color: copied ? C.grn : C.acc,
+        borderRadius: 8,
+        padding: compact ? '6px 10px' : '8px 12px',
+        fontSize: compact ? 11 : 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+        fontFamily: FF,
+        minHeight: compact ? 36 : 44,
+      }}
+    >
+      {copied ? 'Copied ✓' : 'Share'}
+    </button>
   );
 }
 
@@ -4587,7 +4682,7 @@ function BrowseFixedHeader({ children, padX = 16 }) {
 }
 
 /** Category panel — header pinned in flex column; body scrolls internally (Safari-safe vs position:fixed). */
-function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children, showCopyright = true, fillViewport = true }) {
+function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, children, showCopyright = true, fillViewport = true, shareId, shareLabel, addToast }) {
   const rootStyle = fillViewport
     ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: C.bg, fontFamily: FF, overflow: 'hidden' }
     : { display: 'flex', flexDirection: 'column', background: C.bg, fontFamily: FF };
@@ -4610,6 +4705,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
           <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>{title}</div>
           {subtitle ? <div style={{ fontSize: 13, color: C.dim, fontWeight: 600 }}>{subtitle}</div> : null}
         </div>
+        {shareId ? <ShareServiceLinkButton serviceId={shareId} label={shareLabel || title} addToast={addToast} compact /> : null}
       </div>
       <div
         ref={scrollRef}
@@ -5646,10 +5742,11 @@ async function recordQrScan({ onGeo } = {}) {
    User browses → picks service → books → THEN registers
 ================================================================ */
 function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick = 0 }) {
-  const [screen, setScreen] = useState('services'); // services | top-rated | detail | verify | payment | schedule | login
+  const browseInitial = useMemo(() => browseInitialFromOpen(), []);
+  const [screen, setScreen] = useState(browseInitial.screen); // services | top-rated | detail | verify | payment | schedule | login
   const [navTab, setNavTab] = useState('home');
   const [loginIntent, setLoginIntent] = useState(null); // 'home' | 'bookings' | 'profile'
-  const [activeSvc, setActiveSvc] = useState(null);
+  const [activeSvc, setActiveSvc] = useState(browseInitial.activeSvc);
   const [bookingDetail, setBookingDetail] = useState(null);
   const [userId, setUserId] = useState(null);
   const [pendingProfile, setPendingProfile] = useState(null);
@@ -5733,6 +5830,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const browseScrollRef = useRef(null);
   const browseHomeScrollRef = useRef(null);
   const [browseAuthed, setBrowseAuthed] = useState(() => !!localStorage.getItem('scanv_uid'));
+
+  useEffect(() => {
+    if (browseInitial.activeSvc) stripOpenServiceParamFromUrl();
+  }, [browseInitial.activeSvc]);
 
   useEffect(() => {
     const uid = localStorage.getItem('scanv_uid');
@@ -6777,6 +6878,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         scrollRef={browseScrollRef}
         title={cfg.title}
         subtitle={cfg.subtitle}
+        shareId={listCatId}
+        shareLabel={cfg.title}
+        addToast={addToast}
         onBack={() => { setScreen('services'); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
       >
         <CategoryListBody
@@ -6921,6 +7025,9 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       <BrowseCategoryShell
         scrollRef={browseScrollRef}
         title={activeSvc.name}
+        shareId={activeSvc.id}
+        shareLabel={activeSvc.name}
+        addToast={addToast}
         onBack={() => { setScreen(listBack); requestAnimationFrame(() => scrollBrowseTop(browseScrollRef.current)); }}
       >
         <div style={{ padding: '14px 16px 24px' }}>
@@ -8273,6 +8380,9 @@ function ServicesScreen() {
         subtitle={cfg.subtitle}
         showCopyright={false}
         fillViewport={false}
+        shareId={subListCat}
+        shareLabel={cfg.title}
+        addToast={addToast}
         onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollAppToTop()); }}
       >
         <CategoryListBody
@@ -8298,6 +8408,9 @@ function ServicesScreen() {
         title={detail.name}
         showCopyright={false}
         fillViewport={false}
+        shareId={detail.id}
+        shareLabel={detail.name}
+        addToast={addToast}
         onBack={() => { setDetail(null); requestAnimationFrame(() => scrollAppToTop()); }}
       >
         <div style={{ padding: 16 }}>
@@ -18366,6 +18479,12 @@ export default function App() {
               console.warn('[ScanV] finalize after payment', e.message);
             }
           }
+        }
+        const openId = parseOpenServiceParam();
+        if (openId && resolveOpenServiceTarget(openId)) {
+          setUser(profile);
+          setState('browse');
+          return;
         }
         setUser(profile);
         setState('app');
