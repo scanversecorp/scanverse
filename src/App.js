@@ -7044,6 +7044,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     const isCloud = activeSvc?.parent === 'cloud' || activeSvc?.id === 'cloud';
     if (isCloud && !cloudCourseBookReady(activeSvc, cloudFeeView)) {
       setScreen('cloud-admit');
+      requestAnimationFrame(() => scrollAppToTop());
       return;
     }
     if (isCloud && cloudCourseBookReady(activeSvc, cloudFeeView)) {
@@ -7094,6 +7095,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     const cfg = SUB_CATEGORIES.cloud;
     setActiveSvc({ ...svc, parent: 'cloud', cat: cfg?.cat || svc.cat, cash: false });
     setScreen('cloud-admit');
+    requestAnimationFrame(() => scrollAppToTop());
   }, []);
 
   if (screen === 'cloud-admit') {
@@ -7127,7 +7129,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         <CategoryListBody
           categoryId={listCatId}
           onSelect={(svc) => openSubSvc(listCatId, svc)}
-          onAdmit={listCatId === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setScreen('cloud-admit'); } : undefined}
+          onAdmit={listCatId === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setScreen('cloud-admit'); requestAnimationFrame(() => scrollAppToTop()); } : undefined}
           onFillSgr={listCatId === 'cloud' ? openBrowseCloudSgr : undefined}
           apikey={SB_KEY}
           cloudFeeView={cloudFeeView}
@@ -8579,7 +8581,7 @@ function ServicesScreen() {
 
   useEffect(() => {
     requestAnimationFrame(() => scrollAppToTop());
-  }, [subListCat, detail]);
+  }, [subListCat, detail, cloudAdmit]);
 
   useEffect(()=>{
     if (activeSvc && SUB_CATEGORIES[activeSvc.id] && !detail) setSubListCat(activeSvc.id);
@@ -8598,6 +8600,7 @@ function ServicesScreen() {
     const cfg = SUB_CATEGORIES.cloud;
     setActiveSvc({ ...svc, parent: 'cloud', cat: cfg?.cat || svc.cat, cash: false });
     setCloudAdmit(true);
+    requestAnimationFrame(() => scrollAppToTop());
   }, []);
 
   const openCategory = (s) => {
@@ -8645,7 +8648,7 @@ function ServicesScreen() {
         <CategoryListBody
           categoryId={subListCat}
           onSelect={(svc) => openSubSvc(subListCat, svc)}
-          onAdmit={subListCat === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setCloudAdmit(true); } : undefined}
+          onAdmit={subListCat === 'cloud' ? () => { setActiveSvc(findSvcById('cl-training') || { id: 'cl-training', parent: 'cloud', name: 'Cloud & IT Training' }); setCloudAdmit(true); requestAnimationFrame(() => scrollAppToTop()); } : undefined}
           onFillSgr={subListCat === 'cloud' ? openCloudSgr : undefined}
           apikey={SB_KEY}
           cloudFeeView={cloudFeeView}
@@ -8708,6 +8711,7 @@ function ServicesScreen() {
             if (isCloud && !cloudCourseBookReady(payload, cloudFeeView)) {
               setActiveSvc(payload);
               setCloudAdmit(true);
+              requestAnimationFrame(() => scrollAppToTop());
               return;
             }
             setActiveSvc(isCloud ? withCloudCourseFee(payload, cloudFeeView) : payload);

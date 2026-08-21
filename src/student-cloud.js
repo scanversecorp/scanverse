@@ -417,6 +417,27 @@ export function StudentCloudAdmitScreen({
   const canSkipOtp = !!(loggedInUser?.mobile_verified && loggedInMobile10 && digits10(mobile) === loggedInMobile10);
 
   useEffect(() => {
+    const reset = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      document.querySelectorAll('.scanv-scroll-body').forEach((node) => {
+        if (node.scrollTo) node.scrollTo({ top: 0, left: 0 });
+        else node.scrollTop = 0;
+      });
+    };
+    reset();
+    const frame = requestAnimationFrame(reset);
+    const t1 = window.setTimeout(reset, 50);
+    const t2 = window.setTimeout(reset, 200);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!loggedInUser) return;
     const m10 = resolveUserMobile10(loggedInUser);
     if (m10) setMobile(m10);
