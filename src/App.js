@@ -1532,12 +1532,12 @@ function resolveSvcImage(svc) {
 
 /** Scene-led VIP thumbs — center crop reads better than face crop on small cards. */
 const VIP_THUMB_OBJECT_POSITION = {
-  'vip-concierge': 'center 45%',
-  'vip-assistant': 'center 40%',
-  'vip-priority': 'center 50%',
-  'vip-dining': 'center 55%',
-  'vip-airport': 'center 45%',
-  'vip-event': 'center 40%',
+  'vip-concierge': 'center 18%',
+  'vip-assistant': 'center 20%',
+  'vip-priority': 'center 18%',
+  'vip-dining': 'center 22%',
+  'vip-airport': 'center 20%',
+  'vip-event': 'center 18%',
 };
 
 function effectiveSvcPrices(svc) {
