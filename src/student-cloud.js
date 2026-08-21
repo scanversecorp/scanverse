@@ -259,13 +259,54 @@ function otpChange(i, raw, digits, setDigits, prefix) {
   if (ch && i < 5) document.getElementById(`${prefix}${i + 1}`)?.focus();
 }
 
+function auditSgrForm(values) {
+  const fields = {};
+  let message = '';
+  const mark = (key, msg) => { fields[key] = true; if (!message) message = msg; };
+  if (!values.firstName.trim()) mark('firstName', 'Enter first name');
+  if (!values.lastName.trim()) mark('lastName', 'Enter last name');
+  if (!values.experience.trim()) mark('experience', 'Enter your experience');
+  const dobErr = validateSgrDob(values.dob);
+  if (dobErr) mark('dob', dobErr);
+  if (digits10(values.mobile).length !== 10) mark('mobile', 'Enter valid 10-digit mobile');
+  const emailTrim = String(values.email || '').trim();
+  if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) mark('email', 'Enter a valid email address');
+  else if (emailTrim.endsWith('@scanv.app')) mark('email', 'Use your personal or business email');
+  if (!values.address.trim()) mark('address', 'Enter address');
+  if (!values.city.trim()) mark('city', 'Enter city');
+  if (!values.state.trim()) mark('state', 'Enter state');
+  const schedErr = validateSgrSchedule(values.scheduleDate, values.scheduleTime);
+  if (schedErr) {
+    if (/date/i.test(schedErr)) mark('scheduleDate', schedErr);
+    else mark('scheduleTime', schedErr);
+  }
+  return { ok: !Object.keys(fields).length, message, fields };
+}
+
+function applyGeoToAddressFields(geo, setters, { force = false } = {}) {
+  if (!geo) return;
+  const pick = (cur, val) => {
+    const next = val != null ? String(val).trim() : '';
+    if (!next) return cur;
+    if (!force && String(cur || '').trim()) return cur;
+    return next;
+  };
+  setters.setAddress((a) => pick(a, geo.address));
+  setters.setVillage((v) => pick(v, geo.village));
+  setters.setCity((c) => pick(c, geo.city));
+  setters.setState((s) => pick(s, geo.state));
+  setters.setPincode((p) => pick(p, geo.pincode));
+  if (geo.lat != null) setters.setLat(geo.lat);
+  if (geo.lng != null) setters.setLng(geo.lng);
+}
+
 export function StudentCloudAdmitScreen({
   silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, showCopyright = true, loggedInUser = null, kit,
 }) {
   const {
     C, S, FF, Field, Btn, Spin, BDR, CopyrightLine,
     invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified,
-    captureFreshGps, SB_KEY,
+    captureFreshGps, invalidFieldStyle, FormActionError, scrollToFirstFieldError, SB_KEY,
   } = kit;
 
   const courseList = courses || [];
@@ -308,6 +349,8 @@ export function StudentCloudAdmitScreen({
   const [bypassPin, setBypassPin] = useState('');
   const { accepted: termsAccepted, acceptedAt: termsAcceptedAt, accept: acceptTerms, revoke: revokeTerms } = useScanvTermsAcceptance();
   const [err, setErr] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const inpErr = (invalid, extra = {}) => (invalidFieldStyle ? invalidFieldStyle(invalid, extra) : extra);
 
   const courseName = useMemo(
     () => courseList.find((c) => c.id === courseId)?.name || initialCourse?.name || 'Cloud & IT Training',
@@ -348,13 +391,9 @@ export function StudentCloudAdmitScreen({
         });
       }
       const g = await reverseGeo(lat, lng);
-      setAddress(g.address || '');
-      setVillage(g.village || '');
-      setCity(g.city || '');
-      setState(g.state || '');
-      setPincode(g.pincode || '');
-      setLat(lat);
-      setLng(lng);
+      applyGeoToAddressFields(g, {
+        setAddress, setVillage, setCity, setState, setPincode, setLat, setLng,
+      }, { force: true });
       setGpsHint('Address filled from GPS — edit if needed');
       window.setTimeout(() => setGpsHint(''), 4000);
     } catch (e) {
@@ -364,40 +403,62 @@ export function StudentCloudAdmitScreen({
   };
 
   useEffect(() => {
-    if (silentGeo?.address || silentGeo?.city) {
-      setAddress((a) => a || silentGeo.address || '');
-      setVillage((v) => v || silentGeo.village || '');
-      setCity((c) => c || silentGeo.city || '');
-      setState((s) => s || silentGeo.state || '');
-      setPincode((p) => p || silentGeo.pincode || '');
-      setLat(silentGeo.lat ?? null);
-      setLng(silentGeo.lng ?? null);
-    }
+    applyGeoToAddressFields(silentGeo, {
+      setAddress, setVillage, setCity, setState, setPincode, setLat, setLng,
+    });
   }, [silentGeo]);
+
+  // Coords often arrive before village/address on iOS — reverse-geocode when locality still empty
+  useEffect(() => {
+    if (!silentGeo?.lat || silentGeo?.lng == null || !reverseGeo) return undefined;
+    const needsLocality = !String(silentGeo.village || '').trim() || !String(silentGeo.address || '').trim();
+    if (!needsLocality) return undefined;
+    let cancelled = false;
+    reverseGeo(silentGeo.lat, silentGeo.lng).then((g) => {
+      if (cancelled) return;
+      applyGeoToAddressFields({ ...silentGeo, ...g }, {
+        setAddress, setVillage, setCity, setState, setPincode, setLat, setLng,
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [silentGeo, reverseGeo]);
 
   const schedBounds = scheduleBounds();
 
+  const formValues = () => ({
+    firstName, lastName, experience, dob, mobile, email,
+    address, city, state, scheduleDate, scheduleTime,
+  });
+
+  const clearFieldErr = (key) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const failFormAudit = (audit) => {
+    setFieldErrors(audit.fields);
+    setErr(audit.message);
+    scrollToFirstFieldError?.(audit.fields);
+    return false;
+  };
+
   const validateForm = () => {
-    if (!firstName.trim()) return 'Enter first name';
-    if (!lastName.trim()) return 'Enter last name';
-    if (!experience.trim()) return 'Enter your experience';
-    const dobErr = validateSgrDob(dob);
-    if (dobErr) return dobErr;
-    if (digits10(mobile).length !== 10) return 'Enter valid 10-digit mobile';
-    const emailTrim = email.trim();
-    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) return 'Enter a valid email address';
-    if (emailTrim.endsWith('@scanv.app')) return 'Use your personal or business email';
-    if (!address.trim()) return 'Enter address';
-    if (!city.trim()) return 'Enter city';
-    if (!state.trim()) return 'Enter state';
-    const schedErr = validateSgrSchedule(scheduleDate, scheduleTime);
-    if (schedErr) return schedErr;
+    const audit = auditSgrForm(formValues());
+    if (!audit.ok) {
+      failFormAudit(audit);
+      return audit.message;
+    }
+    setFieldErrors({});
     return '';
   };
 
   const sendOtp = async () => {
     const v = validateForm();
-    if (v) return setErr(v);
+    if (v) return;
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
@@ -450,7 +511,7 @@ export function StudentCloudAdmitScreen({
 
   const submitEnrollment = async ({ skipOtp = false } = {}) => {
     const formErr = validateForm();
-    if (formErr) return setErr(formErr);
+    if (formErr) return;
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
     setLoading(true); setErr('');
     try {
@@ -567,43 +628,52 @@ export function StudentCloudAdmitScreen({
         <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Skill Gap Review (SGR) - Form A1</div>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px 28px' }}>
-        {err && <div style={S.err}>{err}</div>}
         <div style={{ ...S.card(), padding: 14, marginBottom: 14, background: '#EFF6FF', border: '1.5px solid #93C5FD' }}>
           <div style={{ fontWeight: 800, color: '#1D4ED8', fontSize: 14 }}>Skill Gap Review (SGR)</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.5 }}>AI, Cloud & Data Center · verify mobile, book a schedule, then pay via Razorpay.</div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Field label="First name" req><input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()} disabled={otpVerified} /></Field>
-          <Field label="Last name" req><input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Sharma" style={S.inp()} disabled={otpVerified} /></Field>
+          <Field label="First name" req invalid={fieldErrors.firstName} fieldKey="firstName">
+            <input value={firstName} onChange={(e) => { clearFieldErr('firstName'); setFirstName(e.target.value); }} placeholder="Rahul" style={S.inp(inpErr(fieldErrors.firstName))} disabled={otpVerified} />
+          </Field>
+          <Field label="Last name" req invalid={fieldErrors.lastName} fieldKey="lastName">
+            <input value={lastName} onChange={(e) => { clearFieldErr('lastName'); setLastName(e.target.value); }} placeholder="Sharma" style={S.inp(inpErr(fieldErrors.lastName))} disabled={otpVerified} />
+          </Field>
         </div>
-        <Field label="Experience" req note="Years / domain — e.g. 2 yrs networking">
-          <input value={experience} onChange={(e) => setExperience(e.target.value)} placeholder="Fresher / 3 years IT support" style={S.inp()} disabled={otpVerified} />
+        <Field label="Experience" req invalid={fieldErrors.experience} fieldKey="experience" note="Years / domain — e.g. 2 yrs networking">
+          <input value={experience} onChange={(e) => { clearFieldErr('experience'); setExperience(e.target.value); }} placeholder="Fresher / 3 years IT support" style={S.inp(inpErr(fieldErrors.experience))} disabled={otpVerified} />
         </Field>
-        <Field label="Date of birth" req note={`Age ${SGR_MIN_AGE}–${SGR_MAX_AGE}`}>
-          <input type="date" min={sgrMinDobInput()} max={sgrMaxDobInput()} value={dob} onChange={(e) => setDob(e.target.value)} style={S.inp()} disabled={otpVerified} />
+        <Field label="Date of birth" req invalid={fieldErrors.dob} fieldKey="dob" note={`Age ${SGR_MIN_AGE}–${SGR_MAX_AGE}`}>
+          <input type="date" min={sgrMinDobInput()} max={sgrMaxDobInput()} value={dob} onChange={(e) => { clearFieldErr('dob'); setDob(e.target.value); }} style={S.inp(inpErr(fieldErrors.dob))} disabled={otpVerified} />
         </Field>
-        <Field label="Mobile" req note={otpVerified ? 'Verified' : canSkipOtp ? 'Logged in — OTP not required' : 'We verify with OTP SMS'}>
-          <div style={{ display: 'flex', alignItems: 'center', background: C.surf, border: BDR, borderRadius: 10, overflow: 'hidden' }}>
+        <Field label="Mobile" req invalid={fieldErrors.mobile} fieldKey="mobile" note={otpVerified ? 'Verified' : canSkipOtp ? 'Logged in — OTP not required' : 'We verify with OTP SMS'}>
+          <div style={{ display: 'flex', alignItems: 'center', background: C.surf, border: fieldErrors.mobile ? `1.5px solid ${C.red}` : BDR, borderRadius: 10, overflow: 'hidden', ...(fieldErrors.mobile ? { background: `${C.red}0d` } : {}) }}>
             <div style={{ padding: '12px', background: C.deep, borderRight: BDR, color: C.sub, fontSize: 14, fontWeight: 700 }}>+91</div>
-            <input type="tel" maxLength={10} value={mobile} onChange={(e) => { setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpSent(false); setOtpVerified(false); }} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={otpVerified} />
+            <input type="tel" maxLength={10} value={mobile} onChange={(e) => { clearFieldErr('mobile'); setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpSent(false); setOtpVerified(false); }} placeholder="9876543210" style={{ ...S.inp(), border: 'none', borderRadius: 0, background: 'transparent' }} disabled={otpVerified} />
           </div>
         </Field>
-        <Field label="Email" req note="For course updates and receipts">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" style={S.inp()} disabled={otpVerified} />
+        <Field label="Email" req invalid={fieldErrors.email} fieldKey="email" note="For course updates and receipts">
+          <input type="email" value={email} onChange={(e) => { clearFieldErr('email'); setEmail(e.target.value); }} placeholder="you@example.com" autoComplete="email" style={S.inp(inpErr(fieldErrors.email))} disabled={otpVerified} />
         </Field>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
           <button type="button" onClick={fillGps} disabled={gpsBusy || otpVerified} style={{ background: 'none', border: `1.5px solid ${C.acc}`, color: C.acc, borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>{gpsBusy ? 'Locating…' : '📍 Use GPS'}</button>
         </div>
         {gpsHint && <div style={{ fontSize: 12, color: C.grn, fontWeight: 600, textAlign: 'right', marginBottom: 8, lineHeight: 1.4 }}>{gpsHint}</div>}
-        <Field label="Address" req><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House, street, area" style={S.inp()} disabled={otpVerified} /></Field>
+        <Field label="Address" req invalid={fieldErrors.address} fieldKey="address">
+          <input value={address} onChange={(e) => { clearFieldErr('address'); setAddress(e.target.value); }} placeholder="House, street, area" style={S.inp(inpErr(fieldErrors.address))} disabled={otpVerified} />
+        </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <Field label="Village"><input value={village} onChange={(e) => setVillage(e.target.value)} placeholder="Village" style={S.inp()} disabled={otpVerified} /></Field>
-          <Field label="City" req><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Pune" style={S.inp()} disabled={otpVerified} /></Field>
+          <Field label="City" req invalid={fieldErrors.city} fieldKey="city">
+            <input value={city} onChange={(e) => { clearFieldErr('city'); setCity(e.target.value); }} placeholder="Pune" style={S.inp(inpErr(fieldErrors.city))} disabled={otpVerified} />
+          </Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Field label="State" req><input value={state} onChange={(e) => setState(e.target.value)} placeholder="Maharashtra" style={S.inp()} disabled={otpVerified} /></Field>
+          <Field label="State" req invalid={fieldErrors.state} fieldKey="state">
+            <input value={state} onChange={(e) => { clearFieldErr('state'); setState(e.target.value); }} placeholder="Maharashtra" style={S.inp(inpErr(fieldErrors.state))} disabled={otpVerified} />
+          </Field>
           <Field label="PIN"><input value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="411057" style={S.inp()} disabled={otpVerified} /></Field>
         </div>
 
@@ -617,10 +687,12 @@ export function StudentCloudAdmitScreen({
             Today or a future date within 12 months
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Field label="Schedule date" req>
-              <input type="date" min={schedBounds.minStr} max={schedBounds.maxStr} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={S.inp()} disabled={otpVerified} />
+            <Field label="Schedule date" req invalid={fieldErrors.scheduleDate} fieldKey="scheduleDate">
+              <input type="date" min={schedBounds.minStr} max={schedBounds.maxStr} value={scheduleDate} onChange={(e) => { clearFieldErr('scheduleDate'); setScheduleDate(e.target.value); }} style={S.inp(inpErr(fieldErrors.scheduleDate))} disabled={otpVerified} />
             </Field>
-            <Field label="Time" req><input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} style={S.inp()} disabled={otpVerified} /></Field>
+            <Field label="Time" req invalid={fieldErrors.scheduleTime} fieldKey="scheduleTime">
+              <input type="time" value={scheduleTime} onChange={(e) => { clearFieldErr('scheduleTime'); setScheduleTime(e.target.value); }} style={S.inp(inpErr(fieldErrors.scheduleTime))} disabled={otpVerified} />
+            </Field>
           </div>
         </div>
 
@@ -648,6 +720,8 @@ export function StudentCloudAdmitScreen({
           />
         )}
 
+        {FormActionError ? <FormActionError message={err} /> : (err ? <div style={S.err}>{err}</div> : null)}
+
         {!otpVerified && !otpSent && canSkipOtp && (
           <Btn full onClick={continueLoggedIn} disabled={loading || !termsAccepted}>{loading ? <><Spin size={16} /> Saving…</> : 'Continue (logged in) →'}</Btn>
         )}
@@ -674,6 +748,7 @@ export function StudentCloudAdmitScreen({
                 ? `SGR waived · pay course fee ₹${activePayLabel} via Razorpay — we confirm automatically after payment.`
                 : 'Razorpay · we confirm automatically after payment.'}
             </div>
+            {FormActionError ? <FormActionError message={err} /> : (err ? <div style={{ ...S.err, marginBottom: 12 }}>{err}</div> : null)}
             {payMode === 'sgr' && (
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14, cursor: 'pointer', fontSize: 11, color: C.dim, lineHeight: 1.45 }}>
                 <input type="checkbox" checked={sgrFeeAck} onChange={(e) => setSgrFeeAck(e.target.checked)} style={{ marginTop: 2, accentColor: C.acc, flexShrink: 0 }} />

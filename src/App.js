@@ -3516,6 +3516,29 @@ const S = {
   err: {background:`${C.red}12`,border:`1.5px solid ${C.red}55`,borderRadius:8,padding:'10px 14px',color:C.red,fontSize:14,marginBottom:14},
 };
 
+function invalidFieldStyle(invalid, extra = {}) {
+  return invalid
+    ? { border: `1.5px solid ${C.red}`, background: `${C.red}0d`, color: C.txt, ...extra }
+    : extra;
+}
+
+function FormActionError({ message }) {
+  if (!message) return null;
+  return (
+    <div style={{ ...S.err, marginTop: 12, marginBottom: 12 }} role="alert">
+      {message}
+    </div>
+  );
+}
+
+function scrollToFirstFieldError(fields) {
+  const key = Object.keys(fields || {}).find((k) => fields[k]);
+  if (!key) return;
+  requestAnimationFrame(() => {
+    document.querySelector(`[data-field-error="${key}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
 const APP_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
@@ -3634,12 +3657,18 @@ function Btn({children,onClick,v='primary',full,disabled,sm,style}) {
   return <button onClick={onClick} disabled={disabled} style={vs[v]||vs.primary}>{children}</button>;
 }
 
-function Field({label,req,note,children}) {
+function Field({ label, req, note, invalid, fieldKey, children }) {
   return (
-    <div style={{marginBottom:13}}>
-      {label && <label style={S.lbl}>{label}{req&&<span style={{color:C.acc}}> *</span>}</label>}
+    <div style={{ marginBottom: 13 }} data-field-error={invalid ? fieldKey : undefined}>
+      {label && (
+        <label style={{ ...S.lbl, color: invalid ? C.red : C.sub }}>
+          {label}{req && <span style={{ color: C.red }}> *</span>}
+        </label>
+      )}
       {children}
-      {note && <div style={{fontSize:12,color:C.dim,marginTop:3}}>{note}</div>}
+      {invalid
+        ? <div style={{ fontSize: 11, color: C.red, marginTop: 3, fontWeight: 600 }}>Required</div>
+        : note && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>{note}</div>}
     </div>
   );
 }
@@ -4683,6 +4712,34 @@ function formatGeoBadge(geo) {
   return 'Locating…';
 }
 
+/** Fill address form fields from geo — only overwrites empty fields unless force=true */
+function applyGeoToAddressState(geo, setters, { force = false } = {}) {
+  if (!geo) return;
+  const pick = (cur, val) => {
+    const next = val != null ? String(val).trim() : '';
+    if (!next) return cur;
+    if (!force && String(cur || '').trim()) return cur;
+    return next;
+  };
+  if (setters.setAddress) setters.setAddress((a) => pick(a, geo.address));
+  if (setters.setVillage) setters.setVillage((v) => pick(v, geo.village));
+  if (setters.setCity) setters.setCity((c) => pick(c, geo.city));
+  if (setters.setState) setters.setState((s) => pick(s, geo.state));
+  if (setters.setPincode) setters.setPincode((p) => pick(p, geo.pincode));
+  if (setters.setLat && geo.lat != null) setters.setLat(geo.lat);
+  if (setters.setLng && geo.lng != null) setters.setLng(geo.lng);
+}
+
+async function enrichSilentGeoCoords(lat, lng, device, setSilentGeo) {
+  mergeSilentGeo(setSilentGeo, { lat, lng, device, source: 'gps' });
+  try {
+    const geo = await reverseGeo(lat, lng);
+    mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, source: 'gps' });
+  } catch {
+    mergeSilentGeo(setSilentGeo, { lat, lng, device, source: 'gps' });
+  }
+}
+
 function mergeSilentGeo(setSilentGeo, patch) {
   setSilentGeo((prev) => {
     let next;
@@ -5583,6 +5640,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
   const [verifyGpsBusy, setVerifyGpsBusy] = useState(false);
   const [verifyGpsHint, setVerifyGpsHint] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [serviceSchedule, setServiceSchedule] = useState(null);
   const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
   const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
@@ -5772,20 +5830,37 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update address fields when GPS arrives
-  useEffect(()=>{
-    if (!silentGeo) return;
-    setAddress(a=>a||silentGeo.address||'');
-    setVillage(v=>v||silentGeo.village||'');
-    setCity(c=>c||silentGeo.city||'');
-    setPincode(p=>p||silentGeo.pincode||'');
-    markAuto(autoFlagsFromValues({
-      address: silentGeo.address,
-      village: silentGeo.village,
-      city: silentGeo.city,
-      pincode: silentGeo.pincode,
-    }));
-  },[silentGeo, markAuto]);
+  // Update address fields when silent GPS / reverse-geocode completes
+  useEffect(() => {
+    applyGeoToAddressState(silentGeo, { setAddress, setVillage, setCity, setPincode });
+    if (silentGeo) {
+      markAuto(autoFlagsFromValues({
+        address: silentGeo.address,
+        village: silentGeo.village,
+        city: silentGeo.city,
+        pincode: silentGeo.pincode,
+      }));
+    }
+  }, [silentGeo, markAuto]);
+
+  // If coords exist but village/address still empty, reverse-geocode once (iOS often delivers coords before address)
+  useEffect(() => {
+    if (!silentGeo?.lat || silentGeo?.lng == null) return undefined;
+    const needsLocality = !String(silentGeo.village || '').trim() || !String(silentGeo.address || '').trim();
+    if (!needsLocality) return undefined;
+    let cancelled = false;
+    reverseGeo(silentGeo.lat, silentGeo.lng).then((g) => {
+      if (cancelled) return;
+      applyGeoToAddressState({ ...silentGeo, ...g }, { setAddress, setVillage, setCity, setPincode });
+      markAuto(autoFlagsFromValues({
+        address: g.address,
+        village: g.village,
+        city: g.city,
+        pincode: g.pincode,
+      }));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [silentGeo?.lat, silentGeo?.lng, silentGeo?.village, silentGeo?.address, markAuto]);
 
   useEffect(() => {
     if (screen !== 'schedule') {
@@ -5810,6 +5885,38 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     setWaChecking(false);
   };
 
+  const clearFieldErr = (key) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const auditBrowseVerifyForm = () => {
+    const fields = {};
+    let message = '';
+    const mark = (key, msg) => {
+      fields[key] = true;
+      if (!message) message = msg;
+    };
+    if (!firstName.trim()) mark('firstName', 'Enter your first name');
+    if (!mobile || mobile.length !== 10) mark('mobile', 'Enter valid 10-digit mobile');
+    if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) mark('email', 'Enter a valid email address');
+    if (!address.trim()) mark('address', 'Enter your address');
+    if (!city.trim()) mark('city', 'Enter your city');
+    if (!pincode.trim() || pincode.length < 6) mark('pincode', 'Enter valid 6-digit PIN code');
+    return { ok: !Object.keys(fields).length, message, fields };
+  };
+
+  const failFormAudit = (audit) => {
+    setFieldErrors(audit.fields);
+    setErr(audit.message);
+    scrollToFirstFieldError(audit.fields);
+    return false;
+  };
+
   const fillBrowseAddressFromGps = async () => {
     setVerifyGpsBusy(true);
     setErr('');
@@ -5822,10 +5929,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
       if (!g.address && !g.village && !g.city) {
         throw new Error('Could not resolve address from GPS — enter manually');
       }
-      setAddress(g.address || '');
-      setVillage(g.village || '');
-      setCity(g.city || '');
-      setPincode(g.pincode || '');
+      applyGeoToAddressState(g, { setAddress, setVillage, setCity, setPincode }, { force: true });
       markAuto(autoFlagsFromValues({
         address: g.address,
         village: g.village,
@@ -5845,13 +5949,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   };
 
   const sendOTP = async (resend = false) => {
-    if (!firstName.trim()) return setErr('Enter your first name');
-    if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
-    if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) return setErr('Enter a valid email address');
-    if (!address.trim()) return setErr('Enter your address');
-    if (!city.trim()) return setErr('Enter your city');
-    if (!pincode.trim()||pincode.length<6) return setErr('Enter valid 6-digit PIN code');
+    const audit = auditBrowseVerifyForm();
+    if (!audit.ok) return failFormAudit(audit);
     if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
+    setFieldErrors({});
     setLoading(true); setErr('');
     try {
       const sent = await invokeSendOtp(`+91${mobile}`, termsAcceptedAt);
@@ -6601,7 +6702,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
         addToast={addToast}
         showCopyright
         loggedInUser={browseAuthed && pendingProfile?.mobile_verified ? pendingProfile : null}
-        kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, invalidFieldStyle, FormActionError, scrollToFirstFieldError, SB_KEY }}
       />
     );
   }
@@ -6958,13 +7059,10 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   if (screen==='verify') {
 
     const sendWA = async () => {
-      if (!firstName.trim()) return setErr('Enter your first name');
-      if (!mobile||mobile.length!==10) return setErr('Enter valid 10-digit mobile');
-      if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) return setErr('Enter a valid email address');
-      if (!address.trim()) return setErr('Enter your address');
-      if (!city.trim()) return setErr('Enter your city');
-      if (!pincode.trim()||pincode.length<6) return setErr('Enter valid 6-digit PIN code');
+      const audit = auditBrowseVerifyForm();
+      if (!audit.ok) return failFormAudit(audit);
       if (!termsAccepted) return setErr(`Please accept ${SCANV_TERMS_ACCEPTED_LABEL} to continue`);
+      setFieldErrors({});
       setLoading(true); setErr('');
       const ok = await startWAVerify(`+91${mobile}`, () => verifyProfile(true), {
         setWaToken, setWaChecking, setOtpSent,
@@ -6990,20 +7088,21 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <div style={{fontSize:16,fontWeight:700,color:C.txt,flex:1,textAlign:'center',marginRight:30}}>Verify mobile</div>
         </div>
         <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY,padding:'16px 16px 24px'}}>
-          {err&&<div style={S.err}>{err}</div>}
           <div style={{color:C.sub,fontSize:13,marginBottom:14,lineHeight:1.6,fontWeight:500}}>Step 1 of 3 · Name, email, address & one-time mobile OTP</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
-            <Field label="First name" req><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Rahul" style={S.inp()}/></Field>
+            <Field label="First name" req invalid={fieldErrors.firstName} fieldKey="firstName">
+              <input value={firstName} onChange={e=>{ clearFieldErr('firstName'); setFirstName(e.target.value); }} placeholder="Rahul" style={S.inp(invalidFieldStyle(fieldErrors.firstName))}/>
+            </Field>
             <Field label="Last name"><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Sharma" style={S.inp()}/></Field>
           </div>
-          <Field label="Mobile" req note="10-digit Indian mobile">
-            <div style={{display:'flex',alignItems:'center',background:C.surf,border:BDR,borderRadius:10,overflow:'hidden'}}>
+          <Field label="Mobile" req invalid={fieldErrors.mobile} fieldKey="mobile" note="10-digit Indian mobile">
+            <div style={{display:'flex',alignItems:'center',background:C.surf,border:fieldErrors.mobile?`1.5px solid ${C.red}`:BDR,borderRadius:10,overflow:'hidden',...(fieldErrors.mobile?{background:`${C.red}0d`}:{})}}>
               <div style={{padding:'12px 12px',background:C.deep,borderRight:BDR,color:C.sub,fontSize:14,fontWeight:700,flexShrink:0}}>+91</div>
-              <input type="tel" maxLength={10} value={mobile} onChange={e=>{ if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
+              <input type="tel" maxLength={10} value={mobile} onChange={e=>{ clearFieldErr('mobile'); if (otpSent) resetOtpFlow(); setMobile(e.target.value.replace(/\D/g,'').slice(0,10)); }} placeholder="9876543210" style={{...S.inp(),border:'none',borderRadius:0,background:'transparent'}}/>
             </div>
           </Field>
-          <Field label="Email" req note="For receipts, bookings, and support">
-            <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" style={S.inp()} />
+          <Field label="Email" req invalid={fieldErrors.email} fieldKey="email" note="For receipts, bookings, and support">
+            <input type="email" value={contactEmail} onChange={e => { clearFieldErr('email'); setContactEmail(e.target.value); }} placeholder="you@example.com" style={S.inp(invalidFieldStyle(fieldErrors.email))} />
           </Field>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
             <button type="button" onClick={fillBrowseAddressFromGps} disabled={verifyGpsBusy} style={{ background: 'none', border: `1.5px solid ${C.acc}`, color: C.acc, borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>
@@ -7011,14 +7110,19 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
             </button>
           </div>
           {verifyGpsHint && <div style={{ fontSize: 12, color: C.grn, fontWeight: 600, textAlign: 'right', marginBottom: 8, lineHeight: 1.4 }}>{verifyGpsHint}</div>}
-          <Field label="Address" req note="House no, street, area">
-            <input value={address} {...browseBind('address', e=>setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')}/>
+          <Field label="Address" req invalid={fieldErrors.address} fieldKey="address" note="House no, street, area">
+            <input value={address} {...browseBind('address', e=>{ clearFieldErr('address'); setAddress(e.target.value); })} placeholder="Flat 302, Rose Society, Wakad" style={{...inpStyle('address'), ...invalidFieldStyle(fieldErrors.address)}}/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:4}}>
-            <Field label="City" req><input value={city} {...browseBind('city', e=>setCity(e.target.value))} placeholder="Your city" style={inpStyle('city')}/></Field>
-            <Field label="PIN code" req><input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e=>setPincode(e.target.value.replace(/\D/g,'').slice(0,6)))} placeholder="411018" style={inpStyle('pincode')}/></Field>
+            <Field label="City" req invalid={fieldErrors.city} fieldKey="city">
+              <input value={city} {...browseBind('city', e=>{ clearFieldErr('city'); setCity(e.target.value); })} placeholder="Your city" style={{...inpStyle('city'), ...invalidFieldStyle(fieldErrors.city)}}/>
+            </Field>
+            <Field label="PIN code" req invalid={fieldErrors.pincode} fieldKey="pincode">
+              <input type="tel" maxLength={6} value={pincode} {...browseBind('pincode', e=>{ clearFieldErr('pincode'); setPincode(e.target.value.replace(/\D/g,'').slice(0,6)); })} placeholder="411018" style={{...inpStyle('pincode'), ...invalidFieldStyle(fieldErrors.pincode)}}/>
+            </Field>
           </div>
           <TermsAcceptanceField accepted={termsAccepted} onAccept={acceptTerms} onRevoke={revokeTerms} C={C} BDR={BDR} />
+          <FormActionError message={err} />
           {!otpSent&&(
             <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:14,border:BDR}}>
               {[['sms','📱 SMS OTP'],['whatsapp','💬 WhatsApp']].map(([v,l])=>(
@@ -8089,7 +8193,7 @@ function ServicesScreen() {
         addToast={addToast}
         showCopyright={false}
         loggedInUser={user?.role === 'customer' && user?.mobile_verified ? user : null}
-        kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, SB_KEY }}
+        kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, invalidFieldStyle, FormActionError, scrollToFirstFieldError, SB_KEY }}
       />
     );
   }
@@ -18047,20 +18151,11 @@ export default function App() {
     requestNativeGps({
       onFast: ({ lat, lng }) => {
         if (cancelled) return;
-        mergeSilentGeo(setSilentGeo, { lat, lng, device, source: 'gps' });
-        reverseGeo(lat, lng).then((geo) => {
-          if (cancelled) return;
-          mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, source: 'gps' });
-        }).catch(() => {});
+        enrichSilentGeoCoords(lat, lng, device, setSilentGeo);
       },
       onAccurate: ({ lat, lng }) => {
         if (cancelled) return;
-        reverseGeo(lat, lng).then((geo) => {
-          if (cancelled) return;
-          mergeSilentGeo(setSilentGeo, { lat, lng, ...geo, device, source: 'gps' });
-        }).catch(() => {
-          if (!cancelled) mergeSilentGeo(setSilentGeo, { lat, lng, device, source: 'gps' });
-        });
+        enrichSilentGeoCoords(lat, lng, device, setSilentGeo);
       },
       onError: () => { /* IP fallback below if GPS denied */ },
     });
