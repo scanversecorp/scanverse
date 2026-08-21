@@ -4281,6 +4281,8 @@ const BROWSE_SCROLL_BODY = {
   WebkitOverflowScrolling: 'touch',
   overscrollBehavior: 'contain',
 };
+/** Logged-in app: one scroll region for screen + footer (Safari-safe vs nested overflow). */
+const APP_SCROLL_BODY = { ...BROWSE_SCROLL_BODY };
 const BROWSE_WRAP_SHELL = { ...APP_SHELL };
 const TRUST_PILLS_ROW = {
   display: 'grid',
@@ -4600,7 +4602,7 @@ function BrowseCategoryShell({ scrollRef, onBack, title, subtitle, padX = 16, ch
       </div>
       <div
         ref={scrollRef}
-        className="scanv-scroll-body"
+        className={fillViewport ? 'scanv-scroll-body' : undefined}
         style={bodyStyle}
       >
         {children}
@@ -7953,7 +7955,7 @@ function QRScreen() {
   const { setScreen } = useApp();
   const qrUrl = SCANV_QR_URL;
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'12px 20px',display:'flex',alignItems:'center',gap:12}}>
         <button onClick={()=>setScreen('services')} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
         <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:'center'}}>ScanV QR Code</div>
@@ -8059,7 +8061,7 @@ function HomeScreen() {
   const rl=user.role==='admin'?'Leader':user.role==='partner'?'Partner':user.role==='candidate'?'Candidate':'Customer';
   const loc=[user.village,user.city,user.pincode].filter(Boolean).join(', ')||LOCAL_COMMUNITIES;
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar/>
       <div style={{padding:'20px 16px'}}>
         <div style={{marginBottom:16}}>
@@ -8201,7 +8203,7 @@ function ServicesScreen() {
   const searching = !!search.trim();
 
   useEffect(() => {
-    requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
+    requestAnimationFrame(() => scrollAppToTop());
   }, [subListCat, detail]);
 
   useEffect(()=>{
@@ -8214,7 +8216,7 @@ function ServicesScreen() {
     setActiveSvc(enriched);
     setDetail(enriched);
     setSubListCat(null);
-    scrollBrowseTop(scrollRef.current);
+    scrollAppToTop();
   };
 
   const openCloudSgr = useCallback((svc) => {
@@ -8226,11 +8228,11 @@ function ServicesScreen() {
   const openCategory = (s) => {
     if (SUB_CATEGORIES[s.id]) {
       setSubListCat(s.id);
-      requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
+      requestAnimationFrame(() => scrollAppToTop());
       return;
     }
     setDetail(s);
-    requestAnimationFrame(() => scrollBrowseTop(scrollRef.current));
+    requestAnimationFrame(() => scrollAppToTop());
   };
 
   if (cloudAdmit) {
@@ -8243,6 +8245,7 @@ function ServicesScreen() {
         onBack={() => setCloudAdmit(false)}
         addToast={addToast}
         showCopyright={false}
+        fillViewport={false}
         loggedInUser={user?.role === 'customer' && user?.mobile_verified ? user : null}
         kit={{ C, S, FF, Field, Btn, Spin, BDR, CopyrightLine, invokeSendOtp, verifyOtpCode, reverseGeo, registerPaymentIntent, checkPaymentVerified, minDobInput, maxDobInput, ageFromDob, captureFreshGps, invalidFieldStyle, FormActionError, scrollToFirstFieldError, SB_KEY }}
       />
@@ -8259,7 +8262,7 @@ function ServicesScreen() {
         subtitle={cfg.subtitle}
         showCopyright={false}
         fillViewport={false}
-        onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
+        onBack={() => { setSubListCat(null); requestAnimationFrame(() => scrollAppToTop()); }}
       >
         <CategoryListBody
           categoryId={subListCat}
@@ -8284,7 +8287,7 @@ function ServicesScreen() {
         title={detail.name}
         showCopyright={false}
         fillViewport={false}
-        onBack={() => { setDetail(null); requestAnimationFrame(() => scrollBrowseTop(scrollRef.current)); }}
+        onBack={() => { setDetail(null); requestAnimationFrame(() => scrollAppToTop()); }}
       >
         <div style={{ padding: 16 }}>
           {isSubSvc && <div style={{ marginBottom: 16, borderRadius: 16, overflow: 'hidden' }}><ServiceThumb svc={detail} categoryId={subCatId(detail)} height={160} /></div>}
@@ -8335,7 +8338,7 @@ function ServicesScreen() {
   }
 
   return (
-    <div ref={scrollRef} style={{fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar />
       <div style={{padding:'12px 16px 16px'}}>
         <div style={{ ...BROWSE_PROMO_BANNER, marginBottom: 12 }}>
@@ -8833,7 +8836,7 @@ function BookScreen() {
     );
   }
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:FF}}>
+    <div style={{fontFamily:FF}}>
       <TopBar title={svc.name} back="services"/>
       <div style={{display:'flex',padding:'12px 16px',gap:4}}>{Array.from({length:progressTotal},(_,i)=>{const n=i+1;return <div key={n} style={{flex:1,height:3,borderRadius:2,background:progressIdx>=n?C.acc:C.deep}} title={stepLabels[i]}/>;})}</div>
       <div style={{padding:'8px 16px 40px'}}>
@@ -9348,7 +9351,7 @@ function TrackServiceScreen() {
 
   if (!bookingId) {
     return (
-      <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF }}>
+      <div style={{ fontFamily: FF }}>
         <TopBar title="Track my service" back="bookings" />
         <div style={{ ...S.card(), margin: 16, padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
@@ -9360,7 +9363,7 @@ function TrackServiceScreen() {
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ fontFamily: FF, display: 'flex', flexDirection: 'column' }}>
       <TopBar title="Track my service" back="bookings" />
       {loading && !booking ? (
         <div style={{ textAlign: 'center', padding: 48 }}><Spin size={32} /></div>
@@ -10337,7 +10340,7 @@ function CRMScreen() {
   const load=useCallback(async()=>{setLoading(true);const tbl=tab==='service'?'service_requests':'training_requests';let q=sb().from(tbl).select('*').order('created_at',{ascending:false});if(user.role!=='admin')q=q.eq('added_by',user.id);const{data}=await q;setRequests(data||[]);setLoading(false);},[tab,user.id,user.role]);
   useEffect(()=>{load();},[load]);
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="CRM"/>
       <div style={{padding:'12px 16px'}}>
         <div style={{display:'flex',background:C.deep,borderRadius:10,padding:3,gap:3,marginBottom:16}}>
@@ -10408,7 +10411,7 @@ function ProfileScreen() {
   };
   const rc=user.role==='admin'?C.gold:user.role==='partner'?C.cyan:user.role==='candidate'?C.vio:C.acc;
   return (
-    <div style={{flex:1,overflowY:'auto',fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif"}}>
       <TopBar title="Profile"/>
       <div style={{padding:16}}>
         <div style={{...S.card(),textAlign:'center',marginBottom:16,padding:24}}>
@@ -10506,7 +10509,7 @@ function LeaderHome() {
   },[]);
   if (!stats) return <div style={{padding:40,textAlign:'center'}}><Spin/></div>;
   return (
-    <div style={{flex:1,overflowY:'auto',padding:16,fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{padding:16,fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:20}}>
         {[['👥','Customers',stats.customers,C.cyan],['🤝','Partners',stats.partners,C.acc],['📅','Bookings',stats.bookings,C.gold],['💰','GMV',`₹${((stats.gmv||0)/100).toLocaleString('en-IN')}`,C.grn]].map(([ic,lbl,val,col])=>(
           <div key={lbl} style={S.card()}><div style={{fontSize:24,marginBottom:6}}>{ic}</div><div style={{color:C.sub,fontSize:12,marginBottom:4}}>{lbl}</div><div style={{color:col,fontWeight:700,fontSize:22}}>{val}</div></div>
@@ -18622,14 +18625,18 @@ export default function App() {
         <PartnerGpsTracker />
         <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>
-          <div className="scanv-mobile-zoom scanv-scroll-body" style={{ ...APP_MAIN, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
-            <Boundary>{renderScreen()}</Boundary>
-            {screen !== 'bookings' && (
-              <CustomerFooterBar
-                linksStyle={{ marginTop: 0, borderTop: BDR, padding: '8px 16px 0' }}
-                copyrightStyle={{ padding: '6px 16px 16px' }}
-              />
-            )}
+          <div className="scanv-mobile-zoom" style={APP_MAIN}>
+            <div style={BROWSE_MAIN_INNER}>
+              <div className="scanv-scroll-body" style={APP_SCROLL_BODY}>
+                <Boundary>{renderScreen()}</Boundary>
+                {screen !== 'bookings' && (
+                  <CustomerFooterBar
+                    linksStyle={{ marginTop: 0, borderTop: BDR, padding: '8px 16px 0' }}
+                    copyrightStyle={{ padding: '6px 16px 16px' }}
+                  />
+                )}
+              </div>
+            </div>
           </div>
           {!['book','track'].includes(screen)&&<BottomNav/>}
         </div>

@@ -341,7 +341,7 @@ function applyGeoToAddressFields(geo, setters, { force = false } = {}) {
 }
 
 export function StudentCloudAdmitScreen({
-  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, showCopyright = true, loggedInUser = null, kit,
+  silentGeo, initialCourse, courses, sgrFeePaise = SGR_FEE_FALLBACK_PAISE, onBack, addToast, showCopyright = true, loggedInUser = null, fillViewport = true, kit,
 }) {
   const {
     C, S, FF, Field, Btn, Spin, BDR, CopyrightLine,
@@ -682,13 +682,20 @@ export function StudentCloudAdmitScreen({
     );
   }
 
+  const shellStyle = fillViewport
+    ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    : { display: 'flex', flexDirection: 'column' };
+  const bodyStyle = fillViewport
+    ? { flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', padding: '14px 16px 28px' }
+    : { padding: '14px 16px 28px' };
+
   return (
-    <>
+    <div style={shellStyle}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', color: C.sub, cursor: 'pointer', fontSize: 22 }}>←</button>
         <div style={{ fontSize: 15, fontWeight: 700, color: C.txt, flex: 1, textAlign: 'center', marginRight: 30 }}>Skill Gap Review (SGR) - Form A1</div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px 28px' }}>
+      <div className={fillViewport ? 'scanv-scroll-body' : undefined} style={bodyStyle}>
         <div style={{ ...S.card(), padding: 14, marginBottom: 14, background: '#EFF6FF', border: '1.5px solid #93C5FD' }}>
           <div style={{ fontWeight: 800, color: '#1D4ED8', fontSize: 14 }}>Skill Gap Review (SGR)</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 4, lineHeight: 1.5 }}>AI, Cloud & Data Center · verify mobile, book a schedule, then pay via Razorpay.</div>
@@ -829,7 +836,7 @@ export function StudentCloudAdmitScreen({
         )}
         {showCopyright && CopyrightLine ? <CopyrightLine style={{ padding: '16px 0 8px', marginTop: 16 }} /> : null}
       </div>
-    </>
+    </div>
   );
 }
 
