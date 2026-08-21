@@ -332,38 +332,29 @@ export function StudentCloudAdmitScreen({
   }, [loggedInUser]);
 
   const fillGps = async () => {
-    setGpsBusy(true); setErr('');
+    setGpsBusy(true); setErr(''); setGpsHint('');
     try {
-      const geo = await captureFreshGps?.(silentGeo) || silentGeo;
-      if (!geo) {
+      const coords = await captureFreshGps?.(null);
+      let lat = coords?.lat ?? null;
+      let lng = coords?.lng ?? null;
+      if (lat == null) {
         await new Promise((resolve, reject) => {
           if (!navigator.geolocation) return reject(new Error('GPS unavailable'));
-          navigator.geolocation.getCurrentPosition(async (pos) => {
-            const g = await reverseGeo(pos.coords.latitude, pos.coords.longitude);
-            setAddress(g.address || '');
-            setVillage(g.village || '');
-            setCity(g.city || '');
-            setState(g.state || '');
-            setPincode(g.pincode || '');
-            setLat(g.lat ?? pos.coords.latitude);
-            setLng(g.lng ?? pos.coords.longitude);
-            resolve();
-          }, () => reject(new Error('Allow location to auto-fill address')), { timeout: 10000, enableHighAccuracy: true });
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { lat = pos.coords.latitude; lng = pos.coords.longitude; resolve(); },
+            () => reject(new Error('Allow location — Settings → Safari → Location → While Using')),
+            { timeout: 22000, enableHighAccuracy: true, maximumAge: 0 },
+          );
         });
-      } else {
-        setAddress((a) => a || geo.address || '');
-        setVillage((v) => v || geo.village || '');
-        setCity((c) => c || geo.city || '');
-        setState((s) => s || geo.state || '');
-        setPincode((p) => p || geo.pincode || '');
-        setLat(geo.lat ?? null);
-        setLng(geo.lng ?? null);
-        if (geo.address) setAddress(geo.address);
-        if (geo.village) setVillage(geo.village);
-        if (geo.city) setCity(geo.city);
-        if (geo.state) setState(geo.state);
-        if (geo.pincode) setPincode(geo.pincode);
       }
+      const g = await reverseGeo(lat, lng);
+      setAddress(g.address || '');
+      setVillage(g.village || '');
+      setCity(g.city || '');
+      setState(g.state || '');
+      setPincode(g.pincode || '');
+      setLat(lat);
+      setLng(lng);
       setGpsHint('Address filled from GPS — edit if needed');
       window.setTimeout(() => setGpsHint(''), 4000);
     } catch (e) {
@@ -547,18 +538,20 @@ export function StudentCloudAdmitScreen({
   }, [txnId, student?.id, paid, done, activePayPaise, payMode, checkPaymentVerified, addToast, SB_KEY]);
 
   if (done) {
+    const schedLabel = [scheduleDate, scheduleTime].filter(Boolean).join(' · ');
     return (
       <div style={{ padding: '24px 16px' }}>
-        <div style={{ ...S.card(), padding: 22, textAlign: 'center' }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
-          <div style={{ fontWeight: 800, fontSize: 16, color: C.txt, marginBottom: 10 }}>Skill Gap Review (SGR)</div>
-          <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.6, fontWeight: 600 }}>
-            {doneMsg || 'Skill Gap Review (SGR) form submitted. One of our consultant will call you in next 72 hours'}
+        <div style={{ ...S.card(), padding: 22 }}>
+          <div style={{ fontSize: 36, marginBottom: 10, textAlign: 'center' }}>✅</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: C.txt, marginBottom: 16, textAlign: 'center' }}>Skill Gap Review (SGR)</div>
+          <div style={{ fontSize: 14, color: C.txt, lineHeight: 1.75, fontWeight: 600 }}>
+            <div><strong>SGR Booking Status:</strong> {paid ? 'Complete' : 'Pending'}</div>
+            <div><strong>Course Name:</strong> {courseName}</div>
+            <div><strong>Schedule:</strong> {schedLabel || '—'}</div>
           </div>
-          <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>
-            {payMode === 'course'
-              ? `Course fee ₹${activePayLabel} paid · ${courseName} · ${scheduleDate} ${scheduleTime}`
-              : `₹${sgrFeeLabel} paid · ${courseName} · ${scheduleDate} ${scheduleTime}`}
+          <div style={{ fontSize: 10, color: C.grn, lineHeight: 1.55, marginTop: 14, fontWeight: 500 }}>
+            Please arrive 15 minutes before the scheduled time.<br />
+            SGR rescheduling requires a separate enrollment.
           </div>
           <Btn full onClick={onBack} style={{ marginTop: 18 }}>Back to Cloud courses</Btn>
         </div>

@@ -4766,6 +4766,21 @@ async function lookupPinByPlaceName(name, stateHint='Maharashtra') {
   return '';
 }
 
+function pickVillageFromOsm(a, displayName) {
+  const tier = [a.village, a.hamlet, a.neighbourhood, a.suburb, a.quarter, a.city_block, a.residential, a.town];
+  for (const v of tier) {
+    const s = String(v || '').trim();
+    if (s.length >= 3) return s;
+  }
+  const parts = String(displayName || '').split(',').map((p) => p.trim()).filter(Boolean);
+  const skip = /^(Pune|Mumbai|Delhi|Maharashtra|India|\d{6})/i;
+  for (let i = 1; i < Math.min(parts.length, 6); i++) {
+    const p = parts[i];
+    if (p && p.length >= 3 && !skip.test(p)) return p;
+  }
+  return '';
+}
+
 /** Browser-friendly fallback when Nominatim is slow or blocked (common on iOS Safari). */
 async function reverseGeoBigDataCloud(lat, lng) {
   try {
@@ -4774,10 +4789,14 @@ async function reverseGeoBigDataCloud(lat, lng) {
     );
     if (!r.ok) return null;
     const d = await r.json();
-    const info = d.localityInfo?.informative || [];
-    const suburb = info.find((x) => /suburb|neighbourhood|quarter/i.test(x.description || ''))?.name || '';
-    const village = d.locality || suburb || info.slice(-2)[0]?.name || '';
-    const city = d.city || info.find((x) => x.order === 9)?.name || d.principalSubdivision || '';
+    const info = [...(d.localityInfo?.informative || []), ...(d.localityInfo?.administrative || [])];
+    const suburb = info.find((x) => /suburb|neighbourhood|quarter|village|locality/i.test(x.description || ''))?.name || '';
+    const villageRaw = String(d.locality || '').trim();
+    const cityName = String(d.city || '').trim();
+    const village = (villageRaw && villageRaw !== cityName ? villageRaw : '') || suburb
+      || info.filter((x) => x.order >= 10 && x.order <= 14).map((x) => x.name).find((n) => n && n !== cityName)
+      || '';
+    const city = cityName || info.find((x) => x.order === 9)?.name || d.principalSubdivision || '';
     const state = d.principalSubdivision || 'Maharashtra';
     let pincode = String(d.postcode || '').replace(/\D/g, '').slice(0, 6);
     if (!/^\d{6}$/.test(pincode) && village) {
@@ -4851,7 +4870,7 @@ async function reverseGeo(lat,lng) {
 
     result = {
       address,
-      village: a.village||a.neighbourhood||a.suburb||a.town||'',
+      village: pickVillageFromOsm(a, d.display_name),
       city: a.city||a.state_district||a.town||a.county?.replace(/\s*Subdistrict$/i,'')||'',
       state,
       pincode,
@@ -4859,9 +4878,21 @@ async function reverseGeo(lat,lng) {
       lat,lng,
     };
   } catch { /* try fallback below */ }
-  if (!result?.address && !result?.village && !result?.city) {
+  if (!result?.village || !result?.address || !result?.city) {
     const fb = await reverseGeoBigDataCloud(lat, lng);
-    if (fb) result = { ...(result || {}), ...fb, lat, lng };
+    if (fb) {
+      result = {
+        ...(result || {}),
+        address: result?.address || fb.address,
+        village: result?.village || fb.village,
+        city: result?.city || fb.city,
+        pincode: result?.pincode || fb.pincode,
+        state: result?.state || fb.state,
+        country: result?.country || fb.country,
+        lat,
+        lng,
+      };
+    }
   }
   return result || { address:'', village:'', city:'', state:'Maharashtra', pincode:'', country:'India', lat, lng };
 }
@@ -5783,13 +5814,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     setVerifyGpsBusy(true);
     setErr('');
     try {
-      const geo = await captureFreshGps(silentGeo);
-      if (geo?.lat == null) {
+      const coords = await captureFreshGps(null);
+      if (coords?.lat == null) {
         throw new Error('Allow location — iPhone: Settings → Safari → Location → While Using');
       }
-      const g = (geo.address || geo.village || geo.city)
-        ? geo
-        : { ...geo, ...(await reverseGeo(geo.lat, geo.lng)) };
+      const g = await reverseGeo(coords.lat, coords.lng);
       if (!g.address && !g.village && !g.city) {
         throw new Error('Could not resolve address from GPS — enter manually');
       }
