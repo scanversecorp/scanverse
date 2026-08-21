@@ -568,6 +568,12 @@ async function checkPaymentVerified(txnId, expectedAmountPaise) {
   const r = await fetchPaymentVerification(txnId, expectedAmountPaise);
   return r.verified;
 }
+function paidAmountCoversBooking(paidPaise, requiredPaise) {
+  const paid = Math.round(Number(paidPaise) || 0);
+  const required = Math.round(Number(requiredPaise) || 0);
+  if (!required) return paid > 0;
+  return paid >= required;
+}
 function usePaymentVerification(txnId, amountPaise, userId, addToast, meta = {}) {
   const { serviceId = null, serviceName = null, servicePricePaise = null, studentCloudCourse = false } = meta;
   const [paymentVerified, setPaymentVerified] = useState(false);
@@ -2068,9 +2074,18 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     return { ok: false, reason: 'missing_service', error: `Could not match service — contact support with ref ${intent.txn_id}` };
   }
 
-  const payCheck = await fetchPaymentVerification(intent.txn_id, intent.amount_paise);
+  const payTotals = paymentTotalsForSvc(svc);
+  const { price, fee, gst, total } = payTotals;
+  const payCheck = await fetchPaymentVerification(intent.txn_id, total);
   if (!payCheck.verified) {
     return { ok: false, reason: 'not_verified', error: 'Payment no longer verified — contact support' };
+  }
+  if (!paidAmountCoversBooking(intent.amount_paise, total)) {
+    return {
+      ok: false,
+      reason: 'underpaid',
+      error: `Payment ₹${(Number(intent.amount_paise || 0) / 100).toLocaleString('en-IN')} does not cover booking total ₹${(total / 100).toLocaleString('en-IN')} — contact support with ref ${intent.txn_id}`,
+    };
   }
 
   const existingByTxn = await findBookingByTxn(intent.txn_id, { customerId: user.id });
@@ -2080,8 +2095,6 @@ async function finalizePaidIntentBooking(user, intent, addToast, nav = {}, sched
     return { ok: true, bookingId: existingByTxn.id, existing: true };
   }
 
-  const payTotals = paymentTotalsForSvc(svc);
-  const { price, fee, gst, total } = payTotals;
   const isCloud = isCloudSubCardService(svc);
   const bookingStatus = isCloud ? cloudBookingStatusFields() : standardBookingStatusFields();
   const isDeliveryShipment = svc.parent === 'delivery';
@@ -17576,6 +17589,9 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
   const disp = detail?.dispatch;
   const cancelRec = detail?.cancellation;
   const payerVpa = detail?.payer_vpa || bk?.payer_vpa || detail?.payment_intents?.find((pi) => pi.payer_vpa)?.payer_vpa || detail?.payments?.find((p) => p.payer_vpa)?.payer_vpa || null;
+  const paidIntent = (detail?.payment_intents || []).find((pi) => pi.status === 'paid') || detail?.payment_intents?.[0] || null;
+  const paidAmountPaise = paidIntent?.amount_paise != null ? Number(paidIntent.amount_paise) : null;
+  const bookingUnderpaid = paidAmountPaise != null && Number(bk?.total || 0) > paidAmountPaise;
 
   return (
     <div>
@@ -17612,7 +17628,12 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} />
-                  <div style={{ fontSize: 11, color: C.txt, marginTop: 4 }}>₹{fmtRs(b.total)}</div>
+                  <div style={{ fontSize: 11, color: C.txt, marginTop: 4 }}>
+                    ₹{fmtRs(b.total)}
+                    {b.paid_amount_paise != null && Number(b.paid_amount_paise) < Number(b.total || 0) ? (
+                      <span style={{ color: C.red }}> · captured ₹{fmtRs(b.paid_amount_paise)}</span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
@@ -17638,7 +17659,13 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                   <div>Scheduled: {fmtDt(bk.date)} {bk.time}</div>
                   <div>Location: {bk.location_text || '—'}</div>
                   <div>Status: <Badge label={bk.status} color={bookingStatusColor[bk.status] || C.sub} /></div>
-                  <div>Total paid: ₹{fmtRs(bk.total)} · TXN {bk.txn_id || '—'}</div>
+                  <div>Booking total: ₹{fmtRs(bk.total)} · TXN {bk.txn_id || '—'}</div>
+                  {paidAmountPaise != null ? (
+                    <div style={{ color: bookingUnderpaid ? C.red : C.sub }}>
+                      Gateway captured: ₹{fmtRs(paidAmountPaise)}
+                      {bookingUnderpaid ? ' · underpaid vs booking total' : ''}
+                    </div>
+                  ) : null}
                   <div style={{ fontSize: 10, color: C.dim }}>Booking ref: <code style={{ fontSize: 10 }}>{bk.id}</code></div>
                   {bk.partner_id && <div>Partner: {detail?.partner?.name || bk.partner_id}</div>}
                   {disp && <div>Dispatch: {disp.status}{disp.assigned_vendor_id ? ` · vendor ${disp.assigned_vendor_id.slice(0, 8)}…` : ''}</div>}

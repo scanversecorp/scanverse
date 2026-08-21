@@ -623,14 +623,20 @@ async function handleCheck(
         error: "Payment not verified by gateway",
       });
     }
+    const amountOk = clientExpectedPaise == null || expectedPaise >= clientExpectedPaise;
     return json({
-      verified: true,
+      verified: amountOk,
       status: "paid",
-      amount_ok: true,
+      amount_ok: amountOk,
       amount_paise: expectedPaise,
       paid_at: row.paid_at,
       mode: row.verified_via,
       payer_vpa: row.payer_vpa || null,
+      ...(amountOk ? {} : {
+        error: "Paid amount is below checkout total",
+        paid_amount_paise: expectedPaise,
+        expected_amount_paise: clientExpectedPaise,
+      }),
     });
   }
 

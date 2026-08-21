@@ -34,26 +34,34 @@ async function payerVpaByTxnIds(
 async function attachPayerVpa<T extends { txn_id?: string | null }>(
   sb: ReturnType<typeof createClient>,
   rows: T[],
-): Promise<Array<T & { payer_vpa: string | null; verified_via: string | null }>> {
+): Promise<Array<T & {
+  payer_vpa: string | null;
+  verified_via: string | null;
+  paid_amount_paise: number | null;
+}>> {
   const vpaMap = await payerVpaByTxnIds(sb, rows.map((r) => String(r.txn_id || "")));
   const txnIds = [...new Set(rows.map((r) => String(r.txn_id || "")).filter(Boolean))];
   const verifiedVia: Record<string, string> = {};
+  const paidAmount: Record<string, number> = {};
   if (txnIds.length) {
     const { data: intents } = await sb
       .from("payment_intents")
-      .select("txn_id, verified_via, status")
+      .select("txn_id, verified_via, status, amount_paise")
       .in("txn_id", txnIds)
       .eq("status", "paid");
     for (const row of intents || []) {
       const txn = String((row as { txn_id?: string }).txn_id || "");
       const via = String((row as { verified_via?: string }).verified_via || "").trim();
+      const amt = Number((row as { amount_paise?: number }).amount_paise);
       if (txn && via) verifiedVia[txn] = via;
+      if (txn && Number.isFinite(amt)) paidAmount[txn] = amt;
     }
   }
   return rows.map((row) => ({
     ...row,
     payer_vpa: row.txn_id ? vpaMap[String(row.txn_id)] || null : null,
     verified_via: row.txn_id ? verifiedVia[String(row.txn_id)] || null : null,
+    paid_amount_paise: row.txn_id ? paidAmount[String(row.txn_id)] ?? null : null,
   }));
 }
 
