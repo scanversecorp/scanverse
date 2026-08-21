@@ -13098,9 +13098,21 @@ function ReportPage() {
     finally { setLoading(false); }
   };
 
+  const reportChrome = (title, body) => (
+    <div className="scanv-root">
+      <div className="scanv-shell" style={APP_SHELL}>
+        <div style={{ flexShrink: 0, background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>{title}</div>
+        </div>
+        {body}
+      </div>
+    </div>
+  );
+
   if (result?.ticket_number) {
-    return (
-      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    return reportChrome('Report an issue', (
+      <div className="scanv-scroll-body" style={{ ...BROWSE_SCROLL_BODY, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ ...S.card(), maxWidth: 420, width: '100%', padding: 28, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: C.txt, marginBottom: 8 }}>Ticket submitted</div>
@@ -13118,16 +13130,12 @@ function ReportPage() {
           <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 0 }} />
         </div>
       </div>
-    );
+    ));
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
-      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
-        <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Report an issue</div>
-      </div>
-      <form onSubmit={submit} style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
+  return reportChrome('Report an issue', (
+    <form className="scanv-scroll-body" onSubmit={submit} style={{ ...BROWSE_SCROLL_BODY, padding: '20px 16px 40px' }}>
+      <div style={{ maxWidth: 480, margin: '0 auto', width: '100%' }}>
         <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>
           Describe your booking, payment, or service issue. You receive a ticket number for reference.
         </div>
@@ -13154,9 +13162,9 @@ function ReportPage() {
           <a href="#track-ticket" style={{ color: C.dim, fontSize: 11 }}>Already have a ticket? Check status →</a>
         </div>
         <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 0 }} />
-      </form>
-    </div>
-  );
+      </div>
+    </form>
+  ));
 }
 
 function TrackTicketPage() {
