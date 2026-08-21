@@ -115,6 +115,8 @@ export const HUB_ACTION_PERMISSIONS: Record<string, string> = {
   list_service_schedule_vendors: "hub.settings",
   update_service_schedule_vendors: "hub.settings",
   purge_test_data: "hub.purge_test",
+  clean_cloud_test_data: "hub.purge_test",
+  send_ops_email: "hub.purge_test",
 };
 
 let pinRoleCache: Map<string, string[]> | null = null;

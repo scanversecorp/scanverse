@@ -51,6 +51,8 @@
  *   mark_social_everywhere — mark daily post platform done
  *   purge_test_data      — { dry_run?, confirm_execute?, confirm? } pre-launch wipe (owner only)
  *   archive_all_except   — { dry_run?, confirm_execute?, confirm?, keep_mobile? } soft-archive users/vendors
+ *   clean_cloud_test_data — { dry_run?, confirm_execute?, confirm?, cutoff_at? } pre-launch cloud/SGR wipe (owner only)
+ *   send_ops_email       — { to?, subject, body } owner-only transactional email (Resend)
  *   run_app_health_check — API security + public endpoint checks
  *   run_infra_health_check — DB, deploy bundle, go-live, catalog checks
  *   run_security_health_check — RLS, auth gates, exposure & production safety
@@ -103,6 +105,7 @@ import {
   hashOtp,
   generateOtp,
   sendOtpDelivery,
+  sendEmailMany,
 } from "../_shared/notify.ts";
 import {
   GO_LIVE_SWITCH_KEYS,
@@ -130,6 +133,9 @@ import {
 import {
   purgeTestDataAdmin,
 } from "../_shared/purge-test-data-admin.ts";
+import {
+  cleanCloudTestDataAdmin,
+} from "../_shared/cloud-test-cleanup-admin.ts";
 import {
   assignStaffRoles,
   deleteStaffUser,
@@ -1950,6 +1956,42 @@ Deno.serve(async (req) => {
       return json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Archive failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "clean_cloud_test_data") {
+    const gate = requireHubPermission(ctx, "purge_test_data");
+    const ownerOk = hasRole(ctx, "scanv_owner") || hasPermission(ctx, "hub.purge_test");
+    if (gate && !ownerOk) return json({ error: `Missing permission: ${gate}` }, 403);
+    try {
+      const result = await cleanCloudTestDataAdmin(sb, body);
+      if (result.error) return json(result, 400);
+      return json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Cloud test cleanup failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "send_ops_email") {
+    const ownerOk = hasRole(ctx, "scanv_owner") || hasPermission(ctx, "hub.purge_test");
+    if (!ownerOk) return json({ error: "Owner PIN required" }, 403);
+    const subject = String(body.subject || "").trim();
+    const text = String(body.body || body.text || "").trim();
+    if (!subject || !text) {
+      return json({ error: "subject and body required" }, 400);
+    }
+    const toRaw = body.to ?? body.recipients ?? "scanversecorp@gmail.com";
+    const recipients = (Array.isArray(toRaw) ? toRaw : String(toRaw).split(/[,;\s]+/))
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+    try {
+      const mail = await sendEmailMany(recipients, subject, text);
+      if (!mail.ok) return json({ error: mail.error || "Email failed", mail }, 400);
+      return json({ success: true, recipients, subject, mail });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Email send failed";
       return json({ error: msg }, 500);
     }
   }

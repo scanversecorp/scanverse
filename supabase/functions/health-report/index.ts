@@ -41,8 +41,21 @@ function healthReportAuthOk(req: Request): boolean {
   if (secret.length >= 8 && header === secret) return true;
   const auth = req.headers.get("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  return !!(serviceKey && token === serviceKey);
+  if (serviceKey && token === serviceKey) return true;
+  const secretKeys = (Deno.env.get("SUPABASE_SECRET_KEYS") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (secretKeys.includes(token)) return true;
+  if (token.startsWith("eyJ")) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload.role === "service_role") return true;
+    } catch { /* ignore malformed JWT */ }
+  }
+  return false;
 }
 
 function reportRecipients(): string[] {
@@ -129,6 +142,27 @@ Deno.serve(async (req) => {
   }
 
   const slotRaw = String(body.slot || "morning").toLowerCase();
+
+  if (slotRaw === "custom") {
+    const toRaw = body.to ?? body.recipients ?? "";
+    const recipients = (Array.isArray(toRaw) ? toRaw : String(toRaw).split(/[,;\s]+/))
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+    const subject = String(body.subject || "").trim();
+    const text = String(body.body || body.text || "").trim();
+    if (!recipients.length || !subject || !text) {
+      return json({ error: "custom slot requires to, subject, and body" }, 400);
+    }
+    try {
+      const mail = await sendEmailMany(recipients, subject, text);
+      if (!mail.ok) return json({ error: mail.error || "Email failed", email: mail }, 400);
+      return json({ success: true, slot: "custom", recipients, subject, email: mail });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Custom email failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
   const slot = slotRaw === "evening" ? "evening" : "morning";
 
   try {

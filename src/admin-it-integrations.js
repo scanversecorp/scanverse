@@ -49,12 +49,13 @@ export function AdminItIntegrationsTab({ pin, adminHubFetch, C, S, FF, Spin, Btn
   const draftFor = (row) => {
     if (!row?.id) {
       return {
-        contact_phone: '', portal_url: '', api_url: '', credential_purpose: '',
+        vendor_name: '', contact_phone: '', portal_url: '', api_url: '', credential_purpose: '',
         scanv_usage: '', switch_state: 'on', hold_until: '',
       };
     }
     if (drafts[row.id]) return drafts[row.id];
     return {
+      vendor_name: row.vendor_name || '',
       contact_phone: row.contact_phone || '',
       portal_url: row.portal_url || '',
       api_url: row.api_url || '',
@@ -144,8 +145,9 @@ export function AdminItIntegrationsTab({ pin, adminHubFetch, C, S, FF, Spin, Btn
       <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.acc}44` }}>
         <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>IT vendors & integrations</div>
         <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.55 }}>
-          Third-party APIs ScanV depends on — contact, portal/API URLs, credential env keys, and ON / OFF / HOLD-UNTIL switches.
-          HOLD keeps the integration off until the chosen date/time, then turns it back on. Secrets are never shown here.
+          Third-party APIs ScanV depends on — <strong style={{ color: C.txt }}>Tool name</strong>, contact, portal/API URLs,
+          credential env keys, and <strong style={{ color: C.txt }}>what ScanV uses each tool for</strong>.
+          ON / OFF / HOLD-UNTIL switches apply where a runtime flag exists. Secrets are never shown here.
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Btn v="outline" sm type="button" onClick={load} disabled={loading}>Reload</Btn>
@@ -163,10 +165,23 @@ export function AdminItIntegrationsTab({ pin, adminHubFetch, C, S, FF, Spin, Btn
           const hasDraft = !!drafts[row.id];
           return (
             <div key={row.id} style={{ ...S.card(), padding: 14, border: row.hold_active ? `1.5px solid ${C.gold}` : `1px solid ${C.bdr}` }}>
+              <div style={{ fontSize: 9, color: C.dim, fontFamily: 'monospace', marginBottom: 6 }}>
+                Tool ID · {row.id}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 800, color: C.txt, fontSize: 15 }}>{row.vendor_name}</div>
-                  <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{row.scanv_usage}</div>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <label style={{ fontSize: 10, color: C.dim, fontWeight: 700, display: 'block', marginBottom: 4 }}>
+                    Tool name
+                  </label>
+                  <input
+                    value={d.vendor_name}
+                    disabled={busy}
+                    onChange={(e) => setDraft(row.id, { vendor_name: e.target.value })}
+                    style={{ ...S.inp(), fontSize: 14, fontWeight: 800, display: 'block', width: '100%' }}
+                  />
+                  {!hasDraft && row.scanv_usage ? (
+                    <div style={{ fontSize: 10, color: C.dim, marginTop: 6, lineHeight: 1.45 }}>{row.scanv_usage}</div>
+                  ) : null}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{
@@ -216,15 +231,29 @@ export function AdminItIntegrationsTab({ pin, adminHubFetch, C, S, FF, Spin, Btn
               </div>
 
               <div style={{ fontSize: 10, color: C.sub, marginBottom: 8, lineHeight: 1.5 }}>
-                <strong style={{ color: C.txt }}>Credential:</strong>{' '}
-                <code style={{ color: C.acc }}>{row.credential_key || '—'}</code>
-                {d.credential_purpose || row.credential_purpose ? (
-                  <span> — {d.credential_purpose || row.credential_purpose}</span>
-                ) : null}
+                <strong style={{ color: C.txt }}>Credential key(s):</strong>{' '}
+                {row.credential_key ? (
+                  row.credential_key.split(/[,+]/).map((k) => k.trim()).filter(Boolean).map((k) => (
+                    <code key={k} style={{ color: C.acc, marginRight: 6 }}>{k}</code>
+                  ))
+                ) : (
+                  <span style={{ color: C.dim }}>— (external / Vercel / GitHub secrets)</span>
+                )}
               </div>
 
               <label style={{ fontSize: 10, color: C.dim, display: 'block', marginBottom: 10 }}>
-                What ScanV uses it for
+                Credential purpose (what the key does)
+                <input
+                  value={d.credential_purpose}
+                  disabled={busy}
+                  onChange={(e) => setDraft(row.id, { credential_purpose: e.target.value })}
+                  placeholder="e.g. API key in URL path — primary SMS OTP"
+                  style={{ ...S.inp(), fontSize: 11, marginTop: 4, display: 'block', width: '100%' }}
+                />
+              </label>
+
+              <label style={{ fontSize: 10, color: C.dim, display: 'block', marginBottom: 10 }}>
+                What ScanV uses this tool for
                 <input
                   value={d.scanv_usage}
                   disabled={busy}
@@ -284,6 +313,7 @@ export function AdminItIntegrationsTab({ pin, adminHubFetch, C, S, FF, Spin, Btn
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {hasDraft ? (
                   <Btn v="primary" sm type="button" disabled={busy} onClick={() => save(row, {
+                    vendor_name: d.vendor_name,
                     contact_phone: d.contact_phone,
                     portal_url: d.portal_url,
                     api_url: d.api_url,
