@@ -4116,7 +4116,7 @@ function captureFreshGps(fallbackGeo = null) {
       },
       onError: () => finish(fallbackGeo),
     });
-    setTimeout(() => finish(fallbackGeo), 10000);
+    setTimeout(() => finish(fallbackGeo), isIOSUA() ? 22000 : 10000);
   });
 }
 
@@ -4743,12 +4743,50 @@ async function lookupPinByPlaceName(name, stateHint='Maharashtra') {
   return '';
 }
 
+/** Browser-friendly fallback when Nominatim is slow or blocked (common on iOS Safari). */
+async function reverseGeoBigDataCloud(lat, lng) {
+  try {
+    const r = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`,
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    const info = d.localityInfo?.informative || [];
+    const suburb = info.find((x) => /suburb|neighbourhood|quarter/i.test(x.description || ''))?.name || '';
+    const village = d.locality || suburb || info.slice(-2)[0]?.name || '';
+    const city = d.city || info.find((x) => x.order === 9)?.name || d.principalSubdivision || '';
+    const state = d.principalSubdivision || 'Maharashtra';
+    let pincode = String(d.postcode || '').replace(/\D/g, '').slice(0, 6);
+    if (!/^\d{6}$/.test(pincode) && village) {
+      pincode = knownPinForPlace(village) || await lookupPinByPlaceName(village, state);
+    }
+    if (!/^\d{6}$/.test(pincode) && city) {
+      pincode = knownPinForPlace(city) || await lookupPinByPlaceName(city, state);
+    }
+    const address = [suburb, village, city].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 3).join(', ');
+    return {
+      address,
+      village: village || suburb,
+      city: city || village,
+      state,
+      pincode,
+      country: d.countryName || 'India',
+      lat,
+      lng,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function reverseGeo(lat,lng) {
+  let result = null;
   try {
     // Nominatim for address text — OSM postcodes are unreliable in India; prefer India Post API
     const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en&zoom=18&addressdetails=1`,{
       headers:{'User-Agent':'ScanV/5.5 (https://getscanv.com; dcoreglobal.com)'}
     });
+    if (!r.ok) throw new Error(`nominatim ${r.status}`);
     const d=await r.json(); const a=d.address||{};
     const state=a.state||'Maharashtra';
     const isIndia=(a.country_code==='in')||(a.country==='India');
@@ -4788,7 +4826,7 @@ async function reverseGeo(lat,lng) {
       ? [street,...locality].join(', ')
       : (d.display_name?.split(',').slice(0,4).join(',').trim()||'');
 
-    return {
+    result = {
       address,
       village: a.village||a.neighbourhood||a.suburb||a.town||'',
       city: a.city||a.state_district||a.town||a.county?.replace(/\s*Subdistrict$/i,'')||'',
@@ -4797,7 +4835,12 @@ async function reverseGeo(lat,lng) {
       country: a.country||'India',
       lat,lng,
     };
-  } catch(e) { return {address:'',village:'',city:'',state:'',pincode:'',country:'',lat,lng}; }
+  } catch { /* try fallback below */ }
+  if (!result?.address && !result?.village && !result?.city) {
+    const fb = await reverseGeoBigDataCloud(lat, lng);
+    if (fb) result = { ...(result || {}), ...fb, lat, lng };
+  }
+  return result || { address:'', village:'', city:'', state:'Maharashtra', pincode:'', country:'India', lat, lng };
 }
 
 /* --- CANVAS FINGERPRINT ------------------------------------------- */
@@ -5484,6 +5527,7 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState('');
   const [bookGps, setBookGps]     = useState('idle'); // GPS state for book screen
+  const [verifyGpsBusy, setVerifyGpsBusy] = useState(false);
   const [serviceSchedule, setServiceSchedule] = useState(null);
   const [scheduleOutsideOk, setScheduleOutsideOk] = useState(false);
   const [verifyMethod, setVerifyMethod] = useState('sms'); // 'sms' | 'whatsapp'
@@ -5709,6 +5753,40 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     setOtpTargetMobile('');
     setWaToken('');
     setWaChecking(false);
+  };
+
+  const fillBrowseAddressFromGps = async () => {
+    setVerifyGpsBusy(true);
+    setErr('');
+    try {
+      const geo = await captureFreshGps(silentGeo);
+      if (geo?.lat == null) {
+        throw new Error('Allow location — iPhone: Settings → Safari → Location → While Using');
+      }
+      const g = (geo.address || geo.village || geo.city)
+        ? geo
+        : { ...geo, ...(await reverseGeo(geo.lat, geo.lng)) };
+      if (!g.address && !g.village && !g.city) {
+        throw new Error('Could not resolve address from GPS — enter manually');
+      }
+      setAddress(g.address || '');
+      setVillage(g.village || '');
+      setCity(g.city || '');
+      setPincode(g.pincode || '');
+      markAuto(autoFlagsFromValues({
+        address: g.address,
+        village: g.village,
+        city: g.city,
+        pincode: g.pincode,
+      }));
+      addToast?.('Address filled from GPS — edit if needed', 'success');
+    } catch (e) {
+      const msg = e.message || 'GPS failed — enter address manually';
+      setErr(msg);
+      addToast?.(msg, 'error');
+    } finally {
+      setVerifyGpsBusy(false);
+    }
   };
 
   const sendOTP = async (resend = false) => {
@@ -6665,7 +6743,33 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
     const schedVal = bookingDetail?.date
       ? validateBookingSlot(bookingDetail.date, bookingDetail.time || '10:00', sched, { outsideOk: scheduleOutsideOk })
       : null;
-    const doGPS=()=>{setBookGps('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setScheduleLoc(locStr);markAuto('loc');setBookingDetail(b=>({...b,loc:locStr,pickup:isDeliveryShipment?(b?.pickup||locStr):b?.pickup}));setBookGps('done');},()=>setBookGps('idle'),{timeout:8000,enableHighAccuracy:true,maximumAge:0});};
+    const doGPS = () => {
+      setBookGps('loading');
+      requestNativeGps({
+        onFast: async ({ lat, lng }) => {
+          try {
+            const geo = await reverseGeo(lat, lng);
+            const locStr = [geo.address, geo.village, geo.city, geo.pincode].filter(Boolean).join(', ');
+            if (!locStr) throw new Error('empty');
+            setScheduleLoc(locStr);
+            markAuto('loc');
+            setBookingDetail((b) => ({
+              ...b,
+              loc: locStr,
+              pickup: isDeliveryShipment ? (b?.pickup || locStr) : b?.pickup,
+            }));
+            setBookGps('done');
+          } catch {
+            setBookGps('idle');
+            addToast?.('Could not resolve address from GPS', 'error');
+          }
+        },
+        onError: () => {
+          setBookGps('idle');
+          addToast?.('Allow location — Settings → Safari → Location → While Using', 'error');
+        },
+      });
+    };
 
     return browseWrap(
       <>
@@ -6846,6 +6950,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           <Field label="Email" req note="For receipts, bookings, and support">
             <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" style={S.inp()} />
           </Field>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <button type="button" onClick={fillBrowseAddressFromGps} disabled={verifyGpsBusy} style={{ background: 'none', border: `1.5px solid ${C.acc}`, color: C.acc, borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>
+              {verifyGpsBusy ? 'Locating…' : '📍 Use my location'}
+            </button>
+          </div>
           <Field label="Address" req note="House no, street, area">
             <input value={address} {...browseBind('address', e=>setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')}/>
           </Field>
@@ -6999,6 +7108,11 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
           )}
           {needsAddress && (
             <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                <button type="button" onClick={fillBrowseAddressFromGps} disabled={verifyGpsBusy} style={{ background: 'none', border: `1.5px solid ${C.acc}`, color: C.acc, borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>
+                  {verifyGpsBusy ? 'Locating…' : '📍 Use my location'}
+                </button>
+              </div>
               <Field label="Address" req note="House no, street, area">
                 <input value={address} {...browseBind('address', e => setAddress(e.target.value))} placeholder="Flat 302, Rose Society, Wakad" style={inpStyle('address')} />
               </Field>
@@ -8185,7 +8299,35 @@ function BookScreen() {
     return () => { cancelled = true; };
   }, [svc?.id]);
 
-  const doGPS=()=>{setGpsState('loading');navigator.geolocation.getCurrentPosition(async pos=>{const geo=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const locStr=[geo.address,geo.village,geo.city,geo.pincode].filter(Boolean).join(', ');setLoc(locStr);markBookAuto('loc');setBookLat(pos.coords.latitude);setBookLng(pos.coords.longitude);setGpsState('done');await sb().from('user_locations').insert({user_id:user.id,lat:pos.coords.latitude,lng:pos.coords.longitude,address:geo.address,village:geo.village,city:geo.city,pincode:geo.pincode,source:'gps',consent_given:true,consent_at:new Date().toISOString()});},()=>{addToast('GPS unavailable','error');setGpsState('idle');},{enableHighAccuracy:true,maximumAge:0});};
+  const doGPS = () => {
+    setGpsState('loading');
+    requestNativeGps({
+      onFast: async ({ lat, lng }) => {
+        try {
+          const geo = await reverseGeo(lat, lng);
+          const locStr = [geo.address, geo.village, geo.city, geo.pincode].filter(Boolean).join(', ');
+          if (!locStr) throw new Error('empty');
+          setLoc(locStr);
+          markBookAuto('loc');
+          setBookLat(lat);
+          setBookLng(lng);
+          setGpsState('done');
+          await sb().from('user_locations').insert({
+            user_id: user.id, lat, lng,
+            address: geo.address, village: geo.village, city: geo.city, pincode: geo.pincode,
+            source: 'gps', consent_given: true, consent_at: new Date().toISOString(),
+          });
+        } catch {
+          addToast('Could not resolve address from GPS', 'error');
+          setGpsState('idle');
+        }
+      },
+      onError: () => {
+        addToast('Allow location — Settings → Safari → Location → While Using', 'error');
+        setGpsState('idle');
+      },
+    });
+  };
 
   const resetBookOtp=()=>{setBookOtpSent(false);setBookOtpChannel('sms');setBookOtpCode(emptyOtpDigits());setBookOtpTarget('');};
 
@@ -9101,20 +9243,60 @@ function requestNativeGps({ onFast, onAccurate, onError } = {}) {
     return;
   }
   let fastDone = false;
+  let watchId = null;
   const emitFast = (payload) => {
     if (fastDone) return;
     fastDone = true;
+    if (watchId != null) {
+      try { navigator.geolocation.clearWatch(watchId); } catch (_) { /* ignore */ }
+      watchId = null;
+    }
     onFast?.(payload);
+  };
+  const emitPayload = (pos) => ({
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    accuracy: pos.coords.accuracy,
+    pos,
+  });
+
+  const tryLowAccuracyFresh = (afterErr) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const payload = emitPayload(pos);
+        emitFast(payload);
+        onAccurate?.(payload);
+      },
+      (err2) => {
+        if (fastDone) return;
+        if (isIOSUA()) {
+          watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              const payload = emitPayload(pos);
+              emitFast(payload);
+              onAccurate?.(payload);
+            },
+            () => { if (!fastDone) onError?.(err2 || afterErr); },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 },
+          );
+          setTimeout(() => {
+            if (watchId != null) {
+              try { navigator.geolocation.clearWatch(watchId); } catch (_) { /* ignore */ }
+              watchId = null;
+            }
+            if (!fastDone) onError?.(err2 || afterErr);
+          }, 25000);
+          return;
+        }
+        onError?.(err2 || afterErr);
+      },
+      { enableHighAccuracy: false, maximumAge: 0, timeout: isIOSUA() ? 15000 : 8000 },
+    );
   };
 
   // Stale-while-revalidate: return last fix instantly if browser has one (< 5 min)
   navigator.geolocation.getCurrentPosition(
-    (pos) => emitFast({
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy,
-      pos,
-    }),
+    (pos) => emitFast(emitPayload(pos)),
     () => {},
     { enableHighAccuracy: false, maximumAge: 300000, timeout: 3000 },
   );
@@ -9122,17 +9304,12 @@ function requestNativeGps({ onFast, onAccurate, onError } = {}) {
   // High accuracy — fired immediately in parallel (not after cached returns)
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      const payload = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        pos,
-      };
+      const payload = emitPayload(pos);
       emitFast(payload);
       onAccurate?.(payload);
     },
-    (err) => { if (!fastDone) onError?.(err); },
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
+    (err) => { if (!fastDone) tryLowAccuracyFresh(err); },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: isIOSUA() ? 20000 : 12000 },
   );
 }
 
