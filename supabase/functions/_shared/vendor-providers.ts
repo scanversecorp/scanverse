@@ -86,6 +86,11 @@ export async function otpDeliveryVendorOpts(
 }
 
 export async function isVendorEnabled(sb: PlatformSb, key: string): Promise<boolean> {
-  const def = VENDOR_PROVIDER_DEFS.find((d) => d.key === key);
-  return isPlatformFlagOn(sb, key, { defaultValue: def?.defaultOn ?? true });
+  try {
+    const { resolveSwitchKeyEnabled } = await import("./it-integrations-admin.ts");
+    return await resolveSwitchKeyEnabled(sb, key);
+  } catch {
+    const def = VENDOR_PROVIDER_DEFS.find((d) => d.key === key);
+    return isPlatformFlagOn(sb, key, { defaultValue: def?.defaultOn ?? true });
+  }
 }

@@ -24,6 +24,7 @@ import { writeScanvTermsAccepted, TermsAcceptanceField, SCANV_TERMS_ACCEPTED_LAB
 const AdminDiagramsTab = lazy(() => import('./admin-diagrams').then((m) => ({ default: m.AdminDiagramsTab })));
 const AdminVendorLeadsTab = lazy(() => import('./admin-vendor-leads').then((m) => ({ default: m.AdminVendorLeadsTab })));
 const AdminLogisticsPartnersTab = lazy(() => import('./admin-logistics-partners').then((m) => ({ default: m.AdminLogisticsPartnersTab })));
+const AdminItIntegrationsTab = lazy(() => import('./admin-it-integrations').then((m) => ({ default: m.AdminItIntegrationsTab })));
 const AdminSocialContentTab = lazy(() => import('./admin-social-content').then((m) => ({ default: m.AdminSocialContentTab })));
 const AdminServiceScheduleTabLazy = lazy(() => import('./admin-service-schedule').then((m) => ({ default: m.AdminServiceScheduleTab })));
 const AdminBusinessCommandTab = lazy(() => import('./admin-business-command').then((m) => ({ default: m.AdminBusinessCommandTab })));
@@ -1708,6 +1709,150 @@ function stripOpenServiceParamFromUrl() {
   const next = url.pathname + (qs ? `?${qs}` : '') + url.hash;
   window.history.replaceState({}, '', next);
 }
+
+const ACTIVE_SESSION_KEY = 'scanv_active_session_key';
+const ACTIVE_SESSION_PING_MS = 30000;
+
+function getActiveSessionKey() {
+  try {
+    let k = sessionStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!k) {
+      k = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `s${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      sessionStorage.setItem(ACTIVE_SESSION_KEY, k);
+    }
+    return k;
+  } catch (_) {
+    return `s${Date.now()}`;
+  }
+}
+
+function resolveBrowseSessionPlacement(screen, activeSvc) {
+  if (screen === 'services') return { card_id: null, card_label: 'Home', sub_card_id: null, sub_card_label: null };
+  if (screen === 'top-rated') return { card_id: null, card_label: 'Top rated', sub_card_id: null, sub_card_label: null };
+  if (screen.endsWith('-list')) {
+    const catId = screen.slice(0, -5);
+    const cfg = SUB_CATEGORIES[catId];
+    return { card_id: catId, card_label: cfg?.title || cfg?.cat || catId, sub_card_id: null, sub_card_label: null };
+  }
+  if (activeSvc?.id) {
+    const catId = activeSvc.parent || svcParentId(activeSvc);
+    const cfg = catId ? SUB_CATEGORIES[catId] : null;
+    return {
+      card_id: catId || null,
+      card_label: cfg?.title || cfg?.cat || activeSvc.cat || '—',
+      sub_card_id: activeSvc.id,
+      sub_card_label: activeSvc.name || null,
+    };
+  }
+  const screenLabels = {
+    login: 'Login',
+    payment: 'Payment',
+    verify: 'Verify OTP',
+    schedule: 'Schedule',
+    'complete-profile': 'Complete profile',
+    'cloud-admit': 'Cloud admission',
+    book: 'Booking',
+    track: 'Track booking',
+    bookings: 'My bookings',
+    profile: 'Profile',
+  };
+  if (screen.startsWith('trust-')) return { card_id: null, card_label: 'Trust & safety', sub_card_id: null, sub_card_label: null };
+  return { card_id: null, card_label: screenLabels[screen] || screen, sub_card_id: null, sub_card_label: null };
+}
+
+function pingActiveSession({ screen, activeSvc, silentGeo, profile, mobile, firstName, lastName, city, state }) {
+  const placement = resolveBrowseSessionPlacement(screen, activeSvc);
+  const dev = silentGeo?.device || detectDevice();
+  let userName = null;
+  let mob = mobile ? String(mobile).replace(/\D/g, '').slice(-10) : null;
+  let profileId = null;
+  if (profile) {
+    profileId = profile.id || null;
+    userName = [profile.first_name || profile.firstName, profile.last_name || profile.lastName].filter(Boolean).join(' ') || null;
+    mob = mob || resolveUserMobile10(profile) || phoneFromProfileId(profile.id);
+  } else {
+    try {
+      const uid = localStorage.getItem('scanv_uid');
+      if (uid) {
+        profileId = uid;
+        mob = mob || phoneFromProfileId(uid);
+      }
+    } catch (_) { /* private mode */ }
+    if (firstName || lastName) userName = [firstName, lastName].filter(Boolean).join(' ');
+  }
+  const locCity = city || profile?.city || silentGeo?.city || '';
+  const locState = state || profile?.state || silentGeo?.state || '';
+  sb().rpc('upsert_active_session', {
+    p_session_key: getActiveSessionKey(),
+    p_profile_id: profileId,
+    p_user_name: userName,
+    p_mobile: mob && mob.length === 10 ? mob : null,
+    p_city: locCity || null,
+    p_state: locState || null,
+    p_card_id: placement.card_id,
+    p_card_label: placement.card_label,
+    p_sub_card_id: placement.sub_card_id,
+    p_sub_card_label: placement.sub_card_label,
+    p_screen: screen,
+    p_device_type: dev?.deviceType || null,
+  }).then(() => {}).catch(() => {});
+}
+
+function useActiveSessionPing(opts) {
+  const {
+    enabled = true,
+    screen,
+    activeSvc,
+    silentGeo,
+    profile,
+    mobile,
+    firstName,
+    lastName,
+    city,
+    state,
+  } = opts;
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const ping = () => pingActiveSession({ screen, activeSvc, silentGeo, profile, mobile, firstName, lastName, city, state });
+    ping();
+    const id = setInterval(ping, ACTIVE_SESSION_PING_MS);
+    return () => clearInterval(id);
+  }, [
+    enabled,
+    screen,
+    activeSvc?.id,
+    activeSvc?.parent,
+    activeSvc?.name,
+    silentGeo?.city,
+    silentGeo?.state,
+    profile?.id,
+    profile?.first_name,
+    profile?.last_name,
+    mobile,
+    firstName,
+    lastName,
+    city,
+    state,
+  ]);
+}
+
+function ActiveSessionReporter() {
+  const { user, screen, activeSvc, silentGeo } = useApp();
+  const skip = ['services', 'home', 'crm'].includes(screen);
+  useActiveSessionPing({
+    enabled: !skip && !!user,
+    screen,
+    activeSvc,
+    silentGeo,
+    profile: user,
+    city: user?.city,
+    state: user?.state,
+  });
+  return null;
+}
+
 const PRICING_PIN_KEY = 'scanv_pricing_pin';
 const PRICING_AUTH_KEY = 'scanv_pricing_auth';
 const PRICING_IDLE_MS = 5 * 60 * 1000;
@@ -5831,6 +5976,18 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   const browseHomeScrollRef = useRef(null);
   const [browseAuthed, setBrowseAuthed] = useState(() => !!localStorage.getItem('scanv_uid'));
 
+  useActiveSessionPing({
+    enabled: true,
+    screen,
+    activeSvc,
+    silentGeo,
+    mobile,
+    firstName,
+    lastName,
+    city,
+    state: silentGeo?.state || '',
+  });
+
   useEffect(() => {
     if (browseInitial.activeSvc) stripOpenServiceParamFromUrl();
   }, [browseInitial.activeSvc]);
@@ -8319,6 +8476,24 @@ function ServicesScreen() {
   const searchResult = useMemo(() => searchAllServices(search), [search, catalogTick]);
   const { categories: list, ...searchSubs } = searchResult;
   const searching = !!search.trim();
+
+  const presenceScreen = cloudAdmit
+    ? 'cloud-admit'
+    : detail
+      ? 'detail'
+      : subListCat
+        ? `${subListCat}-list`
+        : 'services';
+
+  useActiveSessionPing({
+    enabled: true,
+    screen: presenceScreen,
+    activeSvc: detail || activeSvc,
+    silentGeo,
+    profile: user,
+    city: user?.city,
+    state: user?.state,
+  });
 
   useEffect(() => {
     requestAnimationFrame(() => scrollAppToTop());
@@ -14515,6 +14690,7 @@ const SB_DASH = `https://supabase.com/dashboard/project/${SB_PROJECT}`;
 
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview', icon: '📊' },
+  { id: 'active-sessions', label: 'Active Sessions', icon: '🟢' },
   { id: 'business', label: 'Business HQ', icon: '🎯' },
   { id: 'index', label: 'URL Index', icon: '🔗' },
   { id: 'schedule', label: 'Service Schedule', icon: '📅' },
@@ -14533,6 +14709,7 @@ const ADMIN_TABS = [
   { id: 'student-cloud', label: 'Student Cloud', icon: '🎓' },
   { id: 'otp', label: 'OTP Delivery', icon: '📱' },
   { id: 'go-live', label: 'Go-Live', icon: '🚀' },
+  { id: 'it-integrations', label: 'IT Integrations', icon: '🔌' },
   { id: 'todo', label: 'Ops Todo', icon: '📝' },
   { id: 'vendor-leads', label: 'Vendor Leads', icon: '📇' },
   { id: 'logistics', label: 'Logistics API', icon: '🚛' },
@@ -15427,6 +15604,105 @@ function AdminHealthCheckTab({ pin, onNavigateTab }) {
       {!result && !loadingHealth && !stats && !loadingStats && !err && (
         <div style={{ ...S.card(), padding: 16, fontSize: 12, color: C.sub, lineHeight: 1.7 }}>
           Enter your admin PIN to load the ops dashboard.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminActiveSessionsTab({ pin }) {
+  const [minutes, setMinutes] = useState(5);
+  const [rows, setRows] = useState([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!pin) return;
+    setLoading(true);
+    setErr('');
+    try {
+      const data = await adminHubFetch('list_active_sessions', { minutes }, pin);
+      setRows(data.sessions || []);
+      setCount(data.count ?? (data.sessions || []).length);
+    } catch (e) {
+      setErr(e.message);
+      setRows([]);
+      setCount(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [pin, minutes]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!pin) return undefined;
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, [pin, load]);
+
+  const ago = (iso) => {
+    if (!iso) return '—';
+    const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (sec < 60) return `${sec}s ago`;
+    return `${Math.round(sec / 60)}m ago`;
+  };
+
+  return (
+    <div>
+      <div style={{ ...S.card(), padding: 16, marginBottom: 14, border: `1.5px solid ${C.grn}44` }}>
+        <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 6 }}>Active sessions</div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.6 }}>
+          Live users on getscanv.com — name, mobile, city/state, and the home card or sub-card they are viewing.
+          Rows refresh every 15s; heartbeats arrive about every 30s per browser tab.
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+        {[3, 5, 10, 15].map((m) => (
+          <button key={m} type="button" onClick={() => setMinutes(m)} style={{
+            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${minutes === m ? C.acc : C.bdr}`,
+            background: minutes === m ? `${C.acc}18` : C.surf, color: minutes === m ? C.acc : C.sub,
+            fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FF,
+          }}>
+            Last {m} min
+          </button>
+        ))}
+        <Btn v="outline" sm onClick={load} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</Btn>
+        <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>{count} active</span>
+      </div>
+
+      {err && <div style={{ ...S.card(), padding: 12, marginBottom: 14, color: C.red, fontSize: 12 }}>{err}</div>}
+
+      {!rows.length && !loading && !err && (
+        <div style={{ ...S.card(), padding: 24, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+          No active sessions in the last {minutes} minutes.
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div style={{ ...S.card(), padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto', gap: 8, padding: '10px 14px', borderBottom: BDR, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase' }}>
+            <span>User</span>
+            <span>Mobile</span>
+            <span>City / State</span>
+            <span>Card</span>
+            <span>Sub-card</span>
+            <span>Seen</span>
+          </div>
+          {rows.map((r) => (
+            <div key={r.session_key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto', gap: 8, padding: '12px 14px', borderBottom: BDR, alignItems: 'start', fontSize: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, color: C.txt }}>{r.user_name || 'Guest'}</div>
+                {r.device_type ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{r.device_type}</div> : null}
+              </div>
+              <div style={{ color: C.txt, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}>{r.mobile || '—'}</div>
+              <div style={{ color: C.sub, fontSize: 11 }}>{[r.city, r.state].filter(Boolean).join(', ') || '—'}</div>
+              <div style={{ color: C.acc, fontWeight: 600, fontSize: 11 }}>{r.card_label || '—'}</div>
+              <div style={{ color: C.txt, fontSize: 11 }}>{r.sub_card_label || '—'}</div>
+              <div style={{ color: C.dim, fontSize: 10, whiteSpace: 'nowrap' }}>{ago(r.last_seen_at)}</div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -17775,7 +18051,9 @@ function AdminControlCenter({ onPricesUpdated }) {
                 <AdminDeepLinkBtn hash="vendor-admin" label="Vendor admin →" />
                 <AdminDeepLinkBtn hash="vendor-onboard" label="Partner onboarding →" />
                 <AdminDeepLinkBtn hash="otp-delivery-report" label="OTP delivery reports →" />
+                <button type="button" onClick={() => navigateAdminTab('active-sessions')} style={{ ...tabBtn({ id: 'active-sessions' }), border: `1.5px solid ${C.grn}44` }}>🟢 Active Sessions →</button>
                 <button type="button" onClick={() => navigateAdminTab('health')} style={{ ...tabBtn({ id: 'health' }), border: `1.5px solid ${C.grn}44` }}>📊 Ops Dashboard →</button>
+                <button type="button" onClick={() => navigateAdminTab('it-integrations')} style={{ ...tabBtn({ id: 'it-integrations' }), border: `1.5px solid ${C.acc}44` }}>🔌 IT Integrations →</button>
                 <button type="button" onClick={() => navigateAdminTab('go-live')} style={{ ...tabBtn({ id: 'go-live' }), border: `1.5px solid ${C.acc}44` }}>🚀 Go-Live →</button>
               </div>
             </div>
@@ -17877,6 +18155,8 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'health' && <AdminHealthCheckTab pin={usePin} onNavigateTab={navigateAdminTab} />}
 
+        {tab === 'active-sessions' && <AdminActiveSessionsTab pin={usePin} />}
+
         {tab === 'gps' && <AdminGpsStatusTab pin={usePin} />}
 
         {tab === 'bookings' && <AdminBookingsTab pin={usePin} />}
@@ -17919,6 +18199,12 @@ function AdminControlCenter({ onPricesUpdated }) {
 
         {tab === 'go-live' && (
           <AdminGoLiveTab pin={usePin} onMsg={setMsg} onErr={setErr} onGoVendors={() => navigateAdminTab('vendors')} />
+        )}
+
+        {tab === 'it-integrations' && usePin && (
+          <Suspense fallback={<div style={{ fontSize: 11, color: C.dim, padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}><Spin size={14} /> Loading IT integrations…</div>}>
+            <AdminItIntegrationsTab pin={usePin} adminHubFetch={adminHubFetch} C={C} S={S} FF={FF} Spin={Spin} Btn={Btn} />
+          </Suspense>
         )}
 
         {tab === 'todo' && (
@@ -18752,6 +19038,7 @@ export default function App() {
     <Boundary>
       <Ctx.Provider value={ctx}>
         <CustomerShell toasts={toasts}>
+        <ActiveSessionReporter />
         <PartnerGpsTracker />
         <div className="scanv-root">
         <div className="scanv-shell" style={APP_SHELL}>

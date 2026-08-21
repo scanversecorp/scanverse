@@ -4,6 +4,7 @@
  * Actions (POST body):
  *   whoami           — verify PIN, return role
  *   stats            — dashboard counts
+ *   list_active_sessions — live user presence (card / sub-card), default last 5 min
  *   list_agents      — all support_agents (admin only)
  *   create_agent     — { name, email?, phone?, role?, notes? }
  *   update_agent     — { id, name?, email?, phone?, role?, notes?, active? }
@@ -156,6 +157,11 @@ import {
   listLogisticsPipeline,
   updateLogisticsPartner,
 } from "../_shared/logistics-partners-admin.ts";
+import {
+  listItIntegrations,
+  syncItIntegrationFromPlatformSwitch,
+  updateItIntegration,
+} from "../_shared/it-integrations-admin.ts";
 import {
   createExternalTrip,
   quoteExternalTrip,
@@ -715,6 +721,21 @@ async function hubStats(sb: ReturnType<typeof adminSb>) {
   });
 }
 
+async function listActiveSessions(sb: ReturnType<typeof adminSb>, body: Record<string, unknown>) {
+  const minutes = Math.min(Math.max(Number(body.minutes) || 5, 1), 60);
+  const since = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from("active_sessions")
+    .select(
+      "session_key,profile_id,user_name,mobile,city,state,card_id,card_label,sub_card_id,sub_card_label,screen,device_type,last_seen_at,created_at",
+    )
+    .gte("last_seen_at", since)
+    .order("last_seen_at", { ascending: false })
+    .limit(200);
+  if (error) return json({ error: error.message }, 500);
+  return json({ sessions: data || [], count: (data || []).length, window_minutes: minutes });
+}
+
 async function listAgents(sb: ReturnType<typeof adminSb>) {
   const { data, error } = await sb
     .from("support_agents")
@@ -1120,11 +1141,17 @@ async function updateGoLiveSwitch(
     return json({ error: "Permission hub.go_live.exec required for this switch" }, 403);
   }
   const enabled = body.enabled === true || body.enabled === 1 || body.enabled === "1";
-  return updatePlatformSetting(sb, {
+  const res = await updatePlatformSetting(sb, {
     key,
     value: enabled ? "1" : "0",
     updated_by: "admin-go-live-ui",
   });
+  if (res.status === 200 && key.startsWith("vendor_enable_")) {
+    try {
+      await syncItIntegrationFromPlatformSwitch(sb, key, enabled, "admin-go-live-ui");
+    } catch { /* non-blocking */ }
+  }
+  return res;
 }
 
 async function updateGoLiveCheckAction(
@@ -1365,6 +1392,10 @@ Deno.serve(async (req) => {
 
   if (action === "stats") {
     return hubStats(sb);
+  }
+
+  if (action === "list_active_sessions") {
+    return listActiveSessions(sb, body);
   }
 
   if (action === "list_agents") {
@@ -1734,6 +1765,27 @@ Deno.serve(async (req) => {
     const result = await updateLogisticsPartner(sb, body);
     if (result.error) return json({ error: result.error }, 400);
     return json({ success: true, partner: result.partner });
+  }
+
+  if (action === "get_it_integrations") {
+    try {
+      const integrations = await listItIntegrations(sb);
+      return json({ integrations, count: integrations.length });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "IT integrations load failed";
+      return json({ error: msg }, 500);
+    }
+  }
+
+  if (action === "update_it_integration") {
+    const id = String(body.id || "").trim();
+    if (!id) return json({ error: "id required" }, 400);
+    const patch = (body.patch && typeof body.patch === "object")
+      ? body.patch as Record<string, unknown>
+      : body;
+    const result = await updateItIntegration(sb, id, patch, iamActorLabel(ctx));
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ success: true, integration: result.integration });
   }
 
   if (action === "list_external_trips") {
