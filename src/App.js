@@ -40,7 +40,9 @@ const SCANV_QR_URL = `${APP_URL}/?qr=1&utm_source=qr&utm_medium=print`;
 const UPI_PA   = 'vyapar.172928067841@hdfcbank';
 const UPI_PN   = 'DCORE GLOBAL CORPORATION';
 const HDFC_VYAPAR_MERCHANT_ID = '172928067841';
+/** Public voice assist — paused in customer UI; contact is SUPPORT_EMAIL. */
 const ASSIST   = '+91-9270194842';
+const SUPPORT_EMAIL = 'support@getscanv.com';
 const LOCAL_COMMUNITIES = 'Local Communities';
 const INCORPORATION_ORIGIN = 'Designed & Developed by Incorporation, San Francisco, California, USA';
 
@@ -3980,10 +3982,10 @@ function Spin({size=20}) {
   return <div style={{width:size,height:size,border:`2px solid ${C.bdr}`,borderTop:`2px solid ${C.acc}`,borderRadius:'50%',animation:'spin .7s linear infinite',flexShrink:0}}/>;
 }
 
-function Btn({children,onClick,v='primary',full,disabled,sm,style}) {
+function Btn({children,onClick,v='primary',full,disabled,sm,style,type='button'}) {
   const b={borderRadius:11,fontFamily:FF,fontWeight:700,cursor:disabled?'not-allowed':'pointer',width:full?'100%':'auto',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,opacity:disabled?.6:1,border:'none',padding:sm?'8px 14px':'13px 22px',fontSize:sm?12:15,transition:'opacity .15s',...style};
   const vs={primary:{...b,background:disabled?C.deep:C.acc,color:disabled?C.dim:'#fff',boxShadow:disabled?'none':'0 4px 16px rgba(214,58,86,0.35)'},outline:{...b,background:'transparent',color:C.acc,border:`1.5px solid ${C.acc}`,boxShadow:'none'},ghost:{...b,background:C.gls,color:C.txt,border:BDR,boxShadow:'none'},secondary:{...b,background:C.deep,color:C.txt,border:BDR,boxShadow:'none'},danger:{...b,background:disabled?C.deep:C.red,color:disabled?C.dim:'#fff',boxShadow:'none'}};
-  return <button onClick={onClick} disabled={disabled} style={vs[v]||vs.primary}>{children}</button>;
+  return <button type={type} onClick={onClick} disabled={disabled} style={vs[v]||vs.primary}>{children}</button>;
 }
 
 function Field({ label, req, note, invalid, fieldKey, children }) {
@@ -4507,10 +4509,13 @@ function Toast({toasts}) {
 
 function AssistBanner() {
   return (
-    <a href={`tel:${ASSIST.replace(/-/g,'')}`} style={{display:'flex',alignItems:'center',gap:12,background:C.surf,border:'1.5px solid #f0c040',borderRadius:12,padding:'12px 14px',textDecoration:'none',marginBottom:16,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-      <span style={{fontSize:22}}>📞</span>
-      <div><div style={{color:C.txt,fontSize:15,fontWeight:700}}>Need help booking?</div><div style={{color:C.sub,fontSize:13}}>{ASSIST} · Call our team</div></div>
-      <div style={{marginLeft:'auto',background:C.acc,color:'#fff',fontSize:13,fontWeight:800,padding:'8px 12px',borderRadius:8,boxShadow:'0 4px 12px rgba(214,58,86,0.3)'}}>Call</div>
+    <a href={`mailto:${SUPPORT_EMAIL}`} style={{display:'flex',alignItems:'center',gap:12,background:C.surf,border:'1.5px solid #f0c040',borderRadius:12,padding:'12px 14px',textDecoration:'none',marginBottom:16,boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
+      <span style={{fontSize:22}}>✉️</span>
+      <div>
+        <div style={{color:C.txt,fontSize:15,fontWeight:700}}>Need help booking?</div>
+        <div style={{color:C.sub,fontSize:13}}>{SUPPORT_EMAIL}</div>
+      </div>
+      <div style={{marginLeft:'auto',background:C.acc,color:'#fff',fontSize:13,fontWeight:800,padding:'8px 12px',borderRadius:8,boxShadow:'0 4px 12px rgba(214,58,86,0.3)'}}>Email</div>
     </a>
   );
 }
@@ -4526,12 +4531,12 @@ function captureFreshGps(fallbackGeo = null) {
     };
     if (!navigator.geolocation) { finish(fallbackGeo); return; }
     requestNativeGps({
-      onFast: async ({ lat, lng }) => {
+      onFast: async ({ lat, lng, accuracy }) => {
         try {
           const geoData = await reverseGeo(lat, lng);
-          finish({ lat, lng, ...geoData, source: 'gps' });
+          finish({ lat, lng, accuracy, ...geoData, source: 'gps' });
         } catch {
-          finish({ lat, lng, source: 'gps' });
+          finish({ lat, lng, accuracy, source: 'gps' });
         }
       },
       onError: () => finish(fallbackGeo),
@@ -4757,7 +4762,7 @@ const TRUST_COMMITMENT_PAGES = {
         'Terms (/terms), Refund (/refund), and Payment (/payment) policies published',
         'Booking and payment records retained per GST and regulatory requirements',
         'OTP, device, and session logs used for fraud prevention — not sold to advertisers',
-        `Assist line ${ASSIST} for booking help, disputes, and escalations`,
+        `Email ${SUPPORT_EMAIL} for booking help, disputes, and escalations`,
       ]],
     ],
     action: { label: 'Report an issue →', type: 'hash', target: '#report' },
@@ -8292,7 +8297,7 @@ function MaintenancePage({ message, onRetry }) {
         <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>Back soon · {pct}% done</div>
         <Btn full onClick={retry} disabled={busy}>{busy ? 'Checking…' : 'Try again'}</Btn>
         <div style={{ fontSize: 10, color: C.dim, marginTop: 16, lineHeight: 1.55 }}>
-          Urgent booking? Call <a href={`tel:${ASSIST.replace(/\D/g, '')}`} style={{ color: C.acc, fontWeight: 700 }}>{ASSIST}</a>
+          Urgent booking? Email <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.acc, fontWeight: 700 }}>{SUPPORT_EMAIL}</a>
           <br />Staff: <code style={{ color: C.acc }}>#admin → Go-Live</code> · <code style={{ color: C.acc }}>node scripts/maintenance-mode.mjs off</code>
         </div>
       </div>
@@ -8390,13 +8395,12 @@ function BottomNav() {
 }
 
 function TopBar({title,back}) {
-  const {setScreen,logout}=useApp();
+  const {setScreen}=useApp();
   return (
     <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'6px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
       {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
            :<ScanVLogoMark size={LOGO_SIZE.sm} />}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
-      {!back&&<button onClick={logout} style={{background:C.gls,border:`1px solid ${C.bdr}`,color:C.sub,padding:'6px 12px',borderRadius:8,cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>Sign out</button>}
     </div>
   );
 }
@@ -12981,7 +12985,7 @@ function FaqPage() {
     ['How do I track my support ticket?', 'Go to #track-ticket, enter your ticket number and mobile (last 4 digits or full number). You will see basic status, subject, and resolution note when closed.'],
     ['Can I change or cancel a booking?', 'Yes — open Bookings or Track my service and tap Cancel booking on any confirmed or in-progress order. You will see a breakdown: 30% cancellation fee (18% GST + 12% platform service of total paid) and 70% refund. See /refund for details.'],
     ['Is my data safe?', 'Yes — TLS 1.3, AES-256, AWS Mumbai. We never sell data. See /privacy for DPDP Act 2023 rights.'],
-    ['Who operates ScanV?', `ScanV is operated by DCore — connecting customers with independent service partners in ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. Call +91-9270194842 for help.`],
+    ['Who operates ScanV?', `ScanV is operated by DCore — connecting customers with independent service partners in ${LOCAL_COMMUNITIES}. ${INCORPORATION_ORIGIN}. Email ${SUPPORT_EMAIL} for help.`],
     ['What if no partner is available?', 'DCORE may cancel and refund the platform fee. You are notified via SMS. Try rescheduling or another service category.'],
     ['How are partners assigned?', 'After payment, we offer the job to the 3 nearest active partners one-by-one in the ScanV app. SMS, call & WhatsApp are sent as backup. First partner to accept is assigned and live map tracking starts.'],
     ['How long until my ticket is resolved?', 'We aim to respond within 24 business hours. Urgent payment/booking issues are prioritised. Track progress at #track-ticket.'],
@@ -13009,7 +13013,7 @@ function FaqPage() {
           <p style={{ fontSize: 12, color: C.sub, margin: '0 0 10px', lineHeight: 1.6 }}>Submit a report and receive a ticket number for reference.</p>
           <a href="#report" style={{ color: C.acc, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Report an issue →</a>
           {' · '}
-          <a href={`tel:${ASSIST.replace(/-/g, '')}`} style={{ color: C.acc, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Call {ASSIST}</a>
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.acc, fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}>{SUPPORT_EMAIL}</a>
         </div>
         <div style={{ borderTop: `1px solid ${C.bdr}`, paddingTop: 20, marginTop: 20, display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           <FooterLegalLinks current="faq" />
@@ -13025,25 +13029,72 @@ function ReportPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState(null);
+  const [gps, setGps] = useState(null);
+  const [gpsStatus, setGpsStatus] = useState('locating');
+  const gpsPromiseRef = useRef(null);
 
-  const submit = async () => {
+  useEffect(() => {
+    let cancelled = false;
+    setGpsStatus('locating');
+    gpsPromiseRef.current = captureFreshGps(null).then((geo) => {
+      if (cancelled) return geo;
+      if (geo?.lat != null) {
+        setGps(geo);
+        setGpsStatus('ready');
+      } else {
+        setGpsStatus('denied');
+      }
+      return geo;
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const gpsLabel = () => {
+    if (gpsStatus === 'locating') return '📍 Getting your location…';
+    if (gps?.lat != null) {
+      const place = gps.address || [gps.village, gps.city].filter(Boolean).join(', ');
+      return place ? `📍 Location captured · ${place}` : '📍 Location captured';
+    }
+    return '📍 Location unavailable — you can still submit';
+  };
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
     if (!form.reporter_name.trim() || !form.reporter_mobile.trim() || !form.subject.trim() || !form.description.trim()) {
       setErr('Name, mobile, subject, and description are required');
       return;
     }
     setLoading(true); setErr('');
     try {
+      let loc = gps;
+      if (loc?.lat == null && gpsPromiseRef.current) {
+        loc = await gpsPromiseRef.current;
+        if (loc?.lat != null) {
+          setGps(loc);
+          setGpsStatus('ready');
+        }
+      }
+      const place = loc?.address || [loc?.village, loc?.city].filter(Boolean).join(', ') || '';
+      let description = form.description.trim();
+      if (loc?.lat != null && loc?.lng != null) {
+        description += `\n\n[Location at report] ${Number(loc.lat).toFixed(5)}, ${Number(loc.lng).toFixed(5)}${place ? ` · ${place}` : ''}`;
+      }
       const data = await supportTicketsFetch('create', {
         reporter_name: form.reporter_name.trim(),
         reporter_mobile: form.reporter_mobile.trim(),
         reporter_email: form.reporter_email.trim() || undefined,
         category: form.category,
         subject: form.subject.trim(),
-        description: form.description.trim(),
+        description,
         txn_id: form.txn_id.trim() || undefined,
+        reporter_lat: loc?.lat ?? undefined,
+        reporter_lng: loc?.lng ?? undefined,
+        reporter_gps_accuracy: loc?.accuracy ?? undefined,
+        reporter_gps_address: place || undefined,
+        reporter_gps_source: loc?.source || undefined,
       });
       setResult(data);
-    } catch (e) { setErr(e.message); }
+    } catch (e2) { setErr(e2.message); }
     finally { setLoading(false); }
   };
 
@@ -13076,13 +13127,13 @@ function ReportPage() {
         <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 22, textDecoration: 'none' }}>←</a>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.txt }}>Report an issue</div>
       </div>
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
+      <form onSubmit={submit} style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
         <div style={{ fontSize: 12, color: C.sub, marginBottom: 16, lineHeight: 1.6 }}>
           Describe your booking, payment, or service issue. You receive a ticket number for reference.
         </div>
-        <Field label="Your name" req><input value={form.reporter_name} onChange={e => setForm(f => ({ ...f, reporter_name: e.target.value }))} style={S.inp()} placeholder="Full name" /></Field>
-        <Field label="Mobile" req note="Used to verify when tracking"><input value={form.reporter_mobile} onChange={e => setForm(f => ({ ...f, reporter_mobile: e.target.value }))} style={S.inp()} placeholder="10-digit mobile" inputMode="tel" /></Field>
-        <Field label="Email" note="Optional — for closure notification"><input value={form.reporter_email} onChange={e => setForm(f => ({ ...f, reporter_email: e.target.value }))} style={S.inp()} placeholder="you@email.com" inputMode="email" /></Field>
+        <Field label="Your name" req><input value={form.reporter_name} onChange={e => setForm(f => ({ ...f, reporter_name: e.target.value }))} style={S.inp()} placeholder="Full name" autoComplete="name" /></Field>
+        <Field label="Mobile" req note="Used to verify when tracking"><input value={form.reporter_mobile} onChange={e => setForm(f => ({ ...f, reporter_mobile: e.target.value }))} style={S.inp()} placeholder="10-digit mobile" inputMode="tel" autoComplete="tel" /></Field>
+        <Field label="Email" note="Optional — for closure notification"><input value={form.reporter_email} onChange={e => setForm(f => ({ ...f, reporter_email: e.target.value }))} style={S.inp()} placeholder="you@email.com" inputMode="email" autoComplete="email" /></Field>
         <Field label="Category" req>
           <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={S.inp()}>
             {[['booking', 'Booking'], ['payment', 'Payment'], ['service', 'Service quality'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -13091,13 +13142,19 @@ function ReportPage() {
         <Field label="Subject" req><input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} style={S.inp()} placeholder="Brief summary" /></Field>
         <Field label="Description" req><textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ ...S.inp(), minHeight: 100, resize: 'vertical' }} placeholder="What happened? Include TXN ID, date, service name…" /></Field>
         <Field label="Booking / TXN reference" note="Optional"><input value={form.txn_id} onChange={e => setForm(f => ({ ...f, txn_id: e.target.value }))} style={S.inp()} placeholder="TXN-XXXXXXXX" /></Field>
+        <div style={{ fontSize: 12, color: gpsStatus === 'denied' ? C.dim : C.grn, fontWeight: 600, marginBottom: 12, lineHeight: 1.45 }}>
+          {gpsLabel()}
+        </div>
         {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-        <Btn full onClick={submit} disabled={loading}>{loading ? 'Submitting…' : 'Submit report'}</Btn>
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
+        <Btn full type="submit" disabled={loading}>{loading ? 'Submitting…' : 'Submit report'}</Btn>
+        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
+          Or email <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.acc, fontWeight: 700 }}>{SUPPORT_EMAIL}</a>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
           <a href="#track-ticket" style={{ color: C.dim, fontSize: 11 }}>Already have a ticket? Check status →</a>
         </div>
         <CustomerFooterBar linksStyle={{ marginTop: 16, paddingTop: 0, borderTop: 'none' }} copyrightStyle={{ marginTop: 0 }} />
-      </div>
+      </form>
     </div>
   );
 }
@@ -13399,6 +13456,20 @@ function TicketDeskPanel({ pin, useAdminPin = false, readOnly = false }) {
           <div>TXN: {detail.txn_id || '—'}</div>
           <div>Created: {fmtDt(detail.created_at)}</div>
           {detail.assigned_agent_name && <div>Agent: {detail.assigned_agent_name}</div>}
+          {detail.reporter_lat != null && detail.reporter_lng != null && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              GPS:{' '}
+              <a
+                href={`https://maps.google.com/?q=${detail.reporter_lat},${detail.reporter_lng}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: C.acc, fontWeight: 700 }}
+              >
+                {Number(detail.reporter_lat).toFixed(5)}, {Number(detail.reporter_lng).toFixed(5)}
+              </a>
+              {detail.reporter_gps_address ? ` · ${detail.reporter_gps_address}` : ''}
+            </div>
+          )}
         </div>
         {!readOnly && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
@@ -14857,7 +14928,7 @@ function AdminPageIndexTab({ pin, adminHubFetch, onNavigateTab, onCopy, C, S, FF
           Loaded from server after PIN — not in the public app bundle.
           Bookmark: <code style={{ color: C.acc }}>{adminTabUrl('index')}</code>
           · Deep links: <code style={{ color: C.acc }}>#admin?tab=go-live</code>
-          · Assist: <strong style={{ color: C.txt }}>{ASSIST}</strong>
+          · Assist: <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.acc, fontWeight: 700 }}>{SUPPORT_EMAIL}</a>
         </div>
       </div>
 
@@ -16406,7 +16477,7 @@ function AdminGoLiveTab({ pin, onMsg, onErr, onGoVendors }) {
           {onGoVendors ? (
             <button type="button" onClick={onGoVendors} style={{ background: 'none', border: 'none', color: C.acc, cursor: 'pointer', fontWeight: 700, padding: 0, fontSize: 11 }}>Vendors tab</button>
           ) : 'Vendors tab'}
-          · Support: <strong>+91-9270194842</strong>
+          · Support: <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.acc, fontWeight: 700 }}>{SUPPORT_EMAIL}</a>
           · No AWS server required (Vercel + Supabase)
         </div>
         {(cfg.not_required || []).map((n) => (

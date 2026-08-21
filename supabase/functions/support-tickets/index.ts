@@ -57,6 +57,12 @@ function generateTicketNumber(): string {
   return `TKT-${Date.now()}`;
 }
 
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function mobileMatches(stored: string, provided: string): boolean {
   const a = digitsOnly(stored);
   const b = digitsOnly(provided);
@@ -130,15 +136,36 @@ async function createTicket(sb: ReturnType<typeof adminSb>, body: Record<string,
     txn_id: body.txn_id ? String(body.txn_id).trim() : null,
   };
 
+  const lat = numOrNull(body.reporter_lat ?? body.lat);
+  const lng = numOrNull(body.reporter_lng ?? body.lng);
+  const gpsAccuracy = numOrNull(body.reporter_gps_accuracy ?? body.accuracy);
+  const gpsAddress = body.reporter_gps_address ? String(body.reporter_gps_address).trim() : "";
+  const gpsSource = body.reporter_gps_source ? String(body.reporter_gps_source).trim() : "";
+
   const { data: ticket, error } = await sb.from("support_tickets").insert(row).select().single();
   if (error) return json({ error: error.message }, 500);
+
+  if (lat != null && lng != null) {
+    await sb.from("support_tickets").update({
+      reporter_lat: lat,
+      reporter_lng: lng,
+      reporter_gps_accuracy: gpsAccuracy,
+      reporter_gps_address: gpsAddress || null,
+      reporter_gps_source: gpsSource || "gps",
+      reporter_gps_captured_at: new Date().toISOString(),
+    }).eq("id", ticket.id);
+  }
+
+  const gpsNote = lat != null && lng != null
+    ? ` GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}${gpsAddress ? ` (${gpsAddress})` : ""}.`
+    : " GPS not captured.";
 
   await addComment(
     sb,
     ticket.id,
     "system",
     "ScanV",
-    `Ticket ${ticketNumber} created. Category: ${category}.`,
+    `Ticket ${ticketNumber} created. Category: ${category}.${gpsNote}`,
   );
 
   return json({
