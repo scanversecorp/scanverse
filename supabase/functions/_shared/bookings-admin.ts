@@ -34,11 +34,47 @@ async function payerVpaByTxnIds(
 async function attachPayerVpa<T extends { txn_id?: string | null }>(
   sb: ReturnType<typeof createClient>,
   rows: T[],
-): Promise<Array<T & { payer_vpa: string | null }>> {
+): Promise<Array<T & { payer_vpa: string | null; verified_via: string | null }>> {
   const vpaMap = await payerVpaByTxnIds(sb, rows.map((r) => String(r.txn_id || "")));
+  const txnIds = [...new Set(rows.map((r) => String(r.txn_id || "")).filter(Boolean))];
+  const verifiedVia: Record<string, string> = {};
+  if (txnIds.length) {
+    const { data: intents } = await sb
+      .from("payment_intents")
+      .select("txn_id, verified_via, status")
+      .in("txn_id", txnIds)
+      .eq("status", "paid");
+    for (const row of intents || []) {
+      const txn = String((row as { txn_id?: string }).txn_id || "");
+      const via = String((row as { verified_via?: string }).verified_via || "").trim();
+      if (txn && via) verifiedVia[txn] = via;
+    }
+  }
   return rows.map((row) => ({
     ...row,
     payer_vpa: row.txn_id ? vpaMap[String(row.txn_id)] || null : null,
+    verified_via: row.txn_id ? verifiedVia[String(row.txn_id)] || null : null,
+  }));
+}
+
+async function attachCustomerPhones<T extends { customer_id?: string | null }>(
+  sb: ReturnType<typeof createClient>,
+  rows: T[],
+): Promise<Array<T & { customer_phone: string | null }>> {
+  const ids = [...new Set(rows.map((r) => String(r.customer_id || "")).filter(Boolean))];
+  if (!ids.length) return rows.map((row) => ({ ...row, customer_phone: null }));
+
+  const { data: profiles } = await sb
+    .from("profiles")
+    .select("id, phone")
+    .in("id", ids);
+  const phoneById: Record<string, string> = {};
+  for (const p of profiles || []) {
+    phoneById[String((p as { id: string }).id)] = String((p as { phone?: string }).phone || "");
+  }
+  return rows.map((row) => ({
+    ...row,
+    customer_phone: row.customer_id ? phoneById[String(row.customer_id)] || null : null,
   }));
 }
 
@@ -74,7 +110,8 @@ export async function searchBookingsAdmin(
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return attachPayerVpa(sb, data || []);
+  const withVpa = await attachPayerVpa(sb, data || []);
+  return attachCustomerPhones(sb, withVpa);
 }
 
 export async function bookingDetailAdmin(

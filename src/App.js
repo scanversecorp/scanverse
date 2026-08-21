@@ -17601,7 +17601,14 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                 <div>
                   <div style={{ fontWeight: 700, color: C.txt }}>{b.service_name}</div>
                   <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text || '—'}</div>
-                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{b.customer_name || b.customer_id} · TXN {b.txn_id || '—'}{b.payer_vpa ? ` · UPI ${b.payer_vpa}` : ''}</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                    {b.customer_name || '—'}
+                    {b.customer_phone ? ` · ${b.customer_phone}` : (b.customer_id ? ` · ${b.customer_id}` : '')}
+                    {' · '}TXN {b.txn_id || '—'}
+                    {b.payer_vpa ? ` · UPI ${b.payer_vpa}` : ''}
+                    {b.verified_via ? ` · paid via ${b.verified_via}` : ''}
+                  </div>
+                  {b.created_at ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>Booked {fmtDt(b.created_at)}</div> : null}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} />
@@ -17623,7 +17630,11 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                 <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>{bk.service_name}</div>
                 <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
                   <div>Payer UPI: <strong style={{ color: payerVpa ? C.cyan : C.dim, fontFamily: 'ui-monospace, monospace' }}>{payerVpa || 'Not captured yet'}</strong></div>
+                  {detail?.payment_intents?.[0]?.verified_via ? (
+                    <div>Payment confirmed via: <strong style={{ color: C.txt }}>{detail.payment_intents[0].verified_via}</strong></div>
+                  ) : null}
                   <div>Customer: {cust?.name || `${cust?.first_name || ''} ${cust?.last_name || ''}`.trim() || bk.customer_name || bk.customer_id} · {cust?.phone || '—'}</div>
+                  {bk.created_at ? <div>Booked on: {fmtDt(bk.created_at)}</div> : null}
                   <div>Scheduled: {fmtDt(bk.date)} {bk.time}</div>
                   <div>Location: {bk.location_text || '—'}</div>
                   <div>Status: <Badge label={bk.status} color={bookingStatusColor[bk.status] || C.sub} /></div>
