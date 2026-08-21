@@ -1027,21 +1027,24 @@ function ScanVBrandHeader({ geo, padX = 12, padY = 6, bare = false, sticky = fal
       borderBottom: bare ? 'none' : BDR,
       padding: `${padY}px ${padX}px`,
       paddingTop: bare ? padY : BROWSE_HDR_PAD,
-      display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1fr) auto max-content',
+      display: 'flex',
       alignItems: 'center',
-      columnGap: 8,
+      justifyContent: 'space-between',
+      position: 'relative',
       flexShrink: 0,
       margin: 0,
       width: '100%',
       boxSizing: 'border-box',
+      minHeight: 52,
       ...(sticky ? { position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)' } : null),
     }}>
-      <div style={{ justifySelf: 'start', minWidth: 0, overflow: 'hidden' }}>
+      <div style={{ minWidth: 0, overflow: 'hidden', zIndex: 1, flex: '1 1 0', display: 'flex', justifyContent: 'flex-start' }}>
         <ScanVLogoMark part="wordmark" size={LOGO_SIZE.sm} />
       </div>
-      <ScanVLogoMark part="mark" size={44} />
-      <div style={{ justifySelf: 'end', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 0, pointerEvents: 'none' }}>
+        <ScanVLogoMark part="mark" size={44} />
+      </div>
+      <div style={{ minWidth: 0, zIndex: 1, flex: '1 1 0', display: 'flex', justifyContent: 'flex-end' }}>
         <ScanVGeoChip geo={geo} />
       </div>
     </div>
