@@ -963,28 +963,77 @@ function SvcGrid2({ items, renderItem, gap = 10 }) {
   );
 }
 const FF = "'Inter',system-ui,sans-serif";
-const SCANV_LOGO_SRC = '/scanv-brand-logo.png';
-const LOGO_SIZE = { sm: 52, md: 56, lg: 88, xl: 96 };
+const SCANV_MARK_SRC = '/scanv-mark.png';
+const SCANV_WORDMARK_SRC = '/scanv-wordmark.png';
+const SCANV_MARK_ASPECT = 131 / 108;
+const SCANV_WORDMARK_ASPECT = 710 / 171;
+const LOGO_SIZE = { sm: 34, md: 40, lg: 56, xl: 72 };
 
-function ScanVLogoMark({ size = LOGO_SIZE.sm, center = false, linkToApp = false }) {
-  const mark = (
+function ScanVLogoMark({ size = LOGO_SIZE.sm, center = false, linkToApp = false, part = 'both' }) {
+  const markH = size;
+  const markW = Math.round(size * SCANV_MARK_ASPECT);
+  const wordH = Math.round(size * 0.78);
+  const wordW = Math.round(wordH * SCANV_WORDMARK_ASPECT);
+  const markImg = (
     <img
-      src={SCANV_LOGO_SRC}
-      alt="ScanV"
-      width={size}
-      height={size}
+      src={SCANV_MARK_SRC}
+      alt={part === 'wordmark' ? '' : 'ScanV'}
+      width={markW}
+      height={markH}
       title="ScanV"
-      style={{ borderRadius: Math.round(size * 0.22), objectFit: 'contain', display: 'block' }}
+      style={{ objectFit: 'contain', display: 'block', width: markW, height: markH, flexShrink: 0 }}
     />
+  );
+  const wordImg = (
+    <img
+      src={SCANV_WORDMARK_SRC}
+      alt={part === 'mark' ? '' : 'ScanV'}
+      width={wordW}
+      height={wordH}
+      title="ScanV"
+      style={{ objectFit: 'contain', display: 'block', width: wordW, height: wordH, flexShrink: 0 }}
+    />
+  );
+  const inner = part === 'mark' ? markImg : part === 'wordmark' ? wordImg : (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+      {markImg}
+      {wordImg}
+    </div>
   );
   const logoBody = linkToApp ? (
     <a href={APP_URL} style={{ display: 'block', flexShrink: 0, lineHeight: 0 }} aria-label="Open ScanV">
-      {mark}
+      {inner}
     </a>
-  ) : mark;
+  ) : inner;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: center ? 'center' : 'flex-start', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: center ? 'center' : 'flex-start', flexShrink: 0, minWidth: 0 }}>
       {logoBody}
+    </div>
+  );
+}
+
+function ScanVBrandHeader({ right, padX = 12, padY = 6, bare = false, sticky = false }) {
+  return (
+    <div style={{
+      background: bare ? 'transparent' : C.surf,
+      borderBottom: bare ? 'none' : BDR,
+      padding: `${padY}px ${padX}px`,
+      paddingTop: bare ? padY : BROWSE_HDR_PAD,
+      display: 'grid',
+      gridTemplateColumns: '1fr auto 1fr',
+      alignItems: 'center',
+      columnGap: 8,
+      flexShrink: 0,
+      margin: 0,
+      ...(sticky ? { position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)' } : null),
+    }}>
+      <div style={{ justifySelf: 'start', minWidth: 0, overflow: 'hidden' }}>
+        <ScanVLogoMark part="wordmark" size={LOGO_SIZE.sm} />
+      </div>
+      <ScanVLogoMark part="mark" size={52} />
+      <div style={{ justifySelf: 'end', minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
+        {right || null}
+      </div>
     </div>
   );
 }
@@ -7141,12 +7190,13 @@ function BrowseFlow({ silentGeo, onRegistered, onSignUp, addToast, catalogTick =
   // -- SERVICES LIST --------------------------------------------------------
   if (screen==='services') return browseWrap(
     <>
-      <div style={{background:C.surf,borderBottom:BDR,padding:`6px ${BROWSE_HOME_INSET}px`,paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,margin:0}}>
-        <ScanVLogoMark size={LOGO_SIZE.md} />
-        <div style={{fontSize:11,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'52%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-          📍 {formatGeoBadge(silentGeo)}
-        </div>
-      </div>
+      <ScanVBrandHeader
+        right={(
+          <div style={{fontSize:11,fontWeight:700,color:C.cyan,background:'#dce8f7',padding:'5px 10px',borderRadius:99,border:BDR,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            📍 {formatGeoBadge(silentGeo)}
+          </div>
+        )}
+      />
       <div className="browse-home-stack" style={{ ...BROWSE_HOME_STACK, flexShrink: 0, gap: 8 }}>
         <div style={BROWSE_PROMO_BANNER}>
           <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.25, fontFamily: FF }}>Book services with a Smile</div>
@@ -8398,10 +8448,13 @@ function BottomNav() {
 
 function TopBar({title,back}) {
   const {setScreen}=useApp();
+  if (!back && !title) {
+    return <ScanVBrandHeader padX={20} />;
+  }
   return (
     <div style={{background:C.surf,borderBottom:`1px solid ${C.bdr}`,padding:'6px 20px',paddingTop:BROWSE_HDR_PAD,display:'flex',alignItems:'center',gap:12,fontFamily:"'DM Sans',sans-serif"}}>
       {back?<button onClick={()=>setScreen(back)} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:22}}>←</button>
-           :<ScanVLogoMark size={LOGO_SIZE.sm} />}
+           :<ScanVLogoMark part="wordmark" size={LOGO_SIZE.sm} />}
       <div style={{fontSize:15,fontWeight:600,color:C.txt,flex:1,textAlign:back?'center':'left'}}>{title||''}</div>
     </div>
   );
@@ -12225,7 +12278,7 @@ function VendorOnboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
       <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
-        <ScanVLogoMark size={LOGO_SIZE.md} />
+        <ScanVBrandHeader padX={0} padY={0} bare />
         <div style={{ fontSize: 10, color: C.cyan, fontWeight: 700, letterSpacing: 1, marginTop: 10 }}>PARTNER ONBOARDING</div>
         <div style={{ fontSize: 20, fontWeight: 800, color: C.txt }}>Become a ScanV Partner</div>
         <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
@@ -12996,10 +13049,12 @@ function FaqPage() {
   ];
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: FF }}>
-      <div style={{ background: C.surf, borderBottom: BDR, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 3px 14px rgba(18,18,18,0.08)' }}>
-        <ScanVLogoMark size={LOGO_SIZE.sm} />
-        <a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 13, textDecoration: 'none' }}>← Back</a>
-      </div>
+      <ScanVBrandHeader
+        padX={20}
+        padY={14}
+        sticky
+        right={<a href="#" onClick={e => { e.preventDefault(); window.history.back(); }} style={{ color: C.sub, fontSize: 13, textDecoration: 'none' }}>← Back</a>}
+      />
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px 80px' }}>
         <div style={{ background: `linear-gradient(135deg,${C.surf},${C.card})`, border: `1px solid ${C.bdr}`, borderRadius: 16, padding: '28px 24px', marginBottom: 28 }}>
           <div style={{ display: 'inline-block', background: C.cyan, color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: 1, marginBottom: 10 }}>FAQ</div>
@@ -18787,10 +18842,11 @@ function LegalPage({ page, catalogTick = 0 }) {
     <div className="scanv-root">
     <div className="scanv-shell" style={APP_SHELL}>
       {/* Header */}
-      <div style={{flexShrink:0,background:C.surf,borderBottom:BDR,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',boxShadow:'0 3px 14px rgba(18,18,18,0.08)'}}>
-        <ScanVLogoMark size={LOGO_SIZE.sm} />
-        <button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>
-      </div>
+      <ScanVBrandHeader
+        padX={20}
+        padY={14}
+        right={<button onClick={()=>window.history.back()} style={{background:'none',border:'none',color:C.sub,cursor:'pointer',fontSize:13,fontFamily:FF}}>← Back</button>}
+      />
       <div className="scanv-scroll-body" style={{...BROWSE_SCROLL_BODY}}>
       <div style={{maxWidth:720,margin:'0 auto',padding:'32px 20px 80px'}}>
         {/* Hero */}
