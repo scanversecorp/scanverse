@@ -1,6 +1,6 @@
 {
   "name": "scanv",
-  "version": "5.5.4.1787187213524",
+  "version": "5.5.4.1787332036415",
   "description": "ScanV — Professional Services Marketplace · PCMC Pune",
   "private": true,
   "homepage": "https://getscanv.com",
@@ -45,7 +45,7 @@
     ]
   },
   "_deployed": "2026-08-14T03:50:00.000Z",
-  "_built": "2026-08-20T00:53:33.523Z",
+  "_built": "2026-08-21T17:07:16.414Z",
   "devDependencies": {
     "playwright": "^1.62.1",
     "sharp": "^0.35.3"
