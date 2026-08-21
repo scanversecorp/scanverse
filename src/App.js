@@ -17575,6 +17575,7 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
   const cust = detail?.customer;
   const disp = detail?.dispatch;
   const cancelRec = detail?.cancellation;
+  const payerVpa = detail?.payer_vpa || bk?.payer_vpa || detail?.payment_intents?.find((pi) => pi.payer_vpa)?.payer_vpa || detail?.payments?.find((p) => p.payer_vpa)?.payer_vpa || null;
 
   return (
     <div>
@@ -17600,7 +17601,7 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                 <div>
                   <div style={{ fontWeight: 700, color: C.txt }}>{b.service_name}</div>
                   <div style={{ fontSize: 11, color: C.sub }}>{fmtDt(b.date)} {b.time} · {b.location_text || '—'}</div>
-                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{b.customer_name || b.customer_id} · TXN {b.txn_id || '—'}</div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>{b.customer_name || b.customer_id} · TXN {b.txn_id || '—'}{b.payer_vpa ? ` · UPI ${b.payer_vpa}` : ''}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <Badge label={b.status} color={bookingStatusColor[b.status] || C.sub} />
@@ -17621,12 +17622,13 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
               <div style={{ ...S.card(), padding: 14, marginBottom: 12 }}>
                 <div style={{ fontWeight: 800, color: C.txt, fontSize: 16, marginBottom: 8 }}>{bk.service_name}</div>
                 <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6 }}>
-                  <div>ID: <code style={{ fontSize: 11 }}>{bk.id}</code></div>
+                  <div>Payer UPI: <strong style={{ color: payerVpa ? C.cyan : C.dim, fontFamily: 'ui-monospace, monospace' }}>{payerVpa || 'Not captured yet'}</strong></div>
                   <div>Customer: {cust?.name || `${cust?.first_name || ''} ${cust?.last_name || ''}`.trim() || bk.customer_name || bk.customer_id} · {cust?.phone || '—'}</div>
                   <div>Scheduled: {fmtDt(bk.date)} {bk.time}</div>
                   <div>Location: {bk.location_text || '—'}</div>
                   <div>Status: <Badge label={bk.status} color={bookingStatusColor[bk.status] || C.sub} /></div>
                   <div>Total paid: ₹{fmtRs(bk.total)} · TXN {bk.txn_id || '—'}</div>
+                  <div style={{ fontSize: 10, color: C.dim }}>Booking ref: <code style={{ fontSize: 10 }}>{bk.id}</code></div>
                   {bk.partner_id && <div>Partner: {detail?.partner?.name || bk.partner_id}</div>}
                   {disp && <div>Dispatch: {disp.status}{disp.assigned_vendor_id ? ` · vendor ${disp.assigned_vendor_id.slice(0, 8)}…` : ''}</div>}
                   {detail?.live_location?.tracking_active && <div style={{ color: C.gold }}>GPS tracking active</div>}
@@ -17636,6 +17638,24 @@ function BookingsDeskPanel({ fetchFn, pin, canEdit = true, title = 'Bookings man
                     </div>
                   )}
                 </div>
+                {(detail?.payments?.length > 0 || detail?.payment_intents?.length > 0) && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: BDR, fontSize: 11, color: C.sub }}>
+                    <div style={{ fontWeight: 700, color: C.txt, marginBottom: 6 }}>Payment records</div>
+                    {(detail.payment_intents || []).map((pi) => (
+                      <div key={pi.id} style={{ marginBottom: 4 }}>
+                        Intent · {pi.status} · ₹{fmtRs(pi.amount_paise)}
+                        {pi.payer_vpa ? <span style={{ color: C.cyan }}> · {pi.payer_vpa}</span> : null}
+                        {pi.verified_via ? <span style={{ color: C.dim }}> · via {pi.verified_via}</span> : null}
+                      </div>
+                    ))}
+                    {(detail.payments || []).map((p) => (
+                      <div key={p.id} style={{ marginBottom: 4 }}>
+                        Payment · {p.status} · ₹{fmtRs(p.amount)} · {p.method || p.gateway || '—'}
+                        {p.payer_vpa ? <span style={{ color: C.cyan }}> · {p.payer_vpa}</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {isCancellableBooking(bk) && (
                   <Btn v="danger" sm onClick={() => setCancelTarget(bk)} disabled={cancelling} style={{ marginTop: 12 }}>
                     Cancel booking (30% fee)

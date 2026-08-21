@@ -5,6 +5,43 @@ function escIlike(q: string): string {
   return q.replace(/[%_\\]/g, "\\$&");
 }
 
+async function payerVpaByTxnIds(
+  sb: ReturnType<typeof createClient>,
+  txnIds: string[],
+): Promise<Record<string, string>> {
+  const ids = [...new Set(txnIds.filter(Boolean))];
+  if (!ids.length) return {};
+
+  const [{ data: intents }, { data: pays }] = await Promise.all([
+    sb.from("payment_intents").select("txn_id, payer_vpa").in("txn_id", ids),
+    sb.from("payments").select("txn_id, payer_vpa").in("txn_id", ids),
+  ]);
+
+  const out: Record<string, string> = {};
+  for (const row of intents || []) {
+    const txn = String((row as { txn_id?: string }).txn_id || "");
+    const vpa = String((row as { payer_vpa?: string }).payer_vpa || "").trim();
+    if (txn && vpa.includes("@")) out[txn] = vpa.toLowerCase();
+  }
+  for (const row of pays || []) {
+    const txn = String((row as { txn_id?: string }).txn_id || "");
+    const vpa = String((row as { payer_vpa?: string }).payer_vpa || "").trim();
+    if (txn && vpa.includes("@") && !out[txn]) out[txn] = vpa.toLowerCase();
+  }
+  return out;
+}
+
+async function attachPayerVpa<T extends { txn_id?: string | null }>(
+  sb: ReturnType<typeof createClient>,
+  rows: T[],
+): Promise<Array<T & { payer_vpa: string | null }>> {
+  const vpaMap = await payerVpaByTxnIds(sb, rows.map((r) => String(r.txn_id || "")));
+  return rows.map((row) => ({
+    ...row,
+    payer_vpa: row.txn_id ? vpaMap[String(row.txn_id)] || null : null,
+  }));
+}
+
 export async function searchBookingsAdmin(
   sb: ReturnType<typeof createClient>,
   body: Record<string, unknown>,
@@ -37,7 +74,7 @@ export async function searchBookingsAdmin(
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return data || [];
+  return attachPayerVpa(sb, data || []);
 }
 
 export async function bookingDetailAdmin(
@@ -88,13 +125,33 @@ export async function bookingDetailAdmin(
     partner = prof;
   }
 
+  const txnId = booking.txn_id ? String(booking.txn_id) : "";
+  const [{ data: paymentIntents }, { data: payments }] = txnId
+    ? await Promise.all([
+      sb.from("payment_intents")
+        .select("id, txn_id, status, amount_paise, payer_vpa, verified_via, paid_at, razorpay_payment_id")
+        .eq("txn_id", txnId)
+        .order("created_at", { ascending: false }),
+      sb.from("payments")
+        .select("id, txn_id, amount, status, method, gateway, payer_vpa, created_at")
+        .eq("txn_id", txnId)
+        .order("created_at", { ascending: false }),
+    ])
+    : [{ data: [] }, { data: [] }];
+
+  const vpaMap = txnId ? await payerVpaByTxnIds(sb, [txnId]) : {};
+  const payer_vpa = txnId ? vpaMap[txnId] || null : null;
+
   return {
-    booking,
+    booking: { ...booking, payer_vpa },
     customer: customer || null,
     partner,
     dispatch: dispatch || null,
     cancellation: cancellation || null,
     live_location: live || null,
+    payment_intents: paymentIntents || [],
+    payments: payments || [],
+    payer_vpa,
   };
 }
 
